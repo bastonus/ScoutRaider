@@ -157,6 +157,7 @@ _ROADMAP_HTML = _wrap_html("""
 
 <h2>🔴 Priorité Haute</h2>
 <ul>
+    <li><b>Distribution & Auto-updater</b> — Déploiement via installeurs et mise à jour automatique à l'ouverture de l'application</li>
     <li><b>Refonte de la recherche « Inline »</b> — Autocomplétion façon Google Maps intégrée au panneau</li>
     <li><b>Drag & Drop des étapes</b> — Réordonner les étapes par glisser-déposer + déplacement sur la carte</li>
     <li><b>Import GPX / KML</b> — Importer des tracés depuis d'autres applications GPS</li>

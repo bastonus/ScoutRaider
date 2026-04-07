@@ -110,6 +110,8 @@ L'exécutable sera généré dans le dossier `dist/ScoutCarnet/`.
 
 ## 🚀 Guide d'Utilisation Rapide
 
+💡 **Besoin d'aide ?** Utilise **l'Outil Aide (?)** situé en bas de la barre d'outils à gauche pour un guide interactif point par point !
+
 ### 1. Tracer l'itinéraire
 - Sélectionne l'outil **Route (R)** dans la barre d'outils à gauche
 - **Clique sur la carte** pour poser le point de départ (A), puis les étapes suivantes (B, C, D…)
@@ -164,6 +166,7 @@ Generateur_Carnet/
 
 ScoutRaider Suite est en **Beta**. Voici les améliorations prévues :
 
+- 📦 **Distribution & Packaging** — Création d'installeurs (`.exe`, `.dmg`) et d'un **chercheur de mise à jour automatique** via GitHub
 - 🔴 **Recherche inline** façon Google Maps intégrée au panneau
 - 🔴 **Drag & Drop** des étapes sur la carte et dans la liste
 - 🟡 **Import GPX / KML** depuis d'autres applications GPS

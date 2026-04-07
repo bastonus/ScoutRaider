@@ -26,6 +26,7 @@ from state_manager import StateManager
 from utils.presets_manager import PresetsManager
 from utils.ign_client import IGNClient
 from utils.validation_helpers import ConstraintValidator
+from utils.auto_updater import UpdateCheckerThread
 import refactor_polygonalisation
 
 from ui.workspace.tools_panel import ToolsPanel
@@ -441,6 +442,32 @@ class ScoutWorkspace(QMainWindow):
             self.bg_engine.start()
         except Exception as e:
             print("Failed to initialize bg_engine:", e)
+            
+        # --- AUTO-UPDATER ---
+        self._check_for_updates()
+
+    def _check_for_updates(self):
+        """Démarre le thread de vérification des mises à jour en arrière-plan."""
+        self.updater_thread = UpdateCheckerThread()
+        self.updater_thread.update_available.connect(self._on_update_available)
+        self.updater_thread.start()
+
+    def _on_update_available(self, tag, name, body, url):
+        """Affiche une boîte de dialogue si une nouvelle version est trouvée."""
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Mise à jour disponible")
+        msg.setText(f"Une nouvelle version <b>{tag}</b> ({name}) est disponible !")
+        msg.setInformativeText("Souhaitez-vous la télécharger sur GitHub ?")
+        msg.setDetailedText(body)
+
+        btn_yes = msg.addButton("Télécharger", QMessageBox.ActionRole)
+        btn_no = msg.addButton("Plus tard", QMessageBox.RejectRole)
+        
+        msg.exec()
+        
+        if msg.clickedButton() == btn_yes:
+            import webbrowser
+            webbrowser.open(url)
 
     def _assemble_polygonal_steps(self, leg_routes=None):
         """Build the flat `polygonal_steps` array matching the current sequence of stages."""

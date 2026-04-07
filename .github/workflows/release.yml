@@ -120,25 +120,47 @@ jobs:
         with:
           name: "ScoutRaider Suite ${{ github.ref_name }}"
           body: |
-            ## ScoutRaider Suite ${{ github.ref_name }}
+            ## ScoutRaider Suite (Beta) ${{ github.ref_name }}
+            
+            Découvrez la version Beta de **ScoutRaider Suite**, l'application de bureau conçue pour les chefs et cheftaines permettant de planifier, concevoir et générer automatiquement des carnets de raid scout complets. Tracez votre itinéraire, assignez des épreuves et créez des carnets PDF d'exploration !
 
-            ⚠️ **Avertissement** : Les azimuts et métrages sont calculés algorithmiquement et peuvent contenir des erreurs. Vérifiez toujours manuellement avant d'envoyer des scouts sur le terrain.
+            ⚠️ **Avertissement Sécurité** : Les azimuts et métrages sont calculés algorithmiquement. Vérifiez toujours l'itinéraire manuellement sur une carte papier avant d'envoyer vos scouts sur le terrain !
 
-            ### Téléchargements
-            - **Windows** : `ScoutRaider-Suite-Windows.zip` — Décompresser et lancer `ScoutCarnet.exe`
-            - **macOS** : `ScoutRaider-Suite-macOS.zip` — Décompresser et lancer `ScoutCarnet`
-            - **Linux** : `ScoutRaider-Suite-Linux.tar.gz` — `tar xzf` et lancer `./ScoutCarnet`
+            ---
 
-            ### Nouvelles fonctionnalités
-            - 🏕️ Générateur complet de carnets de raid scout
-            - 🗺️ Carte interactive IGN + satellite avec routage BRouter
-            - 🧭 Segmentation automatique avec azimuts et métrages
-            - 🎲 11 modules d'épreuves (Morse, Vigenère, Azimut, etc.)
-            - 📄 Export PDF double (participant + solution)
-            - 📖 Guide intégré et avertissement de sécurité
+            ### 💾 Téléchargements
+            - **Windows** : Téléchargez `ScoutRaider-Suite-Windows.zip` — Décompressez et lancez `ScoutCarnet.exe`
+            - **macOS** : Téléchargez `ScoutRaider-Suite-macOS.zip` — Décompressez et lancez `ScoutCarnet`
+            - **Linux** : Téléchargez `ScoutRaider-Suite-Linux.tar.gz` — Faites `tar xzf` et lancez `./ScoutCarnet`
+
+            ---
+
+            ### 🌟 Nouvelles Fonctionnalités
+            - 🏕️ Générateur complet de carnets de raid scout personnalisables.
+            - 🗺️ Carte interactive IGN et vue Satellite avec routage BRouter.
+            - 🧭 Segmentation d'itinéraire automatique avec calcul d'azimuts et de métrages.
+            - 🎲 11 Épreuves intégrées (Morse, Vigenère, Chiffres Romains, Azimut, etc.).
+            - 🚨 Détection intelligente des zones dangereuses avec alertes.
+            - 📄 Générateur PDF automatique du carnet participant et du corrigé !
+            - 💡 **Outil Aide Intégré (?)** : Cliquez sur le "?" dans la barre d'outils de l'app pour accéder à un guide complet point par point !
+
+            ---
+
+            ### 🚀 Prochaines Étapes
+            - **Distribution & Auto-updater** : Mise en place d'un installeur Windows (.exe), d'un DMG macOS, et d'un système de recherche automatique des mises à jour vérifiant les releases GitHub !
+            - **Refonte de la Recherche** : Autocomplétion intégrée aux champs itinéraires ("façon Google Maps").
+            - **Drag & Drop** : Réorganisation des étapes interactive sur la carte et la liste.
+            - **Import Externe** : Support du format GPX / KML depuis d'autres applications.
+            
+            ---
+
+            ### 💬 Vos Retours Sont Précieux !
+            ScoutRaider Suite est un outil pensé pour vos camps. Aidez-nous à façonner son avenir :
+            - 🐛 Un bug rencontré ?
+            - 💡 Une nouvelle épreuve à proposer ?
+            👉 Rendez-vous sur notre [Page GitHub Issues](https://github.com/bastonus/ScoutRaider-Suite/issues) pour envoyer vos suggestions !
           draft: false
           prerelease: true
           files: |
-            release-artifacts/ScoutRaider-Suite-Windows/ScoutRaider-Suite-Windows.zip
-            release-artifacts/ScoutRaider-Suite-macOS/ScoutRaider-Suite-macOS.zip
-            release-artifacts/ScoutRaider-Suite-Linux/ScoutRaider-Suite-Linux.tar.gz
+            release-artifacts/**/*.zip
+            release-artifacts/**/*.tar.gz

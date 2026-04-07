@@ -275,5 +275,6 @@ Ajout de curseur custom pour les outils, ainsi que des preview au survol des out
   - [ ] Fichier `version.py` ou `__version__` centralisé
   - [ ] Changelog automatique via GitHub Actions
 - [ ] **Releases GitHub** : automatiser la création de releases avec des artefacts de build
+- [x] **Auto-updater** : intégrer un chercheur de mise à jour qui vérifie les releases GitHub et propose de télécharger la dernière version à l'ouverture de l'application
 - [ ] **README.md orienté utilisateur** : installation en un clic, captures d'écran, vidéo démo
 On va publier la Beta, ecris un petit texte pour la presentation qui explique tt dans readme, et un outil aide dans la barre d'outil qui ouvre une fenetre qui explique comment créer un Raid point par point. Aussi ajoute un texte des next features (écrites ici et un encart pour envoyer des suggestions lien github)
