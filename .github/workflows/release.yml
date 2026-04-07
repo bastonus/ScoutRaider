@@ -41,13 +41,14 @@ jobs:
           Start-Process -FilePath "inno_setup.exe" -ArgumentList "/VERYSILENT /NORESTART" -Wait
 
       - name: Create installer script
-        shell: pwsh
+        shell: bash
         run: |
-          $version = python -c "from version import __version__; print(__version__)"
-          @"
+          # Remove 'v' from version for InnoSetup if present
+          VERSION="${GITHUB_REF_NAME#v}"
+          cat > installer.iss << EOF
           [Setup]
           AppName=ScoutRaider Suite
-          AppVersion=$version
+          AppVersion=$VERSION
           AppPublisher=Pierre-Alberic Theobald
           DefaultDirName={autopf}\ScoutRaider Suite
           DefaultGroupName=ScoutRaider Suite
@@ -75,7 +76,7 @@ jobs:
           
           [Run]
           Filename: "{app}\ScoutRaider-Suite.exe"; Description: "{cm:LaunchProgram,ScoutRaider Suite}"; Flags: nowait postinstall skipifsilent
-          "@ | Out-File -FilePath "installer.iss" -Encoding UTF8
+          EOF
 
       - name: Compile Inno Setup installer
         run: |
@@ -205,9 +206,10 @@ jobs:
           Comment=Générateur de carnets de raid scout
           EOF
           
-          # Placeholder icon (white square if no real icon available)
+          # Convert icon for Linux AppImage integration
           cp AppDir/ScoutRaider-Suite.desktop AppDir/usr/share/applications/
-          touch AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png
+          sudo apt-get install -y imagemagick
+          convert assets/icon.ico -resize 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png || cp assets/icon.ico AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png
 
       - name: Download appimagetool
         run: |
