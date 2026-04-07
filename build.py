@@ -27,7 +27,7 @@ def main():
 
     # Validate spec file exists
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    spec_file = os.path.join(script_dir, "ScoutCarnet.spec")
+    spec_file = os.path.join(script_dir, "ScoutRaider-Suite.spec")
     
     if not os.path.exists(spec_file):
         print(f"❌ Fichier spec introuvable : {spec_file}")
@@ -46,30 +46,30 @@ def main():
         sys.exit(1)
 
     # Post-build info
-    dist_dir = os.path.join(script_dir, "dist", "ScoutCarnet")
+    dist_dir = os.path.join(script_dir, "dist", "ScoutRaider-Suite")
     print("\n" + "=" * 60)
     print("  ✅ BUILD TERMINÉ AVEC SUCCÈS")
     print("=" * 60)
     print(f"\n📂 Dossier de sortie : {dist_dir}")
 
     if os_name == "Windows":
-        exe_path = os.path.join(dist_dir, "ScoutCarnet.exe")
+        exe_path = os.path.join(dist_dir, "ScoutRaider-Suite.exe")
         print(f"🎯 Exécutable : {exe_path}")
         print("\n💡 Pour créer un installeur Windows :")
         print("   - Utilisez Inno Setup (https://jrsoftware.org/isinfo.php)")
-        print("   - Ou distribuez le dossier dist/ScoutCarnet/ en archive ZIP")
+        print("   - Ou distribuez le dossier dist/ScoutRaider-Suite/ en archive ZIP")
     elif os_name == "Darwin":
-        app_path = os.path.join(dist_dir, "ScoutCarnet")
+        app_path = os.path.join(dist_dir, "ScoutRaider-Suite")
         print(f"🎯 Application : {app_path}")
         print("\n💡 Pour créer un .dmg macOS :")
         print("   pip install dmgbuild")
         print("   dmgbuild -s dmg_settings.py 'ScoutRaider Suite' ScoutDesignSuite.dmg")
     elif os_name == "Linux":
-        bin_path = os.path.join(dist_dir, "ScoutCarnet")
+        bin_path = os.path.join(dist_dir, "ScoutRaider-Suite")
         print(f"🎯 Binaire : {bin_path}")
         print("\n💡 Pour créer un AppImage Linux :")
         print("   - Utilisez appimagetool (https://appimage.github.io/)")
-        print("   - Ou distribuez le dossier dist/ScoutCarnet/ en archive .tar.gz")
+        print("   - Ou distribuez le dossier dist/ScoutRaider-Suite/ en archive .tar.gz")
 
     print(f"\n⚠️  N'oubliez pas de tester l'application packagée avant de distribuer !")
 

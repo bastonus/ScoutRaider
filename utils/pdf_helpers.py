@@ -119,7 +119,7 @@ def fetch_local_roads(min_lon, min_lat, max_lon, max_lat):
 def reverse_geocode(lat, lon):
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0 ScoutCarnetGen'})
+        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0 ScoutRaiderSuite'})
         data = r.json()
         addr = data.get('address', {})
         street = addr.get('road', addr.get('pedestrian', ''))
@@ -271,7 +271,7 @@ def download_ign_tile(x, y, z):
     
     fmt = "image/jpeg" if ('MAPS' in IGN_LAYER or 'ORTHO' in IGN_LAYER) else "image/png"
     url = f"https://data.geopf.fr/wmts?LAYER={IGN_LAYER}&FORMAT={fmt}&SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}"
-    headers = {'User-Agent': 'Mozilla/5.0 ScoutCarnetGen'}
+    headers = {'User-Agent': 'Mozilla/5.0 ScoutRaiderSuite'}
     for attempt in range(3):
         try:
             r = requests.get(url, headers=headers, timeout=10)

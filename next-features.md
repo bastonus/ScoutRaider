@@ -264,7 +264,7 @@ Ajout de curseur custom pour les outils, ainsi que des preview au survol des out
 - [ ] Recalculer l'itinéraire entre les étapes concernées
 
 ### 25. 🔴 Distribution & Packaging
-> Fichiers : `ScoutCarnet.spec`, nouveaux scripts de build
+> Fichiers : `ScoutRaider-Suite.spec`, nouveaux scripts de build
 - [ ] **Windows** : créer un installeur `.exe` avec PyInstaller ou Inno Setup
   - 🔧 Le fichier `.spec` existe déjà mais nécessite une mise à jour
   - [ ] Inclure toutes les dépendances (PySide6, reportlab, etc.)

@@ -29,11 +29,11 @@ jobs:
           pip install pyinstaller
 
       - name: Build with PyInstaller
-        run: pyinstaller ScoutCarnet.spec --noconfirm
+        run: pyinstaller ScoutRaider-Suite.spec --noconfirm
 
       - name: Create ZIP archive
         working-directory: dist
-        run: Compress-Archive -Path ScoutCarnet -DestinationPath ScoutRaider-Suite-Windows.zip
+        run: Compress-Archive -Path ScoutRaider-Suite -DestinationPath ScoutRaider-Suite-Windows.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -58,11 +58,11 @@ jobs:
           pip install pyinstaller
 
       - name: Build with PyInstaller
-        run: pyinstaller ScoutCarnet.spec --noconfirm
+        run: pyinstaller ScoutRaider-Suite.spec --noconfirm
 
       - name: Create ZIP archive
         working-directory: dist
-        run: zip -r ScoutRaider-Suite-macOS.zip ScoutCarnet
+        run: zip -r ScoutRaider-Suite-macOS.zip ScoutRaider-Suite
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -92,11 +92,11 @@ jobs:
           pip install pyinstaller
 
       - name: Build with PyInstaller
-        run: pyinstaller ScoutCarnet.spec --noconfirm
+        run: pyinstaller ScoutRaider-Suite.spec --noconfirm
 
       - name: Create tar.gz archive
         working-directory: dist
-        run: tar -czf ScoutRaider-Suite-Linux.tar.gz ScoutCarnet
+        run: tar -czf ScoutRaider-Suite-Linux.tar.gz ScoutRaider-Suite
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -129,9 +129,9 @@ jobs:
             ---
 
             ### 💾 Téléchargements
-            - **Windows** : Téléchargez `ScoutRaider-Suite-Windows.zip` — Décompressez et lancez `ScoutCarnet.exe`
-            - **macOS** : Téléchargez `ScoutRaider-Suite-macOS.zip` — Décompressez et lancez `ScoutCarnet`
-            - **Linux** : Téléchargez `ScoutRaider-Suite-Linux.tar.gz` — Faites `tar xzf` et lancez `./ScoutCarnet`
+            - **Windows** : Téléchargez `ScoutRaider-Suite-Windows.zip` — Décompressez et lancez `ScoutRaider-Suite.exe`
+            - **macOS** : Téléchargez `ScoutRaider-Suite-macOS.zip` — Décompressez et lancez `ScoutRaider-Suite`
+            - **Linux** : Téléchargez `ScoutRaider-Suite-Linux.tar.gz` — Faites `tar xzf` et lancez `./ScoutRaider-Suite`
 
             ---
 

@@ -107,7 +107,7 @@ pip install pyinstaller
 python build.py
 ```
 
-L'exécutable sera généré dans le dossier `dist/ScoutCarnet/`.
+L'exécutable sera généré dans le dossier `dist/ScoutRaider-Suite/`.
 
 ---
 

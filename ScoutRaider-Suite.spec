@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-ScoutCarnet.spec — PyInstaller build specification for ScoutRaider Suite.
-Run with: pyinstaller ScoutCarnet.spec --noconfirm
+ScoutRaider-Suite.spec — PyInstaller build specification for ScoutRaider Suite.
+Run with: pyinstaller ScoutRaider-Suite.spec --noconfirm
 Or use:    python build.py
 """
 import os
@@ -87,7 +87,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ScoutCarnet',
+    name='ScoutRaider-Suite',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -109,5 +109,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ScoutCarnet',
+    name='ScoutRaider-Suite',
 )
