@@ -1,9 +1,12 @@
 # 🏕️ ScoutRaider Suite — Générateur de Carnets de Raid
 
-> **Version Beta 0.1.0** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
+> **Version Beta 0.1.4** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
+> 
+> 👉 **[📥 TÉLÉCHARGER LA DERNIÈRE VERSION (Windows, macOS, Linux)](https://github.com/bastonus/ScoutRaider-Suite/releases/latest)**
 
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776ab?logo=python&logoColor=white)](#installation)
 [![PySide6](https://img.shields.io/badge/UI-PySide6-41cd52?logo=qt&logoColor=white)](#)
+[![Releases](https://img.shields.io/github/v/release/bastonus/ScoutRaider-Suite)](https://github.com/bastonus/ScoutRaider-Suite/releases)
 [![Beta](https://img.shields.io/badge/Status-Beta-orange)](#avertissement-de-sécurité)
 
 ---
