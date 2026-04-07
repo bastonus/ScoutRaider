@@ -160,7 +160,6 @@ jobs:
             - 💡 Une nouvelle épreuve à proposer ?
             👉 Rendez-vous sur notre [Page GitHub Issues](https://github.com/bastonus/ScoutRaider-Suite/issues) pour envoyer vos suggestions !
           draft: false
-          prerelease: true
           files: |
             release-artifacts/**/*.zip
             release-artifacts/**/*.tar.gz
