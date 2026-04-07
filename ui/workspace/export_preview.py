@@ -160,7 +160,7 @@ class ExportPreviewDialog(QDialog):
 
     def __init__(self, pdf_participant_path: str, pdf_solution_path: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Export réussi — Scout Design Suite")
+        self.setWindowTitle("Export réussi — ScoutRaider Suite")
         self.setModal(True)
         self.setMinimumWidth(520)
         self.setMaximumWidth(640)

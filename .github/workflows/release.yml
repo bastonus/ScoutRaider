@@ -1,0 +1,144 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r Generateur_Carnet/requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        working-directory: Generateur_Carnet
+        run: pyinstaller ScoutCarnet.spec --noconfirm
+
+      - name: Create ZIP archive
+        working-directory: Generateur_Carnet/dist
+        run: Compress-Archive -Path ScoutCarnet -DestinationPath ScoutRaider-Suite-Windows.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScoutRaider-Suite-Windows
+          path: Generateur_Carnet/dist/ScoutRaider-Suite-Windows.zip
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r Generateur_Carnet/requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        working-directory: Generateur_Carnet
+        run: pyinstaller ScoutCarnet.spec --noconfirm
+
+      - name: Create ZIP archive
+        working-directory: Generateur_Carnet/dist
+        run: zip -r ScoutRaider-Suite-macOS.zip ScoutCarnet
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScoutRaider-Suite-macOS
+          path: Generateur_Carnet/dist/ScoutRaider-Suite-macOS.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libxkbcommon0
+
+      - name: Install dependencies
+        run: |
+          pip install -r Generateur_Carnet/requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        working-directory: Generateur_Carnet
+        run: pyinstaller ScoutCarnet.spec --noconfirm
+
+      - name: Create tar.gz archive
+        working-directory: Generateur_Carnet/dist
+        run: tar -czf ScoutRaider-Suite-Linux.tar.gz ScoutCarnet
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScoutRaider-Suite-Linux
+          path: Generateur_Carnet/dist/ScoutRaider-Suite-Linux.tar.gz
+
+  release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "ScoutRaider Suite ${{ github.ref_name }}"
+          body: |
+            ## ScoutRaider Suite ${{ github.ref_name }}
+
+            ⚠️ **Avertissement** : Les azimuts et métrages sont calculés algorithmiquement et peuvent contenir des erreurs. Vérifiez toujours manuellement avant d'envoyer des scouts sur le terrain.
+
+            ### Téléchargements
+            - **Windows** : `ScoutRaider-Suite-Windows.zip` — Décompresser et lancer `ScoutCarnet.exe`
+            - **macOS** : `ScoutRaider-Suite-macOS.zip` — Décompresser et lancer `ScoutCarnet`
+            - **Linux** : `ScoutRaider-Suite-Linux.tar.gz` — `tar xzf` et lancer `./ScoutCarnet`
+
+            ### Nouvelles fonctionnalités
+            - 🏕️ Générateur complet de carnets de raid scout
+            - 🗺️ Carte interactive IGN + satellite avec routage BRouter
+            - 🧭 Segmentation automatique avec azimuts et métrages
+            - 🎲 11 modules d'épreuves (Morse, Vigenère, Azimut, etc.)
+            - 📄 Export PDF double (participant + solution)
+            - 📖 Guide intégré et avertissement de sécurité
+          draft: false
+          prerelease: true
+          files: |
+            release-artifacts/ScoutRaider-Suite-Windows/ScoutRaider-Suite-Windows.zip
+            release-artifacts/ScoutRaider-Suite-macOS/ScoutRaider-Suite-macOS.zip
+            release-artifacts/ScoutRaider-Suite-Linux/ScoutRaider-Suite-Linux.tar.gz

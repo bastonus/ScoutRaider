@@ -1,5 +1,5 @@
 """
-Scout Design Suite — Main Application Window
+ScoutRaider Suite — Main Application Window
 4-dock Photoshop-style workspace with multi-route engine.
 """
 import os
@@ -389,7 +389,7 @@ class ScoutWorkspace(QMainWindow):
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger("ScoutWorkspace")
-        self.setWindowTitle("Scout Design Suite — Générateur de Carnets")
+        self.setWindowTitle("ScoutRaider Suite — Générateur de Carnets")
         self.resize(1280, 800)
         
         # 1. Core Services
@@ -753,7 +753,7 @@ class ScoutWorkspace(QMainWindow):
             from version import __version__, APP_NAME, APP_AUTHOR
         except ImportError:
             __version__ = "0.1.0-beta"
-            APP_NAME = "Scout Design Suite"
+            APP_NAME = "ScoutRaider Suite"
             APP_AUTHOR = "Association E.S.T.P"
 
         QMessageBox.about(self, f"À propos de {APP_NAME}",

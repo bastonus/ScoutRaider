@@ -1,4 +1,4 @@
-# 🏕️ Scout Design Suite — Générateur de Carnets de Raid
+# 🏕️ ScoutRaider Suite — Générateur de Carnets de Raid
 
 > **Version Beta 0.1.0** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
 
@@ -27,7 +27,7 @@
 
 ## 🎯 Qu'est-ce que c'est ?
 
-Scout Design Suite est un outil conçu pour les **chefs et cheftaines scouts** (Guides et Scouts d'Europe) qui organisent des raids et des randonnées. Il permet de :
+ScoutRaider Suite est un outil conçu pour les **chefs et cheftaines scouts** (Guides et Scouts d'Europe) qui organisent des raids et des randonnées. Il permet de :
 
 1. **Tracer un itinéraire** sur une carte interactive (fonds IGN, satellite) ou importer un fichier GeoJSON
 2. **Découper automatiquement** le tracé en segments avec azimuts et métrages calculés
@@ -63,7 +63,7 @@ Scout Design Suite est un outil conçu pour les **chefs et cheftaines scouts** (
 
 ```bash
 # 1. Cloner le dépôt
-git clone https://github.com/VOTRE_ORGA/scout-design-suite.git
+git clone https://github.com/bastonus/ScoutRaider-Suite.git
 cd scout-design-suite/Generateur_Carnet
 
 # 2. Installer les dépendances
@@ -141,7 +141,7 @@ Generateur_Carnet/
 
 ## 🚀 Prochaines Fonctionnalités
 
-Scout Design Suite est en **Beta**. Voici les améliorations prévues :
+ScoutRaider Suite est en **Beta**. Voici les améliorations prévues :
 
 - 🔴 **Recherche inline** façon Google Maps intégrée au panneau
 - 🔴 **Drag & Drop** des étapes sur la carte et dans la liste
@@ -157,8 +157,8 @@ Scout Design Suite est en **Beta**. Voici les améliorations prévues :
 
 Vos retours sont essentiels pour améliorer l'outil !
 
-- 🐛 **Signaler un bug** → [Créer une Issue](https://github.com/VOTRE_ORGA/scout-design-suite/issues/new?labels=bug)
-- 💡 **Proposer une fonctionnalité** → [Feature Request](https://github.com/VOTRE_ORGA/scout-design-suite/issues/new?labels=enhancement)
+- 🐛 **Signaler un bug** → [Créer une Issue](https://github.com/bastonus/ScoutRaider-Suite/issues/new?labels=bug)
+- 💡 **Proposer une fonctionnalité** → [Feature Request](https://github.com/bastonus/ScoutRaider-Suite/issues/new?labels=enhancement)
 
 ---
 

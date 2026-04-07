@@ -1,4 +1,4 @@
-# Scout Design Suite — Roadmap des Fonctionnalités
+# ScoutRaider Suite — Roadmap des Fonctionnalités
 
 > **Légende :**
 > - 🟢 **Facile** (< 2h, changements isolés) — 🟡 **Moyen** (2–6h, multi-fichiers) — 🔴 **Difficile** (> 6h, architecture lourde)

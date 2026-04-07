@@ -1,5 +1,5 @@
 """
-Build script — Cross-platform PyInstaller build for Scout Design Suite.
+Build script — Cross-platform PyInstaller build for ScoutRaider Suite.
 Usage: python build.py
 """
 import os
@@ -9,7 +9,7 @@ import subprocess
 
 def main():
     print("=" * 60)
-    print("  Scout Design Suite — Build Script")
+    print("  ScoutRaider Suite — Build Script")
     print("=" * 60)
 
     # Detect OS
@@ -63,7 +63,7 @@ def main():
         print(f"🎯 Application : {app_path}")
         print("\n💡 Pour créer un .dmg macOS :")
         print("   pip install dmgbuild")
-        print("   dmgbuild -s dmg_settings.py 'Scout Design Suite' ScoutDesignSuite.dmg")
+        print("   dmgbuild -s dmg_settings.py 'ScoutRaider Suite' ScoutDesignSuite.dmg")
     elif os_name == "Linux":
         bin_path = os.path.join(dist_dir, "ScoutCarnet")
         print(f"🎯 Binaire : {bin_path}")

@@ -66,7 +66,7 @@ def _wrap_html(body: str) -> str:
 # ═══════════════════════════════════════════════════════════
 
 _GUIDE_HTML = _wrap_html("""
-<h1>📖 Guide — Créer un Raid avec Scout Design Suite</h1>
+<h1>📖 Guide — Créer un Raid avec ScoutRaider Suite</h1>
 
 <div class="warning-box">
     <b>⚠️ AVERTISSEMENT DE SÉCURITÉ — LIRE IMPÉRATIVEMENT</b><br><br>
@@ -153,7 +153,7 @@ _GUIDE_HTML = _wrap_html("""
 _ROADMAP_HTML = _wrap_html("""
 <h1>🚀 Prochaines fonctionnalités</h1>
 
-<p>Scout Design Suite est en <b>version Beta</b>. Voici les améliorations prévues :</p>
+<p>ScoutRaider Suite est en <b>version Beta</b>. Voici les améliorations prévues :</p>
 
 <h2>🔴 Priorité Haute</h2>
 <ul>
@@ -195,7 +195,7 @@ _ROADMAP_HTML = _wrap_html("""
 _SUGGESTIONS_HTML = _wrap_html("""
 <h1>💡 Suggestions & Feedback</h1>
 
-<p>Scout Design Suite est un projet collaboratif. Vos retours sont essentiels
+<p>ScoutRaider Suite est un projet collaboratif. Vos retours sont essentiels
 pour améliorer l'outil !</p>
 
 <h2>Comment contribuer ?</h2>
@@ -235,7 +235,7 @@ class HelpDialog(QDialog):
 
     def __init__(self, parent=None, initial_tab: int = 0):
         super().__init__(parent)
-        self.setWindowTitle("Aide — Scout Design Suite")
+        self.setWindowTitle("Aide — ScoutRaider Suite")
         self.setMinimumSize(720, 600)
         self.resize(780, 650)
 
@@ -273,9 +273,9 @@ class HelpDialog(QDialog):
 
         try:
             from version import __version__
-            ver_label = QLabel(f"Scout Design Suite v{__version__}")
+            ver_label = QLabel(f"ScoutRaider Suite v{__version__}")
         except ImportError:
-            ver_label = QLabel("Scout Design Suite")
+            ver_label = QLabel("ScoutRaider Suite")
         ver_label.setStyleSheet("color: #666; font-size: 10px;")
         bottom.addWidget(ver_label)
 

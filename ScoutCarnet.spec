@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-ScoutCarnet.spec — PyInstaller build specification for Scout Design Suite.
+ScoutCarnet.spec — PyInstaller build specification for ScoutRaider Suite.
 Run with: pyinstaller ScoutCarnet.spec --noconfirm
 Or use:    python build.py
 """
