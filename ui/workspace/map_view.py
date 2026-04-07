@@ -247,19 +247,19 @@ class MapView(QWidget):
                                 # SAFELY emit to main GUI thread via Signal
                                 self._geo_signal.emit(lat, lon)
                         else:
-                            self.logger.debug("Windows location permission denied by user or OS.")
+                            print("Windows location permission denied by user or OS.")
                     
                     # Run asyncio loop in background thread
                     asyncio.run(demander_permission_windows())
                 except ImportError:
-                    self.logger.debug("winsdk module missing. Please install it with 'pip install winsdk'.")
+                    print("winsdk module missing — la géolocalisation Windows ne sera pas disponible.")
                 except Exception as e:
-                    self.logger.debug(f"Windows geolocation error: {e}")
+                    print(f"Windows geolocation error: {e}")
                     
             threading.Thread(target=fetch_windows_loc, daemon=True).start()
         else:
             # Fallback for Linux/macOS could go here, or just ignore since requested for Windows.
-            self.logger.debug(f"Geolocation not explicitly configured for OS: {systeme}")
+            print(f"Géolocalisation native non configurée pour l'OS : {systeme}")
 
     def _apply_native_geolocation(self, lat, lon):
         """Handle native position update and center the map."""
