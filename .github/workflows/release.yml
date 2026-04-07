@@ -58,7 +58,7 @@ jobs:
           SolidCompression=yes
           WizardStyle=modern
           PrivilegesRequired=lowest
-          SetupIconFile=dist\ScoutRaider-Suite\assets\icon.ico
+          SetupIconFile=assets\icon.ico
           UninstallDisplayIcon={app}\ScoutRaider-Suite.exe
           
           [Languages]
@@ -210,6 +210,7 @@ jobs:
           cp AppDir/ScoutRaider-Suite.desktop AppDir/usr/share/applications/
           sudo apt-get install -y imagemagick
           convert assets/icon.ico -resize 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png || cp assets/icon.ico AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png
+          cp AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png AppDir/ScoutRaider-Suite.png
 
       - name: Download appimagetool
         run: |
