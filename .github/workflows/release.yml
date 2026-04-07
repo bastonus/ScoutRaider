@@ -10,8 +10,12 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  APP_NAME: ScoutRaider-Suite
 
 jobs:
+  # ─────────────────────────────────────────────────────────
+  # WINDOWS — PyInstaller + Inno Setup → Setup.exe
+  # ─────────────────────────────────────────────────────────
   build-windows:
     runs-on: windows-latest
     steps:
@@ -23,24 +27,67 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install Python dependencies (skip winsdk)
         run: |
-          pip install -r requirements.txt
+          pip install PySide6 folium reportlab geopy requests shapely numpy matplotlib python-dotenv
           pip install pyinstaller
 
       - name: Build with PyInstaller
         run: pyinstaller ScoutRaider-Suite.spec --noconfirm
 
-      - name: Create ZIP archive
-        working-directory: dist
-        run: Compress-Archive -Path ScoutRaider-Suite -DestinationPath ScoutRaider-Suite-Windows.zip
+      - name: Download Inno Setup
+        run: |
+          Invoke-WebRequest -Uri "https://jrsoftware.org/download.php/is.exe" -OutFile "inno_setup.exe"
+          Start-Process -FilePath "inno_setup.exe" -ArgumentList "/VERYSILENT /NORESTART" -Wait
 
-      - name: Upload artifact
+      - name: Create installer script
+        shell: pwsh
+        run: |
+          $version = python -c "from version import __version__; print(__version__)"
+          @"
+          [Setup]
+          AppName=ScoutRaider Suite
+          AppVersion=$version
+          AppPublisher=Pierre-Alberic Theobald
+          DefaultDirName={autopf}\ScoutRaider Suite
+          DefaultGroupName=ScoutRaider Suite
+          OutputDir=installer_output
+          OutputBaseFilename=ScoutRaider-Suite-Windows-Setup
+          Compression=lzma
+          SolidCompression=yes
+          WizardStyle=modern
+          PrivilegesRequired=lowest
+          
+          [Languages]
+          Name: "french"; MessagesFile: "compiler:Languages\French.isl"
+          
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+          
+          [Files]
+          Source: "dist\ScoutRaider-Suite\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          
+          [Icons]
+          Name: "{group}\ScoutRaider Suite"; Filename: "{app}\ScoutRaider-Suite.exe"
+          Name: "{autodesktop}\ScoutRaider Suite"; Filename: "{app}\ScoutRaider-Suite.exe"; Tasks: desktopicon
+          
+          [Run]
+          Filename: "{app}\ScoutRaider-Suite.exe"; Description: "{cm:LaunchProgram,ScoutRaider Suite}"; Flags: nowait postinstall skipifsilent
+          "@ | Out-File -FilePath "installer.iss" -Encoding UTF8
+
+      - name: Compile Inno Setup installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
           name: ScoutRaider-Suite-Windows
-          path: dist/ScoutRaider-Suite-Windows.zip
+          path: installer_output/ScoutRaider-Suite-Windows-Setup.exe
 
+  # ─────────────────────────────────────────────────────────
+  # MACOS — PyInstaller + create-dmg → .dmg
+  # ─────────────────────────────────────────────────────────
   build-macos:
     runs-on: macos-latest
     steps:
@@ -60,16 +107,52 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller ScoutRaider-Suite.spec --noconfirm
 
-      - name: Create ZIP archive
-        working-directory: dist
-        run: zip -r ScoutRaider-Suite-macOS.zip ScoutRaider-Suite
+      - name: Wrap as .app bundle
+        run: |
+          mkdir -p dist/ScoutRaider-Suite.app/Contents/MacOS
+          cp -r dist/ScoutRaider-Suite/* dist/ScoutRaider-Suite.app/Contents/MacOS/
+          cat > dist/ScoutRaider-Suite.app/Contents/Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>ScoutRaider-Suite</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.scoutraider.suite</string>
+              <key>CFBundleName</key>
+              <string>ScoutRaider Suite</string>
+              <key>CFBundleVersion</key>
+              <string>${{ github.ref_name }}</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>11.0</string>
+          </dict>
+          </plist>
+          EOF
 
-      - name: Upload artifact
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create .dmg installer
+        run: |
+          create-dmg \
+            --volname "ScoutRaider Suite" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --app-drop-link 450 185 \
+            "ScoutRaider-Suite-macOS.dmg" \
+            "dist/ScoutRaider-Suite.app"
+
+      - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
         with:
           name: ScoutRaider-Suite-macOS
-          path: dist/ScoutRaider-Suite-macOS.zip
+          path: ScoutRaider-Suite-macOS.dmg
 
+  # ─────────────────────────────────────────────────────────
+  # LINUX — PyInstaller + appimagetool → .AppImage
+  # ─────────────────────────────────────────────────────────
   build-linux:
     runs-on: ubuntu-latest
     steps:
@@ -84,9 +167,9 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 libxkbcommon0
+          sudo apt-get install -y libegl1 libxkbcommon0 fuse libfuse2
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
@@ -94,16 +177,56 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller ScoutRaider-Suite.spec --noconfirm
 
-      - name: Create tar.gz archive
-        working-directory: dist
-        run: tar -czf ScoutRaider-Suite-Linux.tar.gz ScoutRaider-Suite
+      - name: Create AppDir structure
+        run: |
+          mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
+          cp -r dist/ScoutRaider-Suite/* AppDir/usr/bin/
+          
+          # AppRun launcher
+          cat > AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=$(dirname "$SELF")
+          export PATH="$HERE/usr/bin:$PATH"
+          exec "$HERE/usr/bin/ScoutRaider-Suite" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+          
+          # .desktop file
+          cat > AppDir/ScoutRaider-Suite.desktop << 'EOF'
+          [Desktop Entry]
+          Name=ScoutRaider Suite
+          Exec=ScoutRaider-Suite
+          Icon=ScoutRaider-Suite
+          Type=Application
+          Categories=Education;
+          Comment=Générateur de carnets de raid scout
+          EOF
+          
+          # Placeholder icon (white square if no real icon available)
+          cp AppDir/ScoutRaider-Suite.desktop AppDir/usr/share/applications/
+          touch AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png
 
-      - name: Upload artifact
+      - name: Download appimagetool
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+
+      - name: Build AppImage
+        run: |
+          ARCH=x86_64 ./appimagetool AppDir ScoutRaider-Suite-Linux.AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+
+      - name: Upload Linux AppImage
         uses: actions/upload-artifact@v4
         with:
           name: ScoutRaider-Suite-Linux
-          path: dist/ScoutRaider-Suite-Linux.tar.gz
+          path: ScoutRaider-Suite-Linux.AppImage
 
+  # ─────────────────────────────────────────────────────────
+  # RELEASE — Attach all installers to the GitHub Release
+  # ─────────────────────────────────────────────────────────
   release:
     needs: [build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
@@ -128,38 +251,29 @@ jobs:
 
             ---
 
-            ### 💾 Téléchargements
-            - **Windows** : Téléchargez `ScoutRaider-Suite-Windows.zip` — Décompressez et lancez `ScoutRaider-Suite.exe`
-            - **macOS** : Téléchargez `ScoutRaider-Suite-macOS.zip` — Décompressez et lancez `ScoutRaider-Suite`
-            - **Linux** : Téléchargez `ScoutRaider-Suite-Linux.tar.gz` — Faites `tar xzf` et lancez `./ScoutRaider-Suite`
+            ### 💾 Installation
+            | Plateforme | Fichier | Instructions |
+            |---|---|---|
+            | 🪟 **Windows** | `ScoutRaider-Suite-Windows-Setup.exe` | Double-cliquez pour installer → Lancez depuis le Bureau |
+            | 🍎 **macOS** | `ScoutRaider-Suite-macOS.dmg` | Ouvrez le DMG → Glissez l'app dans Applications |
+            | 🐧 **Linux** | `ScoutRaider-Suite-Linux.AppImage` | `chmod +x *.AppImage` puis double-cliquez |
 
             ---
 
-            ### 🌟 Nouvelles Fonctionnalités
-            - 🏕️ Générateur complet de carnets de raid scout personnalisables.
-            - 🗺️ Carte interactive IGN et vue Satellite avec routage BRouter.
-            - 🧭 Segmentation d'itinéraire automatique avec calcul d'azimuts et de métrages.
-            - 🎲 11 Épreuves intégrées (Morse, Vigenère, Chiffres Romains, Azimut, etc.).
-            - 🚨 Détection intelligente des zones dangereuses avec alertes.
-            - 📄 Générateur PDF automatique du carnet participant et du corrigé !
-            - 💡 **Outil Aide Intégré (?)** : Cliquez sur le "?" dans la barre d'outils de l'app pour accéder à un guide complet point par point !
+            ### 🌟 Fonctionnalités
+            - 🗺️ Carte interactive IGN et vue Satellite avec routage BRouter
+            - 🧭 Segmentation d'itinéraire automatique avec calcul d'azimuts et de métrages
+            - 🎲 11 Épreuves intégrées (Morse, Vigenère, Chiffres Romains, Azimut, etc.)
+            - 🚨 Détection intelligente des zones dangereuses avec alertes
+            - 📄 Générateur PDF automatique du carnet participant et du corrigé
+            - 💡 **Outil Aide Intégré (?)** : Guide complet point par point
 
-            ---
-
-            ### 🚀 Prochaines Étapes
-            - **Distribution & Auto-updater** : Mise en place d'un installeur Windows (.exe), d'un DMG macOS, et d'un système de recherche automatique des mises à jour vérifiant les releases GitHub !
-            - **Refonte de la Recherche** : Autocomplétion intégrée aux champs itinéraires ("façon Google Maps").
-            - **Drag & Drop** : Réorganisation des étapes interactive sur la carte et la liste.
-            - **Import Externe** : Support du format GPX / KML depuis d'autres applications.
-            
             ---
 
             ### 💬 Vos Retours Sont Précieux !
-            ScoutRaider Suite est un outil pensé pour vos camps. Aidez-nous à façonner son avenir :
-            - 🐛 Un bug rencontré ?
-            - 💡 Une nouvelle épreuve à proposer ?
-            👉 Rendez-vous sur notre [Page GitHub Issues](https://github.com/bastonus/ScoutRaider-Suite/issues) pour envoyer vos suggestions !
+            👉 [Page GitHub Issues](https://github.com/bastonus/ScoutRaider-Suite/issues)
           draft: false
           files: |
-            release-artifacts/**/*.zip
-            release-artifacts/**/*.tar.gz
+            release-artifacts/**/*.exe
+            release-artifacts/**/*.dmg
+            release-artifacts/**/*.AppImage
