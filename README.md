@@ -36,6 +36,27 @@ ScoutRaider Suite est un outil conçu pour les **chefs et cheftaines scouts** (G
 
 ---
 
+## 📸 Aperçu
+
+**Découvrez les capacités de ScoutRaider Suite avec ce carnet généré automatiquement :**
+👉 **[Télécharger l'Exemple de Carnet (Thème Contrebandier)](Carnet_Contrebandier.pdf)**
+
+### Interface de création
+*(Ajoutez les captures d'écran ci-dessous dans le dossier `assets/screenshots/`)*
+
+<p align="center">
+  <img src="assets/screenshots/main_view.png" alt="Vue principale du générateur avec carte IGN" width="48%">
+  <img src="assets/screenshots/azimuth_tool.png" alt="Outil de modification des azimuts" width="48%">
+</p>
+
+### Encodage des épreuves
+<p align="center">
+  <img src="assets/screenshots/modules_panel.png" alt="Assignation des épreuves sur l'itinéraire" width="48%">
+  <img src="assets/screenshots/pdf_export.png" alt="Aperçu du PDF généré" width="48%">
+</p>
+
+---
+
 ## ✨ Fonctionnalités
 
 | Fonctionnalité | Description |
