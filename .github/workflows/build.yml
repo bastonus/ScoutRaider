@@ -1,0 +1,65 @@
+name: Build Scout Carnet Generator
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Ensure Modules Requirements are installed
+      run: |
+        python -c "import os, subprocess; [subprocess.check_call(['pip', 'install', '-r', os.path.join(root, file)]) for root, dirs, files in os.walk('modules') for file in files if file == 'requirements.txt']"
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller ScoutCarnet.spec
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ScoutCarnet-${{ matrix.os }}
+        path: dist/*
+        
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: artifacts/**/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,1633 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <title>Éditeur de Carte Scout</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <link rel="stylesheet" href="leaflet.css" />
+    <script src="leaflet.js"></script>
+    <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { padding: 0; margin: 0; font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; background: #535353; overflow: hidden; }
+        #map { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; background: #404040; cursor: crosshair; }
+        
+        /* ── Segment Labels ── */
+        .dist-label {
+            background: rgba(30, 30, 30, 0.85);
+            color: #cccccc;
+            border: 1px solid #484848;
+            padding: 2px 5px;
+            font-weight: 600;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+        .azi-label {
+            color: #ef4444;
+            font-weight: 700;
+            font-size: 12px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        /* ── Floating Search Bar ── */
+        #floating-search {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(50, 50, 50, 0.92);
+            backdrop-filter: blur(8px);
+            border: 1px solid #484848;
+            border-radius: 8px;
+            padding: 6px 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+        }
+        #floating-search svg { flex-shrink: 0; }
+        #search-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ddd;
+            font-size: 12px;
+            width: 220px;
+        }
+        #search-input::placeholder { color: #888; }
+
+        /* ── Geolocation Button ── */
+        #btn-geolocate {
+            position: absolute;
+            top: 16px;
+            left: 300px;
+            z-index: 1000;
+            background: rgba(50, 50, 50, 0.92);
+            backdrop-filter: blur(8px);
+            border: 1px solid #484848;
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+            transition: background 0.2s;
+        }
+        #btn-geolocate:hover { background: rgba(70, 70, 70, 0.95); }
+        #btn-geolocate svg { width: 16px; height: 16px; fill: #999; }
+        #btn-geolocate.active svg { fill: #2d8ceb; }
+
+        /* ── Satellite Button ── */
+        #btn-satellite {
+            position: absolute;
+            top: 16px;
+            left: 340px;
+            z-index: 1000;
+            background: rgba(50, 50, 50, 0.92);
+            backdrop-filter: blur(8px);
+            border: 1px solid #484848;
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+            transition: background 0.2s;
+        }
+        #btn-satellite:hover { background: rgba(70, 70, 70, 0.95); }
+        #btn-satellite svg { width: 16px; height: 16px; fill: #999; }
+        #btn-satellite.active { background: rgba(70, 70, 70, 0.95); }
+        #btn-satellite.active svg { fill: #2d8ceb; }
+        #search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            background: #333;
+            border: 1px solid #484848;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .search-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 11px;
+            color: #cccccc;
+            border-bottom: 1px solid #3a3a3a;
+        }
+        .search-item:last-child { border-bottom: none; }
+        .search-item:hover { background: #2d8ceb; color: white; }
+
+        /* ── Map Info Pills ── */
+        #info-pills {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            gap: 12px;
+            pointer-events: none;
+        }
+        .info-pill {
+            background: rgba(40, 40, 40, 0.9);
+            backdrop-filter: blur(6px);
+            border: 1px solid #484848;
+            border-radius: 20px;
+            padding: 6px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+            color: #2d8ceb;
+            display: flex;
+            align-items: center;
+        }
+
+        /* ── Map Markers ── */
+        .marker-pin {
+            width: 24px; height: 24px;
+            border-radius: 50% 50% 50% 0;
+            background: #10b981;
+            position: absolute;
+            transform: rotate(-45deg);
+            left: 50%; top: 50%;
+            margin: -16px 0 0 -12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            border: 2px solid rgba(255,255,255,0.8);
+        }
+        .marker-label {
+            position: absolute;
+            transform: rotate(45deg);
+            font-weight: 800;
+            font-size: 11px;
+            z-index: 10;
+            color: white;
+        }
+        .marker-pin.end { background: #ef4444; }
+
+        /* ── Loading Overlay ── */
+        #loading-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 41, 59, 0.9);
+            border-radius: 30px;
+            padding: 8px 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            z-index: 2000;
+            display: none;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            backdrop-filter: blur(4px);
+            pointer-events: none; /* Non-blocking */
+            transition: all 0.3s ease;
+        }
+        .spinner {
+            width: 20px; height: 20px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* ── Route Overlap Alert ── */
+        #selection-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.15); z-index: 999; display: none;
+            pointer-events: none;
+        }
+        #status-banner {
+            position: absolute;
+            top: 80px; left: 50%; transform: translateX(-50%);
+            z-index: 1500;
+            background: #ef4444; color: white;
+            padding: 8px 16px; border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none; font-size: 11px; font-weight: 700;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        /* ── Attribution ── */
+        .leaflet-control-attribution {
+            background: rgba(60,60,60,0.85) !important;
+            color: #999 !important;
+            font-size: 9px !important;
+        }
+        .leaflet-control-attribution a { color: #2d8ceb !important; }
+        .leaflet-control-zoom a {
+            background: #3c3c3c !important;
+            color: #cccccc !important;
+            border-color: #2b2b2b !important;
+        }
+        .leaflet-control-zoom a:hover { background: #4a4a4a !important; }
+
+        /* ── Encoding popup ── */
+        .encoding-popup .leaflet-popup-content-wrapper {
+            background: #2b2b2b;
+            border: 1px solid #484848;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            padding: 0;
+        }
+        .encoding-popup .leaflet-popup-content { margin: 0; }
+        .encoding-popup .leaflet-popup-tip { background: #2b2b2b; }
+
+        /* ── Cursor letter follower ── */
+        #cursor-letter {
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            font-weight: 700;
+            transform: translate(14px, -18px);
+        }
+
+        /* ── Stage Markers (New Style) ── */
+        .stage-marker {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            background: #fff;
+            border: 3px solid #2d8ceb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: #2d8ceb;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stage-marker:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        .stage-marker.anchored {
+            background: #2d8ceb;
+            color: #fff;
+            border-color: #fff;
+            animation: pulse-blue 1.5s infinite;
+        }
+        @keyframes pulse-blue {
+            0% { box-shadow: 0 0 0 0 rgba(45, 140, 235, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(45, 140, 235, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(45, 140, 235, 0); }
+        }
+        @keyframes pulse-white {
+            0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.9); }
+            70% { box-shadow: 0 0 0 15px rgba(255, 255, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+
+        .stage-tooltip {
+            background: #2b2b2b; color: #ccc; border: 1px solid #484848;
+            font-size: 11px; font-weight: 600;
+            border-radius: 4px; padding: 4px 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+        .stage-tooltip.leaflet-tooltip-bottom:before { border-bottom-color: #484848; }
+        .stage-tooltip.leaflet-tooltip-top:before { border-top-color: #484848; }
+
+        .alt-badge-pulse { animation: pulse-white 1.5s infinite; }
+
+        /* ── Tooltips ── */
+        .stage-tooltip {
+            background: rgba(30, 30, 30, 0.9) !important;
+            border: 1px solid #484848 !important;
+            color: #fff !important;
+            font-weight: 600 !important;
+            font-size: 11px !important;
+        }
+
+        /* ── Drop highlight on segments ── */
+        .segment-drop-highlight { stroke-opacity: 1 !important; stroke-width: 8 !important; }
+
+        /* ── Violation Highlights ── */
+        .segment-violation-error { filter: drop-shadow(0 0 4px #ef4444); }
+        .segment-violation-warn { filter: drop-shadow(0 0 3px #f59e0b); }
+
+        /* ── Tool Animations (E & R) ── */
+        @keyframes pulseSelected {
+            0% { opacity: 0.9; stroke-width: 10; }
+            50% { opacity: 0.4; stroke-width: 14; }
+            100% { opacity: 0.9; stroke-width: 10; }
+        }
+        .fading-selected-segment {
+            animation: pulseSelected 1.5s infinite;
+        }
+
+        @keyframes anchorPulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(45, 140, 235, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(45, 140, 235, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(45, 140, 235, 0); }
+        }
+        .marker-anchored > div {
+            animation: anchorPulse 1.5s infinite;
+            background: #007acc !important;
+            border-color: white !important;
+            color: white !important;
+        }
+
+        /* ── Custom Assignment Popup ── */
+        #encoding-popup {
+            position: absolute;
+            top: 60px; right: 20px;
+            width: 260px;
+            background: #252526;
+            border: 1px solid #444;
+            border-radius: 6px;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            flex-direction: column;
+        }
+        #encoding-popup-header {
+            background: #333; padding: 8px 12px;
+            border-top-left-radius: 6px; border-top-right-radius: 6px;
+            cursor: move; user-select: none;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #444;
+        }
+        #encoding-popup-title { color: #ccc; font-size: 11px; font-weight: bold; }
+        #encoding-popup-close { cursor: pointer; color: #888; font-size: 14px; line-height: 1; }
+        #encoding-popup-close:hover { color: #fff; }
+        #encoding-search {
+            background: #1e1e1e; color: #ccc; border: none;
+            padding: 6px 12px; margin: 8px; border-radius: 4px; border: 1px solid #444; font-size: 12px;
+        }
+        #encoding-search:focus { outline: 1px solid #007acc; }
+        #encoding-list {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 0 8px 8px 8px;
+        }
+        .encoding-item {
+            padding: 6px 8px; cursor: pointer; color: #ccc; font-size: 12px;
+            border-radius: 4px; display: flex; align-items: center; gap: 8px;
+        }
+        .encoding-item:hover { background: #007acc; color: #fff; }
+
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="cursor-letter" style="display: none;"></div>
+    
+    <!-- Barre de recherche flottante -->
+    <div id="floating-search">
+        <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#999"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" id="search-input" placeholder="Rechercher un lieu..." autocomplete="off">
+        <div id="search-results"></div>
+    </div>
+
+    <!-- Bouton Géolocalisation -->
+    <div id="btn-geolocate" title="Me géolocaliser">
+        <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+    </div>
+
+    <!-- Bouton Satellite -->
+    <div id="btn-satellite" title="Basculer vers la vue Satellite">
+        <svg viewBox="0 0 24 24"><path d="M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z"/></svg>
+    </div>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text">Calcul de l'itinéraire...</div>
+    </div>
+
+    <div id="status-banner">⚠ Chevauchement détecté — Choisissez une alternative</div>
+    <div id="selection-overlay"></div>
+
+    <!-- Custom Encodage Popup -->
+    <div id="encoding-popup">
+        <div id="encoding-popup-header">
+            <span id="encoding-popup-title">ASSIGNER UNE ÉPREUVE</span>
+            <span id="encoding-popup-close">×</span>
+        </div>
+        <input type="text" id="encoding-search" placeholder="Rechercher...">
+        <div id="encoding-list"></div>
+    </div>
+
+    <div id="info-pills">
+        <div id="status-pill" class="info-pill">
+            <span id="distance-text">0.0 km</span>
+            <span id="loading-text" style="display:none; color: #f59e0b; margin-left: 8px; padding-left: 8px; border-left: 1px solid #666;">Calcul en cours...</span>
+        </div>
+    </div>
+    <div id="cursor-letter"></div>
+
+    <script>
+        // ── Preemptive Geolocation Variable Init ──────────────
+        // Default to a wide view of France
+        var _preGeoLat = 46.603354, _preGeoLon = 1.888334, _preGeoReady = false;
+        
+        // Wait briefly before initializing map to allow Python QtPositioning to inject location
+        setTimeout(function() { 
+            if (typeof map === 'undefined' || !map) {
+                _preGeoReady = true;
+            }
+        }, 800);
+        // ──────────────────────────────────────────────────────
+        
+        // Bridge setup
+        var bridge = null;
+        new QWebChannel(qt.webChannelTransport, function(channel) {
+            bridge = channel.objects.bridge;
+            window.bridge = bridge;
+            
+            function checkGeo() {
+                if (_preGeoReady) { initMap(); }
+                else { setTimeout(checkGeo, 50); }
+            }
+            checkGeo();
+        });
+
+        var map = null;
+        var bridge = null;
+        var vectorLayer = L.featureGroup();
+        var arrowLayer = L.featureGroup();
+        var tempMarkerLayer = L.featureGroup();
+        var waypointLayer = L.featureGroup();
+        var azimutHandleLayer = L.featureGroup();
+        var dangerPoiLayer = L.featureGroup();
+        var assignments = {};
+        var selectionModeActive = false;
+        
+        // --- Route Tool Globals ---
+        var anchoredStageIdx = -1;
+        var dashedPreviewLine = null;
+        var dashedPreviewAnchor = null;
+
+        const modColors = {
+            'carte_ign': '#3b82f6', 'drapeaux': '#f59e0b', 'gilwell': '#8b5cf6',
+            'morse': '#ef4444', 'vigenere': '#ec4899', 'templier': '#f97316',
+            'texte_clair': '#10b981', 'avocat': '#14b8a6', 'cassis': '#a855f7',
+            'maritime': '#06b6d4', 'polybe': '#f43f5e', 'unassigned': '#6b7280'
+        };
+
+        function initMap() {
+            try {
+                // Map initialized with wide France fallback view
+                map = L.map('map', { center: [_preGeoLat, _preGeoLon], zoom: 6, zoomControl: false });
+                L.control.zoom({ position: 'topright' }).addTo(map);
+
+                var ignUrl = "https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}";
+                var satUrl = "https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}";
+                
+                var planLayer = L.tileLayer(ignUrl, { attribution: '&copy; IGN', maxZoom: 19 });
+                var satLayer = L.tileLayer(satUrl, { attribution: '&copy; IGN', maxZoom: 19 });
+                
+                planLayer.addTo(map);
+
+                vectorLayer.addTo(map);
+                arrowLayer.addTo(map);
+                tempMarkerLayer.addTo(map);
+                azimutHandleLayer.addTo(map);
+                waypointLayer.addTo(map);
+                dangerPoiLayer.addTo(map);
+
+                map.on('click', function(e) {
+                    if (selectionModeActive) return;
+                    if (bridge) bridge.onMapClick(e.latlng.lat, e.latlng.lng);
+                });
+
+                // Zoom intelligent pour Feature #11
+                map.on('zoomend', updateArrowVisibility);
+
+                // Show user position marker if preemptive geolocation succeeded
+                if (_preGeoReady) {
+                    L.circleMarker([_preGeoLat, _preGeoLon], {
+                        radius: 8, color: '#2d8ceb', fillColor: '#2d8ceb',
+                        fillOpacity: 0.3, weight: 2
+                    }).addTo(map);
+                }
+
+                // Bouton géolocalisation
+                document.getElementById('btn-geolocate').addEventListener('click', function() {
+                    var btn = this;
+                    btn.classList.add('active');
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(function(pos) {
+                            map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+                            L.circleMarker([pos.coords.latitude, pos.coords.longitude], {
+                                radius: 8, color: '#2d8ceb', fillColor: '#2d8ceb',
+                                fillOpacity: 0.3, weight: 2
+                            }).addTo(map);
+                            setTimeout(function() { btn.classList.remove('active'); }, 1000);
+                        }, function() { btn.classList.remove('active'); });
+                    }
+                });
+
+                // Bouton Satellite
+                var isSatellite = false;
+                document.getElementById('btn-satellite').addEventListener('click', function() {
+                    var btn = this;
+                    if (isSatellite) {
+                        map.removeLayer(satLayer);
+                        planLayer.addTo(map);
+                        btn.classList.remove('active');
+                        isSatellite = false;
+                    } else {
+                        map.removeLayer(planLayer);
+                        satLayer.addTo(map);
+                        btn.classList.add('active');
+                        isSatellite = true;
+                    }
+                });
+
+                // Recherche
+                var searchInput = document.getElementById('search-input');
+                var searchResults = document.getElementById('search-results');
+                var searchTimeout = null;
+
+                searchInput.addEventListener('input', function() {
+                    var query = this.value;
+                    clearTimeout(searchTimeout);
+                    if (query.length < 3) { searchResults.style.display = 'none'; return; }
+                    searchTimeout = setTimeout(function() { if (bridge) bridge.requestSuggestions(query); }, 300);
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (!document.getElementById('floating-search').contains(e.target)) {
+                        searchResults.style.display = 'none';
+                    }
+                });
+
+                window.showSuggestions = function(list) {
+                    if (!list || list.length === 0) { searchResults.style.display = 'none'; return; }
+                    searchResults.innerHTML = '';
+                    list.forEach(function(item) {
+                        var div = document.createElement('div');
+                        div.className = 'search-item';
+                        div.innerText = item.label;
+                        div.onclick = function() {
+                            map.setView([item.lat, item.lon], 16);
+                            searchInput.value = item.label;
+                            searchResults.style.display = 'none';
+                        };
+                        searchResults.appendChild(div);
+                    });
+                    searchResults.style.display = 'block';
+                };
+
+                // Bridge Qt
+                if (typeof qt !== 'undefined' && bridge) {
+                    bridge.onBaseMapChanged("GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2");
+                }
+            } catch (err) { console.error("Map Init Error:", err); }
+        }
+
+        window.stopLoading = function() { /* no-op, toolbar removed */ };
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const p1 = lat1 * Math.PI/180, p2 = lat2 * Math.PI/180;
+            const dp = (lat2-lat1) * Math.PI/180, dl = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(dp/2) * Math.sin(dp/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2) * Math.sin(dl/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function getDestLatLng(lat, lng, azi, distMeters) {
+            const R = 6371000, ad = distMeters / R, brng = azi * Math.PI / 180;
+            const lat1 = lat * Math.PI / 180, lon1 = lng * Math.PI / 180;
+            const lat2 = Math.asin(Math.sin(lat1) * Math.cos(ad) + Math.cos(lat1) * Math.sin(ad) * Math.cos(brng));
+            const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(ad) * Math.cos(lat1), Math.cos(ad) - Math.sin(lat1) * Math.sin(lat2));
+            return [lat2 * 180 / Math.PI, lon2 * 180 / Math.PI];
+        }
+
+        function getClosestPointOnPolylines(latlng) {
+            if (!map) return [latlng.lat, latlng.lng];
+            var minPt = null, minDist = Infinity, pPx = map.project(latlng);
+            vectorLayer.eachLayer(function(layer) {
+                if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                    var latlngs = layer.getLatLngs();
+                    for (var i = 0; i < latlngs.length - 1; i++) {
+                        var a = map.project(latlngs[i]), b = map.project(latlngs[i+1]);
+                        var distAB = a.distanceTo(b);
+                        if (distAB === 0) continue;
+                        var t = ((pPx.x - a.x)*(b.x - a.x) + (pPx.y - a.y)*(b.y - a.y)) / (distAB * distAB);
+                        t = Math.max(0, Math.min(1, t));
+                        var closestPx = L.point(a.x + t*(b.x - a.x), a.y + t*(b.y - a.y));
+                        var d = pPx.distanceTo(closestPx);
+                        if (d < minDist) { minDist = d; minPt = map.unproject(closestPx); }
+                    }
+                }
+            });
+            return minPt ? [minPt.lat, minPt.lng] : [latlng.lat, latlng.lng];
+        }
+
+        function calculateAzimut(lat1, lon1, lat2, lon2) {
+            var y = Math.sin((lon2 - lon1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180);
+            var x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+                    Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos((lon2 - lon1) * Math.PI / 180);
+            var brng = Math.atan2(y, x) * 180 / Math.PI;
+            return ((brng + 360) % 360).toFixed(0);
+        }
+
+        function renderSegments(segments, currentAssignments, showArrows, fitBounds, stages, violations, rawGeojson, dangerPois) {
+            if (!map) return;
+            vectorLayer.clearLayers();
+            arrowLayer.clearLayers();
+            if (window.dangerPoiLayer) dangerPoiLayer.clearLayers();
+            assignments = currentAssignments || {};
+            var vios = violations || {};
+            
+            // Check for dangerous route fallback
+            var maxDanger = null;
+            var dangerScores = {"extreme": 3, "high": 2, "minor": 1};
+            
+            // Draw raw GeoJSON trace as the base layer for uncalculated segments
+            if (rawGeojson && rawGeojson.features && rawGeojson.features.length > 0) {
+                // Match the vibrant blue of the stage markers (#2d8ceb)
+                L.geoJSON(rawGeojson, { style: { color: '#2d8ceb', weight: 6, opacity: 0.8 } }).addTo(vectorLayer);
+                
+                rawGeojson.features.forEach(function(feat) {
+                    if (feat.properties && feat.properties.danger_level) {
+                        var dl = feat.properties.danger_level;
+                        if (!maxDanger || dangerScores[dl] > dangerScores[maxDanger]) {
+                            maxDanger = dl;
+                        }
+                    } else if (feat.properties && feat.properties.is_fallback) {
+                        // Legacy fallback
+                        if (!maxDanger) maxDanger = "minor";
+                    }
+                });
+            }
+            
+            // Toggle banner
+            if (maxDanger === "extreme") {
+                window.showMainWarning("⚠ DANGER EXTRÊME : Cet itinéraire emprunte une autoroute ou équivalent", true, '#ef4444');
+            } else if (maxDanger === "high") {
+                window.showMainWarning("⚠ DANGER IMPORTANT : Passage par une route nationale ou grand axe", true, '#ea580c');
+            } else if (maxDanger === "minor") {
+                window.showMainWarning("⚠ DANGER MINEUR : Passage par une route départementale", true, '#f59e0b');
+            } else {
+                window.showMainWarning("", false, '#ef4444');
+            }
+            
+            let totalDist = 0;
+            if (!segments || !Array.isArray(segments)) {
+                if (document.getElementById('status-pill')) document.getElementById('status-pill').style.display = "none";
+                if (document.getElementById('distance-text')) document.getElementById('distance-text').innerText = "0.0 km";
+                return;
+            } else {
+                if (document.getElementById('status-pill')) document.getElementById('status-pill').style.display = "flex";
+            }
+
+            segments.forEach(function(seg, idx) {
+                const props = seg.properties || {};
+                const coords = (seg.geometry && seg.geometry.coordinates) ? seg.geometry.coordinates : (seg.coords || []);
+                if (coords.length === 0) return;
+                const latLngs = coords.map(function(c) { return [c[1], c[0]]; });
+                const mod = assignments[idx] || 'unassigned';
+                const color = modColors[mod] || '#6b7280';
+                
+                const poly = L.polyline(latLngs, { color: color, weight: 5, opacity: 0.85 });
+                poly._leg_key = seg.leg_key || props.leg_key; // Attach leg key for targeted styling
+                
+                // Violation Styling
+                const vio = vios[idx];
+                if (vio) {
+                    if (vio.level === 'error') {
+                        poly.setStyle({ color: '#ef4444', weight: 8 }); // Red, solid
+                    } else {
+                        poly.setStyle({ color: '#f59e0b', weight: 6 }); // Orange, solid
+                    }
+                }
+
+                // Insertion Preview Styling
+                // If anchoredStageIdx is active and it's not the last stage
+                // we want segments that belong to anchoredStageIdx -> anchoredStageIdx+1 to be dashed
+                if (typeof anchoredStageIdx !== 'undefined' && anchoredStageIdx >= 0) {
+                    var totalStages = 0;
+                    if (window.scoutStages) totalStages = window.scoutStages.length;
+                    
+                    if (anchoredStageIdx < totalStages - 1) {
+                        // How to identify which segment is between anchor and anchor+1?
+                        // Actually, we process segments independently, but we can check if the segment is within that leg
+                        // using the `props.start_idx` or by matching `troncon` if we passed it.
+                        // Let's rely on the segment's stage proximity.
+                        // Actually, if we just pass a list of "insertion_segments" from PyQt, it's easier.
+                        // For now, let's keep it simple: the user asked to dash the lines during insertion.
+                        // We will implement PyQt side signaling for this!
+                    }
+                }
+
+                poly._azimut = (props.azimut !== undefined) ? props.azimut : seg.azimut;
+
+                let segDist = 0;
+                for (let i = 0; i < coords.length - 1; i++) {
+                    segDist += getDistance(coords[i][1], coords[i][0], coords[i+1][1], coords[i+1][0]);
+                }
+                poly._segDist = segDist;
+                totalDist += segDist;
+
+                // Click → select segment (or add node)
+                poly.on('click', function(e) { 
+                    if (selectionModeActive) return;
+                    if (currentTool === 'node' && bridge) {
+                        bridge.onAddNode(e.latlng.lat, e.latlng.lng, idx);
+                    } else if (currentTool === 'encodage') {
+                        var toggle = e.originalEvent && (e.originalEvent.ctrlKey || e.originalEvent.metaKey);
+                        var rangeSelect = e.originalEvent && e.originalEvent.shiftKey;
+                        selectSegment(idx, toggle, rangeSelect);
+                    } else if (currentTool === 'route' && bridge) {
+                        bridge.onStageClicked(props.start_idx !== undefined ? props.start_idx : idx);
+                    } else if (bridge) {
+                        bridge.onSegmentClicked(idx); 
+                    }
+                });
+
+                // Context menu → right-click
+                poly.on('contextmenu', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    if(bridge) bridge.onSegmentContextMenu(idx, e.latlng.lat, e.latlng.lng);
+                });
+
+                // Drag-and-drop support for modules
+                const polyElement = poly.getElement ? poly.getElement() : null;
+                poly.on('add', function() {
+                    const el = this.getElement();
+                    if (el) {
+                        el.addEventListener('dragover', function(e) {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'copy';
+                            el.classList.add('segment-drop-highlight');
+                        });
+                        el.addEventListener('dragleave', function() {
+                            el.classList.remove('segment-drop-highlight');
+                        });
+                        el.addEventListener('drop', function(e) {
+                            e.preventDefault();
+                            el.classList.remove('segment-drop-highlight');
+                            const methodId = e.dataTransfer.getData('text/plain');
+                            if (methodId && bridge) {
+                                bridge.onDropMethod(methodId, idx);
+                            }
+                        });
+                    }
+                });
+                
+                if (mod !== 'unassigned') {
+                    var label = mod.replace(/_/g, ' ');
+                    label = label.charAt(0).toUpperCase() + label.slice(1);
+                    var ttHtml = '<div style="display:flex;align-items:center;gap:6px">' +
+                                 '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';display:inline-block"></span>' + 
+                                 '<span style="color:#ccc;font-size:12px;font-weight:600">' + label + '</span></div>';
+                    poly.bindTooltip(ttHtml, { 
+                        permanent: true, direction: 'center', className: 'stage-tooltip' 
+                    });
+                }
+                vectorLayer.addLayer(poly);
+                
+                // Node squares at segment boundaries
+                if (idx > 0) {
+                    const startPt = latLngs[0];
+                    const nodeIcon = L.divIcon({
+                        className: '',
+                        html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #555;border-radius:1px;cursor:pointer;"></div>',
+                        iconSize: [8, 8], iconAnchor: [4, 4]
+                    });
+                    const nodeMarker = L.marker(startPt, { icon: nodeIcon, interactive: true, draggable: true });
+                    const pointIdx = props.start_idx || idx;
+                    
+                    // Styled tooltip
+                    nodeMarker.bindTooltip('Maintenir Alt + Clic pour supprimer', {
+                        direction: 'top', offset: [0, -4], className: 'stage-tooltip'
+                    });
+                    
+                    nodeMarker.on('click', function(e) {
+                        if (currentTool === 'node') {
+                            // Node tool: Alt+Click to delete
+                            if (e.originalEvent && e.originalEvent.altKey) {
+                                if (bridge) bridge.onRemoveNode(pointIdx);
+                            }
+                        } else if (bridge) {
+                            bridge.onNodeContextMenu(idx, startPt[0], startPt[1]);
+                        }
+                    });
+                    
+                    nodeMarker.on('drag', function(e) {
+                        if (currentTool === 'node') {
+                            var snapped = getClosestPointOnPolylines(e.latlng);
+                            e.target.setLatLng(snapped);
+                            // Live Azimut Tooltip
+                            var prv = latLngs[latLngs.length - 1]; // very approx prev point since we only have startPt here... actually wait,
+                            if(window.lastNodeStartPt) {
+                                var azi = calculateAzimut(window.lastNodeStartPt.lat, window.lastNodeStartPt.lng, snapped[0], snapped[1]);
+                                e.target.bindTooltip(azi + '°', {permanent: true, direction: 'top', className: 'azi-live'}).openTooltip();
+                            }
+                        }
+                    });
+
+                    nodeMarker.on('dragstart', function(e) {
+                        if (currentTool === 'node' && idx > 0) {
+                            // Store previous point for rough azimut visual
+                            var prvCoords = (segments[idx-1].geometry && segments[idx-1].geometry.coordinates) ? segments[idx-1].geometry.coordinates : segments[idx-1].coords;
+                            if (prvCoords.length > 0) window.lastNodeStartPt = {lat: prvCoords[0][1], lng: prvCoords[0][0]};
+                        }
+                    });
+                    
+                    nodeMarker.on('dragend', function(e) {
+                        if (currentTool === 'node') {
+                            e.target.unbindTooltip();
+                            var snapped = getClosestPointOnPolylines(e.target.getLatLng());
+                            e.target.setLatLng(snapped);
+                            if (bridge) bridge.onMoveNode(pointIdx, snapped[0], snapped[1]);
+                        } else {
+                            e.target.setLatLng(startPt);
+                        }
+                    });
+                    
+                    vectorLayer.addLayer(nodeMarker);
+                }
+
+                const azimut = (props.azimut !== undefined) ? props.azimut : seg.azimut;
+                if (showArrows && azimut !== undefined && currentTool !== 'azimut' && segDist >= 30) {
+                    // Default red dashed arrows (hidden when azimut tool is active, or segment < 30m)
+                    const start = latLngs[0];
+                    const arrowLen = Math.max(80, Math.min(250, segDist * 0.4));
+                    const dest = getDestLatLng(start[0], start[1], azimut, arrowLen);
+                    const arrowLine = L.polyline([start, dest], { color: '#ef4444', weight: 2, dashArray: '5, 8', opacity: 0.8 });
+                    const icon = L.divIcon({ className: 'azi-label', html: azimut + '\u00B0', iconAnchor: [-6, 12] });
+                    L.marker(dest, { icon: icon, interactive: false }).addTo(arrowLayer);
+                    arrowLayer.addLayer(arrowLine);
+                }
+            });
+            
+            if (fitBounds !== false && vectorLayer.getLayers().length > 0) { map.fitBounds(vectorLayer.getBounds(), { padding: [50, 50] }); }
+            
+            // Render discreet Danger POIs (V2 Design)
+            if (dangerPois && Array.isArray(dangerPois)) {
+                dangerPois.forEach(function(poi) {
+                    var color = "#eab308";
+                    var htmlBtn = "";
+                    if (poi.level === "extreme") {
+                        color = "#ef4444";
+                        htmlBtn = "<br><br><span style='font-size:12px;color:#555;'>Attention : Trajet prolongé sur Autoroute</span><br><br><button onclick='if(bridge) bridge.onDangerValidated(" + poi.route_idx + "); map.closePopup();' style='background:"+color+";color:white;border:none;padding:6px;border-radius:4px;cursor:pointer;width:100%;font-size:11px;'>Valider l'évitement (Pont/Séparateur)</button>";
+                    } else if (poi.level === "high") {
+                        color = "#ea580c";
+                        htmlBtn = "<br><br><span style='font-size:12px;color:#555;'>Attention : Trajet prolongé sur Nationale</span><br><br><button onclick='if(bridge) bridge.onDangerValidated(" + poi.route_idx + "); map.closePopup();' style='background:"+color+";color:white;border:none;padding:6px;border-radius:4px;cursor:pointer;width:100%;font-size:11px;'>Valider la présence de trottoirs</button>";
+                    } else {
+                        color = "#eab308";
+                        htmlBtn = "<br><br><span style='font-size:12px;color:#555;'>Info : Trajet prolongé sur Départementale</span><br><br><button onclick='if(bridge) bridge.onDangerValidated(" + poi.route_idx + "); map.closePopup();' style='background:#facc15;color:#333;border:none;padding:6px;border-radius:4px;cursor:pointer;width:100%;font-size:11px;'>Marquer comme sécurisé</button>";
+                    }
+
+                    // CircleMarker is a discreet, scalable visual point
+                    var marker = L.circleMarker([poi.lat, poi.lon], {
+                        radius: 5,
+                        fillColor: color,
+                        color: "white",
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.95
+                    }).addTo(dangerPoiLayer);
+                    
+                    marker.bindPopup("<div style='text-align:center;font-family:sans-serif;min-width:160px;padding:4px;'><b>Marqueur de vérification</b>" + htmlBtn + "</div>");
+                });
+            }
+
+            // Refresh tool overlays
+            refreshToolOverlays();
+            updateArrowVisibility();
+            
+            // Strict Z-Index pour waypointLayer et dangerPOI
+            if (map.hasLayer(waypointLayer)) waypointLayer.bringToFront();
+            if (map.hasLayer(dangerPoiLayer)) dangerPoiLayer.bringToFront();
+            
+            // Format and display total distance
+            var elDist = document.getElementById('distance-text');
+            var elPill = document.getElementById('status-pill');
+            if (elDist && elPill) {
+                var distKm = (totalDist / 1000).toFixed(1);
+                elDist.innerText = distKm + " km";
+                elPill.style.display = totalDist > 0 ? "flex" : "none";
+            }
+        }
+        
+        window.showMainWarning = function(msg, show, color) {
+            var banner = document.getElementById('status-banner');
+            if (!banner) return;
+            if (show) {
+                banner.innerText = msg;
+                if (color) banner.style.background = color;
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+            }
+        };
+
+        function updateArrowVisibility() {
+            if (!map) return;
+            var z = map.getZoom();
+            var shouldShow = (z >= 14) && (currentTool !== 'azimut');
+            if (!shouldShow) {
+                if (map.hasLayer(arrowLayer)) map.removeLayer(arrowLayer);
+            } else {
+                if (!map.hasLayer(arrowLayer)) map.addLayer(arrowLayer);
+            }
+        }
+
+        function renderGeoJSONOnly(geojson) {
+            if (!map) return;
+            vectorLayer.clearLayers();
+            const layer = L.geoJSON(geojson).addTo(vectorLayer);
+            map.fitBounds(layer.getBounds(), { padding: [50, 50] });
+        }
+
+        // ── Loading / Status messages → info-pills ──────────
+        window.showLoading = function(text) {
+            var elPill = document.getElementById('status-pill');
+            var elLoad = document.getElementById('loading-text');
+            if (elLoad && elPill) {
+                elLoad.innerText = text || 'Calcul...';
+                elLoad.style.color = '#f59e0b';
+                elLoad.style.display = 'inline-block';
+                elPill.style.display = 'flex'; // Ensure pill is visible even if distance is 0
+            }
+        };
+
+        window.hideLoading = function() {
+            var elLoad = document.getElementById('loading-text');
+            if (elLoad) {
+                elLoad.style.display = 'none';
+            }
+        };
+
+        window.showStatusMessage = function(message, level) {
+            var elPill = document.getElementById('status-pill');
+            var elLoad = document.getElementById('loading-text');
+            if (elLoad && elPill) {
+                elLoad.innerText = message;
+                elLoad.style.color = (level === 'error') ? '#ef4444' : '#f59e0b';
+                elLoad.style.display = 'inline-block';
+                elPill.style.display = 'flex';
+                setTimeout(function() { elLoad.style.display = 'none'; }, 5000);
+            }
+        };
+
+        var currentTool = 'route';
+        var encodageHighlight = null;
+        var selectedSegments = [];
+
+        window.setCursorLetter = function(letter) {
+            var el = document.getElementById('cursor-letter');
+            if (!el) return;
+            if (letter && currentTool === 'route') {
+                el.innerText = letter;
+                el.style.display = 'block';
+            } else {
+                el.style.display = 'none';
+            }
+        };
+
+        window.clearCursorLetter = function() {
+            var el = document.getElementById('cursor-letter');
+            if (el) el.style.display = 'none';
+        };
+
+        function setActiveTool(toolId) {
+            currentTool = toolId;
+            var mapEl = document.getElementById('map');
+            
+            // Clean up previous tool state
+            azimutHandleLayer.clearLayers();
+            waypointLayer.clearLayers();
+            selectedSegments = [];
+            if (typeof clearCursorLetter === 'function') clearCursorLetter();
+            if (encodageHighlight) { vectorLayer.removeLayer(encodageHighlight); encodageHighlight = null; }
+            
+            // Toggle red azimuts strictly when azimut tool is used, and respecting zoom
+            updateArrowVisibility();
+            
+            // Set cursor per tool
+            switch(toolId) {
+                case 'node':    mapEl.style.cursor = 'crosshair'; break;
+                case 'azimut':  mapEl.style.cursor = 'move'; break;
+                case 'encodage': mapEl.style.cursor = 'crosshair'; break;
+                case 'route':   mapEl.style.cursor = 'crosshair'; break;
+                default:        mapEl.style.cursor = ''; break;
+            }
+            
+            // Allow drawing a box in encodage mode by disabling map dragging
+            if (toolId === 'encodage') {
+                if (map) map.dragging.disable();
+            } else {
+                if (map) map.dragging.enable();
+            }
+            
+            // Re-render to apply tool-specific visuals
+            refreshToolOverlays();
+            
+            // Cursor letter: show for route tool
+            if (toolId === 'route') {
+                _startCursorFollow();
+            } else {
+                clearCursorLetter();
+                _stopCursorFollow();
+            }
+        }
+
+        // Cursor letter follower
+        var _cursorLetterEl = null;
+        function setCursorLetter(letter) {
+            if (!_cursorLetterEl) _cursorLetterEl = document.getElementById('cursor-letter');
+            _cursorLetterEl.textContent = letter;
+            _cursorLetterEl.style.display = letter ? 'block' : 'none';
+        }
+        function clearCursorLetter() {
+            if (!_cursorLetterEl) _cursorLetterEl = document.getElementById('cursor-letter');
+            _cursorLetterEl.style.display = 'none';
+        }
+        function _onCursorMove(e) {
+            if (!_cursorLetterEl) _cursorLetterEl = document.getElementById('cursor-letter');
+            _cursorLetterEl.style.left = e.clientX + 'px';
+            _cursorLetterEl.style.top = e.clientY + 'px';
+        }
+        function _startCursorFollow() {
+            document.addEventListener('mousemove', _onCursorMove);
+        }
+        function _stopCursorFollow() {
+            document.removeEventListener('mousemove', _onCursorMove);
+        }
+
+        function refreshToolOverlays() {
+            azimutHandleLayer.clearLayers();
+            
+            if (currentTool === 'azimut') {
+                // Render draggable azimut handles (solid blue lines + white circle tips)
+                vectorLayer.eachLayer(function(layer) {
+                    if (!(layer instanceof L.Polyline) || layer instanceof L.Polygon) return;
+                    var latlngs = layer.getLatLngs();
+                    if (!latlngs || latlngs.length === 0) return;
+                    var start = latlngs[0];
+                    // Get segment index from layer order
+                    var segIdx = -1;
+                    var counter = 0;
+                    vectorLayer.eachLayer(function(l) {
+                        if (l instanceof L.Polyline && !(l instanceof L.Polygon)) {
+                            if (l === layer) segIdx = counter;
+                            counter++;
+                        }
+                    });
+                    if (segIdx < 0) return;
+                    
+                    var azimut = layer._azimut;
+                    if (azimut === undefined) return;
+                    
+                    // Same length as red dashed arrows
+                    var segDist = layer._segDist || 200;
+                    var arrowLen = Math.max(80, Math.min(250, segDist * 0.4));
+                    var dest = getDestLatLng(start.lat, start.lng, azimut, arrowLen);
+                    
+                    // Solid blue line (replaces red dashed)
+                    var line = L.polyline([start, dest], { color: '#2d8ceb', weight: 2, opacity: 0.9 });
+                    azimutHandleLayer.addLayer(line);
+                    
+                    // Degree label (stored as marker so we can update text)
+                    var labelMarker = L.marker(dest, {
+                        icon: L.divIcon({
+                            className: '',
+                            html: '<span style="color:#2d8ceb;font-weight:700;font-size:12px;text-shadow:1px 1px 2px rgba(0,0,0,0.8)">' + azimut + '°</span>',
+                            iconAnchor: [-8, 12]
+                        }), interactive: false
+                    });
+                    azimutHandleLayer.addLayer(labelMarker);
+                    
+                    // Draggable white circle handle
+                    var handle = L.marker(dest, {
+                        icon: L.divIcon({
+                            className: '',
+                            html: '<div style="width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid #2d8ceb;cursor:move;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
+                            iconSize: [14, 14], iconAnchor: [7, 7]
+                        }), draggable: true
+                    });
+                    handle._segIdx = segIdx;
+                    handle._startLatLng = start;
+                    handle._arrowLen = arrowLen;
+                    
+                    // Drag: follow mouse freely (no arc snap) for fluid interaction
+                    handle.on('drag', function(e) {
+                        var pos = e.target.getLatLng();
+                        var p1 = map.latLngToContainerPoint(handle._startLatLng);
+                        var p2 = map.latLngToContainerPoint(pos);
+                        var dx = p2.x - p1.x;
+                        var dy = p1.y - p2.y; // Y is inverted on screen
+                        var newAzi = Math.round((Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360);
+                        
+                        // Line follows mouse position directly (not snapped to arc)
+                        line.setLatLngs([handle._startLatLng, pos]);
+                        labelMarker.setLatLng(pos);
+                        labelMarker.setIcon(L.divIcon({
+                            className: '',
+                            html: '<span style="color:#2d8ceb;font-weight:700;font-size:12px;text-shadow:1px 1px 2px rgba(0,0,0,0.8)">' + newAzi + '°</span>',
+                            iconAnchor: [-8, 12]
+                        }));
+                    });
+                    
+                    // Dragend: Keep angle but snap distance to consistent rail, and send to backend
+                    handle.on('dragend', function(e) {
+                        var pos = e.target.getLatLng();
+                        var p1 = map.latLngToContainerPoint(handle._startLatLng);
+                        var p2 = map.latLngToContainerPoint(pos);
+                        var dx = p2.x - p1.x;
+                        var dy = p1.y - p2.y; // Y is inverted on screen
+                        var newAzi = Math.round((Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360);
+                        
+                        // User requested to snap distance, "redimensionnant la longueur de la barre"
+                        var snapped = getDestLatLng(handle._startLatLng.lat, handle._startLatLng.lng, newAzi, handle._arrowLen);
+                        e.target.setLatLng(snapped);
+                        line.setLatLngs([handle._startLatLng, snapped]);
+                        labelMarker.setLatLng(snapped);
+                        labelMarker.setIcon(L.divIcon({
+                            className: '',
+                            html: '<span style="color:#2d8ceb;font-weight:700;font-size:12px;text-shadow:1px 1px 2px rgba(0,0,0,0.8)">' + newAzi + '°</span>',
+                            iconAnchor: [-8, 12]
+                        }));
+                        if (bridge) bridge.onUpdateAzimut(handle._segIdx, newAzi);
+                    });
+                    
+                    azimutHandleLayer.addLayer(handle);
+                });
+            }
+        }
+
+        var lastSelectedSegment = -1;
+
+        function selectSegment(idx, toggle, rangeSelect) {
+            if (rangeSelect && lastSelectedSegment !== -1) {
+                var start = Math.min(idx, lastSelectedSegment);
+                var end = Math.max(idx, lastSelectedSegment);
+                for (var i = start; i <= end; i++) {
+                    if (selectedSegments.indexOf(i) === -1) {
+                        selectedSegments.push(i);
+                    }
+                }
+            } else if (toggle) {
+                var pos = selectedSegments.indexOf(idx);
+                if (pos > -1) {
+                    selectedSegments.splice(pos, 1);
+                } else {
+                    selectedSegments.push(idx);
+                }
+            } else {
+                selectedSegments = [idx];
+            }
+            
+            lastSelectedSegment = idx;
+            updateSegmentSelectionVisuals();
+        }
+
+        function updateSegmentSelectionVisuals() {
+            // Reset all segments
+            vectorLayer.eachLayer(function(layer) {
+                if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                    layer.setStyle({ weight: 5, dashArray: null });
+                }
+            });
+            // Highlight selected
+            var counter = 0;
+            var centerLayer = null;
+            vectorLayer.eachLayer(function(layer) {
+                if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                    if (selectedSegments.indexOf(counter) > -1) {
+                        layer.setStyle({ weight: 8 });
+                        
+                        // Encodage tool: highlight selected heavily and grab center for the last one
+                        if (currentTool === 'encodage') {
+                            L.DomUtil.addClass(layer._path, 'fading-selected-segment');
+                            centerLayer = layer;
+                        }
+                    } else {
+                        if (layer._path) L.DomUtil.removeClass(layer._path, 'fading-selected-segment');
+                    }
+                    counter++;
+                }
+            });
+            
+            if (currentTool === 'encodage' && selectedSegments.length > 0) {
+                var popup = document.getElementById('encoding-popup');
+                var listContainer = document.getElementById('encoding-list');
+                var title = document.getElementById('encoding-popup-title');
+                var numSegs = selectedSegments.length;
+                
+                title.innerText = numSegs > 1 ? 'ASSIGNER (' + numSegs + ' TRONÇONS)' : 'ASSIGNER UNE ÉPREUVE';
+                listContainer.innerHTML = '';
+                
+                var allMods = Object.keys(modColors).filter(function(m) { return m !== 'unassigned'; });
+                window._encodingModulesCache = allMods; // for search
+                
+                function renderList(filterTerm) {
+                    listContainer.innerHTML = '';
+                    var terms = (filterTerm || '').toLowerCase();
+                    allMods.forEach(function(mod) {
+                        var label = mod.replace(/_/g, ' ');
+                        label = label.charAt(0).toUpperCase() + label.slice(1);
+                        if (terms && label.toLowerCase().indexOf(terms) === -1) return;
+                        
+                        var div = document.createElement('div');
+                        div.className = 'encoding-item';
+                        div.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:' + modColors[mod] + '"></span> ' + label;
+                        div.onclick = function() { window.assignChallengeBatch(mod); };
+                        listContainer.appendChild(div);
+                    });
+                }
+                renderList('');
+                
+                // Position popup near center ONLY if it's currently hidden, to prevent jarring movement while panning
+                if (popup.style.display !== 'flex' && centerLayer) {
+                    popup.style.display = 'flex';
+                }
+            } else if (currentTool === 'encodage') {
+                document.getElementById('encoding-popup').style.display = 'none';
+            }
+        }
+
+        // Marquee Selection Logic for Encodage tool
+        var marqueeBox = null;
+        var marqueeStart = null;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Spacebar Dragging
+            var spaceIsPressed = false;
+            document.addEventListener('keydown', function(e) {
+                if (e.keyCode === 32 && currentTool === 'encodage' && !spaceIsPressed) {
+                    e.preventDefault();
+                    spaceIsPressed = true;
+                    selectionModeActive = true; 
+                    if (map) map.dragging.enable();
+                    document.body.style.cursor = 'grab';
+                }
+            });
+            document.addEventListener('keyup', function(e) {
+                if (e.keyCode === 32 && spaceIsPressed) {
+                    spaceIsPressed = false;
+                    selectionModeActive = false;
+                    if (map && currentTool === 'encodage') map.dragging.disable();
+                    document.body.style.cursor = 'crosshair';
+                }
+            });
+
+            // Popup Dragging Logic
+            var popup = document.getElementById('encoding-popup');
+            var header = document.getElementById('encoding-popup-header');
+            var isDraggingPopup = false, startX, startY, startLeft, startTop;
+
+            header.addEventListener('mousedown', function(e) {
+                isDraggingPopup = true;
+                startX = e.clientX; startY = e.clientY;
+                startLeft = popup.offsetLeft; startTop = popup.offsetTop;
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!isDraggingPopup) return;
+                popup.style.left = (startLeft + e.clientX - startX) + 'px';
+                popup.style.top = (startTop + e.clientY - startY) + 'px';
+                popup.style.right = 'auto'; // Disable flex right binding
+            });
+            document.addEventListener('mouseup', function() { isDraggingPopup = false; });
+            
+            // Popup Search
+            var pSearch = document.getElementById('encoding-search');
+            pSearch.addEventListener('input', function() {
+                var terms = this.value.toLowerCase();
+                var listContainer = document.getElementById('encoding-list');
+                listContainer.innerHTML = '';
+                (window._encodingModulesCache || []).forEach(function(mod) {
+                    var label = mod.replace(/_/g, ' ');
+                    label = label.charAt(0).toUpperCase() + label.slice(1);
+                    if (terms && label.toLowerCase().indexOf(terms) === -1) return;
+                    var div = document.createElement('div');
+                    div.className = 'encoding-item';
+                    div.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:' + modColors[mod] + '"></span> ' + label;
+                    div.onclick = function() { window.assignChallengeBatch(mod); };
+                    listContainer.appendChild(div);
+                });
+            });
+
+            // Popup Close
+            document.getElementById('encoding-popup-close').addEventListener('click', function() {
+                popup.style.display = 'none';
+                selectedSegments = [];
+                updateSegmentSelectionVisuals();
+            });
+
+            setTimeout(function() {
+                if (!map) return;
+                map.on('mousedown', function(e) {
+                    if (currentTool !== 'encodage' || spaceIsPressed) return;
+                    marqueeStart = e.latlng;
+                    if (marqueeBox) { map.removeLayer(marqueeBox); marqueeBox = null; }
+                });
+                map.on('mousemove', function(e) {
+                    if (currentTool !== 'encodage' || !marqueeStart || spaceIsPressed) return;
+                    var bounds = L.latLngBounds(marqueeStart, e.latlng);
+                    if (!marqueeBox) {
+                        marqueeBox = L.rectangle(bounds, {color: "#2d8ceb", weight: 1, fillOpacity: 0.2, dashArray: '4,4'}).addTo(map);
+                    } else {
+                        marqueeBox.setBounds(bounds);
+                    }
+                });
+                map.on('mouseup', function(e) {
+                    if (currentTool === 'encodage' && marqueeStart && marqueeBox && !spaceIsPressed) {
+                        var bounds = marqueeBox.getBounds();
+                        map.removeLayer(marqueeBox);
+                        marqueeBox = null;
+                        
+                        var counter = 0;
+                        var changed = false;
+                        vectorLayer.eachLayer(function(layer) {
+                            if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                                if (layer.getBounds().intersects(bounds) || bounds.contains(layer.getBounds())) {
+                                    if (selectedSegments.indexOf(counter) === -1) {
+                                        selectedSegments.push(counter);
+                                        changed = true;
+                                    }
+                                }
+                                counter++;
+                            }
+                        });
+                        
+                        if (changed) {
+                            lastSelectedSegment = selectedSegments[selectedSegments.length - 1];
+                            updateSegmentSelectionVisuals();
+                        } else if (!e.originalEvent.ctrlKey && !e.originalEvent.metaKey && !e.originalEvent.shiftKey) {
+                            selectedSegments = [];
+                            updateSegmentSelectionVisuals();
+                        }
+                    }
+                    marqueeStart = null;
+                });
+            }, 500);
+        });
+
+        window.assignChallengeBatch = function(methodId) {
+            if (bridge) bridge.onBatchAssign(methodId, JSON.stringify(selectedSegments));
+            map.closePopup();
+            selectedSegments = [];
+            
+            // Revert styles
+            vectorLayer.eachLayer(function(layer) {
+                if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                    layer.setStyle({ weight: 5, dashArray: null });
+                }
+            });
+        };
+
+        window.assignChallenge = function(methodId, segIdx) {
+            if (bridge) bridge.onDropMethod(methodId, segIdx);
+            map.closePopup();
+        };
+
+        // ═══════════════════════════════════════════════════
+        // ROUTE TOOL — Waypoints & Dashed Preview
+        // ═══════════════════════════════════════════════════
+        
+        function renderWaypoints(stages) {
+            waypointLayer.clearLayers();
+            if (currentTool !== 'route' || !stages || stages.length === 0) return;
+            
+            stages.forEach(function(stage, idx) {
+                var letter = stage.label || String.fromCharCode(65 + idx);
+                var isAnchored = (idx === anchoredStageIdx);
+                
+                var icon = L.divIcon({
+                    className: 'stage-marker' + (isAnchored ? ' anchored' : ''),
+                    html: '<div>' + letter + '</div>',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
+                
+                var marker = L.marker([stage.lat, stage.lon], { icon: icon, interactive: true, zIndexOffset: 1000 });
+                
+                // Tooltip
+                marker.bindTooltip('Étape ' + letter + ' · Alt+Clic pour supprimer', {
+                    direction: 'top', offset: [0, -16], className: 'stage-tooltip'
+                });
+                
+                marker.on('mouseover', function() { if (bridge) bridge.onStageHovered(idx); });
+                marker.on('mouseout', function() { if (bridge) bridge.onStageHovered(-1); });
+                
+                marker.on('click', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    if (e.originalEvent && e.originalEvent.altKey) {
+                        if (bridge) bridge.onStageDelete(idx);
+                    } else {
+                        // Toggle local anchor visual immediately for responsiveness
+                        if (anchoredStageIdx === idx) anchoredStageIdx = -1;
+                        else anchoredStageIdx = idx;
+                        renderWaypoints(stages);
+                        
+                        if (bridge) bridge.onStageClicked(idx);
+                    }
+                });
+                
+                waypointLayer.addLayer(marker);
+            });
+            
+            // Feature #10 : Keep waypoints above all elements
+            if (map.hasLayer(waypointLayer)) waypointLayer.bringToFront();
+        }
+
+        window.deleteStage = function(idx) {
+            if (bridge) bridge.onStageDelete(idx);
+            map.closePopup();
+        };
+
+        function showDashedPreview(lat, lon, stageIdx) {
+            hideDashedPreview();
+            dashedPreviewAnchor = [lat, lon];
+            if (stageIdx !== undefined && stageIdx >= 0) {
+                anchoredStageIdx = stageIdx;
+                // Add anchored class to existing marker
+                var i = 0;
+                waypointLayer.eachLayer(function(marker) {
+                    if (i === stageIdx && marker.getElement()) {
+                        marker.getElement().classList.add('anchored');
+                    }
+                    i++;
+                });
+            }
+            dashedPreviewLine = L.polyline([[lat, lon], [lat, lon]], {
+                color: '#2d8ceb', weight: 2, dashArray: '8, 6', opacity: 0.7
+            }).addTo(map);
+            
+            // Follow mouse
+            map.on('mousemove', _updateDashedPreview);
+        }
+
+        function _updateDashedPreview(e) {
+            if (dashedPreviewLine && dashedPreviewAnchor) {
+                dashedPreviewLine.setLatLngs([dashedPreviewAnchor, [e.latlng.lat, e.latlng.lng]]);
+                // Follow mouse with letter if anchored
+                var cursorLetter = document.getElementById('cursor-letter');
+                if (cursorLetter && cursorLetter.style.display !== 'none') {
+                    cursorLetter.style.left = e.containerPoint.x + 'px';
+                    cursorLetter.style.top = e.containerPoint.y + 'px';
+                }
+            }
+        }
+
+        function hideDashedPreview() {
+            if (dashedPreviewLine) {
+                map.removeLayer(dashedPreviewLine);
+                dashedPreviewLine = null;
+            }
+            dashedPreviewAnchor = null;
+            map.off('mousemove', _updateDashedPreview);
+        }
+
+        // Fade specific legs using their leg_key/index
+        window._currentLegKeys = []; // We can store the sequence of keys here if needed
+        function fadeLegs(legIndices) {
+            // legIndices usually contains the index of the stage where the leg starts.
+            // In the current logic, Leg N connects Stage N and Stage N+1.
+            // We'll iterate and find which legKeys we are targeting.
+            
+            // To be robust, let's identify which leg keys correspond to the requested indices.
+            // Since `segments` is a flat list, we relies on poly._leg_key.
+            // But we need to know WHICH leg key specifically corresponds to legIndices[i].
+            
+            // For now, if we don't have a direct index-to-key map, we can rely on segments 
+            // having the leg index if we pass it.
+            // However, since we are in JS, let's just use the poly metadata.
+            
+            // Let's assume we want to fade the N-th unique leg found in the segments.
+            let foundKeys = [];
+            vectorLayer.eachLayer(function(layer) {
+                if (layer instanceof L.Polyline && layer._leg_key && !foundKeys.includes(layer._leg_key)) {
+                    foundKeys.push(layer._leg_key);
+                }
+            });
+
+            let targetKeys = legIndices.map(i => foundKeys[i]).filter(k => k);
+
+            vectorLayer.eachLayer(function(layer) {
+                if (layer instanceof L.Polyline && layer._leg_key) {
+                    if (targetKeys.includes(layer._leg_key)) {
+                        layer.setStyle({ dashArray: '8, 6', opacity: 0.35 });
+                    }
+                }
+            });
+        }
+
+        function unfadeAllLegs() {
+            vectorLayer.eachLayer(function(layer) {
+                if (layer instanceof L.Polyline) {
+                    layer.setStyle({ dashArray: null, opacity: 0.85 });
+                }
+            });
+        }
+        
+        initMap();
+        // ── Loading Functions ──
+        window.showLoading = function(text) {
+            document.getElementById('loading-text').innerText = text || "Calcul en cours...";
+            document.getElementById('loading-overlay').style.display = 'flex';
+        };
+        window.hideLoading = function() {
+            document.getElementById('loading-overlay').style.display = 'none';
+        };
+
+        // ── Route Alternatives ──
+        var alternativeLayers = L.featureGroup();
+        window.showRouteAlternatives = function(alts) {
+            if (!map) return;
+            selectionModeActive = true;
+            alternativeLayers.clearLayers();
+            alternativeLayers.addTo(map);
+            document.getElementById('overlap-banner').style.display = 'block';
+            document.getElementById('selection-overlay').style.display = 'block';
+            
+            var colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6']; 
+            
+            alts.forEach(function(alt, idx) {
+                var color = colors[idx % colors.length];
+                var latlngs = alt.geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
+                
+                var poly = L.polyline(latlngs, {
+                    color: color, weight: 6, opacity: 0.75, dashArray: '10, 5', interactive: true
+                });
+                
+                // Polyline Hover Effect
+                poly.on('mouseover', function() { 
+                    this.setStyle({ weight: 10, opacity: 1.0, dashArray: null });
+                });
+                poly.on('mouseout', function() { 
+                    this.setStyle({ weight: 6, opacity: 0.75, dashArray: '10, 5' });
+                });
+
+                // Label marker
+                var coords = alt.geometry.coordinates;
+                var centerIdx = Math.floor(coords.length / 2);
+                var center = [coords[centerIdx][1], coords[centerIdx][0]];
+                
+                var icon = L.divIcon({
+                    className: 'alt-badge-pulse',
+                    html: '<div style="background:' + color + ';color:white;width:32px;height:32px;border-radius:50%;' +
+                          'display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;cursor:pointer;' +
+                          'border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.5)">' + (idx+1) + '</div>',
+                    iconSize: [32, 32], iconAnchor: [16, 16]
+                });
+                
+                var marker = L.marker(center, { icon: icon });
+                
+                // Tooltip
+                marker.bindTooltip('Itinéraire ' + (idx+1) + ' - Cliquer pour sélectionner', {
+                    permanent: true, direction: 'top', offset: [0, -20], className: 'stage-tooltip'
+                });
+
+                var selectFn = function() { if(bridge) bridge.onRouteAlternativeSelected(idx); };
+                marker.on('click', selectFn);
+                poly.on('click', selectFn);
+                
+                alternativeLayers.addLayer(poly);
+                alternativeLayers.addLayer(marker);
+            });
+            
+            if (alternativeLayers.getLayers().length > 0) {
+                map.fitBounds(alternativeLayers.getBounds(), { padding: [120, 120] });
+            }
+        };
+        
+        window.showStatusMessage = function(msg, level) {
+            var banner = document.getElementById('status-banner');
+            if (!banner) return;
+            banner.innerHTML = (level === 'warning' ? '⚠️ ' : '🚫 ') + msg;
+            banner.style.background = (level === 'warning' ? '#f59e0b' : '#ef4444');
+            banner.style.display = 'block';
+            if (level === 'warning') {
+                setTimeout(function() { if(banner) banner.style.display = 'none'; }, 18000);
+            }
+        };
+
+        window.clearRouteAlternatives = function() {
+            selectionModeActive = false;
+            alternativeLayers.clearLayers();
+            var sb = document.getElementById('status-banner');
+            if (sb) sb.style.display = 'none';
+            var so = document.getElementById('selection-overlay');
+            if (so) so.style.display = 'none';
+        };
+
+    </script>
+</body>
+</html>

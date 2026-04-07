@@ -1,0 +1,10 @@
+PySide6
+folium
+reportlab
+geopy
+requests
+shapely
+numpy
+matplotlib
+python-dotenv
+winsdk

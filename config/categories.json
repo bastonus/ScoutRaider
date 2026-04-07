@@ -1,0 +1,35 @@
+{
+  "_help": {
+    "description": "Définition des catégories de contraintes pour les différents modules du jeu de piste.",
+    "instructions": [
+      "Comment classifier vos modules et comprendre les catégories de l'Orchestrateur :",
+      "L'Orchestrateur ne gère pas les règles de rythme code par code, mais par 'Catégories'.",
+      "Il empêchera par exemple d'avoir plus de 3 codes de type 'crypted_message' d'affilée.",
+      "",
+      "Pour créer/classifier un nouveau module : rajoutez une entrée dans 'module_categories' associant votre module à une des catégories existantes.",
+      "",
+      "--- TYPES DE CATÉGORIES DISPONIBLES ---",
+      "1. 'explicit_message' :",
+      "   - Règles appliquées : Détection de POI géographiques. Devient Priorité absolue en zone urbaine/dense. Désactive les codes visuels à cet endroit.",
+      "2. 'ign_map' :",
+      "   - Règles appliquées : Doit couvrir 100 à 300 mètres réels. Favorisée sur le 1er tiers du parcours. Probabilité strictement VERROUILLÉE À 0% sur le dernier tiers (anti-spoil d'arrivée). Seule autorisée à lire les courbes GeoJSON.",
+      "3. 'graphic' :",
+      "   - Règles appliquées : Regroupe les visuels sur le terrain (Drapeaux, Gilwell). Provoqués par l'Orchestrateur pour casser la monotonie du texte. Règles spécifiques de distance/volume internes aux modules.",
+      "4. 'crypted_message' :",
+      "   - Règles appliquées : Tous les textes codés. Limites extrêmement strictes d'azimuts pour éviter la fatigue (1 seul azimut en général, sauf Morse qui peut en prendre 2)."
+    ]
+  },
+  "module_categories": {
+    "texte_clair": "explicit_message",
+    "carte_ign": "ign_map",
+    "gilwell": "graphic",
+    "drapeaux": "graphic",
+    "morse": "crypted_message",
+    "templier": "crypted_message",
+    "polybe": "crypted_message",
+    "maritime": "crypted_message",
+    "avocat": "crypted_message",
+    "cassis": "crypted_message",
+    "vigenere": "crypted_message"
+  }
+}

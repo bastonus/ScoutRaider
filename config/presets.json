@@ -1,0 +1,178 @@
+{
+  "active_preset": "arret_de_promesse_1",
+  "factory": {
+    "arret_de_promesse_1": {
+      "name": "Raid de Promesse (Niveau 1)",
+      "polygonalisation": {
+        "tolerance_angle": 10,
+        "hors_piste": false,
+        "forcer_carrefours": true
+      },
+      "weights": {
+        "texte_clair": 80,
+        "morse": 20,
+        "vigenere": 0,
+        "carte_ign": 0,
+        "gilwell": 0,
+        "drapeaux": 0,
+        "azimut_pur": 0,
+        "polybe": 0,
+        "templier": 0,
+        "maritime": 0,
+        "avocat": 0,
+        "cassis": 0
+      },
+      "overrides": {
+        "morse": {
+          "max_occurrences": 3
+        }
+      }
+    },
+    "seconde_classe_1": {
+      "name": "Seconde Classe (Niveau 2)",
+      "polygonalisation": {
+        "tolerance_angle": 25,
+        "hors_piste": false,
+        "forcer_carrefours": true
+      },
+      "weights": {
+        "texte_clair": 40,
+        "morse": 20,
+        "carte_ign": 20,
+        "gilwell": 10,
+        "drapeaux": 10,
+        "polybe": 0,
+        "templier": 0,
+        "maritime": 0,
+        "avocat": 0,
+        "cassis": 0,
+        "vigenere": 0,
+        "azimut_pur": 0
+      },
+      "overrides": {}
+    },
+    "premiere_classe_1": {
+      "name": "Première Classe (Niveau 3)",
+      "polygonalisation": {
+        "tolerance_angle": 35,
+        "hors_piste": false,
+        "forcer_carrefours": true
+      },
+      "weights": {
+        "texte_clair": 10,
+        "morse": 15,
+        "polybe": 15,
+        "templier": 10,
+        "avocat": 10,
+        "cassis": 10,
+        "carte_ign": 10,
+        "drapeaux": 10,
+        "gilwell": 10,
+        "vigenere": 0
+      },
+      "overrides": {
+        "morse": {
+          "max_occurrences": 5
+        },
+        "vigenere": {
+          "max_occurrences": 0
+        }
+      }
+    },
+    "raider_1": {
+      "name": "Raider (Niveau 4 - Orientation)",
+      "polygonalisation": {
+        "tolerance_angle": 45,
+        "hors_piste": true,
+        "forcer_carrefours": false
+      },
+      "weights": {
+        "azimut_pur": 40,
+        "carte_ign": 20,
+        "maritime": 15,
+        "vigenere": 15,
+        "texte_clair": 10
+      },
+      "overrides": {
+        "vigenere": {
+          "max_distance_m": 150,
+          "max_occurrences": 1
+        }
+      }
+    }
+  },
+  "custom": {
+    "arret_de_promesse_1_custom": {
+      "name": "Raid de Promesse (Niveau 1) (Copie)",
+      "weights": {
+        "texte_clair": 80,
+        "morse": 20,
+        "carte_ign": 40,
+        "vigenere": 0,
+        "gilwell": 0,
+        "drapeaux": 0,
+        "azimut_pur": 0,
+        "polybe": 0,
+        "templier": 0,
+        "maritime": 0,
+        "avocat": 0,
+        "cassis": 0
+      },
+      "polygonalisation": {
+        "tolerance_angle": 10,
+        "hors_piste": false,
+        "forcer_carrefours": true
+      },
+      "overrides": {
+        "morse": {
+          "max_occurrences": 3
+        }
+      }
+    },
+    "arret_de_promesse_1_custom_custom": {
+      "name": "Raid de Promesse (Niveau 1) (Copie) (Copie)",
+      "weights": {
+        "texte_clair": 80,
+        "morse": 20,
+        "carte_ign": 140,
+        "vigenere": 0,
+        "gilwell": 0,
+        "drapeaux": 0,
+        "azimut_pur": 0,
+        "polybe": 0,
+        "templier": 0,
+        "maritime": 0,
+        "avocat": 0,
+        "cassis": 0
+      },
+      "polygonalisation": {
+        "tolerance_angle": 10,
+        "hors_piste": false,
+        "forcer_carrefours": true
+      },
+      "overrides": {
+        "morse": {
+          "max_occurrences": 3
+        }
+      }
+    },
+    "arret_de_promesse_1_custom_custom_custom": {
+      "name": "Raid de Promesse (Niveau 1) (Copie) (Copie) (Copie)",
+      "weights": {
+        "texte_clair": 80,
+        "morse": 20,
+        "carte_ign": 55
+      },
+      "polygonalisation": {
+        "tolerance_angle": 10,
+        "hors_piste": false,
+        "forcer_carrefours": true
+      },
+      "overrides": {
+        "morse": {
+          "max_occurrences": 3
+        }
+      }
+    }
+  }
+}
