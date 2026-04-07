@@ -7,4 +7,4 @@ shapely
 numpy
 matplotlib
 python-dotenv
-winsdk
+winsdk; sys_platform == 'win32'
