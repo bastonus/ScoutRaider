@@ -885,6 +885,15 @@ class ScoutWorkspace(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.dock_difficulty)
         self.tabifyDockWidget(self.dock_modules, self.dock_difficulty)
         
+        # --- DROITE : Thème (onglet avec Difficulté) ---
+        self.dock_theme = QDockWidget("Thème", self)
+        self.dock_theme.setObjectName("dock_theme")
+        from ui.workspace.theme_panel import ThemePanel
+        self.theme_panel = ThemePanel(self.state_manager)
+        self.dock_theme.setWidget(self.theme_panel)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.dock_theme)
+        self.tabifyDockWidget(self.dock_difficulty, self.dock_theme)
+        
         # Raise default tabs
         self.dock_route.raise_()
         self.dock_modules.raise_()
@@ -1405,6 +1414,7 @@ class ScoutWorkspace(QMainWindow):
         start_p = steps[segment_idx]["properties"]["start_idx"]
         end_p = steps[segment_idx]["properties"]["point_idx"]
         
+        import refactor_polygonalisation
         geojson = self.state_manager.get_state("geojson_data")
         all_points = refactor_polygonalisation.get_all_points_from_geojson(geojson)
         if not all_points: return
@@ -1625,6 +1635,7 @@ class ScoutWorkspace(QMainWindow):
         self.tools_panel.refresh_from_state()
         self.route_panel.refresh_from_state()
         self.difficulty_panel.refresh_from_state()
+        self.theme_panel.refresh_from_state()
         self.delayed_map_update(fit_bounds=True)
 
     def on_poly_updated(self):

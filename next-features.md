@@ -15,9 +15,9 @@
 - [x] Vérifier l'encodage des noms de couches et des labels IGN
 - [x] Tester avec les 10 thèmes existants (`themes.json`)
 
-### 2. 🟢 Réparer l'Import de `refactor_polygonalisation` ⭐ P0
+### 2. ✅ Réparer l'Import de `refactor_polygonalisation` ⭐ P0
 > Fichier : `main.py` (L1072)
-- [ ] Corriger l'import error : le fichier est à la racine, pas dans `utils/`.
+- [x] Corriger l'import error : le fichier est à la racine, pas dans `utils/`.
 
 ### 3. ✅ Corriger le chevauchement des étapes sur l'export PDF ⭐ P0
 > Fichiers : `utils/pdf_helpers.py`, `main_orchestrator.py`
@@ -40,11 +40,11 @@ Le panneau Itinéraire doit offrir une gestion fluide des étapes et des raccord
 - [x] **Clarté des adresses** : Afficher uniquement l'adresse ou les coordonnées dans les champs de recherche (pas de labels A/B).
 - [ ] **Visuel Google Maps** : Refondre l'UI pour ressembler à Google Maps (champs arrondis, icônes fluides).
   ![Inspiration Google Maps](file:///C:/Users/Azandikka/.gemini/antigravity/brain/29ef0434-1e5d-4962-951f-7f3e43af4c9d/media__1774649708482.png)
-- [ ] **Refonte de la recherche ("Inline" façon Google Maps)** :
+- [x] **Refonte de la recherche ("Inline" façon Google Maps)** :
     - Remplacer le menu déroulant flottant par un affichage complet sous les champs, intégré au layout latéral.
     - **Au focus (champ vide)** : Afficher obligatoirement "Votre position" (pointant vers la géolocalisation native) et l'historique des requêtes récentes.
     - **Lors de la frappe** : Afficher dynamiquement les résultats d'autocomplétion IGN.
-- [ ] **Limitation d'affichage à 3 étapes** :
+- [x] **Limitation d'affichage à 3 étapes** :
     - Limiter la hauteur de la zone des étapes (idéalement via `QScrollArea`) pour afficher au maximum 3 champs simultanément.
     - Mettre en place un auto-scroll (ex: `ensureWidgetVisible`) pour cibler automatiquement le champ actif.
 - [x] **Visuel de liste** : Placer les lettres (A, B, C...) à droite et afficher le métrage (distance) en bout de ligne pour chaque étape.
@@ -176,10 +176,10 @@ Outil Encodage refondu avec sélection rectangulaire (box), Shift+Click pour pla
   - Note : actuellement themes.json contient 10 thèmes (Neutre, La Mafia, Les Vikings, Le Roi Soleil, La Chevalerie, Les Gaulois, WW1, WW2, LOTR, Napoléon)
 - [x] Synchroniser avec la variable `ph.CURRENT_THEME` dans l'orchestrateur
 
-### 17. 🟡 Séparer le panneau Difficulté du panneau Thème
+### 17. ✅ Séparer le panneau Difficulté du panneau Thème
 > Fichier : `ui/workspace/difficulty_panel.py`
-- [ ] Extraire la section « STYLE DU CARNET PDF » (thème) dans un widget/dock séparé ou dans l'onglet Export
-- [ ] Le panneau Difficulté ne garde que : preset, bouton orchestrateur, résumé, validateur
+- [x] Extraire la section « STYLE DU CARNET PDF » (thème) dans un widget/dock séparé ou dans l'onglet Export
+- [x] Le panneau Difficulté ne garde que : preset, bouton orchestrateur, résumé, validateur
 - [ ] Le panneau Thème contient : sélection du thème, preview des labels, override des clés Vigenère, etc.
 
 ### 18. 🟡 Ajouter la fenêtre d'édition de presets
@@ -277,4 +277,10 @@ Ajout de curseur custom pour les outils, ainsi que des preview au survol des out
 - [ ] **Releases GitHub** : automatiser la création de releases avec des artefacts de build
 - [x] **Auto-updater** : intégrer un chercheur de mise à jour qui vérifie les releases GitHub et propose de télécharger la dernière version à l'ouverture de l'application
 - [ ] **README.md orienté utilisateur** : installation en un clic, captures d'écran, vidéo démo
-On va publier la Beta, ecris un petit texte pour la presentation qui explique tt dans readme, et un outil aide dans la barre d'outil qui ouvre une fenetre qui explique comment créer un Raid point par point. Aussi ajoute un texte des next features (écrites ici et un encart pour envoyer des suggestions lien github)
+
+### 26. 🔴 Version Mobile (Compagnon & Création)
+> Déclinaison de ScoutRaider Suite pour iOS & Android
+- [ ] **Application compagnon (Joueur)** : Permettre aux scouts d'utiliser l'application sur le terrain avec GPS intégré pour valider les étapes sans imprimer le carnet ou valider des coordonnées.
+- [ ] **Architecture hybride** : Évaluer l'utilisation de frameworks cross-platform (React Native, Flutter, ou Kivy/Qt pour Python).
+- [ ] **UI/UX Tactile** : Adapter l'interface complexe pour un usage mobile (panneaux rétractables, map en plein écran).
+- [ ] **Sync Cloud** : Synchroniser les projets (`.scoutproj`) entre l'application de bureau et l'application mobile pour concevoir sur PC et tester sur le terrain.

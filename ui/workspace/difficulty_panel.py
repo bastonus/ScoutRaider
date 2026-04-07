@@ -404,13 +404,6 @@ class DifficultyPanel(QWidget):
         auto_layout.addWidget(self.btn_auto)
         self._summary = _SummaryWidget(); auto_layout.addWidget(self._summary); layout.addWidget(grp_auto)
 
-        grp_theme = QGroupBox("STYLE DU CARNET PDF")
-        theme_layout = QHBoxLayout(grp_theme)
-        self.combo_theme = QComboBox()
-        self._load_themes()   # ← dynamic load from config/themes.json
-        self.combo_theme.currentTextChanged.connect(lambda t: self.state_manager.update_state("theme_id", t))
-        theme_layout.addWidget(QLabel("Th\u00e8me :")); theme_layout.addWidget(self.combo_theme, 1); layout.addWidget(grp_theme)
-
         grp_manual = QGroupBox("VALIDATEUR DE CONTRAINTES")
         manual_layout = QVBoxLayout(grp_manual)
         self._lbl_no_violations = QLabel("\u2713 Contraintes respect\u00E9es")
@@ -424,19 +417,6 @@ class DifficultyPanel(QWidget):
 
         scroll.setWidget(inner); main_vbox = QVBoxLayout(self); main_vbox.setContentsMargins(0,0,0,0); main_vbox.addWidget(scroll)
         self.load_presets(); self.state_manager.state_changed.connect(self._on_state_changed)
-
-    def _load_themes(self):
-        theme_file = os.path.join(PROJECT_ROOT, 'config', 'themes.json')
-        themes = ["Neutre", "Carnet_Contrebandier", "Aventures_Maritimes"] # Fallback
-        if os.path.exists(theme_file):
-            try:
-                with open(theme_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    # Filter out _help and grab keys
-                    themes = [k for k in data.keys() if k != "_help"]
-            except Exception as e:
-                print(f"Erreur chargement themes.json: {e}")
-        self.combo_theme.addItems(themes)
 
     def load_presets(self):
         self.combo_presets.clear()
@@ -495,7 +475,6 @@ class DifficultyPanel(QWidget):
                 self._violations_area.addWidget(lbl)
 
     def refresh_from_state(self):
-        self.combo_theme.setCurrentText(self.state_manager.get_state("theme_id", "Neutre"))
         pid = self.state_manager.get_state("active_preset_id")
         if pid:
             idx = self.combo_presets.findData(pid)

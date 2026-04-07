@@ -1,6 +1,6 @@
 """ScoutRaider Suite — Centralized version info."""
 
-__version__ = "0.1.5-beta"
+__version__ = "0.1.6-beta"
 APP_NAME = "ScoutRaider Suite"
 APP_AUTHOR = "Pierre-Albéric Théobald, chef de troupe de la Première Port-Marly"
 APP_DESCRIPTION = "Générateur de carnets de raid scout"
