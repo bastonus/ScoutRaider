@@ -175,7 +175,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller pillow
 
       - name: Build with PyInstaller
         run: pyinstaller ScoutRaider-Suite.spec --noconfirm
@@ -208,9 +208,8 @@ jobs:
           
           # Convert icon for Linux AppImage integration
           cp AppDir/ScoutRaider-Suite.desktop AppDir/usr/share/applications/
-          sudo apt-get install -y imagemagick
-          convert assets/icon.ico -resize 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png || cp assets/icon.ico AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png
-          cp AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png AppDir/ScoutRaider-Suite.png
+          python -c "from PIL import Image; img=Image.open('assets/icon.ico'); img.save('AppDir/ScoutRaider-Suite.png')"
+          cp AppDir/ScoutRaider-Suite.png AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png
 
       - name: Download appimagetool
         run: |
