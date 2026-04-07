@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                 QPushButton, QListWidget, QListWidgetItem, 
                                 QTextEdit, QProgressBar, QPlainTextEdit)
 from PySide6.QtCore import Qt, QTimer, QThread, QSettings, QByteArray, QMutex
-from PySide6.QtGui import QAction, QActionGroup
+from PySide6.QtGui import QAction, QActionGroup, QIcon
 
 # Ensure project root is in path
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -391,6 +391,7 @@ class ScoutWorkspace(QMainWindow):
         super().__init__()
         self.logger = logging.getLogger("ScoutWorkspace")
         self.setWindowTitle("ScoutRaider Suite — Générateur de Carnets")
+        self.setWindowIcon(QIcon(os.path.join(PROJECT_ROOT, "assets", "icon.ico")))
         self.resize(1280, 800)
         
         # 1. Core Services

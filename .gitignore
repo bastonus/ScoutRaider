@@ -1,0 +1,4 @@
+*.exe
+*.AppImage
+*.dmg
+dist/

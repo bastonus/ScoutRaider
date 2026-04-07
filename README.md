@@ -1,6 +1,10 @@
+<p align="center">
+  <img src="assets/logo.png" width="160" alt="ScoutRaider Suite Logo">
+</p>
+
 # 🏕️ ScoutRaider Suite — Générateur de Carnets de Raid
 
-> **Version Beta 0.1.6** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
+> **Version Beta 0.1.7** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
 > 
 > 👉 **[📥 TÉLÉCHARGER LA DERNIÈRE VERSION (Windows, macOS, Linux)](https://github.com/bastonus/ScoutRaider-Suite/releases/latest)**
 

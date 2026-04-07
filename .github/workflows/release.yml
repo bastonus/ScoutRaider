@@ -59,6 +59,8 @@ jobs:
           WizardStyle=modern
           PrivilegesRequired=lowest
           SetupIconFile=assets\icon.ico
+          WizardImageFile=assets\wizard_image.bmp
+          WizardSmallImageFile=assets\wizard_small.bmp
           UninstallDisplayIcon={app}\ScoutRaider-Suite.exe
           
           [Languages]
