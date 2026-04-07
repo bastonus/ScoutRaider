@@ -22,22 +22,21 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r Generateur_Carnet/requirements.txt
+          pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Build with PyInstaller
-        working-directory: Generateur_Carnet
         run: pyinstaller ScoutCarnet.spec --noconfirm
 
       - name: Create ZIP archive
-        working-directory: Generateur_Carnet/dist
+        working-directory: dist
         run: Compress-Archive -Path ScoutCarnet -DestinationPath ScoutRaider-Suite-Windows.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ScoutRaider-Suite-Windows
-          path: Generateur_Carnet/dist/ScoutRaider-Suite-Windows.zip
+          path: dist/ScoutRaider-Suite-Windows.zip
 
   build-macos:
     runs-on: macos-latest
@@ -52,22 +51,21 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r Generateur_Carnet/requirements.txt
+          pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Build with PyInstaller
-        working-directory: Generateur_Carnet
         run: pyinstaller ScoutCarnet.spec --noconfirm
 
       - name: Create ZIP archive
-        working-directory: Generateur_Carnet/dist
+        working-directory: dist
         run: zip -r ScoutRaider-Suite-macOS.zip ScoutCarnet
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ScoutRaider-Suite-macOS
-          path: Generateur_Carnet/dist/ScoutRaider-Suite-macOS.zip
+          path: dist/ScoutRaider-Suite-macOS.zip
 
   build-linux:
     runs-on: ubuntu-latest
@@ -87,22 +85,21 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r Generateur_Carnet/requirements.txt
+          pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Build with PyInstaller
-        working-directory: Generateur_Carnet
         run: pyinstaller ScoutCarnet.spec --noconfirm
 
       - name: Create tar.gz archive
-        working-directory: Generateur_Carnet/dist
+        working-directory: dist
         run: tar -czf ScoutRaider-Suite-Linux.tar.gz ScoutCarnet
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ScoutRaider-Suite-Linux
-          path: Generateur_Carnet/dist/ScoutRaider-Suite-Linux.tar.gz
+          path: dist/ScoutRaider-Suite-Linux.tar.gz
 
   release:
     needs: [build-windows, build-macos, build-linux]
