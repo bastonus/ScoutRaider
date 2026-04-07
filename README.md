@@ -164,10 +164,10 @@ Vos retours sont essentiels pour améliorer l'outil !
 
 ## 📜 Licence
 
-*(À définir par l'équipe association E.S.T.P / Scouts d'Europe)*
+*(Créé par Pierre-Albéric Théobald, chef de troupe de la Première Port-Marly)*
 
 ---
 
 <p align="center">
-  Fait avec ❤️ pour les scouts · <b>Association E.S.T.P — Scouts d'Europe</b>
+  Fait avec ❤️ pour les scouts · **Créé par Pierre-Albéric Théobald, chef de troupe de la Première Port-Marly**
 </p>

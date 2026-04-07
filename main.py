@@ -754,7 +754,7 @@ class ScoutWorkspace(QMainWindow):
         except ImportError:
             __version__ = "0.1.0-beta"
             APP_NAME = "ScoutRaider Suite"
-            APP_AUTHOR = "Association E.S.T.P"
+            APP_AUTHOR = "Pierre-Albéric Théobald, chef de troupe de la Première Port-Marly"
 
         QMessageBox.about(self, f"À propos de {APP_NAME}",
             f"<h2>{APP_NAME}</h2>"
