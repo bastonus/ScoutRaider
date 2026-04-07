@@ -447,14 +447,27 @@ class ScoutWorkspace(QMainWindow):
         # --- AUTO-UPDATER ---
         self._check_for_updates()
 
-    def _check_for_updates(self):
+    def _check_for_updates(self, manual=False):
         """Démarre le thread de vérification des mises à jour en arrière-plan."""
         self.updater_thread = UpdateCheckerThread()
+        self.updater_thread.manual_mode = manual
         self.updater_thread.update_available.connect(self._on_update_available)
+        self.updater_thread.error_occurred.connect(self._on_update_error)
+        self.updater_thread.finished.connect(lambda: self._on_update_check_finished(manual))
         self.updater_thread.start()
+        if manual:
+            self.statusBar().showMessage("Vérification des mises à jour...", 3000)
+
+    def _on_update_check_finished(self, manual):
+        """Called when the update check thread finishes (even if no update found)."""
+        if manual and not hasattr(self, "_update_found_flag"):
+             QMessageBox.information(self, "Mise à jour", "Votre version de ScoutRaider Suite est à jour !")
+        if hasattr(self, "_update_found_flag"):
+            delattr(self, "_update_found_flag")
 
     def _on_update_available(self, tag, name, body, url):
         """Affiche une boîte de dialogue si une nouvelle version est trouvée."""
+        self._update_found_flag = True
         msg = QMessageBox(self)
         msg.setWindowTitle("Mise à jour disponible")
         msg.setText(f"Une nouvelle version <b>{tag}</b> ({name}) est disponible !")
@@ -469,6 +482,11 @@ class ScoutWorkspace(QMainWindow):
         if msg.clickedButton() == btn_yes:
             import webbrowser
             webbrowser.open(url)
+
+    def _on_update_error(self, error_msg):
+        """Affiche une erreur si la vérification manuelle échoue."""
+        if hasattr(self.updater_thread, 'manual_mode') and self.updater_thread.manual_mode:
+            QMessageBox.warning(self, "Mise à jour", error_msg)
 
     def _assemble_polygonal_steps(self, leg_routes=None):
         """Build the flat `polygonal_steps` array matching the current sequence of stages."""
@@ -672,6 +690,11 @@ class ScoutWorkspace(QMainWindow):
         
         # --- Aide ---
         help_menu = menubar.addMenu("&Aide")
+        
+        upd_act = QAction("🔄 Vérifier les mises à jour...", self)
+        upd_act.triggered.connect(lambda: self._check_for_updates(manual=True))
+        help_menu.addAction(upd_act)
+        help_menu.addSeparator()
         
         guide_act = QAction("📖 Guide du Raid", self)
         guide_act.setShortcut("F1")

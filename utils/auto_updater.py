@@ -27,6 +27,11 @@ class UpdateCheckerThread(QThread):
     Emits update_available(tag_name, release_name, release_body, html_url) if a newer version exists.
     """
     update_available = Signal(str, str, str, str)
+    error_occurred = Signal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.manual_mode = False
 
     def run(self):
         try:
@@ -40,6 +45,8 @@ class UpdateCheckerThread(QThread):
             if response.status_code == 200:
                 releases = response.json()
                 if not releases:
+                    if self.manual_mode:
+                        self.error_occurred.emit("Aucune release trouvée sur GitHub.")
                     return
                 # Get the most recent release
                 latest = releases[0]
@@ -56,6 +63,12 @@ class UpdateCheckerThread(QThread):
                         latest.get("body", ""),
                         latest.get("html_url", GITHUB_URL)
                     )
+                elif self.manual_mode:
+                    # Thread will finish and main window finished signal will handle success msg
+                    pass
+            elif self.manual_mode:
+                self.error_occurred.emit(f"Erreur API GitHub : {response.status_code}")
         except Exception as e:
-            # Silently fail update check if offline or rate limited
+            if self.manual_mode:
+                self.error_occurred.emit(f"Impossible de vérifier les mises à jour : {str(e)}")
             pass
