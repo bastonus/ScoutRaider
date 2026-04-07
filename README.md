@@ -1,6 +1,6 @@
 # 🏕️ ScoutRaider Suite — Générateur de Carnets de Raid
 
-> **Version Beta 0.1.4** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
+> **Version Beta 0.1.6** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
 > 
 > 👉 **[📥 TÉLÉCHARGER LA DERNIÈRE VERSION (Windows, macOS, Linux)](https://github.com/bastonus/ScoutRaider-Suite/releases/latest)**
 
@@ -78,33 +78,35 @@ ScoutRaider Suite est un outil conçu pour les **chefs et cheftaines scouts** (G
 
 ## 📦 Installation
 
-### Prérequis
+### ✅ Installation en 1 clic (Recommandé)
 
-- **Python 3.9+** avec pip
-- **Accès Internet** (pour les fonds de carte et le routage BRouter)
+| Plateforme | Téléchargement | Instructions |
+|---|---|---|
+| 🪟 **Windows** | [`ScoutRaider-Suite-Windows-Setup.exe`](https://github.com/bastonus/ScoutRaider-Suite/releases/latest) | Double-cliquez pour installer |
+| 🍎 **macOS** | [`ScoutRaider-Suite-macOS.dmg`](https://github.com/bastonus/ScoutRaider-Suite/releases/latest) | Glissez l'app dans Applications |
+| 🐧 **Linux** | [`ScoutRaider-Suite-Linux.AppImage`](https://github.com/bastonus/ScoutRaider-Suite/releases/latest) | `chmod +x *.AppImage` puis lancez |
 
-### Installation rapide
+> Aucune installation de Python requise.
+
+### Depuis les sources (développeurs)
 
 ```bash
 # 1. Cloner le dépôt
 git clone https://github.com/bastonus/ScoutRaider-Suite.git
-cd scout-design-suite/Generateur_Carnet
+cd ScoutRaider-Suite/Generateur_Carnet
 
 # 2. Installer les dépendances
-pip install -r requirements.txt
+python install.py
 
 # 3. Lancer l'application
 python main.py
 ```
 
-### Créer un exécutable (optionnel)
+### Créer un exécutable manuellement
 
 ```bash
-# Installer PyInstaller
 pip install pyinstaller
-
-# Lancer le build
-python build.py
+pyinstaller ScoutRaider-Suite.spec --noconfirm
 ```
 
 L'exécutable sera généré dans le dossier `dist/ScoutRaider-Suite/`.
@@ -169,7 +171,6 @@ Generateur_Carnet/
 
 ScoutRaider Suite est en **Beta**. Voici les améliorations prévues :
 
-- 📦 **Distribution & Packaging** — Création d'installeurs (`.exe`, `.dmg`) et d'un **chercheur de mise à jour automatique** via GitHub
 - 🔴 **Recherche inline** façon Google Maps intégrée au panneau
 - 🔴 **Drag & Drop** des étapes sur la carte et dans la liste
 - 🟡 **Import GPX / KML** depuis d'autres applications GPS

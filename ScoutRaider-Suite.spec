@@ -98,7 +98,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='NONE',  # TODO: Replace with app icon path (e.g., 'assets/icon.ico')
+    icon='assets/icon.ico',
 )
 
 coll = COLLECT(

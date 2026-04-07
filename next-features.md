@@ -263,20 +263,21 @@ Ajout de curseur custom pour les outils, ainsi que des preview au survol des out
 - [ ] Quand l'outil Route est actif, permettre de cliquer sur un marqueur d'étape (A, B, C…) pour insérer un nœud de segmentation juste après cette étape
 - [ ] Recalculer l'itinéraire entre les étapes concernées
 
-### 25. 🔴 Distribution & Packaging
+### 25. ✅ Distribution & Packaging
 > Fichiers : `ScoutRaider-Suite.spec`, nouveaux scripts de build
-- [ ] **Windows** : créer un installeur `.exe` avec PyInstaller ou Inno Setup
+- [x] **Windows** : créer un installeur `.exe` avec PyInstaller ou Inno Setup
   - 🔧 Le fichier `.spec` existe déjà mais nécessite une mise à jour
-  - [ ] Inclure toutes les dépendances (PySide6, reportlab, etc.)
-  - [ ] Ajouter une icône et un splash screen
-- [ ] **macOS** : créer un `.dmg` avec `py2app`
-- [ ] **Linux** : créer un `.AppImage` ou un `.deb`
-- [ ] **Versioning** : mettre en place un système de versions (SemVer)
-  - [ ] Fichier `version.py` ou `__version__` centralisé
-  - [ ] Changelog automatique via GitHub Actions
-- [ ] **Releases GitHub** : automatiser la création de releases avec des artefacts de build
-- [x] **Auto-updater** : intégrer un chercheur de mise à jour qui vérifie les releases GitHub et propose de télécharger la dernière version à l'ouverture de l'application
-- [ ] **README.md orienté utilisateur** : installation en un clic, captures d'écran, vidéo démo
+  - [x] Inclure toutes les dépendances (PySide6, reportlab, etc.)
+  - [x] Ajouter une icône
+- [x] **macOS** : créer un `.dmg` avec `create-dmg`
+- [x] **Linux** : créer un `.AppImage` avec `appimagetool`
+- [x] **Versioning** : mettre en place un système de versions (SemVer)
+  - [x] Fichier `version.py` centralisé
+  - [x] Changelog automatique via GitHub Actions
+- [x] **Releases GitHub** : automatiser la création de releases avec des artefacts de build natifs
+- [x] **Auto-updater** : intégrer un chercheur de mise à jour qui vérifie les releases GitHub
+- [x] **README.md orienté utilisateur** : installation en un clic, captures d'écran, guide rapide
+
 
 ### 26. 🔴 Version Mobile (Compagnon & Création)
 > Déclinaison de ScoutRaider Suite pour iOS & Android

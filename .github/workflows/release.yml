@@ -57,6 +57,8 @@ jobs:
           SolidCompression=yes
           WizardStyle=modern
           PrivilegesRequired=lowest
+          SetupIconFile=dist\ScoutRaider-Suite\assets\icon.ico
+          UninstallDisplayIcon={app}\ScoutRaider-Suite.exe
           
           [Languages]
           Name: "french"; MessagesFile: "compiler:Languages\French.isl"
