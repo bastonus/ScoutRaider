@@ -7,4 +7,10 @@ shapely
 numpy
 matplotlib
 python-dotenv
+python-docx
+odfpy
+geographiclib
+Pillow
+cairosvg
+svglib
 winsdk; sys_platform == 'win32'

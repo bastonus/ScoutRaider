@@ -6,7 +6,7 @@ from utils.pdf_helpers import *
 def generate(c, w_pdf, y_current, segments, config, categories, is_sol, step_num):
     msgs_to_calc = []
     for s in segments:
-        poi_str = get_nearest_poi(s['coords'][0][0], s['coords'][0][1])
+        poi_str = get_nearest_poi(s['coords'])
         clair = generate_prohibition_text(s.get('distance', s.get('properties', {}).get('metrage', 0)), s.get('azimut', s.get('properties', {}).get('azimut', 0)), poi_str)
         msgs_to_calc.append({'clair': clair, 'encoded': clair, 'type': 'clair'})
         

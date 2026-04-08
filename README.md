@@ -4,7 +4,7 @@
 
 # 🏕️ ScoutRaider Suite — Générateur de Carnets de Raid
 
-> **Version Beta 0.1.7** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
+> **Version Beta 0.1.8** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
 > 
 > 👉 **[📥 TÉLÉCHARGER LA DERNIÈRE VERSION (Windows, macOS, Linux)](https://github.com/bastonus/ScoutRaider-Suite/releases/latest)**
 
@@ -74,6 +74,7 @@ ScoutRaider Suite est un outil conçu pour les **chefs et cheftaines scouts** (G
 | 🎲 **11 modules d'épreuves** | Morse, Vigenère, azimut-distance, carte IGN, cadran solaire, etc. |
 | ⚠️ **Alerte routes dangereuses** | Détection des portions à grande vitesse (motorways, nationales) |
 | 📄 **Export PDF** | Carnet participant + carnet solution, thèmes visuels personnalisables |
+| 🌐 **Export HTML/DOCX** | **[BETA]** Formats expérimentaux, non recommandés pour l'usage terrain actuel |
 | 📊 **Export CSV** | Export des nœuds avec coordonnées, azimuts et métrages |
 | 💾 **Sauvegarde projet** | Format `.scoutproj` avec undo/redo complet |
 | 🎨 **10 thèmes** | Contrebandier, Vikings, Mafia, Roi Soleil, Chevalerie, Gaulois, WW1, WW2, LOTR, Napoléon |

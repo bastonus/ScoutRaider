@@ -26,6 +26,7 @@ SCALE_M_TO_PT = 0.113384
 ZOOM_LEVEL = 15
 IGN_LAYER = "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2"
 GLOBAL_POIS = []
+_USED_POI_CACHE = set()  # Tracks recently used POI descriptions to avoid repetition
 TILE_CACHE = {}
 CURRENT_THEME = "La Mafia"
 THEME_DATA = {}
@@ -42,8 +43,9 @@ with open(themes_path, 'r', encoding='utf-8') as f:
     THEME_DATA = data
 
 def set_global_pois(pois):
-    global GLOBAL_POIS
+    global GLOBAL_POIS, _USED_POI_CACHE
     GLOBAL_POIS = pois
+    _USED_POI_CACHE = set()  # Reset cache on each new export
 
 def dist_m(p1, p2):
     # p1, p2 are (lon, lat)
@@ -128,36 +130,56 @@ def reverse_geocode(lat, lon):
     except:
         return "Localisation indisponible"
 
-def get_nearest_poi(lon, lat):
-    if lon is None or lat is None or not GLOBAL_POIS: return None
-    best = None
-    best_dist = float('inf')
+def get_nearest_poi(coords_list):
+    global _USED_POI_CACHE
+    if not coords_list or not GLOBAL_POIS: return None
     
-    # 1. Find nearest amenity/shop/historic (within 150m)
-    for poi in GLOBAL_POIS:
-        if 'highway' in poi['tags']: continue
-        dlat = (poi['lat'] - lat) * 111000
-        dlon = (poi['lon'] - lon) * 111000 * math.cos(math.radians(lat))
-        dist = math.sqrt(dlat**2 + dlon**2)
-        if dist < 150 and dist < best_dist:
-            best_dist = dist
-            best = poi
+    global_best = None
+    global_best_dist = float('inf')
+    global_best_street = ""
+    
+    # We sample every 5th point to optimize if the segment has many points
+    sample_coords = coords_list[::5] if len(coords_list) > 20 else coords_list
+    if coords_list[-1] not in sample_coords:
+        sample_coords.append(coords_list[-1])
+        
+    for pt in sample_coords:
+        if not pt or len(pt) < 2: continue
+        lon, lat = pt[0], pt[1]
+        
+        best = None
+        best_dist = float('inf')
+        
+        # 1. Find nearest amenity/shop/historic (within 150m)
+        for poi in GLOBAL_POIS:
+            if 'highway' in poi['tags']: continue
+            dlat = (poi['lat'] - lat) * 111000
+            dlon = (poi['lon'] - lon) * 111000 * math.cos(math.radians(lat))
+            dist = math.sqrt(dlat**2 + dlon**2)
+            if dist < 150 and dist < best_dist:
+                best_dist = dist
+                best = poi
+                
+        if best and best_dist < global_best_dist:
+            global_best_dist = best_dist
+            global_best = best
             
-    # 2. Find nearest street for context
-    street_name = ""
-    best_road_dist = float('inf')
-    for poi in GLOBAL_POIS:
-        if 'highway' not in poi['tags']: continue
-        dlat = (poi['lat'] - lat) * 111000
-        dlon = (poi['lon'] - lon) * 111000 * math.cos(math.radians(lat))
-        dist = math.sqrt(dlat**2 + dlon**2)
-        if dist < 50 and dist < best_road_dist:
-            best_road_dist = dist
-            tags = poi['tags']
-            street_name = tags.get('name', tags.get('ref', ''))
+            # 2. Find nearest street for context for this specific POI
+            best_road_dist = float('inf')
+            street_name = ""
+            for poi in GLOBAL_POIS:
+                if 'highway' not in poi['tags']: continue
+                dlat = (poi['lat'] - lat) * 111000
+                dlon = (poi['lon'] - lon) * 111000 * math.cos(math.radians(lat))
+                dist = math.sqrt(dlat**2 + dlon**2)
+                if dist < 50 and dist < best_road_dist:
+                    best_road_dist = dist
+                    tags = poi['tags']
+                    street_name = tags.get('name', tags.get('ref', ''))
+            global_best_street = street_name
 
-    if best:
-        tags = best['tags']
+    if global_best:
+        tags = global_best['tags']
         name = tags.get('name', '')
         poi_type = "un bâtiment"
         if 'amenity' in tags:
@@ -169,14 +191,19 @@ def get_nearest_poi(lon, lat):
             elif v == 'hospital': poi_type = "l'infirmerie"
         elif 'shop' in tags:
             v = tags['shop']
-            if v == 'bakery': poi_type = "la boulangerie (une couverture)"
+            if v == 'bakery': poi_type = "la boulangerie"
             elif v == 'alcohol': poi_type = "notre planque à gnôle"
         elif 'historic' in tags:
             poi_type = "un monument chargé d'histoire"
             
         full_desc = f"{poi_type}"
-        if name: full_desc += f" nommé '{name}'"
-        if street_name: full_desc += f" {street_name}"
+        if name: full_desc += f" {name}"       # No quotes around the name
+        if global_best_street: full_desc += f", {global_best_street}"
+        
+        # Anti-repetition: if this exact description was already used, skip it
+        if full_desc in _USED_POI_CACHE:
+            return None
+        _USED_POI_CACHE.add(full_desc)
         return full_desc
     return None
 
@@ -809,6 +836,7 @@ def draw_global_map_page(c, w_pdf, h_pdf, title, coords_list, line_color, is_pol
         
     c.setFont("Helvetica-Bold", 8)
     for poi in GLOBAL_POIS:
+        if 'highway' in poi.get('tags', {}): continue
         lat, lon = poi['lat'], poi['lon']
         if min_lon <= lon <= max_lon and min_lat <= lat <= max_lat:
             px, py = get_pos(lon, lat)
@@ -816,7 +844,7 @@ def draw_global_map_page(c, w_pdf, h_pdf, title, coords_list, line_color, is_pol
             c.setFillColorRGB(0.8, 0, 0.8)
             c.circle(px, py, 3, fill=1)
             c.setFillColorRGB(0, 0, 0)
-            c.drawString(px + 4, py - 3, poi.get('name', 'POI'))
+            c.drawString(px + 4, py - 3, poi.get('tags', {}).get('name', 'POI'))
             
     c.showPage()
 

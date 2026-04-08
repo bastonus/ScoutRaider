@@ -1,9 +1,21 @@
-# ScoutRaider Suite — Roadmap des Fonctionnalités
+# ScoutRaider Suite \u2014 Roadmap des Fonctionnalit\u00E9s
 
 > **Légende :**
 > - 🟢 **Facile** (< 2h, changements isolés) — 🟡 **Moyen** (2–6h, multi-fichiers) — 🔴 **Difficile** (> 6h, architecture lourde)
 > - ⭐ Priorité : **P0** = Critique/Bloquant — **P1** = Important — **P2** = Amélioration — **P3** = Nice-to-have
 > - ✅ Déjà implémenté — 🔧 Partiellement implémenté
+
+---
+
+## 📦 v0.1.8-beta (Latest) — 08/04/2026
+
+Cette version finalise la structure multi-onglets et améliore la fidélité des exports.
+
+- [x] **Multi-Project Tabbed Workspace** : Support complet pour travailler sur plusieurs itinéraires simultanément.
+- [x] **Export Format Parity** : Amélioration des exports HTML, DOCX et ODT (Rendu des images IGN, diagrammes Gilwell, etc.).
+- [x] **[ATTENTION]** Les exports HTML, DOCX et ODT sont marqués comme **BETA** et ne sont pas encore certifiés pour l'usage terrain. Utilisez le PDF pour vos raids.
+- [x] **Theme Editor Panel** :Nouvel outil pour créer et modifier vos thèmes visuels.
+- [x] **Corrections de bugs** : Résolution des erreurs de POI et des crashs lors de la génération PDF.
 
 ---
 

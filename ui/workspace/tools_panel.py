@@ -13,14 +13,15 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QGroupBox, QSlider, QCheckBox, QScrollArea,
-                               QFileDialog, QMessageBox)
+                               QFileDialog, QMessageBox, QTabWidget, QComboBox)
 from PySide6.QtCore import Qt, Signal, QThread
 
 class ToolsPanel(QWidget):
     """Segmentation controls — curve sensitivity, min length, options."""
     map_needs_update = Signal()
-    poly_needs_update = Signal()
+    polygonalization_finished = Signal()
     manual_recalc_requested = Signal()
+    poly_recalc_started = Signal(list) # Emitted with old assignments metadata
     
     analysis_cache = {"points": [], "indices": [], "instr_count": 0}
 
@@ -38,9 +39,14 @@ class ToolsPanel(QWidget):
         layout.setSpacing(2)
 
         # ── SEGMENTATION CONTROLS ──────────────────────────
-        group_poly = QGroupBox("SEGMENTATION")
+        group_poly = QGroupBox("PR\u00C9PARATION DES SEGMENTS")
         poly_layout = QVBoxLayout()
         poly_layout.setSpacing(4)
+        
+        desc_poly = QLabel("D\u00E9coupez votre itin\u00E9raire en segments directionnels pr\u00EAts \u00E0 \u00EAtre encod\u00E9s.")
+        desc_poly.setStyleSheet("color: #94a3b8; font-size: 11px; font-style: italic; margin-bottom: 4px;")
+        desc_poly.setWordWrap(True)
+        poly_layout.addWidget(desc_poly)
         
         # Tolérance
         tol_row = QHBoxLayout()
@@ -97,26 +103,17 @@ class ToolsPanel(QWidget):
         group_poly.setLayout(poly_layout)
         layout.addWidget(group_poly)
 
-        # ── EXPORT ─────────────────────────────────────────
-        group_export = QGroupBox("EXPORT")
-        export_layout = QVBoxLayout()
-        export_layout.setSpacing(4)
-
-        self.btn_export_csv = QPushButton("⬇ Exporter les nœuds (CSV)")
-        self.btn_export_csv.setToolTip(
-            "Exporter la liste des nœuds avec coordonnées GPS, azimut, métrage, technique et tronçon")
-        self.btn_export_csv.clicked.connect(self._export_csv)
-        export_layout.addWidget(self.btn_export_csv)
-
-        group_export.setLayout(export_layout)
-        layout.addWidget(group_export)
-
         layout.addStretch()
 
         scroll.setWidget(inner)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
+
+    def set_state_manager(self, state_manager):
+        """Rebind this panel to a different StateManager (multi-tab support)."""
+        self.state_manager = state_manager
+        self.refresh_from_state()
 
     # ── Callbacks ──────────────────────────
 
@@ -178,13 +175,13 @@ class ToolsPanel(QWidget):
             })
         
         self.state_manager.update_state("polygonal_steps", segments)
-        self.poly_needs_update.emit()
+        self.polygonalization_finished.emit()
         self.map_needs_update.emit()
 
     def on_arrows_toggled(self, state):
         show = (state == Qt.Checked.value or state == Qt.Checked)
         self.state_manager.update_state("show_azimuth_arrows", show)
-        self.poly_needs_update.emit()
+        self.polygonalization_finished.emit()
 
     def refresh_from_state(self):
         poly_settings = self.state_manager.get_state("polygonalization_settings", {})
@@ -195,127 +192,3 @@ class ToolsPanel(QWidget):
 
         show_arrows = self.state_manager.get_state("show_azimuth_arrows", True)
         self.chk_arrows.setChecked(show_arrows)
-
-    # ── CSV Export ─────────────────────────────────────────
-
-    def _export_csv(self):
-        """Export polygonal nodes as CSV with GPS coords, azimuth, distance, technique, tronçon label."""
-        steps = self.state_manager.get_state("polygonal_steps", [])
-        if not steps:
-            QMessageBox.warning(self, "Export CSV",
-                "Aucun segment disponible.\nLancez d'abord la segmentation (\"Recalculer les segments\").")
-            return
-
-        filepath, _ = QFileDialog.getSaveFileName(
-            self, "Exporter les nœuds en CSV",
-            "noeuds_itineraire.csv",
-            "Fichier CSV (*.csv);;Tous les fichiers (*.*)")
-        if not filepath:
-            return
-
-        # ── Data sources ──────────────────────────────────
-        manual_assigns = self.state_manager.get_state("custom_assignments", {})
-        auto_assigns   = self.state_manager.get_state("auto_assignments", {})
-        stages         = self.state_manager.get_state("stages", [])  # [{lat, lon, label}]
-
-        # ── Build tronçon boundaries ──────────────────────
-        # For each segment, determine which tronçon (A→B, B→C…) it belongs to.
-        # Strategy: find the closest waypoint (stage) to each segment's start node,
-        # then assign tronçon based on the previous and next stage labels.
-        def _haversine_m(lat1, lon1, lat2, lon2):
-            R = 6371000
-            phi1, phi2 = math.radians(lat1), math.radians(lat2)
-            dphi = math.radians(lat2 - lat1)
-            dlam = math.radians(lon2 - lon1)
-            a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlam/2)**2
-            return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-        # stages sorted by their natural label order (A, B, C…)
-        sorted_stages = sorted(stages, key=lambda s: s.get("label", ""))
-
-        # For each stage, find the segment index whose start node is closest to that stage
-        stage_seg_indices = []  # parallel to sorted_stages
-        for stage in sorted_stages:
-            slat, slon = stage["lat"], stage["lon"]
-            best_idx, best_d = 0, float("inf")
-            for i, seg in enumerate(steps):
-                coords = seg.get("coords", [])
-                if not coords:
-                    coords = seg.get("properties", {}).get("coords_intersection", None)
-                    if coords:
-                        node_lon, node_lat = coords[0], coords[1]
-                    else:
-                        continue
-                else:
-                    node_lon, node_lat = coords[0][0], coords[0][1]
-                d = _haversine_m(slat, slon, node_lat, node_lon)
-                if d < best_d:
-                    best_d, best_idx = d, i
-            stage_seg_indices.append(best_idx)
-
-        def _troncon_label(seg_idx):
-            """Return label like 'A→B' for the given segment index."""
-            if not sorted_stages or len(sorted_stages) < 2:
-                return ""
-            # Find between which two consecutive stages this segment sits
-            for k in range(len(stage_seg_indices) - 1):
-                lo = stage_seg_indices[k]
-                hi = stage_seg_indices[k + 1]
-                # Normalise in case stages aren't perfectly ordered by seg index
-                if lo > hi:
-                    lo, hi = hi, lo
-                if lo <= seg_idx <= hi:
-                    lbl_a = sorted_stages[k].get("label", str(k))
-                    lbl_b = sorted_stages[k + 1].get("label", str(k + 1))
-                    return f"{lbl_a}\u2192{lbl_b}"
-            # Fallback: before first stage or after last
-            if seg_idx < stage_seg_indices[0]:
-                return f"?\u2192{sorted_stages[0].get('label', 'A')}"
-            return f"{sorted_stages[-1].get('label', '?')}\u2192?"
-
-        # ── Write CSV ─────────────────────────────────────
-        try:
-            with open(filepath, 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.writer(f, delimiter=';')
-                writer.writerow([
-                    "N°", "Latitude", "Longitude",
-                    "Azimut (°)", "Métrage (m)",
-                    "Technique", "Tronçon"
-                ])
-                for i, seg in enumerate(steps):
-                    props    = seg.get("properties", {})
-                    coords   = seg.get("coords", [])
-                    azimut   = seg.get("azimut",   props.get("azimut",  ""))
-                    metrage  = seg.get("distance",  props.get("metrage", ""))
-
-                    # Start-node GPS
-                    if coords:
-                        node_lon, node_lat = coords[0][0], coords[0][1]
-                    else:
-                        ci = props.get("coords_intersection")
-                        if ci:
-                            node_lon, node_lat = ci[0], ci[1]
-                        else:
-                            node_lat = node_lon = ""
-
-                    # Technique: manual override → auto assignment → blank
-                    technique = (manual_assigns.get(str(i))
-                                 or auto_assigns.get(str(i))
-                                 or "")
-
-                    troncon = _troncon_label(i)
-
-                    # Format coords to 6 decimal places
-                    lat_str = f"{node_lat:.6f}".replace('.', ',') if isinstance(node_lat, float) else node_lat
-                    lon_str = f"{node_lon:.6f}".replace('.', ',') if isinstance(node_lon, float) else node_lon
-
-                    writer.writerow([
-                        i + 1, lat_str, lon_str,
-                        azimut, metrage,
-                        technique, troncon
-                    ])
-
-            QMessageBox.information(self, "Export CSV",
-                f"✓ {len(steps)} nœuds exportés avec succès !\n{filepath}")
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur export CSV", str(e))

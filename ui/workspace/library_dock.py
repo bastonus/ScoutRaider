@@ -155,3 +155,9 @@ class LibraryDock(QWidget):
                 return
         
         self.load_methods()
+
+    def set_state_manager(self, state_manager):
+        """Rebind this panel to a different StateManager (multi-tab support)."""
+        self.state_manager = state_manager
+        # Library content is static (module list), no state-driven refresh needed
+

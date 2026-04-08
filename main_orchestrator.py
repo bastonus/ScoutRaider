@@ -61,6 +61,7 @@ class Orchestrator:
         self._session_history = [] # For occurrence counts
 
         self.load_config()
+        self._cancelled = False
         self.load_categories()
         self.load_and_check_modules()
 
@@ -114,6 +115,9 @@ class Orchestrator:
             except subprocess.CalledProcessError as e:
                 print(f"Erreur d'installation des dépendances pour {module_name}. Erreur: {e}")
                 sys.exit(1)
+
+    def cancel(self):
+        self._cancelled = True
 
     def load_trajectory(self, geojson_path):
         """
@@ -253,17 +257,16 @@ class Orchestrator:
         self.state_manager.update_state("custom_assignments", assign)
         return path_plan
 
-    def generate_pdf_from_gui(self, output_dir=None, progress_callback=None):
+    def generate_export_from_gui(self, fmt="pdf", output_dir=None, progress_callback=None, opts=None):
         """
         Consumes the UI user assignments, handles logical module fusions, 
-        and dispatches generation to the PDF assembler.
+        and dispatches generation to the appropriate export format.
         
         Args:
-            output_dir (str): Directory where the PDFs should be created.
+            fmt (str): format of export ('pdf', 'html', 'docx', 'odt')
+            output_dir (str): Directory where the files should be created.
             progress_callback (callable, optional): Callback for progress updates.
-            
-        Returns:
-            tuple: Path to participant PDF, path to solution PDF.
+            opts (dict, optional): Specific options for the format export.
         """
         if not self.state_manager:
             raise ValueError("State manager non défini dans l'orchestrateur")
@@ -310,10 +313,25 @@ class Orchestrator:
         if current_mod:
             path_plan.append((current_mod, current_start, current_count))
             
-        print(f"--- FUSION LOGIQUE: {len(path_plan)} étapes finales après regroupement ---")
+        if self._cancelled: return None
+        
+        print(f"--- FUSION LOGIQUE: {len(path_plan)} \u00E9tapes finales apr\u00E8s regroupement ---")
         if progress_callback: progress_callback(f"Fusion logique : {len(path_plan)} étapes après regroupement...", 5)
-        pdf_part, pdf_sol = self.assemble_carnet(path_plan, output_dir=output_dir, progress_callback=progress_callback)
-        return pdf_part, pdf_sol
+        
+        if fmt == "pdf":
+            return self.assemble_carnet(path_plan, output_dir=output_dir, progress_callback=progress_callback)
+        elif fmt == "html":
+            from utils.export_html import export_html
+            return export_html(self, path_plan, output_dir=output_dir, progress_callback=progress_callback, opts=opts)
+        elif fmt == "docx":
+            from utils.export_docx import export_docx
+            return export_docx(self, path_plan, output_dir=output_dir, progress_callback=progress_callback, opts=opts)
+        elif fmt == "odt":
+            from utils.export_odt import export_odt
+            return export_odt(self, path_plan, output_dir=output_dir, progress_callback=progress_callback, opts=opts)
+        else:
+            raise ValueError(f"Format d'export inconnu: {fmt}")
+
 
 
     def assemble_carnet(self, path_plan, output_dir=None, progress_callback=None):
@@ -330,6 +348,7 @@ class Orchestrator:
         out = output_dir if (output_dir and os.path.isdir(output_dir)) else PROJECT_ROOT
 
         for sol in [False, True]:
+            if self._cancelled: break
             role = "Solution" if sol else "Participant"
             if progress_callback: progress_callback(f"Début Génération PDF {role}...", 15 if not sol else 60)
             
@@ -382,7 +401,8 @@ class Orchestrator:
                 used_mods.add(mod_name)
                 module_impl = self.modules.get(mod_name)
                 
-                step_msg = f"[{role}] Étape {idx+1}/{len(path_plan)} : {mod_name.upper()}"
+                if self._cancelled: break
+                step_msg = f"[{role}] \u00C9tape {idx+1}/{len(path_plan)} : {mod_name.upper()}"
                 p = (15 if not sol else 60) + int((idx / len(path_plan)) * 30)
                 if progress_callback: progress_callback(step_msg, p)
                 

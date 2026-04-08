@@ -1039,6 +1039,11 @@ class RoutePanel(QWidget):
         """Full refresh from state — called by main window."""
         self._rebuild_stage_list()
 
+    def set_state_manager(self, state_manager):
+        """Rebind this panel to a different StateManager (multi-tab support)."""
+        self.state_manager = state_manager
+        self.refresh_from_state()
+
     # Legacy compatibility aliases
     _rebuild_list = refresh_from_state
 

@@ -7,15 +7,18 @@ import sys
 import json
 import logging
 import math
+import tempfile
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                 QHBoxLayout, QLabel, QProgressDialog, QDockWidget, 
                                 QStatusBar, QMessageBox, QFileDialog, QInputDialog, 
                                 QTabWidget, QTabBar, QRubberBand, QDialog, 
                                 QPushButton, QListWidget, QListWidgetItem, 
-                                QTextEdit, QProgressBar, QPlainTextEdit)
-from PySide6.QtCore import Qt, QTimer, QThread, QSettings, QByteArray, QMutex
-from PySide6.QtGui import QAction, QActionGroup, QIcon
+                                QTextEdit, QProgressBar, QPlainTextEdit, QToolButton,
+                                QSizePolicy)
+from PySide6.QtCore import Qt, QTimer, QThread, QSettings, QByteArray, QMutex, QSize
+from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence, QShortcut
 
 # Ensure project root is in path
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -285,27 +288,47 @@ class _ExportWorker(QThread):
     export_done = _Signal(bool, str, str, str)
     progress_update = _Signal(str, int)
 
-    def __init__(self, state_manager, output_dir=None):
+    def __init__(self, state_manager, output_dir=None, fmt="pdf", opts=None):
         super().__init__()
         self.state_manager = state_manager
         self.output_dir = output_dir
+        self.fmt = fmt
+        self.opts = opts or {}
+        self.orch = None
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
+        if self.orch:
+            self.orch.cancel()
 
     def run(self):
         try:
-            self.progress_update.emit("Démarrage de l'orchestrateur...", 0)
+            self.progress_update.emit(f"D\u00E9marrage de l'orchestrateur pour l'export {self.fmt.upper()}...", 0)
             from main_orchestrator import Orchestrator
-            orch = Orchestrator(self.state_manager)
+            self.orch = Orchestrator(self.state_manager)
 
             def cb(msg, p=None):
                 self.progress_update.emit(msg, p if p is not None else -1)
 
-            # PASSING output_dir and callback to generate_pdf_from_gui
-            paths = orch.generate_pdf_from_gui(output_dir=self.output_dir, progress_callback=cb)
+            paths = self.orch.generate_export_from_gui(
+                fmt=self.fmt,
+                output_dir=self.output_dir, 
+                progress_callback=cb,
+                opts=self.opts
+            )
+
+            if self._cancelled:
+                self.export_done.emit(False, "Exportation annul\u00E9e par l'utilisateur", "", "")
+                return
 
             if isinstance(paths, tuple) and len(paths) == 2:
                 pdf_part, pdf_sol = paths
+            elif isinstance(paths, str):
+                pdf_part = paths
+                pdf_sol = ""
             else:
-                # Fallback : chercher par nom de thème
+                # Fallback : chercher par nom de thème pour les anciens retours (ça ne devrait plus arriver avec generate_export_from_gui)
                 import utils.pdf_helpers as ph
                 base = ph.get_theme_label('filename', 'Carnet_Contrebandier')
                 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -319,71 +342,53 @@ class _ExportWorker(QThread):
             import traceback
             self.export_done.emit(False, traceback.format_exc(), "", "")
 
-
-class ExportProgressDialog(QDialog):
-    """Dialogue de progression détaillé avec console de log."""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Génération du Carnet Scout")
-        self.setMinimumSize(600, 450)
-        self.setWindowModality(Qt.WindowModal)
-        
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
-        
-        # Titre et indicateur de phase
-        self.title_label = QLabel("<b>Préparation de l'export...</b>")
-        self.title_label.setStyleSheet("font-size: 14px;")
-        layout.addWidget(self.title_label)
-        
-        # Barre de progression
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 2px solid #333;
-                border-radius: 5px;
-                text-align: center;
-                height: 25px;
-                background: #1e1e1e;
-            }
-            QProgressBar::chunk {
-                background-color: #5c5cff;
-                width: 20px;
-            }
-        """)
-        layout.addWidget(self.progress_bar)
-        
-        # Console de log
-        layout.addWidget(QLabel("Détails de la génération :"))
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
-        self.log_view.setStyleSheet("""
-            QPlainTextEdit {
-                background-color: #0c0c0c;
-                color: #00ff00;
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 11px;
-                border: 1px solid #444;
-            }
-        """)
-        layout.addWidget(self.log_view)
-        
-        # Bouton fermer (désactivé pendant l'export)
-        self.close_btn = QPushButton("Fermer")
-        self.close_btn.setEnabled(False)
-        self.close_btn.clicked.connect(self.accept)
-        layout.addWidget(self.close_btn)
-
-    def log(self, message, percentage=-1):
-        if percentage >= 0:
-            self.progress_bar.setValue(percentage)
-        
-        if message:
-            self.title_label.setText(f"<b>{message}</b>")
-            self.log_view.appendPlainText(f"> {message}")
-            # Auto-scroll
-            self.log_view.verticalScrollBar().setValue(self.log_view.verticalScrollBar().maximum())
+# ── Tab bar style ────────────────────────────────────────────────────────────
+PROJECT_TAB_STYLE = """
+QTabWidget#project_tabs::pane {
+    border: none;
+    background: #1e1e1e;
+    margin-top: 0;
+}
+QTabBar#project_tabbar {
+    background: #252525;
+    border-bottom: 1px solid #111;
+}
+QTabBar#project_tabbar::tab {
+    background: #2d2d2d;
+    color: #888;
+    padding: 6px 16px;
+    border: none;
+    border-right: 1px solid #1a1a1a;
+    border-bottom: 2px solid transparent;
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 100px;
+    max-width: 220px;
+}
+QTabBar#project_tabbar::tab:selected {
+    background: #1e1e1e;
+    color: #fff;
+    border-bottom: 2px solid #2d8ceb;
+}
+QTabBar#project_tabbar::tab:hover:!selected {
+    background: #333;
+    color: #ccc;
+}
+QTabBar#project_tabbar::tab:first {
+    border-top-left-radius: 3px;
+}
+QToolButton#tab_plus_btn {
+    background: #2d2d2d;
+    color: #aaa;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 4px 10px;
+    margin: 2px;
+    border-radius: 3px;
+}
+QToolButton#tab_plus_btn:hover { background: #3a3a3a; color: #fff; }
+"""
 
 
 class ScoutWorkspace(QMainWindow):
@@ -394,8 +399,7 @@ class ScoutWorkspace(QMainWindow):
         self.setWindowIcon(QIcon(os.path.join(PROJECT_ROOT, "assets", "icon.ico")))
         self.resize(1280, 800)
         
-        # 1. Core Services
-        self.state_manager = StateManager()
+        # 1. Core Services (shared across all tabs)
         self.presets_manager = PresetsManager()
         self.validator = ConstraintValidator()
         self.ign_client = IGNClient()
@@ -407,22 +411,21 @@ class ScoutWorkspace(QMainWindow):
         self._pending_alternatives = []
         self._pending_stages = []
         self._pending_leg_idx = -1
+        self._leg_choices = {}  # Cache for route choices: {key: geometry}
         
-        # 2. Central Widget = Map
-        self.map_view = MapView(self.state_manager)
-        self.setCentralWidget(self.map_view)
-        
+        # ── 2. Central Widget = PROJECT TABS ──────────────────────────────────
+        self._setup_project_tabs()
+
         # 3. Dockable Panels
         self.setup_docks()
         
         # 5. Connect Signals
-        self._leg_choices = {} # Cache for route choices: {key: geometry}
-        self._route_selection_mode = False
         self._connect_signals()
         
         # 6. Menus & Toolbars
         self.setup_menus()
         self.setup_toolbars()
+        self._setup_tab_shortcuts()
         
         # 7. Status Bar
         self.setStatusBar(QStatusBar(self))
@@ -444,6 +447,225 @@ class ScoutWorkspace(QMainWindow):
             
         # --- AUTO-UPDATER ---
         self._check_for_updates()
+
+    # ═══════════════════════════════════════════════════════
+    #  PROPERTIES — delegate to active tab for backward compat
+    # ═══════════════════════════════════════════════════════
+
+    @property
+    def state_manager(self):
+        tab = self._active_tab()
+        return tab.state_manager if tab else None
+
+    @property
+    def map_view(self):
+        tab = self._active_tab()
+        return tab.map_view if tab else None
+
+    @property
+    def export_panel(self):
+        """Backward-compat shim — returns the active tab's ExportGallery."""
+        tab = self._active_tab()
+        return tab.export_gallery if tab else None
+
+    # ═══════════════════════════════════════════════════════
+    #  PROJECT TABS SETUP
+    # ═══════════════════════════════════════════════════════
+
+    def _setup_project_tabs(self):
+        from ui.workspace.project_tab import ProjectTab
+
+        self.project_tabs = QTabWidget()
+        self.project_tabs.setObjectName("project_tabs")
+        self.project_tabs.setTabBar(QTabBar())
+        self.project_tabs.tabBar().setObjectName("project_tabbar")
+        self.project_tabs.setTabsClosable(True)
+        self.project_tabs.setMovable(True)
+        self.project_tabs.setDocumentMode(True)
+        self.project_tabs.setStyleSheet(PROJECT_TAB_STYLE)
+
+        # « + » button for new tab
+        self._btn_new_tab = QToolButton()
+        self._btn_new_tab.setObjectName("tab_plus_btn")
+        self._btn_new_tab.setText("+")
+        self._btn_new_tab.setToolTip("Nouveau projet (Ctrl+N)")
+        self._btn_new_tab.clicked.connect(self._new_tab)
+        self.project_tabs.setCornerWidget(self._btn_new_tab, Qt.TopRightCorner)
+
+        self.project_tabs.tabCloseRequested.connect(self._on_tab_close_requested)
+        self.project_tabs.currentChanged.connect(self._on_active_tab_changed)
+
+        self.setCentralWidget(self.project_tabs)
+
+        # Open first blank project
+        self._new_tab()
+
+    def _new_tab(self, path: str | None = None):
+        """Create and activate a new ProjectTab."""
+        from ui.workspace.project_tab import ProjectTab
+
+        tab = ProjectTab()
+        if path:
+            tab.load_project(path)
+        
+        title = tab.title
+        idx = self.project_tabs.addTab(tab, f"📄 {title}")
+        tab.title_changed.connect(lambda t, i=idx: self._update_tab_title(self.project_tabs.indexOf(tab), t))
+        tab.export_requested.connect(self._on_export_requested_from_tab)
+        tab.cancel_requested.connect(self._on_export_cancel)
+
+        self.project_tabs.setCurrentIndex(idx)
+        return tab
+
+    def _update_tab_title(self, idx: int, title: str):
+        if 0 <= idx < self.project_tabs.count():
+            self.project_tabs.setTabText(idx, f"📄 {title}")
+            # Also update main window title
+            self.setWindowTitle(f"ScoutRaider Suite — {title}")
+
+    def _active_tab(self):
+        """Return the currently active ProjectTab, or None."""
+        w = self.project_tabs.currentWidget() if hasattr(self, 'project_tabs') else None
+        return w
+
+    def _on_active_tab_changed(self, index: int):
+        """Rebind docks to the newly active tab."""
+        tab = self.project_tabs.widget(index)
+        if tab is None:
+            return
+        self._rebind_docks_to_tab(tab)
+        # Refresh title bar
+        self.setWindowTitle(f"ScoutRaider Suite — {tab.title}")
+        # Refresh UI panels from this tab's state
+        self._refresh_ui_for_tab(tab)
+
+    def _rebind_docks_to_tab(self, tab):
+        """
+        Reconnect all dock panels to the new active tab's StateManager.
+        We don't reconnect map_view signals here because MapView is owned
+        by the tab — each tab's MapView signals were connected in _connect_signals
+        via the property, but at that initial moment there's only one tab.
+        
+        For new tabs we connect lazily here.
+        """
+        sm = tab.state_manager
+        mv = tab.map_view
+
+        # Reconnect map_view → workspace signals (lazy for new tabs)
+        try:
+            mv.method_dropped.connect(self.on_method_dropped)
+            mv.segment_menu_requested.connect(self.on_segment_menu)
+            mv.node_menu_requested.connect(self.on_node_menu)
+            mv.azimut_updated.connect(self.on_azimut_manually_updated)
+            mv.segments_merged.connect(self.on_segments_merged)
+            mv.node_added.connect(self.on_node_added)
+            mv.node_removed.connect(self.on_node_removed)
+            mv.node_moved.connect(self.on_node_moved)
+            mv.batch_assign.connect(self.on_batch_assign)
+            mv.search_suggestions_requested.connect(self.on_map_search_autocomplete)
+            mv.calculate_route_with_points_requested.connect(self.on_ign_route_with_points)
+            mv.reset_route_requested.connect(self.on_reset_itinerary)
+            mv.basemap_changed.connect(self.on_basemap_changed)
+            mv.map_clicked.connect(self.on_map_clicked)
+            mv.stage_clicked.connect(self.on_stage_clicked)
+            mv.stage_hovered.connect(self.on_stage_hovered)
+            mv.stage_delete_requested.connect(self.on_stage_delete_requested)
+            mv.route_alternative_selected.connect(self.on_route_alternative_selected)
+            mv.danger_validated.connect(self.on_danger_validated)
+        except RuntimeError:
+            pass  # Already connected
+
+        # Reconnect dock panels to new StateManager
+        if hasattr(self, 'tools_panel'):
+            self.tools_panel.set_state_manager(sm)
+        if hasattr(self, 'route_panel'):
+            self.route_panel.set_state_manager(sm)
+        if hasattr(self, 'difficulty_panel'):
+            self.difficulty_panel.set_state_manager(sm)
+        if hasattr(self, 'theme_panel'):
+            self.theme_panel.set_state_manager(sm)
+        if hasattr(self, 'library_widget'):
+            self.library_widget.set_state_manager(sm)
+
+        # Connect StateManager → global handler
+        try:
+            sm.state_changed.connect(self.on_state_changed_globally)
+        except RuntimeError:
+            pass
+
+    def _refresh_ui_for_tab(self, tab):
+        """Refresh all dock panels to reflect the active tab's state."""
+        if hasattr(self, 'tools_panel'):
+            try: self.tools_panel.refresh_from_state()
+            except Exception: pass
+        if hasattr(self, 'route_panel'):
+            try: self.route_panel.refresh_from_state()
+            except Exception: pass
+        if hasattr(self, 'difficulty_panel'):
+            try: self.difficulty_panel.refresh_from_state()
+            except Exception: pass
+        if hasattr(self, 'theme_panel'):
+            try: self.theme_panel.refresh_from_state()
+            except Exception: pass
+        self.delayed_map_update(fit_bounds=True)
+
+    def _on_tab_close_requested(self, index: int):
+        if self.project_tabs.count() <= 1:
+            # Don't close the last tab — just reset it
+            tab = self.project_tabs.widget(index)
+            if tab:
+                tab.new_project()
+                self.project_tabs.setTabText(index, "📄 Nouveau projet")
+                self.refresh_ui()
+            return
+
+        tab = self.project_tabs.widget(index)
+        title = tab.title if tab else "ce projet"
+        res = QMessageBox.question(
+            self, "Fermer le projet",
+            f"Fermer « {title} » ?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if res == QMessageBox.Yes:
+            self.project_tabs.removeTab(index)
+
+    def _setup_tab_shortcuts(self):
+        # Ctrl+W  → close current tab
+        sc_close = QShortcut(QKeySequence("Ctrl+W"), self)
+        sc_close.activated.connect(lambda: self._on_tab_close_requested(self.project_tabs.currentIndex()))
+
+        # Ctrl+Tab → next tab
+        sc_next = QShortcut(QKeySequence("Ctrl+Tab"), self)
+        sc_next.activated.connect(self._next_tab)
+
+        # Ctrl+Shift+Tab → previous tab
+        sc_prev = QShortcut(QKeySequence("Ctrl+Shift+Tab"), self)
+        sc_prev.activated.connect(self._prev_tab)
+
+    def _next_tab(self):
+        n = self.project_tabs.count()
+        if n > 1:
+            self.project_tabs.setCurrentIndex((self.project_tabs.currentIndex() + 1) % n)
+
+    def _prev_tab(self):
+        n = self.project_tabs.count()
+        if n > 1:
+            self.project_tabs.setCurrentIndex((self.project_tabs.currentIndex() - 1) % n)
+
+    # ── Export routing (from tab's ExportGallery) ─────────────────────────────
+
+    def _on_export_requested_from_tab(self, fmt: str, opts: dict):
+        """Route export requests from any tab's ExportGallery to the pipeline."""
+        if fmt == "pdf":
+            self.run_export_pipeline(fmt="pdf", opts=opts)
+        elif fmt == "html":
+            self.run_export_pipeline(fmt="html")
+        elif fmt == "docx":
+            self.run_export_pipeline(fmt="docx")
+        elif fmt == "odt":
+            self.run_export_pipeline(fmt="odt")
+        elif fmt == "csv":
+            self.run_export_pipeline_csv(opts)
 
     def _check_for_updates(self, manual=False):
         """Démarre le thread de vérification des mises à jour en arrière-plan."""
@@ -539,43 +761,21 @@ class ScoutWorkspace(QMainWindow):
     # ═══════════════════════════════════════════════════════
     
     def _connect_signals(self):
-        # Map → Main
-        self.map_view.method_dropped.connect(self.on_method_dropped)
-        self.map_view.segment_menu_requested.connect(self.on_segment_menu)
-        self.map_view.node_menu_requested.connect(self.on_node_menu)
-        self.map_view.azimut_updated.connect(self.on_azimut_manually_updated)
-        self.map_view.segments_merged.connect(self.on_segments_merged)
-        self.map_view.node_added.connect(self.on_node_added)
-        self.map_view.node_removed.connect(self.on_node_removed)
-        self.map_view.node_moved.connect(self.on_node_moved)
-        self.map_view.batch_assign.connect(self.on_batch_assign)
-        self.map_view.search_suggestions_requested.connect(self.on_map_search_autocomplete)
-        self.map_view.calculate_route_with_points_requested.connect(self.on_ign_route_with_points)
-        self.map_view.reset_route_requested.connect(self.on_reset_itinerary)
-        self.map_view.basemap_changed.connect(self.on_basemap_changed)
-        self.map_view.map_clicked.connect(self.on_map_clicked)
-        self.map_view.stage_clicked.connect(self.on_stage_clicked)
-        self.map_view.stage_hovered.connect(self.on_stage_hovered)
-        self.map_view.stage_delete_requested.connect(self.on_stage_delete_requested)
-        self.map_view.route_alternative_selected.connect(self.on_route_alternative_selected)
-        self.map_view.danger_validated.connect(self.on_danger_validated)
+        # Map → Main (for the initial first tab)
+        self._rebind_docks_to_tab(self._active_tab())
+        
         # Segmentation Panel → Main
         self.tools_panel.map_needs_update.connect(self.delayed_map_update)
-        self.tools_panel.poly_needs_update.connect(self.on_poly_updated)
-        if hasattr(self.tools_panel, 'manual_recalc_requested'):
-            self.tools_panel.manual_recalc_requested.connect(self.on_routes_changed)
+        self.tools_panel.polygonalization_finished.connect(self.on_poly_updated)
+        self.tools_panel.poly_recalc_started.connect(self._on_poly_recalc_started)
         
         # Route Panel → Main
         self.route_panel.routes_changed.connect(self.on_routes_changed)
         self.route_panel.map_needs_update.connect(lambda: self.delayed_map_update())
         self.route_panel.stages_reordered.connect(self._on_stages_reordered)
         
-        # Difficulty Panel → Main
+        # Orchestration Panel → Main
         self.difficulty_panel.assignment_changed.connect(self.delayed_map_update)
-        self.difficulty_panel.trigger_export.connect(self.run_export_pipeline)
-        
-        # State Manager → Main
-        self.state_manager.state_changed.connect(self.on_state_changed_globally)
 
     # ═══════════════════════════════════════════════════════
     # STATE CHANGE HANDLER
@@ -876,42 +1076,46 @@ class ScoutWorkspace(QMainWindow):
         self.setTabPosition(Qt.RightDockWidgetArea, QTabWidget.North)
         self.setTabPosition(Qt.TopDockWidgetArea, QTabWidget.North)
         self.setTabPosition(Qt.BottomDockWidgetArea, QTabWidget.North)
+
+        # Dock panels are created with a placeholder StateManager;
+        # they are rebound to the active tab's SM via _rebind_docks_to_tab.
+        _sm = self.state_manager  # the first tab's SM
         
         # --- LEFT: Route Panel ---
         self.dock_route = QDockWidget("Itin\u00e9raire", self)
         self.dock_route.setObjectName("dock_itineraires")
-        self.route_panel = RoutePanel(self.state_manager)
+        self.route_panel = RoutePanel(_sm)
         self.dock_route.setWidget(self.route_panel)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.dock_route)
         
-        # --- GAUCHE : Segmentation (onglet avec Itinéraires) ---
-        self.dock_segmentation = QDockWidget("Segmentation", self)
+        # --- GAUCHE : Pr\u00E9paration des Segments ---
+        self.dock_segmentation = QDockWidget("Pr\u00E9paration des Segments", self)
         self.dock_segmentation.setObjectName("dock_segmentation")
-        self.tools_panel = ToolsPanel(self.state_manager)
+        self.tools_panel = ToolsPanel(_sm)
         self.dock_segmentation.setWidget(self.tools_panel)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.dock_segmentation)
         self.tabifyDockWidget(self.dock_route, self.dock_segmentation)
         
         # --- DROITE : Épreuves ---
-        self.dock_modules = QDockWidget("Modules", self)
+        self.dock_modules = QDockWidget("Codes & \u00C9preuves", self)
         self.dock_modules.setObjectName("dock_modules")
-        self.library_widget = LibraryDock(self.state_manager)
+        self.library_widget = LibraryDock(_sm)
         self.dock_modules.setWidget(self.library_widget)
         self.addDockWidget(Qt.RightDockWidgetArea, self.dock_modules)
         
-        # --- DROITE : Difficulté (onglet avec Épreuves) ---
-        self.dock_difficulty = QDockWidget("Difficulté", self)
+        # --- DROITE : Orchestration ---
+        self.dock_difficulty = QDockWidget("Orchestration Automatique", self)
         self.dock_difficulty.setObjectName("dock_difficulte")
-        self.difficulty_panel = DifficultyPanel(self.state_manager, self.presets_manager)
+        self.difficulty_panel = DifficultyPanel(_sm, self.presets_manager)
         self.dock_difficulty.setWidget(self.difficulty_panel)
         self.addDockWidget(Qt.RightDockWidgetArea, self.dock_difficulty)
         self.tabifyDockWidget(self.dock_modules, self.dock_difficulty)
         
-        # --- DROITE : Thème (onglet avec Difficulté) ---
+        # --- DROITE : Thème ---
         self.dock_theme = QDockWidget("Thème", self)
         self.dock_theme.setObjectName("dock_theme")
         from ui.workspace.theme_panel import ThemePanel
-        self.theme_panel = ThemePanel(self.state_manager)
+        self.theme_panel = ThemePanel(_sm)
         self.dock_theme.setWidget(self.theme_panel)
         self.addDockWidget(Qt.RightDockWidgetArea, self.dock_theme)
         self.tabifyDockWidget(self.dock_difficulty, self.dock_theme)
@@ -1610,22 +1814,20 @@ class ScoutWorkspace(QMainWindow):
     # ═══════════════════════════════════════════════════════
     
     def on_new_project(self):
-        res = QMessageBox.question(self, "Nouveau Projet", 
-            "Réinitialiser le projet actuel ?", QMessageBox.Yes | QMessageBox.No)
-        if res == QMessageBox.Yes:
-            self.state_manager.new_project()
-            self.refresh_ui()
-            self.statusBar().showMessage("Nouveau projet créé", 3000)
+        """Open a fresh project in a *new* tab (Photoshop-style)."""
+        self._new_tab()
+        self.statusBar().showMessage("Nouveau projet créé dans un nouvel onglet", 3000)
 
     def on_open_project(self):
+        """Open an existing .scoutproj in a new tab."""
         path, _ = QFileDialog.getOpenFileName(self, "Ouvrir Projet Scout", "", "Projet Scout (*.scoutproj)")
         if path:
             try:
-                self.state_manager.load_project(path)
+                tab = self._new_tab(path)
                 self.refresh_ui()
                 self.statusBar().showMessage(f"Chargé : {os.path.basename(path)}", 3000)
                 
-                # Feature 7: Auto-recalculate missing segmentation
+                # Auto-recalculate missing segmentation
                 steps = self.state_manager.get_state("polygonal_steps", [])
                 routes = self.state_manager.get_state("routes", [])
                 if routes and not steps:
@@ -1634,8 +1836,9 @@ class ScoutWorkspace(QMainWindow):
                 QMessageBox.critical(self, "Erreur", f"Échec du chargement : {e}")
 
     def on_save_project(self):
-        if self.state_manager.current_filepath:
-            self.state_manager.save_project()
+        tab = self._active_tab()
+        if tab and tab.filepath:
+            tab.save_project()
             self.statusBar().showMessage("Enregistré", 3000)
         else:
             self.on_save_project_as()
@@ -1645,7 +1848,9 @@ class ScoutWorkspace(QMainWindow):
         if path:
             if not path.endswith(".scoutproj"):
                 path += ".scoutproj"
-            self.state_manager.save_project(path)
+            tab = self._active_tab()
+            if tab:
+                tab.save_project(path)
             self.statusBar().showMessage(f"Enregistré : {os.path.basename(path)}", 3000)
 
     # ═══════════════════════════════════════════════════════
@@ -1660,17 +1865,28 @@ class ScoutWorkspace(QMainWindow):
         self.theme_panel.refresh_from_state()
         self.delayed_map_update(fit_bounds=True)
 
+    def _on_poly_recalc_started(self, old_data):
+        """Called just before a new segmentation overwrites the current one."""
+        self._old_assignments_for_repro = old_data
+
     def on_poly_updated(self):
         """Triggered when segmentation parameters change or async calculation finishes."""
         new_steps = self.state_manager.get_state("polygonal_steps", [])
-        preserved = getattr(self, '_preserved_modules', [])
-        new_assignments = {}
-        for i in range(len(new_steps)):
-            if i < len(preserved):
-                new_assignments[str(i)] = preserved[i]
-            else:
-                new_assignments[str(i)] = "unassigned"
-        self.state_manager.update_state("custom_assignments", new_assignments)
+        
+        # We now use the stored old data if available to perform a smart reprojection
+        if hasattr(self, '_old_assignments_for_repro') and self._old_assignments_for_repro:
+            self.reproject_assignments(self._old_assignments_for_repro)
+            self._old_assignments_for_repro = [] # Clear after use
+        else:
+            # Fallback if no old data (unlikely now)
+            preserved = getattr(self, '_preserved_modules', [])
+            new_assignments = {}
+            for i in range(len(new_steps)):
+                if i < len(preserved):
+                    new_assignments[str(i)] = preserved[i]
+                else:
+                    new_assignments[str(i)] = "unassigned"
+            self.state_manager.update_state("custom_assignments", new_assignments)
         
         self.delayed_map_update(fit_bounds=False)
         self.statusBar().showMessage(f"✓ Azimuts mis à jour ({len(new_steps)} segments)", 3000)
@@ -1733,8 +1949,38 @@ class ScoutWorkspace(QMainWindow):
     # ═══════════════════════════════════════════════════════
     # EXPORT
     # ═══════════════════════════════════════════════════════
-    
-    def run_export_pipeline(self):
+        
+    def run_export_pipeline_pdf(self, opts):
+        self.run_export_pipeline(fmt="pdf", opts=opts)
+
+    def run_export_pipeline_html(self):
+        self.run_export_pipeline(fmt="html")
+
+    def run_export_pipeline_docx(self):
+        self.run_export_pipeline(fmt="docx")
+
+    def run_export_pipeline_odt(self):
+        self.run_export_pipeline(fmt="odt")
+
+    def run_export_pipeline_csv(self, opts):
+        steps = self.state_manager.get_state("polygonal_steps", [])
+        if not steps:
+            QMessageBox.warning(self, "Export CSV", "Aucun segment disponible.\nLancez d'abord la segmentation.")
+            return
+        filepath, _ = QFileDialog.getSaveFileName(
+            self, "Exporter les nœuds en CSV", "noeuds_itineraire.csv", "Fichier CSV (*.csv);;Tous les fichiers (*.*)"
+        )
+        if not filepath:
+            return
+            
+        from utils.export_csv import export_csv_file
+        try:
+            export_csv_file(self.state_manager, filepath, opts)
+            self.statusBar().showMessage(f"Export CSV terminé : {os.path.basename(filepath)}", 4000)
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur d'export CSV", str(e))
+
+    def run_export_pipeline(self, fmt="pdf", opts=None):
         # 1. Validation de base (données présentes)
         geojson = self.state_manager.get_state("geojson_data")
         steps = self.state_manager.get_state("polygonal_steps", [])
@@ -1752,34 +1998,28 @@ class ScoutWorkspace(QMainWindow):
             if dialog.exec() == QDialog.Rejected:
                 return # User cancelled
 
-        # 3. Demander le dossier de sauvegarde
-        save_dir = QFileDialog.getExistingDirectory(self, "Choisir le dossier d'exportation", PROJECT_ROOT)
-        if not save_dir:
-            return # User cancelled
+        # 3. Cr\u00E9er un dossier temporaire pour l'export
+        temp_dir = tempfile.mkdtemp(prefix="scout_export_")
+        self.logger.info(f"Export temp dir: {temp_dir}")
 
         # 4. Lancement de l'export
-        self._export_progress_dialog = ExportProgressDialog(self)
-        self._export_progress_dialog.show()
+        self.export_panel.start_progress()
 
-        self._export_worker = _ExportWorker(self.state_manager, output_dir=save_dir)
+        self._export_worker = _ExportWorker(self.state_manager, output_dir=temp_dir, fmt=fmt, opts=opts)
         self._export_worker.export_done.connect(self._on_export_finished)
         self._export_worker.progress_update.connect(self._on_export_progress)
         self._export_worker.start()
 
+    def _on_export_cancel(self):
+        if hasattr(self, '_export_worker') and self._export_worker.isRunning():
+            self._export_worker.cancel()
+            self.statusBar().showMessage("Annulation de l'export...", 3000)
+
     def _on_export_progress(self, msg, percentage):
-        if hasattr(self, '_export_progress_dialog'):
-            self._export_progress_dialog.log(msg, percentage)
+        self.export_panel.update_progress(msg, percentage)
 
     def _on_export_finished(self, success, error_msg, pdf_participant, pdf_solution):
-        if hasattr(self, '_export_progress_dialog'):
-            if success:
-                self._export_progress_dialog.log("Génération terminée avec succès !", 100)
-                self._export_progress_dialog.close_btn.setEnabled(True)
-                self._export_progress_dialog.close_btn.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
-            else:
-                self._export_progress_dialog.log(f"ERREUR : {error_msg}", -1)
-                self._export_progress_dialog.close_btn.setEnabled(True)
-                self._export_progress_dialog.close_btn.setText("Fermer (Erreur)")
+        self.export_panel.finish_progress(success, error_msg, pdf_participant, pdf_solution)
 
         if not success:
             QMessageBox.critical(self, "Erreur d'export",
@@ -1787,11 +2027,7 @@ class ScoutWorkspace(QMainWindow):
             self.statusBar().showMessage("Export échoué", 4000)
             return
 
-        self.statusBar().showMessage("Export terminé ✓", 4000)
-
-        from ui.workspace.export_preview import ExportPreviewDialog
-        dlg = ExportPreviewDialog(pdf_participant, pdf_solution, parent=self)
-        dlg.exec()
+        self.statusBar().showMessage("Export termin\u00E9 \u2713", 4000)
 
 
     # ═══════════════════════════════════════════════════════

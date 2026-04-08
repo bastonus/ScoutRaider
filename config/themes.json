@@ -27,7 +27,7 @@
     "drapeaux_fake": ["Le {c} est un piège.", "N'allez pas au {c}.", "Fuyez le {c}."],
     "drapeaux_outro": ["Le dernier fanion cité est votre arrivée.", "Arrêtez-vous au dernier fanion."],
     "labels": {
-      "filename": "Carnet_Contrebandier",
+      "filename": "Carnet_De_Raid",
       "main_title": "CARNET DE ROUTE",
       "soluce_title": "SOLUCE - CHEFS",
       "start_point": "Point de Départ",

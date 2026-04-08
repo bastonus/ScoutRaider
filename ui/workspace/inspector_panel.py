@@ -63,9 +63,23 @@ class InspectorPanel(QWidget):
         theme_lbl.setToolTip("Visual theme applied to the exported PDF booklet")
         theme_row.addWidget(theme_lbl)
         self.combo_theme = QComboBox()
-        self.combo_theme.addItems(["Neutre", "Carnet_Contrebandier", "Aventures_Maritimes"])
+        
+        themes = ["Neutre", "Carnet_Contrebandier", "Aventures_Maritimes"]
+        theme_path = os.path.join(PROJECT_ROOT, "config", "themes.json")
+        if os.path.exists(theme_path):
+            try:
+                with open(theme_path, 'r', encoding='utf-8') as f:
+                    themes = [k for k in json.load(f).keys() if k != "_help"]
+            except: pass
+            
+        self.combo_theme.addItems(themes)
         self.combo_theme.currentTextChanged.connect(lambda t: self.state_manager.update_state("theme_id", t))
         theme_row.addWidget(self.combo_theme, 1)
+        
+        self.btn_edit_themes_insp = QPushButton("Gérer les thèmes...")
+        self.btn_edit_themes_insp.clicked.connect(self._open_theme_editor)
+        theme_row.addWidget(self.btn_edit_themes_insp)
+        
         theme_layout.addLayout(theme_row)
         
         group_theme.setLayout(theme_layout)
@@ -144,3 +158,21 @@ class InspectorPanel(QWidget):
         if idx >= 0:
             self.combo_theme.setCurrentIndex(idx)
         self.set_selected_segment(-1)
+
+    def _open_theme_editor(self):
+        from ui.workspace.theme_editor_panel import ThemeEditorDialog
+        dlg = ThemeEditorDialog(self)
+        if dlg.exec():
+            curr = self.combo_theme.currentText()
+            self.combo_theme.clear()
+            themes = ["Neutre"]
+            theme_path = os.path.join(PROJECT_ROOT, "config", "themes.json")
+            if os.path.exists(theme_path):
+                try:
+                    import json
+                    with open(theme_path, 'r', encoding='utf-8') as f:
+                        themes = [k for k in json.load(f).keys() if k != "_help"]
+                except: pass
+            self.combo_theme.addItems(themes)
+            if curr in [self.combo_theme.itemText(i) for i in range(self.combo_theme.count())]:
+                self.combo_theme.setCurrentText(curr)

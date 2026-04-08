@@ -1,5 +1,5 @@
 """
-Difficulty Panel — Panneau principal de distribution des épreuves.
+Orchestration Panel — Panneau de distribution intelligente des épreuves.
 
 Architecture :
   - Mode AUTO (prioritaire)  : l'orchestrateur choisit et place toutes les épreuves
@@ -24,30 +24,22 @@ from PySide6.QtCore import Qt, Signal, QTimer
 from utils.validation_helpers import ConstraintValidator
 
 PANEL_STYLE = """
-QWidget#panel_root { background: #0f172a; }
-QGroupBox {
-    font-weight: 700; font-size: 11px; color: #94a3b8;
-    border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
-    margin-top: 12px; padding: 10px 4px 4px 4px;
-}
-QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
-QGroupBox#grp_auto { background: rgba(79, 70, 229, 0.04); border: 1px solid rgba(79, 70, 229, 0.2); }
+QWidget#panel_root { background: transparent; }
+QGroupBox#grp_auto { background: rgba(45, 140, 235, 0.04); border-top: 1px solid #2d8ceb; }
 QPushButton#btn_auto {
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #4f46e5, stop:1 #7c3aed);
-    color: white; font-size: 13px; font-weight: 700; padding: 14px; border-radius: 8px; border: none;
+    background-color: #2d8ceb; color: white; font-size: 13px; font-weight: 700;
+    padding: 12px; border: 1px solid #2577cc; border-radius: 0px;
 }
-QPushButton#btn_auto:hover { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #6366f1, stop:1 #8b5cf6); }
-QPushButton#btn_auto:disabled { background: #1e1e2e; color: #475569; }
+QPushButton#btn_auto:hover { background-color: #3d9cff; }
+QPushButton#btn_auto:disabled { background-color: #3c3c3c; color: #666666; border-color: #363636; }
 QPushButton#btn_secondary {
-    background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 11px; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+    background-color: #4a4a4a; color: #cccccc; font-size: 11px; padding: 8px;
+    border: 1px solid #3c3c3c;
 }
-QPushButton#btn_secondary:hover { background: rgba(255,255,255,0.1); color: #f1f5f9; }
-QLabel#lbl_summary { color: #94a3b8; font-size: 11px; padding: 2px; }
-QLabel#lbl_violation_error { color: #f87171; font-size: 11px; font-weight: 600; background: rgba(248, 113, 113, 0.1); padding: 2px 6px; border-radius: 4px; margin-bottom: 2px; }
-QLabel#lbl_violation_warn { color: #fbbf24; font-size: 11px; background: rgba(251, 191, 36, 0.1); padding: 2px 6px; border-radius: 4px; margin-bottom: 2px; }
-QComboBox { background: #1e293b; color: #f1f5f9; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 6px 10px; font-size: 12px; }
-QComboBox::drop-down { border: none; }
-QScrollArea { border: none; background: transparent; }
+QPushButton#btn_secondary:hover { background-color: #555555; border-color: #4a4a4a; }
+QLabel#lbl_summary { color: #999999; font-size: 11px; padding: 2px; }
+QLabel#lbl_violation_error { color: #e74c3c; font-size: 11px; font-weight: 600; background: rgba(231, 76, 60, 0.1); padding: 2px 6px; margin-bottom: 2px; }
+QLabel#lbl_violation_warn { color: #f39c12; font-size: 11px; background: rgba(243, 156, 18, 0.1); padding: 2px 6px; margin-bottom: 2px; }
 """
 
 PRESET_DESCRIPTIONS = {
@@ -61,12 +53,12 @@ class _SummaryWidget(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("summary_frame")
-        self.setStyleSheet("QFrame#summary_frame { background: rgba(79, 70, 229, 0.08); border: 1px solid rgba(79, 70, 229, 0.3); border-radius: 8px; padding: 4px; }")
+        self.setStyleSheet("QFrame#summary_frame { background: rgba(45, 140, 235, 0.06); border-top: 1px solid #2d8ceb; padding: 4px; }")
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(10, 8, 10, 8)
         self._layout.setSpacing(4)
         self._title = QLabel("AUCUN PLAN G\u00C9N\u00C9R\u00C9")
-        self._title.setStyleSheet("font-size: 10px; color: #818cf8; font-weight: 800; letter-spacing: 0.5px;")
+        self._title.setStyleSheet("font-size: 10px; color: #2d8ceb; font-weight: 800; letter-spacing: 0.5px;")
         self._layout.addWidget(self._title)
         self._body = QLabel("")
         self._body.setObjectName("lbl_summary")
@@ -100,18 +92,18 @@ class PresetEditorDialog(QDialog):
         self.presets_manager = presets_manager
         self.resize(650, 500)
         self.setStyleSheet("""
-            QDialog { background: #0f172a; color: #f1f5f9; }
-            QLabel { color: #f1f5f9; }
-            QLineEdit, QSpinBox, QListWidget { background: #1e293b; color: #f1f5f9; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 4px; }
+            QDialog { background: #535353; color: #cccccc; }
+            QLabel { color: #cccccc; }
+            QLineEdit, QSpinBox, QListWidget { background: #2b2b2b; color: #cccccc; border: 1px solid #1d1d1d; padding: 4px; }
             QSpinBox::up-button, QSpinBox::down-button { width: 16px; }
-            QPushButton { background: rgba(255,255,255,0.1); color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; }
-            QPushButton:hover { background: rgba(255,255,255,0.2); }
-            QPushButton#btn_delete { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-            QPushButton#btn_delete:hover { background: #ef4444; color: white; }
-            QPushButton#btn_primary { background: #4f46e5; color: white; }
-            QPushButton#btn_primary:hover { background: #6366f1; }
-            QListWidget::item { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-            QListWidget::item:selected { background: #4f46e5; color: white; border-radius: 4px; }
+            QPushButton { background: #4a4a4a; color: #cccccc; border: 1px solid #3c3c3c; padding: 6px 12px; font-weight: bold; }
+            QPushButton:hover { background: #555555; }
+            QPushButton#btn_delete { background: rgba(231, 76, 60, 0.15); color: #e74c3c; }
+            QPushButton#btn_delete:hover { background: #e74c3c; color: white; }
+            QPushButton#btn_primary { background: #2d8ceb; color: white; border: 1px solid #2577cc; }
+            QPushButton#btn_primary:hover { background: #3d9cff; }
+            QListWidget::item { padding: 8px; border-bottom: 1px solid #303030; }
+            QListWidget::item:selected { background: #2d8ceb; color: white; }
         """)
 
         # Data model: we load everything into memory to allow saving/switching
@@ -374,17 +366,28 @@ class DifficultyPanel(QWidget):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(12)
 
-        grp_rules = QGroupBox("STRAT\u00C9GIE DE L'ORCHESTRATEUR")
+        grp_workflow = QGroupBox("COMPRENDRE LE FLUX DE TRAVAIL")
+        work_layout = QVBoxLayout(grp_workflow)
+        work_txt = (
+            "<b>1. Segmentation :</b> Pr\u00E9parez le trac\u00E9 en le d\u00E9coupant en segments (onglet Segments).<br>"
+            "<b>2. Orchestration :</b> R\u00E9partissez ici les modules de la biblioth\u00E8que sur ces segments.<br>"
+            "<b>3. Personnalisation :</b> Affinez si besoin par s\u00E9lection directe sur la carte.<br>"
+            "<b>4. Exportation :</b> G\u00E9n\u00E9rez vos documents finaux (onglet Export)."
+        )
+        work_lbl = QLabel(work_txt); work_lbl.setWordWrap(True); work_lbl.setStyleSheet("font-size: 11px; color: #2d8ceb;")
+        work_layout.addWidget(work_lbl); layout.addWidget(grp_workflow)
+
+        grp_rules = QGroupBox("R\u00C8GLES DE L'ORCHESTRATION")
         rules_layout = QVBoxLayout(grp_rules)
-        txt = "\u2022 <b>Rythme :</b> Max 3 \u00E9crits d'affil\u00E9e.<br>\u2022 <b>Visibilit\u00E9 :</b> Alternance visuel/\u00E9crit.<br>\u2022 <b>POI :</b> Texte clair forc\u00E9 en ville.<br>\u2022 <b>Exhaustivit\u00E9 :</b> Tout module activ\u00E9 utilis\u00E9 1\u00D7."
-        rules_lbl = QLabel(txt); rules_lbl.setWordWrap(True); rules_lbl.setStyleSheet("font-size: 11px; color: #64748b;")
+        txt = "\u2022 <b>Rythme :</b> Max 3 \u00E9preuves \u00E9crites cons\u00E9cutives.<br>\u2022 <b>Vari\u00E9t\u00E9 :</b> Alternance entre carte, code et jeu.<br>\u2022 <b>S\u00E9curit\u00E9 :</b> Pas d'azimuts stricts en centre-ville.<br>\u2022 <b>Exhaustivit\u00E9 :</b> Chaque module est utilis\u00E9."
+        rules_lbl = QLabel(txt); rules_lbl.setWordWrap(True); rules_lbl.setStyleSheet("font-size: 11px; color: #999999;")
         rules_layout.addWidget(rules_lbl); layout.addWidget(grp_rules)
 
-        grp_auto = QGroupBox("MODE AUTOMATIQUE (RECOMMAND\u00C9)")
+        grp_auto = QGroupBox("R\u00C9PARTITION DES MODULES")
         grp_auto.setObjectName("grp_auto")
         auto_layout = QVBoxLayout(grp_auto)
         row_p = QHBoxLayout()
-        row_p.addWidget(QLabel("Niveau :"))
+        row_p.addWidget(QLabel("Niveau de difficul\u00E9 :"))
         self.combo_presets = QComboBox()
         self.combo_presets.currentIndexChanged.connect(self._on_preset_changed)
         row_p.addWidget(self.combo_presets, 1)
@@ -397,9 +400,9 @@ class DifficultyPanel(QWidget):
         row_p.addWidget(self.btn_edit_preset)
 
         auto_layout.addLayout(row_p)
-        self.lbl_preset_desc = QLabel(""); self.lbl_preset_desc.setWordWrap(True); self.lbl_preset_desc.setStyleSheet("font-size: 11px; color: #818cf8; italic;")
+        self.lbl_preset_desc = QLabel(""); self.lbl_preset_desc.setWordWrap(True); self.lbl_preset_desc.setStyleSheet("font-size: 11px; color: #2d8ceb; italic;")
         auto_layout.addWidget(self.lbl_preset_desc)
-        self.btn_auto = QPushButton("\u26A1  Organiser l'itin\u00E9raire")
+        self.btn_auto = QPushButton("\u26A1  G\u00E9n\u00E9rer l'encodage")
         self.btn_auto.setObjectName("btn_auto"); self.btn_auto.setCursor(Qt.PointingHandCursor); self.btn_auto.clicked.connect(self._run_orchestrator)
         auto_layout.addWidget(self.btn_auto)
         self._summary = _SummaryWidget(); auto_layout.addWidget(self._summary); layout.addWidget(grp_auto)
@@ -411,9 +414,7 @@ class DifficultyPanel(QWidget):
         manual_layout.addWidget(self._lbl_no_violations)
         self._violations_area = QVBoxLayout(); self._violations_area.setSpacing(4); manual_layout.addLayout(self._violations_area); layout.addWidget(grp_manual)
 
-        self.btn_export = QPushButton("\u1F4C4  G\u00E9n\u00E9rer les carnets PDF")
-        self.btn_export.setObjectName("btn_secondary"); self.btn_export.setCursor(Qt.PointingHandCursor); self.btn_export.clicked.connect(self.trigger_export)
-        layout.addWidget(self.btn_export); layout.addStretch()
+        layout.addStretch()
 
         scroll.setWidget(inner); main_vbox = QVBoxLayout(self); main_vbox.setContentsMargins(0,0,0,0); main_vbox.addWidget(scroll)
         self.load_presets(); self.state_manager.state_changed.connect(self._on_state_changed)
@@ -481,3 +482,19 @@ class DifficultyPanel(QWidget):
             if idx >= 0: self.combo_presets.setCurrentIndex(idx)
         self._summary.update_summary(self.state_manager.get_state("custom_assignments", {}), self.state_manager.get_state("polygonal_steps", []))
         self._run_validation()
+
+    def set_state_manager(self, state_manager):
+        """Rebind this panel to a different StateManager (multi-tab support)."""
+        # Disconnect old SM's signal
+        try:
+            self.state_manager.state_changed.disconnect(self._on_state_changed)
+        except RuntimeError:
+            pass
+        self.state_manager = state_manager
+        # Connect new SM's signal
+        try:
+            self.state_manager.state_changed.connect(self._on_state_changed)
+        except RuntimeError:
+            pass
+        self.refresh_from_state()
+

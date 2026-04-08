@@ -10,7 +10,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QComboBox, QGroupBox, QScrollArea
+    QComboBox, QGroupBox, QScrollArea, QPushButton
 )
 
 class ThemePanel(QWidget):
@@ -19,19 +19,7 @@ class ThemePanel(QWidget):
         self.setObjectName("theme_panel_root")
         self.state_manager = state_manager
         
-        self.setStyleSheet("""
-            QWidget#theme_panel_root { background: #0f172a; }
-            QGroupBox {
-                font-weight: 700; font-size: 11px; color: #94a3b8;
-                border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
-                margin-top: 12px; padding: 10px 4px 4px 4px;
-            }
-            QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
-            QComboBox { background: #1e293b; color: #f1f5f9; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 6px 10px; font-size: 12px; }
-            QComboBox::drop-down { border: none; }
-            QScrollArea { border: none; background: transparent; }
-            QLabel { color: #f1f5f9; }
-        """)
+        # Theme inherits from global style.qss (Photoshop CC dark)
         
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -50,6 +38,10 @@ class ThemePanel(QWidget):
         theme_layout.addWidget(QLabel("Thème :"))
         theme_layout.addWidget(self.combo_theme, 1)
         
+        self.btn_edit_themes = QPushButton("Gérer les thèmes...")
+        self.btn_edit_themes.clicked.connect(self._open_theme_editor)
+        theme_layout.addWidget(self.btn_edit_themes)
+        
         layout.addWidget(grp_theme)
         layout.addStretch()
         
@@ -57,6 +49,16 @@ class ThemePanel(QWidget):
         main_vbox = QVBoxLayout(self)
         main_vbox.setContentsMargins(0,0,0,0)
         main_vbox.addWidget(scroll)
+
+    def _open_theme_editor(self):
+        from ui.workspace.theme_editor_panel import ThemeEditorDialog
+        dlg = ThemeEditorDialog(self)
+        if dlg.exec():
+            curr = self.combo_theme.currentText()
+            self.combo_theme.clear()
+            self._load_themes()
+            if curr in [self.combo_theme.itemText(i) for i in range(self.combo_theme.count())]:
+                self.combo_theme.setCurrentText(curr)
 
     def _load_themes(self):
         theme_file = os.path.join(PROJECT_ROOT, 'config', 'themes.json')
@@ -72,3 +74,9 @@ class ThemePanel(QWidget):
 
     def refresh_from_state(self):
         self.combo_theme.setCurrentText(self.state_manager.get_state("theme_id", "Neutre"))
+
+    def set_state_manager(self, state_manager):
+        """Rebind this panel to a different StateManager (multi-tab support)."""
+        self.state_manager = state_manager
+        self.refresh_from_state()
+
