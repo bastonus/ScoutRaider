@@ -29,7 +29,7 @@ jobs:
 
       - name: Install Python dependencies (skip winsdk)
         run: |
-          pip install PySide6 folium reportlab geopy requests shapely numpy matplotlib python-dotenv
+          pip install PySide6 folium reportlab geopy requests shapely numpy matplotlib python-dotenv python-docx odfpy geographiclib Pillow cairosvg svglib
           pip install pyinstaller
 
       - name: Build with PyInstaller
@@ -172,7 +172,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 libxkbcommon0 fuse libfuse2
+          sudo apt-get install -y libegl1 libxkbcommon0 fuse libfuse2 libcairo2-dev pkg-config python3-dev libffi-dev
 
       - name: Install Python dependencies
         run: |
