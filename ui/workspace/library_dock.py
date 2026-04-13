@@ -61,9 +61,9 @@ class LibraryDock(QWidget):
         
         # Header with "+" button
         header = QHBoxLayout()
-        hint = QLabel("Glissez une épreuve sur un tronçon")
-        hint.setStyleSheet("font-size: 10px; color: #999;")
-        hint.setToolTip("Chaque épreuve encode les directions différemment dans le PDF final")
+        hint = QLabel("Glissez un encodage sur un tronçon")
+        hint.setAlignment(Qt.AlignCenter)
+        hint.setToolTip("Chaque type d'encodage chiffre les directions différemment dans le PDF final")
         header.addWidget(hint, 1)
         
         self.btn_add = QPushButton("+")

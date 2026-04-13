@@ -30,12 +30,23 @@ class Bridge(QObject):
     stageDeleteRequested = Signal(int)  # stage index to delete (right-click)
     routeAlternativeSelected = Signal(int) # alternative index chosen
     dangerValidated = Signal(int) # route_idx to validate
+    toolChanged = Signal(str)
+    helpRequested = Signal()
+    advancedParamsApplied = Signal(str)
+    
+    @Slot()
+    def onHelpRequested(self):
+        self.helpRequested.emit()
     
     @Slot(int)
     def onDangerValidated(self, route_idx):
         self.dangerValidated.emit(route_idx)
     def onRouteAlternativeSelected(self, idx):
         self.routeAlternativeSelected.emit(idx)
+
+    @Slot(str)
+    def onApplyAdvancedParams(self, params_str):
+        self.advancedParamsApplied.emit(params_str)
     
     @Slot(int)
     def onSegmentClicked(self, segment_id):
@@ -98,6 +109,10 @@ class Bridge(QObject):
         self.togglePickingRequested.emit(enabled)
 
     @Slot(str)
+    def onToolChanged(self, tool_id):
+        self.toolChanged.emit(tool_id)
+
+    @Slot(str)
     def onCalculateRoute(self, profile):
         self.calculateRouteRequested.emit(profile)
 
@@ -108,6 +123,10 @@ class Bridge(QObject):
     @Slot()
     def onResetRoute(self):
         self.resetRouteRequested.emit()
+
+    @Slot(str)
+    def onToolChanged(self, tool_id):
+        self.toolChanged.emit(tool_id)
 
     @Slot(int)
     def onStageClicked(self, stageIdx):
@@ -149,6 +168,9 @@ class MapView(QWidget):
     stage_delete_requested = Signal(int)
     route_alternative_selected = Signal(int)
     danger_validated = Signal(int)
+    tool_changed = Signal(str)
+    help_requested = Signal()
+    advanced_params_applied = Signal(str)
 
     # Thread-safe cross-thread signal for OS Location
     _geo_signal = Signal(float, float)
@@ -191,6 +213,9 @@ class MapView(QWidget):
         self.bridge.stageDeleteRequested.connect(self.stage_delete_requested.emit)
         self.bridge.routeAlternativeSelected.connect(self.route_alternative_selected.emit)
         self.bridge.dangerValidated.connect(self.danger_validated.emit)
+        self.bridge.toolChanged.connect(self.tool_changed.emit)
+        self.bridge.helpRequested.connect(self.help_requested.emit)
+        self.bridge.advancedParamsApplied.connect(self.advanced_params_applied.emit)
 
         self.channel.registerObject("bridge", self.bridge)
         self.web_view.page().setWebChannel(self.channel)
@@ -315,6 +340,10 @@ class MapView(QWidget):
 
     def center_on(self, lat, lon, zoom=13):
         self.web_view.page().runJavaScript(f"if(typeof map !== 'undefined' && map) map.setView([{lat}, {lon}], {zoom});")
+
+    def show_advanced_params(self, settings_dict):
+        import json
+        self.web_view.page().runJavaScript(f"if(window.showAdvancedParams) window.showAdvancedParams({json.dumps(settings_dict)});")
 
     def render_waypoints(self, stages):
         """Send stages list to JS for waypoint rendering."""

@@ -251,7 +251,14 @@ jobs:
           body: |
             ## ScoutRaider Suite (Beta) ${{ github.ref_name }}
             
-            Découvrez la version Beta de **ScoutRaider Suite**, l'application de bureau conçue pour les chefs et cheftaines permettant de planifier, concevoir et générer automatiquement des carnets de raid scout complets. Tracez votre itinéraire, assignez des épreuves et créez des carnets PDF d'exploration !
+            ### 🎨 Refonte Totale de l'UI (Phase 1 : Map)
+            Cette version marque le début du **nouveau design system** de ScoutRaider Suite. 
+            L'interface a été simplifiée pour se concentrer sur l'essentiel, avec une refonte complète de la partie **Carte (Map)** :
+            - **Modernisation des Notifications** : Nouveau système de "pills" glassmorphiques pour les alertes et chevauchements.
+            - **Curseurs Professionnels** : Nouveaux indicateurs visuels pour chaque outil (Itinéraire, Nœud, Azimut, Encodage).
+            - **Ergonomie Améliorée** : Layout clarifié et suppression des éléments redondants.
+            
+            Cette mise à jour prépare le terrain pour la refonte de tous les outils de préparation et de l'orchestrateur.
 
             ⚠️ **Avertissement Sécurité** : Les azimuts et métrages sont calculés algorithmiquement. Vérifiez toujours l'itinéraire manuellement sur une carte papier avant d'envoyer vos scouts sur le terrain !
 

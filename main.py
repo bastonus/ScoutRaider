@@ -32,7 +32,6 @@ from utils.validation_helpers import ConstraintValidator
 from utils.auto_updater import UpdateCheckerThread
 import refactor_polygonalisation
 
-from ui.workspace.tools_panel import ToolsPanel
 from ui.workspace.map_view import MapView
 from ui.workspace.route_panel import RoutePanel
 from ui.workspace.library_dock import LibraryDock
@@ -553,31 +552,32 @@ class ScoutWorkspace(QMainWindow):
 
         # Reconnect map_view → workspace signals (lazy for new tabs)
         try:
-            mv.method_dropped.connect(self.on_method_dropped)
-            mv.segment_menu_requested.connect(self.on_segment_menu)
-            mv.node_menu_requested.connect(self.on_node_menu)
-            mv.azimut_updated.connect(self.on_azimut_manually_updated)
-            mv.segments_merged.connect(self.on_segments_merged)
-            mv.node_added.connect(self.on_node_added)
-            mv.node_removed.connect(self.on_node_removed)
-            mv.node_moved.connect(self.on_node_moved)
-            mv.batch_assign.connect(self.on_batch_assign)
-            mv.search_suggestions_requested.connect(self.on_map_search_autocomplete)
-            mv.calculate_route_with_points_requested.connect(self.on_ign_route_with_points)
-            mv.reset_route_requested.connect(self.on_reset_itinerary)
-            mv.basemap_changed.connect(self.on_basemap_changed)
-            mv.map_clicked.connect(self.on_map_clicked)
-            mv.stage_clicked.connect(self.on_stage_clicked)
-            mv.stage_hovered.connect(self.on_stage_hovered)
-            mv.stage_delete_requested.connect(self.on_stage_delete_requested)
-            mv.route_alternative_selected.connect(self.on_route_alternative_selected)
-            mv.danger_validated.connect(self.on_danger_validated)
+            mv.method_dropped.connect(self.on_method_dropped, type=Qt.UniqueConnection)
+            mv.segment_menu_requested.connect(self.on_segment_menu, type=Qt.UniqueConnection)
+            mv.node_menu_requested.connect(self.on_node_menu, type=Qt.UniqueConnection)
+            mv.azimut_updated.connect(self.on_azimut_manually_updated, type=Qt.UniqueConnection)
+            mv.segments_merged.connect(self.on_segments_merged, type=Qt.UniqueConnection)
+            mv.node_added.connect(self.on_node_added, type=Qt.UniqueConnection)
+            mv.node_removed.connect(self.on_node_removed, type=Qt.UniqueConnection)
+            mv.node_moved.connect(self.on_node_moved, type=Qt.UniqueConnection)
+            mv.batch_assign.connect(self.on_batch_assign, type=Qt.UniqueConnection)
+            mv.search_suggestions_requested.connect(self.on_map_search_autocomplete, type=Qt.UniqueConnection)
+            mv.calculate_route_with_points_requested.connect(self.on_ign_route_with_points, type=Qt.UniqueConnection)
+            mv.reset_route_requested.connect(self.on_reset_itinerary, type=Qt.UniqueConnection)
+            mv.basemap_changed.connect(self.on_basemap_changed, type=Qt.UniqueConnection)
+            mv.map_clicked.connect(self.on_map_clicked, type=Qt.UniqueConnection)
+            mv.stage_clicked.connect(self.on_stage_clicked, type=Qt.UniqueConnection)
+            mv.stage_hovered.connect(self.on_stage_hovered, type=Qt.UniqueConnection)
+            mv.stage_delete_requested.connect(self.on_stage_delete_requested, type=Qt.UniqueConnection)
+            mv.route_alternative_selected.connect(self.on_route_alternative_selected, type=Qt.UniqueConnection)
+            mv.danger_validated.connect(self.on_danger_validated, type=Qt.UniqueConnection)
+            mv.tool_changed.connect(self.set_active_tool, type=Qt.UniqueConnection)
+            mv.help_requested.connect(self._show_help, type=Qt.UniqueConnection)
+            mv.advanced_params_applied.connect(self.on_advanced_params_applied, type=Qt.UniqueConnection)
         except RuntimeError:
             pass  # Already connected
 
         # Reconnect dock panels to new StateManager
-        if hasattr(self, 'tools_panel'):
-            self.tools_panel.set_state_manager(sm)
         if hasattr(self, 'route_panel'):
             self.route_panel.set_state_manager(sm)
         if hasattr(self, 'difficulty_panel'):
@@ -595,9 +595,6 @@ class ScoutWorkspace(QMainWindow):
 
     def _refresh_ui_for_tab(self, tab):
         """Refresh all dock panels to reflect the active tab's state."""
-        if hasattr(self, 'tools_panel'):
-            try: self.tools_panel.refresh_from_state()
-            except Exception: pass
         if hasattr(self, 'route_panel'):
             try: self.route_panel.refresh_from_state()
             except Exception: pass
@@ -751,6 +748,9 @@ class ScoutWorkspace(QMainWindow):
                     pending_legs.remove(leg_key)
                     self.state_manager.update_state("pending_azimut_legs", pending_legs)
                     
+                    if not pending_legs:
+                        self.map_view.hide_loading()
+                    
                 self._assemble_polygonal_steps()
             elif job_id == "global_azimut_manual":
                 self.state_manager.update_state("polygonal_steps", segments)
@@ -763,11 +763,6 @@ class ScoutWorkspace(QMainWindow):
     def _connect_signals(self):
         # Map → Main (for the initial first tab)
         self._rebind_docks_to_tab(self._active_tab())
-        
-        # Segmentation Panel → Main
-        self.tools_panel.map_needs_update.connect(self.delayed_map_update)
-        self.tools_panel.polygonalization_finished.connect(self.on_poly_updated)
-        self.tools_panel.poly_recalc_started.connect(self._on_poly_recalc_started)
         
         # Route Panel → Main
         self.route_panel.routes_changed.connect(self.on_routes_changed)
@@ -855,7 +850,6 @@ class ScoutWorkspace(QMainWindow):
         # --- Fenêtres ---
         window_menu = menubar.addMenu("&Fenêtres")
         window_menu.addAction(self.dock_route.toggleViewAction())
-        window_menu.addAction(self.dock_segmentation.toggleViewAction())
         window_menu.addAction(self.dock_modules.toggleViewAction())
         window_menu.addAction(self.dock_difficulty.toggleViewAction())
         
@@ -920,63 +914,6 @@ class ScoutWorkspace(QMainWindow):
     def setup_toolbars(self):
         from PySide6.QtWidgets import QToolBar
         
-        # --- LEFT TOOLBAR (Photoshop Style) ---
-        self.left_toolbar = QToolBar("Outils", self)
-        self.left_toolbar.setObjectName("toolbar_outils")
-        self.left_toolbar.setMovable(False)
-        self.left_toolbar.setIconSize(self.left_toolbar.iconSize() * 1.5)
-        self.left_toolbar.setStyleSheet("""
-            QToolBar { background-color: #333; border-right: 1px solid #111; spacing: 10px; padding: 5px; }
-            QToolButton { background-color: transparent; border-radius: 5px; padding: 5px; color: white; font-weight: bold; }
-            QToolButton:checked { background-color: #007acc; }
-            QToolButton:hover { background-color: #444; }
-        """)
-        self.addToolBar(Qt.LeftToolBarArea, self.left_toolbar)
-        
-        self.tool_group = QActionGroup(self)
-        self.tool_group.setExclusive(True)
-        
-        # Outil Route (R)
-        self.route_tool_act = self.left_toolbar.addAction("R")
-        self.route_tool_act.setToolTip("Outil Route (R) — Gérer les étapes")
-        self.route_tool_act.setShortcut("R")
-        self.route_tool_act.setCheckable(True)
-        self.route_tool_act.setChecked(True)
-        self.route_tool_act.setActionGroup(self.tool_group)
-        self.route_tool_act.triggered.connect(lambda: self.set_active_tool("route"))
-        
-        # Outil Nœuds (N)
-        self.node_tool_act = self.left_toolbar.addAction("N")
-        self.node_tool_act.setToolTip("Outil Nœuds (N) — Ajouter/supprimer des nœuds")
-        self.node_tool_act.setShortcut("N")
-        self.node_tool_act.setCheckable(True)
-        self.node_tool_act.setActionGroup(self.tool_group)
-        self.node_tool_act.triggered.connect(lambda: self.set_active_tool("node"))
-        
-        # Outil Azimut (A)
-        self.azimut_tool_act = self.left_toolbar.addAction("A")
-        self.azimut_tool_act.setToolTip("Outil Azimut (A) — Éditer les azimuts")
-        self.azimut_tool_act.setShortcut("A")
-        self.azimut_tool_act.setCheckable(True)
-        self.azimut_tool_act.setActionGroup(self.tool_group)
-        self.azimut_tool_act.triggered.connect(lambda: self.set_active_tool("azimut"))
-        
-        # Outil Encodage (E)
-        self.encodage_tool_act = self.left_toolbar.addAction("E")
-        self.encodage_tool_act.setToolTip("Outil Encodage (E) — Assigner une épreuve")
-        self.encodage_tool_act.setShortcut("E")
-        self.encodage_tool_act.setCheckable(True)
-        self.encodage_tool_act.setActionGroup(self.tool_group)
-        self.encodage_tool_act.triggered.connect(lambda: self.set_active_tool("encodage"))
-        
-        # --- Separator + Help Button ---
-        self.left_toolbar.addSeparator()
-        
-        self.help_tool_act = self.left_toolbar.addAction("?")
-        self.help_tool_act.setToolTip("Aide — Guide du Raid, Roadmap, Suggestions (F1)")
-        self.help_tool_act.setCheckable(False)
-        self.help_tool_act.triggered.connect(lambda: self._show_help(0))
-        
         # --- TOP CONTEXTUAL TOOLBAR ---
         self.context_toolbar = QToolBar("Options", self)
         self.context_toolbar.setObjectName("toolbar_options")
@@ -1019,7 +956,7 @@ class ScoutWorkspace(QMainWindow):
     TOOL_CONTEXT = {
         "node": "NŒUD | Cliquez sur un tronçon pour ajouter, sur un nœud pour supprimer",
         "azimut": "AZIMUT | Glissez les poignées bleues pour modifier la direction",
-        "encodage": "ENCODAGE | Cliquez sur un tronçon pour assigner une épreuve",
+        "encodage": "ENCODAGE | Cliquez sur un tronçon pour l'encodage d'itinéraire",
         "route": "ROUTE | Cliquez sur un point d'ancrage pour ajouter une étape",
     }
 
@@ -1088,15 +1025,7 @@ class ScoutWorkspace(QMainWindow):
         self.dock_route.setWidget(self.route_panel)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.dock_route)
         
-        # --- GAUCHE : Pr\u00E9paration des Segments ---
-        self.dock_segmentation = QDockWidget("Pr\u00E9paration des Segments", self)
-        self.dock_segmentation.setObjectName("dock_segmentation")
-        self.tools_panel = ToolsPanel(_sm)
-        self.dock_segmentation.setWidget(self.tools_panel)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.dock_segmentation)
-        self.tabifyDockWidget(self.dock_route, self.dock_segmentation)
-        
-        # --- DROITE : Épreuves ---
+        # --- DROITE : Encodage d'itinéraire ---
         self.dock_modules = QDockWidget("Codes & \u00C9preuves", self)
         self.dock_modules.setObjectName("dock_modules")
         self.library_widget = LibraryDock(_sm)
@@ -1346,7 +1275,7 @@ class ScoutWorkspace(QMainWindow):
         if len(stages) < 2:
             return
 
-        # --- HÉRITAGE DES ÉPREUVES ---
+        # --- HÉRITAGE DE L'ENCODAGE ---
         old_steps = self.state_manager.get_state("polygonal_steps", [])
         assignments = self.state_manager.get_state("custom_assignments", {})
         self._preserved_modules = []
@@ -1355,8 +1284,8 @@ class ScoutWorkspace(QMainWindow):
             if chall != "unassigned":
                 self._preserved_modules.append(chall)
 
-        self.statusBar().showMessage("Calcul de l'itinéraire (parallèle)...")
-        self.map_view.show_loading("Calcul parallèle des étapes...")
+        self.statusBar().showMessage("Calcul de l'itinéraire...")
+        self.map_view.show_loading("Calcul de l'itinéraire...")
 
         # Cancel any running worker - STORE IT in a list so it doesn't get garbage collected and crash
         if not hasattr(self, '_old_route_workers'):
@@ -1398,7 +1327,7 @@ class ScoutWorkspace(QMainWindow):
 
     def _on_parallel_route_done(self, stages, leg_routes, all_coords):
         """Callback when the parallel route worker finishes."""
-        self.map_view.hide_loading()
+        # Note: We don't call hide_loading() yet because we'll transition to "Calcul des azimuts..."
 
         if not all_coords:
             self.statusBar().showMessage("Aucun itinéraire trouvé", 3000)
@@ -1451,8 +1380,8 @@ class ScoutWorkspace(QMainWindow):
         self.state_manager.update_state("geojson_data", merged_geojson)
 
         # --- INCREMENTAL AZIMUTS ---
-        self.statusBar().showMessage(f"Itinéraire dessiné. Calcul incrémental des azimuts...", 4000)
-        
+        self.statusBar().showMessage(f"Itinéraire dessiné. Calcul des azimuts...", 4000)
+        self.map_view.show_loading("Calcul des azimuts...")
         settings = self.state_manager.get_state("polygonalization_settings", {})
         force_inter = self.chk_intersections.isChecked() if hasattr(self, 'chk_intersections') else True
         if hasattr(self, 'tools_panel'):
@@ -1483,19 +1412,16 @@ class ScoutWorkspace(QMainWindow):
         
         if fallback_warnings:
             if max_danger_level == "extreme":
-                warn_msg = f"⚠ Point de vigilance ({', '.join(fallback_warnings)}) : Trajet le long d'une autoroute."
+                warn_msg = f"({', '.join(fallback_warnings)}) : Trajet le long d'une autoroute."
             elif max_danger_level == "motorway_cross":
-                warn_msg = f"ℹ Information ({', '.join(fallback_warnings)}) : Passage sous ou sur une autoroute détecté."
+                warn_msg = f"({', '.join(fallback_warnings)}) : Passage sous ou sur une autoroute détecté."
             elif max_danger_level == "high":
-                warn_msg = f"⚠ Point de vigilance ({', '.join(fallback_warnings)}) : Trajet prolongé sur route nationale."
+                warn_msg = f"({', '.join(fallback_warnings)}) : Trajet prolongé sur route nationale."
             else:
-                warn_msg = f"ℹ Information ({', '.join(fallback_warnings)}) : Section longue sur route départementale."
+                warn_msg = f"({', '.join(fallback_warnings)}) : Section longue sur route départementale."
 
             self.statusBar().showMessage(warn_msg, 8000)
             self.map_view.show_status_message(warn_msg, "warning")
-        else:
-            self.statusBar().showMessage(f"Itinéraire {stage_labels} calculé ✓", 3000)
-        
         # Refresh the map markers and UI lists so they visually update (e.g. after inversion)
         self._refresh_stages()
         self._sync_route_panel_with_stages()
@@ -1520,6 +1446,29 @@ class ScoutWorkspace(QMainWindow):
             self.state_manager.update_state("routes", routes)
             self.delayed_map_update()
             self.statusBar().showMessage(f"Danger de l'étape {route_idx+1} vérifié et acquitté", 3000)
+
+    def on_advanced_params_applied(self, params_str):
+        import json
+        try:
+            params = json.loads(params_str)
+            poly_settings = {
+                "allow_offroad": params.get("allow_offroad", False),
+                "force_intersections": params.get("force_intersections", True),
+                "tolerance": params.get("tolerance", 45),
+                "min_dist": params.get("min_dist", 80)
+            }
+            self.state_manager.update_state("polygonalization_settings", poly_settings)
+            self.state_manager.update_state("small_roads_only", params.get("small_roads_only", True))
+            
+            self.statusBar().showMessage("Paramètres appliqués, recalcul...")
+            
+            stages = self.state_manager.get_state("stages", [])
+            if len(stages) >= 2:
+                self._calculate_route_for_stages(stages)
+            else:
+                self.delayed_map_update()
+        except Exception as e:
+            self.logger.error(f"Error applying advanced params: {e}")
 
     def on_routes_changed(self):
         """Called when the route list changes — re-analyze for segmentation."""

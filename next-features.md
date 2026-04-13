@@ -7,7 +7,17 @@
 
 ---
 
-## 📦 v0.1.8-beta (Latest) — 08/04/2026
+## 📦 v0.2.0-beta (Current) — 13/04/2026
+
+Cette version initie une **refonte totale de l'UI**, pour l'instant concentrée sur la partie **Carte (Map)**. C'est une mise à jour majeure préparant un design plus simple et une refonte globale de tous les outils de préparation.
+
+- [x] **Refonte visuelle de la Carte** : Modernisation des notifications, curseurs et interactions.
+- [ ] **Simplification de l'UI** : Allègement des menus et amélioration de l'ergonomie (en cours).
+- [ ] **Mise à jour majeure des outils** : Refonte programmée des outils de préparation pour un workflow plus fluide.
+
+---
+
+## 📦 v0.1.8-beta — 08/04/2026
 
 Cette version finalise la structure multi-onglets et améliore la fidélité des exports.
 
@@ -68,6 +78,8 @@ Le panneau Itinéraire doit offrir une gestion fluide des étapes et des raccord
         - *Mécanique* : Le tracé suit approximativement (ou s'efface temporairement) puis, après un **temps de sécurité** (quelques ms de stabilisation/debounce), la **liste d'attente globale** (JobQueue) se reforme pour recalculer uniquement les segments rattachés au point déplacé, minimisant la charge.
 - [x] **Édition d'étape (Crayon)** : Le bouton d'édition doit ancrer l'outil **Route (R)** sur la lettre de l'étape sélectionnée pour permettre son déplacement précis.
 - [x] **Sélection d'étape** : Cliquer sur une étape dans le panneau doit centrer la carte sur ce point.
+- [x] **Sélection d'étape** : Cliquer sur une étape dans le panneau doit centrer la carte sur ce point.
+
 
 ### 6. ✅ Corriger l'outil « Inverser l'itinéraire »
 > Fichier : `ui/workspace/route_panel.py` → `_reverse_active()`
@@ -79,6 +91,7 @@ Le panneau Itinéraire doit offrir une gestion fluide des étapes et des raccord
 > Fichiers : `state_manager.py`, `main.py`
 - [x] Détecter à l'importation GeoJSON si des `polygonal_steps` sont absents
 - [x] Lancer automatiquement `run_polygonalization()` si nécessaire après un `load_project()` ou un import GeoJSON
+- [x] Gérer le cas d'un fichier GeoJSON brut sans métadonnées (azimuts, métrages) → les recalculer
 - [x] Gérer le cas d'un fichier GeoJSON brut sans métadonnées (azimuts, métrages) → les recalculer
 
 ---
@@ -140,6 +153,10 @@ Outil Encodage refondu avec sélection rectangulaire (box), Shift+Click pour pla
 - [x] Masquer automatiquement les labels trop denses à faible zoom
 - [x] Réafficher progressivement au zoom-in (approche « cluster » ou « priority queue »)
 
+### 11. 🔴 Persistance des labels Azimut ⭐ P1
+- [ ] Corriger le bug où les labels d'azimut (textes rouges) disparaissent après l'utilisation de l'outil « Ajuster l'azimut ».
+- [ ] S'assurer que les labels redeviennent visibles dès que l'on quitte l'outil d'ajustement.
+
 ---
 
 ## P1 — EXPORT & IMPORT
@@ -169,14 +186,69 @@ Outil Encodage refondu avec sélection rectangulaire (box), Shift+Click pour pla
 ## P1 — UX & NAVIGATION
 
 ### 14. 🟡 Intégration de la bulle d'info et recherche (Carte) ⭐ P1
-- [ ] Fusionner l'overlay de recherche "Calcul d'itinéraires" avec le petit carré d'information (distance/kilométrage) en bas de la carte.
-- [ ] Créer une bulle unifiée : la recherche met à jour dynamiquement le kilométrage affiché dans le même conteneur.
-- [ ] Design : Aspect "bulle flottante" intégrée, évitant la superposition maladroite actuelle.
+- [x] Fusionner l'overlay de recherche "Calcul d'itinéraires" avec le petit carré d'information (distance/kilométrage) en bas de la carte.
+- [x] Créer une bulle unifiée : la recherche met à jour dynamiquement le kilométrage affiché dans le même conteneur.
+- [x] Design : Aspect "bulle flottante" intégrée, évitant la superposition maladroite actuelle.
 
 ### 15. ✅ Géolocalisation préemptive au démarrage ⭐ P1
 - [x] Lancer la récupération de la localisation utilisateur dès le lancement de l'application, *avant* l'initialisation visuelle de la carte.
 - [x] Éviter le "saut" visuel (téléportation depuis Paris) en chargeant directement la carte sur la position trouvée.
 - [x] Maintenir un fallback sur Paris si la localisation est indisponible ou trop lente.
+
+### 16. ✅ Notifications de la Carte (Chevauchement & Erreurs) ⭐ P1
+- [x] **Chevauchement détecté** : Remplacer l'alerte texte simple par une bulle de notification à fond teinté jaune (ex: `rgba(245, 158, 11, 0.15)`) avec texte blanc et titre jaune ("Chevauchement détecté").
+- [x] **Design du Chevauchement** : Afficher en dessous du titre l'étape source et l'étape destination (ex: `[C] - - - [D]`) qui posent problème, pour une lecture rapide visuelle.
+- [x] **Suppression** : Ne *jamais* afficher de notification pour "Itinéraire calculé" (retirer ce comportement du code, le retour visuel du tracé suffit).
+
+### 17. 🟡 Navigation globale avec Espace (Pan) ⭐ P1
+- [ ] Permettre le déplacement de la carte (Pan) depuis n'importe quel outil en maintenant la touche `Espace`.
+- [ ] Changer le curseur en **main ouverte** (`csr_main_hand.svg`) lors de l'appui sur `Espace`.
+- [ ] Changer le curseur en **main fermée** (`csr_main_grab.svg`) lors du clic gauche maintenu pour déplacer.
+
+## P1 — MODERNISATION RÉACTIVE DES OUTILS ⭐ P1
+*Ce bloc regroupe les améliorations visuelles et les corrections techniques essentielles pour chaque outil de la carte.*
+
+### 23. 🟡 Système de Design des Curseurs Professionnel ⭐ P2
+Consolider les règles visuelles pour tous les curseurs de l'application :
+- **Positionnement** : Tous les indicateurs d'action doivent être placés systématiquement dans le **coin inférieur droit** du curseur principal.
+- **Palette de Couleurs** :
+    - **Remplissage (Fill)** : Noir pour les formes fermées du curseur principal.
+    - **Contour/Sélecteur** : Blanc pour assurer le contraste.
+    - **Accents (Indicateurs)** : Utiliser le **Bleu** pour mettre en valeur les icônes d'action, avec des détails internes en **Blanc**.
+- **Réactivité & Contraste** :
+    - Assurer un alignement parfait entre le pointeur système et la "pointe" du SVG.
+    - Pour les curseurs monochromes/sans forme interne, implémenter une inversion intelligente du contraste (foncé sur fond clair, clair sur fond foncé).
+- **Consistance Visuelle** : Si un indicateur est à une échelle différente, adapter son épaisseur de trait (`stroke-width`) pour qu'elle corresponde visuellement à celle du curseur principal.
+- **Lisibilité** : Garantir un espacement propre et une lisibilité maximale pour chaque état du curseur.
+- **Note Technique** : Utiliser les fichiers SVG du dossier `ui/workspace/icons/` (préfixes `csr_` pour les bases de curseurs, `ind_` pour les indicateurs, `marker_` pour les épingles).
+
+### 24. 🧱 Spécifications par Outil (Design & Stabilité)
+
+#### A. Outil Itinéraire (Route) ⭐ P1
+- [ ] **Curseur custom** : Utiliser `ui/workspace/icons/csr_itinerary_plus.svg` (basé sur `csr_marker_base.svg` + `ind_plus`) avec remplissage **Noir**, contour **Blanc** et indicateur **Bleu** en bas à droite.
+- [ ] **Dynamicité** : Remplacer le rond central par la lettre de l'étape de l'itinéraire (feedback temps-réel).
+- [ ] **Fusion Segmentation** : Intégrer les nœuds/azimuts comme "Paramètres avancés" et supprimer l'onglet indépendant.
+- [ ] **Marqueurs** : Remplacer les ronds d'étape par des épingles `ui/workspace/icons/marker_stage.svg` bleues à bordure blanche (lettre au centre).
+
+#### B. Outil Nœud (N) ⭐ P0
+- [ ] **Curseur contextuel** : 
+    - Défaut : `ui/workspace/icons/csr_main_pointer.svg` avec indicateur `ui/workspace/icons/ind_node.svg` (Bleu/Blanc) en bas à droite.
+    - Survol tracé : `ui/workspace/icons/csr_main_hand.svg` avec le même indicateur.
+    - Drag & Drop : Utiliser `ui/workspace/icons/csr_main_grab.svg` avec indicateur `ui/workspace/icons/ind_move_h.svg` (Bleu/Blanc).
+- [ ] **Règles de Drag & Drop** :
+    - Autoriser le déplacement des nœuds **UNIQUEMENT** lorsque l'outil Nœud est actif.
+    - Les nœuds doivent **glisser le long de l'itinéraire** (contrainte de tracé) lors du déplacement.
+    - Lors du "Drop" : Recalculer automatiquement les segments et **mettre à jour visuellement** les labels d'azimut (actuellement calculés mais non affichés).
+- [ ] **Correctif Stabilité** : 🔴 Résoudre le bug où les nœuds ajoutés/supprimés ne s'affichent pas sur la carte malgré la notification de succès.
+
+#### C. Outil Azimut (A) ⭐ P1
+- [ ] **Curseur contextuel** : Défaut `ui/workspace/icons/csr_main_pointer.svg` avec indicateur `ui/workspace/icons/ind_compass.svg` (Bleu/Blanc) en bas à droite. Survol poignée : `ui/workspace/icons/csr_main_move.svg` sans indicateur.
+- [ ] **Correctif Stabilité** : 🔴 Garantir la persistance des labels d'azimut (textes rouges) après utilisation de l'outil d'ajustement.
+
+#### D. Outil Encodage d'itinéraire ⭐ P0
+- [ ] **Correctif Critique** : 🔴 Résoudre le crash `IDX is not defined` qui bloque l'outil.
+- [ ] **Brainstorm UX/Architecture** : Réfléchir à une version plus efficiente de l'assignation des modules.
+- [ ] **Curseur** : À mettre à jour une fois le nouveau design validé (TBD lors du brainstorm).
 
 ---
 
@@ -203,13 +275,12 @@ Outil Encodage refondu avec sélection rectangulaire (box), Shift+Click pour pla
 - [ ] Pouvoir créer de nouveaux presets personnalisés (sauvegardés dans `presets.json` → section `"custom"`)
 - [ ] Pouvoir éditer les presets existants (factory → en lecture seule, custom → modifiables)
 
-### 19. 🟡 Épreuves expandables (descriptions, contraintes, preview)
+### 19. 🟡 Refonte Bibliothèque d'Encodage ("Codes et épreuves") ⭐ P1
 > Fichier : `ui/workspace/library_dock.py`
-- [ ] Au clic ou au survol d'une épreuve dans la library, afficher un popup/panneau avec :
-  - [ ] Le nom complet et la description (depuis le `manifest.json` du module)
-  - [ ] Les contraintes (catégories, distances, occurrences)
-  - [ ] Une image de preview (capture d'écran du PDF généré par ce module)
-- [ ] Charger ces infos à partir des `manifest.json` dans chaque dossier `modules/`
+- [ ] Renommer l'onglet actuel ("Codes et épreuves") en "Types d'encodage" ou "Bibliothèque d'encodage".
+- [ ] Rôle strict : Cet onglet doit être un pur **éditeur / visualiseur** de bibliothèque, il ne doit PAS permettre de glisser-déposer pour assigner à la carte (afin d'éviter la redite avec l'outil Encodage).
+- [ ] Afficher un aperçu visuel (image/thumbnail) généré automatiquement ou ajouté dans le `manifest.json`.
+- [ ] Gérer les informations détaillées (descriptions, contraintes, etc.) au clic ou au survol.
 
 ### 20. 🔴 Onglets multiples pour projets (multi-map tabs)
 > Fichier : `main.py` → `ScoutWorkspace`
@@ -246,6 +317,44 @@ Ajout de curseur custom pour les outils, ainsi que des preview au survol des out
   - [ ] Ajouter un système d'archive (exporter un module en `.scoutmod` → zip du dossier)
 - [ ] **Documentation** : créer un `MODULES.md` avec un guide pour développeurs de modules
 - [ ] **Templates** : créer un dossier `modules/_template/` avec un squelette de module
+
+### 23. 🟡 Refonte Majeure : Outil Encodage & UI "Ligne de Métro" ⭐ P1
+*Cette refonte vise à réorganiser l'assignation des encodages en créant une Trinité cohérente : L'Outil Carte (Métro), la Bibliothèque (Types) et le Bouton d'Orchestration.*
+
+#### A. Bibliothèque d'Encodages (Ex-"Codes et épreuves")
+> Fichier : `ui/workspace/library_dock.py`
+- [ ] Renommer l'onglet `Codes et épreuves` en `Bibliothèque d'encodages` (ou `Types d'encodage`).
+- [ ] Rôle strict : Pure interface de consultation/édition de bibliothèque.
+- [ ] Supprimer toute logique de drag-and-drop vers la carte (pour contrer la redite avec l'Outil Encodage).
+- [ ] Afficher pour chaque module : une preview miniature (image générée ou issue du `manifest.json`), sa description, et un panel pour éditer ses paramètres internes (ex: paramétrages de vigenère).
+
+#### B. UI de l'Outil Encodage sur la Carte (L'interface)
+> Fichier : `ui/workspace/map_template.html` & interface JS
+L'activation de l'Outil Encodage déclenche les changements de vue suivants :
+- [ ] **Dégagement de l'espace visuel** : Masquer automatiquement la barre de recherche, la vue satellite, et le bouton de géolocalisation pour libérer tout le haut de l'écran.
+- [ ] **Légende Dynamique** : En bas à gauche, afficher un discret panneau Légende reliant chaque code couleur à son nom (ex: 🔴 Morse, 🔵 Polybe, etc.), avec un fond semi-transparent propre.
+- [ ] **Rendu de l'Itinéraire sur la Map** :
+  - L'affichage "classique" des étapes est masqué au profit du "Style Métro".
+  - Les Nœuds/Tronçons s'affichent comme des ronds blancs cerclés de la couleur de l'encodage assigné.
+  - Les Étapes (A, B) s'affichent en gros `A`, entourées de la couleur de la séquence qui leur succède.
+  - Par défaut : tous les ronds blancs sont associés à une couleur "neutre" correspondant à l'IGN pur.
+
+#### C. La Barre Flottante "Ligne de Métro" (Le workflow)
+- [ ] Créer une barre d'outils flottante horizontale située en haut de l'écran (à la place de la barre de recherche masquée).
+- [ ] Afficher explicitement l'itinéraire sous la forme d'un schéma Ligne de Métro :
+  - `(Gros A) — o — o — o — (Gros B) — o — o — (Gros C)`
+  - Chaque `o` est textuellement un nœud cliquable.
+- [ ] Granularité Fine : Permettre de sélectionner, **depuis cette ligne de métro**, un ensemble strict de points/nœuds contigus (clic-glisser rapide + raccourcis). Ne SURTOUT PAS forcer l'assignation par bloc d'étapes (A vers B entier). L'utilisateur doit choisir "tronçon par tronçon" mais via une UI ultra-rapide.
+- [ ] Relier la sélection à une palette d'affectation immédiate pour attribuer l'encodage aux points sélectionnés.
+- [ ] Les couleurs de la timeline Métro doivent se mettre à jour instantanément pour refléter les nouvelles assignations et concorder avec la légende.
+
+#### D. Orchestration Automatique (Le Bouton Magique)
+> Fichier : `main_orchestrator.py`
+- [ ] Supprimer l'aspect d'interface lourde de l'orchestrateur. Il ne doit pas être un outil en double.
+- [ ] Intégrer un simple bouton "Répartition automatique des modules" directement hébergé dans la barre flottante "Ligne de Métro" (ou juste en dessous).
+- [ ] Ce bouton doit remplir/compléter uniquement les trous non-assignés du trajet.
+- [ ] Important : Assurer fermement la logique de fusion pour qu'il n'écrase JAMAIS ce que l'utilisateur a déjà peint manuellement (le code Python doit respecter `manual_assignments`).
+- [ ] Les paramètres précis (limites des modules, éditeur de presets) deviennent des fenêtres secondaires de configuration via le panel ou l'onglet dédiés. (Améliorer les presets actuels qui sont jugés mauvais).
 
 ---
 
