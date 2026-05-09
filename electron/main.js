@@ -4,7 +4,8 @@ import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import os from 'os';
 import { execFile } from 'child_process';
-import { autoUpdater } from 'electron-updater';
+import pkg from 'electron-updater';
+const { autoUpdater } = pkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -101,7 +102,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
     },
-    icon: path.join(__dirname, '../legacy/logo.png'),
+    icon: path.join(__dirname, '../build/icon.png'),
   });
 
   if (process.env.NODE_ENV === 'development') {
