@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logos/ScoutRaider%20Logo.svg" width="160" alt="ScoutRaider Logo">
+  <img src="assets/logos/fleurdelyslogo%20rounded%20full.svg" width="160" alt="ScoutRaider Logo">
 </p>
 
 # 🏕️ ScoutRaider — Générateur de Carnets de Raid
