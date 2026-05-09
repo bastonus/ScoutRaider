@@ -1,0 +1,672 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
+
+@font-face {
+  font-family: 'Maritime';
+  src: url('/fonts/mari-01.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Morse';
+  src: url('/fonts/morse.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'TemplarsCipherPlus';
+  src: url('/fonts/TemplarsCipherPlus.ttf') format('truetype');
+}
+
+:root {
+    /* ═══════ CORE PALETTE — Slate Blue-Grey / Mono ═══════ */
+    --bg-base:    #111418;          /* fond le plus profond */
+    --bg-dark:    #161b22;          /* menubar, statusbar   */
+    --bg-panel:   #1c2128;          /* panneaux dockés      */
+    --bg-surface: #242b34;          /* surfaces secondaires */
+    --bg-border:  #2d3741;          /* séparateurs / dividers */
+    --bg-app:     #131820;
+
+    /* Accent vert logo (seul élément coloré) */
+    --accent-default:     #5cbd6e;
+    --accent-hover:       #72d480;
+    --accent-muted:       #3d9a50;
+    --accent-pill:        #338544;
+    --accent-transparent: rgba(92, 189, 110, 0.10);
+    --accent-glow:        rgba(92, 189, 110, 0.20);
+
+    /* Secondary accent (warning / gold) — conservé mais discret */
+    --accent-secondary:             #c9954a;
+    --accent-secondary-transparent: rgba(201, 149, 74, 0.10);
+
+    /* Semantic */
+    --semantic-red:    #d95f5f;
+    --semantic-green:  #5cbd6e;
+    --semantic-orange: #d4914a;
+    --semantic-orange-bg: rgba(212, 145, 74, 0.12);
+
+    /* Textes — blancs */
+    --text-primary: #f2f5f8;
+    --text-default: #d0d8e2;
+    --text-dim:     #606c7a;
+
+    /* Radii */
+    --radius-main:    18px;
+    --radius-sm:      12px;
+    --radius-md:      18px;
+    --radius-lg:      22px;
+    --radius-toolbar: 18px;
+    --radius-pill:    9999px;
+
+    /* Typography */
+    --font-ui:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'Consolas', 'Courier New', monospace;
+
+    /* Glass / shadows */
+    --glass-bg:      rgba(22, 27, 34, 0.88);
+    --glass-border:  rgba(255, 255, 255, 0.05);
+    --shadow-glass:  0 8px 32px rgba(0, 0, 0, 0.55);
+    --shadow-glow:   0 0 24px rgba(92, 189, 110, 0.04);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: var(--font-ui);
+    background: #111418;
+    background-image:
+        radial-gradient(circle at 70% 0%,   rgba(92, 189, 110, 0.04) 0%, transparent 50%),
+        radial-gradient(circle at 5%  100%, rgba(92, 189, 110, 0.03) 0%, transparent 45%);
+    color: var(--text-default);
+    min-height: 100vh;
+    font-size: 13px;
+    overflow: hidden;
+}
+
+h1 { color: var(--text-primary); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+h2 { color: var(--text-primary); font-size: 13px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 14px; }
+.lbl { font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
+
+/* ══════════════════════════════════════════════════
+   DOCKVIEW THEME OVERRIDES (FLOATING PANELS STYLE)
+   ══════════════════════════════════════════════════ */
+.dockview-theme-dark {
+    --dv-background-color: transparent !important;
+    --dv-group-background-color: transparent !important;
+    --dv-group-content-background-color: var(--bg-panel) !important;
+    --dv-activegroup-visiblepanel-tab-background-color: var(--bg-panel) !important;
+    --dv-inactivegroup-visiblepanel-tab-background-color: transparent !important;
+    --dv-activegroup-visiblepanel-tab-color: var(--text-primary) !important;
+    --dv-tabs-and-actions-container-background-color: transparent !important;
+    --dv-drag-over-background-color: var(--accent-glow) !important;
+    
+    background: transparent !important;
+}
+
+.dockview-theme-dark .dv-group {
+    background: transparent !important;
+    border: none !important;
+    padding: 10px !important;
+    border-radius: 0 !important;
+    position: relative;
+}
+
+.dockview-theme-dark .dv-group::after {
+    display: none !important;
+}
+
+.dockview-theme-dark .dv-tabs-and-actions-container {
+    padding: 0 16px !important;
+    background: transparent !important;
+    height: 38px !important;
+    display: flex;
+    align-items: flex-end;
+    border: none !important;
+    margin-bottom: 0 !important;
+}
+.dockview-theme-dark .dv-tab {
+    background: transparent;
+    border: none !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.dockview-theme-dark .dv-group-content {
+    background: var(--bg-panel) !important;
+    border-radius: var(--radius-lg) !important; /* Full squircle */
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: var(--shadow-glass), var(--shadow-glow) !important;
+    overflow: hidden !important;
+    position: relative;
+    z-index: 8;
+}
+
+.dockview-theme-dark .dv-tab:hover {
+    background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.dockview-theme-dark .dv-tab-active {
+    background: var(--bg-panel) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: #fff !important;
+}
+
+/* ══════════════════════════════════════════════════
+   CHROME / ELECTRON-TABS STYLE
+   ══════════════════════════════════════════════════ */
+.chrome-tab {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    color: var(--text-dim);
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    user-select: none;
+    min-width: 120px;
+    max-width: 220px;
+    height: 38px;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    background: transparent;
+    transition: background 0.15s;
+    margin-right: 2px;
+}
+
+.chrome-tab:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.chrome-tab.active {
+    background: var(--bg-panel) !important;
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    z-index: 10;
+    border-bottom: none;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
+}
+
+/* "Ears" of the active Chrome tab (inverse border-radius) */
+.chrome-tab.active::before,
+.chrome-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+}
+
+.chrome-tab.active::before {
+    left: -12px;
+    border-bottom-right-radius: 12px;
+    box-shadow: 6px 0 0 0 var(--bg-panel);
+}
+
+.chrome-tab.active::after {
+    right: -12px;
+    border-bottom-left-radius: 12px;
+    box-shadow: -6px 0 0 0 var(--bg-panel);
+}
+
+.tab-x {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8 !important;
+    transition: background 0.15s, color 0.15s;
+    margin-left: auto;
+}
+
+.chrome-tab:hover .tab-x,
+.chrome-tab.active .tab-x {
+    opacity: 0.6;
+}
+
+.tab-x:hover {
+    opacity: 1 !important;
+    background: rgba(232, 93, 93, 0.2);
+    color: var(--semantic-red);
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
+    100% { opacity: 0.6; transform: scale(1); }
+}
+
+.tab-add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-default);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    margin: 0 8px;
+}
+
+.tab-add-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.1);
+    box-shadow: 0 0 12px var(--accent-glow);
+}
+
+/* Header style for sidebar panels without tabs */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--bg-panel);
+}
+
+/* ═══════════════════════════════════════
+   STANDARD SECTION TITLES
+   ═══════════════════════════════════════ */
+.section-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: none;
+    letter-spacing: 0.01em;
+}
+
+.dock-panel-content {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    background: transparent !important;
+    gap: 16px;
+    position: relative;
+}
+
+/* Option pour retirer les marges (ex: Carte) */
+.dock-panel-content.no-padding {
+    padding: 0 !important;
+    gap: 0;
+}
+
+.btn-discreet {
+    background: transparent;
+    border: 1px solid var(--bg-border);
+    border-radius: var(--radius-pill);
+    color: var(--text-dim);
+    font-size: 10.5px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+    text-transform: none;
+}
+
+.btn-discreet:hover {
+    border-color: var(--accent-default);
+    color: var(--text-primary);
+    background: var(--accent-transparent);
+}
+
+.menu-item-hover:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-default);
+}
+
+/* ═══════════════════════════════════════
+   PANEL & LAYOUT
+   ═══════════════════════════════════════ */
+.panel {
+    background: var(--bg-panel);
+    backdrop-filter: blur(40px) saturate(1.8);
+    border: none !important;
+    border-radius: var(--radius-main) !important;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 14px;
+}
+.panel-glass {
+    background: var(--bg-panel);
+    backdrop-filter: blur(40px) saturate(1.8);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-glass);
+    border-radius: var(--radius-main);
+}
+
+/* BUTTONS */
+.btn {
+    background: var(--bg-surface); color: var(--text-default);
+    border: 1px solid var(--glass-border); border-radius: var(--radius-main);
+    padding: 6px 16px; font-size: 12px; font-weight: 600; font-family: var(--font-ui);
+    cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: all 0.15s;
+    width: max-content;
+    text-decoration: none;
+}
+.btn:hover { background: var(--bg-border); border-color: var(--accent-default); color: var(--text-primary); }
+.btn-primary { background: var(--accent-default); border-color: var(--accent-default); color: #ffffff; font-weight: 700; }
+.btn-primary:hover { background: var(--accent-hover); box-shadow: 0 4px 16px var(--accent-glow); }
+.btn-pill { border-radius: var(--radius-pill); }
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+.btn-icon { width: 34px; height: 34px; padding: 0; background: transparent; border: none; color: var(--text-dim); border-radius: var(--radius-main); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.15s; }
+.btn-icon:hover { color: var(--accent-default); background: var(--accent-transparent); }
+.btn-icon svg { width: 15px; height: 15px; stroke-width: 2.2; }
+.btn svg { width: 13px; height: 13px; stroke-width: 2.2; }
+
+/* ═══════════════════════════════════════
+   SEARCH BARS
+   ═══════════════════════════════════════ */
+.search-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-dark); border: 1px solid var(--bg-border);
+    border-radius: var(--radius-pill); padding: 0 16px; height: 38px;
+    width: 90%; max-width: 320px;
+    margin: 8px 0 16px 0;
+    transition: all 0.2s;
+}
+.search-bar:focus-within { border-color: var(--accent-default); box-shadow: 0 0 10px var(--accent-glow); }
+.search-bar input { background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 13px; width: 100%; font-family: var(--font-ui); }
+.search-bar input::placeholder { color: var(--text-dim); }
+.search-bar svg { color: var(--text-dim); width: 15px; height: 15px; flex-shrink: 0; }
+
+/* ═══════════════════════════════════════
+   CARD GRID (Libraries)
+   ═══════════════════════════════════════ */
+.card-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+}
+.module-card {
+    background: var(--bg-dark); border: 1px solid var(--glass-border);
+    border-radius: var(--radius-main); overflow: hidden; cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+    display: flex; flex-direction: column;
+}
+.module-card:hover {
+    border-color: var(--accent-default); transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35), 0 0 16px var(--accent-glow);
+}
+.card-img {
+    height: 72px; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; position: relative; overflow: hidden;
+}
+.card-img .card-icon { position: relative; z-index: 1; opacity: 0.9; }
+.card-img::after {
+    content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.25);
+}
+.card-body { padding: 10px; display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.card-name { font-size: 12px; font-weight: 700; color: var(--text-primary); }
+.card-desc { font-size: 10px; color: var(--text-dim); line-height: 1.4; }
+.card-new {
+    background: var(--bg-surface); border: 1.5px dashed var(--bg-border);
+    border-radius: var(--radius-lg); min-height: 130px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; cursor: pointer; color: var(--text-dim); transition: 0.2s;
+    font-size: 11px; font-weight: 600;
+}
+.card-new:hover { border-color: var(--accent-default); color: var(--accent-hover); background: var(--accent-transparent); }
+.card-new svg { width: 20px; height: 20px; }
+
+/* ═══════════════════════════════════════
+   ITINERARY TIMELINE
+   ═══════════════════════════════════════ */
+.timeline-container { display: flex; flex-direction: column; gap: 6px; }
+.stage-pill {
+    display: flex; align-items: center; gap: 9px;
+    background: var(--bg-surface); border: 1px solid var(--glass-border);
+    border-radius: var(--radius-pill); padding: 6px 10px; transition: 0.2s;
+}
+.stage-pill:focus-within { border-color: var(--accent-default); background: var(--bg-dark); }
+.stage-letter {
+    width: 25px; height: 25px; border-radius: 50%; background: var(--bg-dark);
+    border: 2.5px solid var(--accent-default);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; color: var(--accent-default); flex-shrink: 0;
+}
+.stage-input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 12px; min-width: 0; }
+.stage-connector { height: 14px; margin-left: 18px; border-left: 2px dashed var(--bg-border); display: flex; align-items: center; padding-left: 12px; }
+.stage-connector span { font-size: 10px; color: var(--text-dim); font-weight: 600; }
+
+/* ═══════════════════════════════════════
+   METRO LINE
+   ═══════════════════════════════════════ */
+.metro-container { display: flex; flex-direction: column; gap: 10px; position: relative; }
+.metro-pill {
+    display: flex; align-items: center; flex-wrap: wrap; align-content: flex-start;
+    background: var(--glass-bg); backdrop-filter: blur(14px) saturate(1.4);
+    border: 1px solid var(--glass-border); border-radius: var(--radius-pill);
+    padding: 10px 16px; min-height: 44px; max-height: 150px; overflow-y: auto; overflow-x: hidden;
+    box-shadow: var(--shadow-glass); gap: 12px 0; width: 100%;
+}
+.metro-stage {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--bg-dark);
+    border: 2.5px solid var(--accent-default);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; color: var(--accent-default);
+    flex-shrink: 0; z-index: 4; cursor: pointer; position: relative; transition: transform 0.15s;
+    margin-bottom: 2px;
+}
+.metro-stage:hover { transform: scale(1.1); box-shadow: 0 0 10px currentColor; }
+.metro-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--bg-dark); border: 2.5px solid var(--text-dim);
+    flex-shrink: 0; z-index: 4; cursor: pointer; transition: 0.15s; position: relative;
+}
+.metro-dot:hover { border-color: var(--text-primary); background: var(--accent-hover); transform: scale(1.15); box-shadow: 0 0 8px var(--accent-glow); }
+.metro-seg {
+    height: 6px; flex-shrink: 0; width: 40px;
+    background: var(--bg-border); cursor: pointer; transition: all 0.15s;
+    margin: 0 -12px; z-index: 2; position: relative;
+}
+
+/* ═══════════════════════════════════════
+   LEAFLET — BASE + DARK THEME OVERRIDE
+   ═══════════════════════════════════════ */
+.leaflet-container {
+    background: var(--bg-base) !important;
+    border-radius: 0 !important;
+}
+
+/* Wrapper */
+.leaflet-popup-content-wrapper {
+    background: rgba(14, 22, 17, 0.97) !important;
+    color: var(--text-default) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(92, 189, 110, 0.06) !important;
+    backdrop-filter: blur(14px) !important;
+    padding: 0 !important;
+    font-family: var(--font-ui) !important;
+}
+
+/* Inner content */
+.leaflet-popup-content {
+    margin: 0 !important;
+    font-size: 12px !important;
+    color: var(--text-default) !important;
+    line-height: 1.5 !important;
+}
+
+/* Arrow / tip */
+.leaflet-popup-tip-container {
+    margin-top: -1px !important;
+}
+.leaflet-popup-tip {
+    background: rgba(14, 22, 17, 0.97) !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* Close button */
+.leaflet-popup-close-button {
+    color: var(--text-dim) !important;
+    font-size: 16px !important;
+    font-weight: 400 !important;
+    line-height: 20px !important;
+    width: 20px !important;
+    height: 20px !important;
+    top: 8px !important;
+    right: 8px !important;
+    padding: 0 !important;
+    text-align: center !important;
+}
+.leaflet-popup-close-button:hover {
+    color: var(--text-primary) !important;
+    background: transparent !important;
+}
+
+/* Leaflet Tooltip dark override */
+.leaflet-tooltip {
+    background: rgba(14, 22, 17, 0.95) !important;
+    color: var(--text-default) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(10px) !important;
+    font-family: var(--font-ui) !important;
+    font-size: 11px !important;
+    padding: 6px 10px !important;
+    white-space: nowrap !important;
+}
+.leaflet-tooltip::before {
+    border-right-color: rgba(255, 255, 255, 0.08) !important;
+}
+.leaflet-tooltip-left::before  { border-left-color:  rgba(255, 255, 255, 0.08) !important; }
+.leaflet-tooltip-right::before { border-right-color: rgba(255, 255, 255, 0.08) !important; }
+.leaflet-tooltip-top::before   { border-top-color:   rgba(255, 255, 255, 0.08) !important; }
+.leaflet-tooltip-bottom::before{ border-bottom-color:rgba(255, 255, 255, 0.08) !important; }
+
+/* Custom popup content class used in ActiveRouteLayer and MapComponent */
+.encoding-map-popup .leaflet-popup-content-wrapper,
+.poi-popup .leaflet-popup-content-wrapper {
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+.dockview-theme-dark .dv-separator,
+.dockview-theme-dark .dv-sash,
+.dockview-theme-dark .dv-sash.dv-enabled {
+    background: transparent !important;
+    opacity: 1 !important;
+    width: 10px !important;
+}
+
+.dockview-theme-dark .dv-sash:hover {
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* S'assurer que le contenu du séparateur ne montre pas de ligne */
+.dockview-theme-dark .dv-sash-container .dv-sash::before,
+.dockview-theme-dark .dv-sash-container .dv-sash::after {
+    display: none !important;
+}
+
+.dock-container {
+    background: transparent;
+    padding: 8px !important;
+}
+
+.gradient-bg {
+    background: transparent;
+}
+
+/* ═══════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════ */
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes slideInY {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+@keyframes glowPulse {
+    0% { box-shadow: 0 0 4px var(--accent-transparent); }
+    50% { box-shadow: 0 0 16px var(--accent-glow); }
+    100% { box-shadow: 0 0 4px var(--accent-transparent); }
+}
+
+/* ═══════════════════════════════════════
+   SCROLLBAR STYLING
+   ═══════════════════════════════════════ */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--bg-border);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-muted);
+}
+.hide-scrollbar-webkit::-webkit-scrollbar {
+    display: none;
+}
+
+/* Menu Dropdown Styles */
+.menu-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.menu-item-hover:hover {
+  background: var(--accent-transparent);
+  color: var(--accent-default) !important;
+}
+
+/* ReactQuill Dark Theme Overrides */
+.ql-toolbar.ql-snow {
+    border: 1px solid var(--bg-border) !important;
+    background: var(--bg-panel);
+    border-radius: 8px 8px 0 0;
+}
+.ql-container.ql-snow {
+    border: 1px solid var(--bg-border) !important;
+    border-top: none !important;
+    border-radius: 0 0 8px 8px;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: var(--font-ui);
+}
+.ql-snow .ql-stroke { stroke: var(--text-dim) !important; }
+.ql-snow .ql-fill { fill: var(--text-dim) !important; }
+.ql-snow .ql-picker { color: var(--text-dim) !important; }
+.ql-snow .ql-picker-options { background: var(--bg-panel) !important; border-color: var(--bg-border) !important; }
+.ql-editor.ql-blank::before { color: var(--text-dim) !important; font-style: italic; }
+.ck-content-override .ck.ck-editor__main > .ck-editor__editable { background: transparent !important; border: none !important; box-shadow: none !important; color: var(--text-primary); }
+.ck-content-override .ck.ck-toolbar { background: transparent !important; border: none !important; border-bottom: 1px solid rgba(255,255,255,0.05) !important; }

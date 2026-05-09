@@ -1,4 +1,12 @@
+node_modules/
+dist/
+dist_electron/
+python-dist/
+build_output.txt
+scoutraider.log
 *.exe
 *.AppImage
 *.dmg
-dist/
+.env
+.vscode/
+*.af~lock~

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="ScoutRaider%20Logo.svg" width="160" alt="ScoutRaider Logo">
+  <img src="assets/logos/ScoutRaider%20Logo.svg" width="160" alt="ScoutRaider Logo">
 </p>
 
 # 🏕️ ScoutRaider — Générateur de Carnets de Raid
@@ -10,7 +10,7 @@
 
 [![React/Vite](https://img.shields.io/badge/UI-React_Vite-61dafb?logo=react&logoColor=black)](#)
 [![Electron](https://img.shields.io/badge/App-Electron-47848f?logo=electron&logoColor=white)](#)
-[![Releases](https://img.shields.io/github/v/release/bastonus/ScoutRaider)](https://github.com/bastonus/ScoutRaider/releases)
+[![Releases](https://img.shields.io/github/v/release/bastonus/ScoutRaider-Suite)](https://github.com/bastonus/ScoutRaider-Suite/releases)
 [![Beta](https://img.shields.io/badge/Status-Beta-orange)](#avertissement-de-sécurité)
 
 ---
@@ -69,8 +69,8 @@ ScoutRaider est un outil conçu pour les **chefs et cheftaines scouts** (Guides 
 
 ```bash
 # 1. Cloner le dépôt
-git clone https://github.com/bastonus/ScoutRaider.git
-cd ScoutRaider
+git clone https://github.com/bastonus/ScoutRaider-Suite.git
+cd ScoutRaider-Suite
 
 # 2. Installer les dépendances Node.js
 npm install
@@ -101,8 +101,8 @@ ScoutRaider/
 
 Vos retours sont essentiels pour améliorer l'outil, particulièrement durant cette phase de refonte !
 
-- 🐛 **Signaler un bug** → [Créer une Issue](https://github.com/bastonus/ScoutRaider/issues/new?labels=bug)
-- 💡 **Proposer une fonctionnalité** → [Feature Request](https://github.com/bastonus/ScoutRaider/issues/new?labels=enhancement)
+- 🐛 **Signaler un bug** → [Créer une Issue](https://github.com/bastonus/ScoutRaider-Suite/issues/new?labels=bug)
+- 💡 **Proposer une fonctionnalité** → [Feature Request](https://github.com/bastonus/ScoutRaider-Suite/issues/new?labels=enhancement)
 
 ---
 

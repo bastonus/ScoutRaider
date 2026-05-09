@@ -1,0 +1,394 @@
+{
+  "_help": {
+    "description": "Fichier de thématisation du carnet de route.",
+    "instructions": [
+      "Comment créer un nouveau thème d'aventure :",
+      "1. Copiez un bloc entier d'un thème existant (ex: 'Neutre').",
+      "2. Changez le nom de la clé (ex: 'Mon Nouveau Thème').",
+      "3. 'intros' : Liste de phrases d'accroche utilisées au début d'une étape.",
+      "4. 'actions' : Liste de verbes de mouvement utilisés pour lier les étapes.",
+      "5. 'poi' : Phrase utilisée si l'étape passe devant un point d'intérêt. La variable '{poi}' sera remplacée par le nom du lieu trouvé.",
+      "6. 'vigenere_key' : Le mot-clé de chiffrement utilisé par le module Vigenère (en majuscules, sans espaces ni symboles).",
+      "7. Blocs 'drapeaux_*' : Phrases spécifiques pour l'épreuve des fanions.",
+      "   - 'drapeaux_intros' : Phrase pour lancer le défi.",
+      "   - 'drapeaux_real' : Phrase pour indiquer un vrai fanion (la variable '{c}' sera remplacée par la couleur).",
+      "   - 'drapeaux_fake' : Phrase pour indiquer un faux fanion/piège.",
+      "   - 'drapeaux_outro' : Phrase de conclusion du défi.",
+      "8. 'labels' : Clés pour traduire/renommer les titres des annexes et du document final. Si une clé manque, le programme utilise le thème 'Neutre' par défaut."
+    ]
+  },
+  "Neutre": {
+    "description": "",
+    "icon": "globe-off.svg",
+    "preview_image": "assets/themes/neutre.jpg",
+    "intros": [
+      "Il est temps de se mettre en route.",
+      "Prochaine étape.",
+      "En avant."
+    ],
+    "actions": [
+      "avancez de",
+      "marchez sur",
+      "poursuivez sur"
+    ],
+    "poi": "Passez devant {poi}, et",
+    "vigenere_key": "MOUSTACHE",
+    "drapeaux_intros": [
+      "Piste aux fanions."
+    ],
+    "drapeaux_real": [
+      "Allez au {c}.",
+      "Rejoignez le {c}.",
+      "Marchez vers le {c}."
+    ],
+    "drapeaux_fake": [
+      "Le {c} est un piège.",
+      "N'allez pas au {c}.",
+      "Fuyez le {c}."
+    ],
+    "drapeaux_outro": [
+      "Le dernier fanion cité est votre arrivée.",
+      "Arrêtez-vous au dernier fanion."
+    ],
+    "labels": {
+      "filename": "Carnet_De_Raid",
+      "main_title": "CARNET DE ROUTE",
+      "soluce_title": "SOLUCE - CHEFS",
+      "start_point": "Point de Départ",
+      "annex_title": "ANNEXE",
+      "vigenere_label": "Chiffre de Vigenère",
+      "morse_label": "Télégramme Morse",
+      "templier_label": "Croix des Templiers",
+      "polybe_label": "Carré de Polybe",
+      "maritime_label": "Signaux Maritimes",
+      "avocat_label": "Affaire Classée",
+      "cassis_label": "Secret de la Cave",
+      "clair_label": "Message Clair",
+      "ign_label": "Carte IGN",
+      "gilwell_label": "Relevé Gilwell",
+      "drapeaux_label": "Fanions de signalisation",
+      "global_map_brut": "CARTE GLOBALE : TRACÉ BRUT EXACT",
+      "global_map_poly": "CARTE GLOBALE : TRACÉ POLYGONAL (ÉTAPES)",
+      "ledger_title": "GRAND LIVRE DES ÉTAPES (LOGISTIQUE)"
+    }
+  },
+  "La Mafia": {
+    "icon": "msg-lock.svg",
+    "preview_image": "assets/themes/mafia.jpg",
+    "intros": [
+      "Le boss veut qu'on bouge.",
+      "Les flics rodent.",
+      "La planque est compromise.",
+      "Don Moustache a passé un ordre."
+    ],
+    "actions": [
+      "filez sur",
+      "marchez discrètement pendant",
+      "avancez sans vous faire repérer de"
+    ],
+    "poi": "Longez silencieusement {poi}, puis",
+    "vigenere_key": "MOUSTACHE",
+    "drapeaux_intros": [
+      "Suivez les couleurs de la famille."
+    ],
+    "drapeaux_real": [
+      "Passez au {c}.",
+      "Contact au {c}.",
+      "Foncez au {c}."
+    ],
+    "drapeaux_fake": [
+      "Le {c} est faux.",
+      "Flics au {c}.",
+      "Oubliez le {c}."
+    ],
+    "drapeaux_outro": [
+      "La planque est au dernier fanion.",
+      "Livraison au dernier point cité."
+    ],
+    "labels": {
+      "filename": "Carnet_Mafia",
+      "main_title": "DOSSIER CONFIDENTIEL",
+      "soluce_title": "SOLUCE - DON MOUSTACHE",
+      "start_point": "Lieu de RDV",
+      "annex_title": "CODES DE LA FAMILLE",
+      "vigenere_label": "Chiffre du Boss",
+      "morse_label": "Message Radio",
+      "templier_label": "Signes Secrets",
+      "polybe_label": "Grille de l'Ombre",
+      "maritime_label": "Signaux Lumineux",
+      "avocat_label": "Note du Conseil",
+      "cassis_label": "Consigne d'Alcools",
+      "clair_label": "Pass Parole",
+      "ign_label": "Plan de Secteur",
+      "gilwell_label": "Traces du Chef",
+      "drapeaux_label": "Piste aux Fanions",
+      "global_map_brut": "CARTE DU RÉSEAU : TRACÉ BRUT",
+      "global_map_poly": "CARTE DES OPÉRATIONS : ÉTAPES",
+      "ledger_title": "REGISTRE DES LIVRAISONS"
+    }
+  },
+  "Les Vikings": {
+    "icon": "map-pin.svg",
+    "preview_image": "assets/themes/vikings.jpg",
+    "intros": [
+      "Odin nous observe.",
+      "Les drakkars nous attendent.",
+      "Pour le Valhalla !"
+    ],
+    "actions": [
+      "marchez d'un pas lourd sur",
+      "avancez fièrement de",
+      "bravez les éléments sur"
+    ],
+    "poi": "Saluez les dieux devant {poi}, et",
+    "vigenere_key": "VALHALLA",
+    "drapeaux_intros": [
+      "Suivez les étendards."
+    ],
+    "drapeaux_real": [
+      "Marchez au {c}.",
+      "Ralliez le {c}.",
+      "Naviguez vers le {c}."
+    ],
+    "drapeaux_fake": [
+      "Le {c} est maudit.",
+      "Piège au {c}.",
+      "Laissez le {c}."
+    ],
+    "drapeaux_outro": [
+      "Le drakkar attend au dernier fanion.",
+      "La course s'arrête au dernier fanion."
+    ]
+  },
+  "Le Roi Soleil": {
+    "icon": "drafting-compass.svg",
+    "preview_image": "assets/themes/roi_soleil.jpg",
+    "intros": [
+      "Sa Majesté l'exige.",
+      "La cour se déplace.",
+      "Pour la gloire de Versailles."
+    ],
+    "actions": [
+      "poursuivez votre noble marche de",
+      "avancez avec majesté de",
+      "parcourez"
+    ],
+    "poi": "Passez dignement devant {poi}, puis",
+    "vigenere_key": "VERSAILLES",
+    "drapeaux_intros": [
+      "Observez les pavillons royaux."
+    ],
+    "drapeaux_real": [
+      "Allez au pavillon {c}.",
+      "Honneurs au {c}.",
+      "Vers le {c}."
+    ],
+    "drapeaux_fake": [
+      "Complot au {c}.",
+      "Le {c} est vil.",
+      "Fuyez le {c}."
+    ],
+    "drapeaux_outro": [
+      "Le Roi vous attend au dernier pavillon.",
+      "La parade cesse au dernier fanion."
+    ]
+  },
+  "La Chevalerie": {
+    "icon": "drafting-compass.svg",
+    "preview_image": "assets/themes/chevalerie.jpg",
+    "intros": [
+      "Pour notre seigneur !",
+      "La quête se poursuit.",
+      "Montjoie Saint Denis !"
+    ],
+    "actions": [
+      "chevauchez sur",
+      "marchez vaillamment pendant",
+      "avancez fièrement de"
+    ],
+    "poi": "Honorez {poi}, puis",
+    "vigenere_key": "MONTJOIE",
+    "drapeaux_intros": [
+      "Cherchez les oriflammes."
+    ],
+    "drapeaux_real": [
+      "Chargez au {c}.",
+      "Bannière {c}.",
+      "Chevauchez vers le {c}."
+    ],
+    "drapeaux_fake": [
+      "Embuscade au {c}.",
+      "Le {c} est faux.",
+      "Marauds au {c}."
+    ],
+    "drapeaux_outro": [
+      "Le graal est au dernier oriflamme.",
+      "Le repos a lieu au dernier fanion."
+    ]
+  },
+  "Les Gaulois": {
+    "icon": "history.svg",
+    "preview_image": "assets/themes/gaulois.jpg",
+    "intros": [
+      "Par Toutatis !",
+      "Le ciel va nous tomber sur la tête !",
+      "Pour la tribu !"
+    ],
+    "actions": [
+      "marchez d'un bon pas sur",
+      "faufilez-vous sur",
+      "avancez dans la forêt de"
+    ],
+    "poi": "Longez {poi}, et",
+    "vigenere_key": "TOUTATIS",
+    "drapeaux_intros": [
+      "Suivez les menhirs colorés."
+    ],
+    "drapeaux_real": [
+      "Sanglier au {c}.",
+      "Druide au {c}.",
+      "Courez au {c}."
+    ],
+    "drapeaux_fake": [
+      "Romains au {c}.",
+      "César au {c}.",
+      "Oubliez le {c}."
+    ],
+    "drapeaux_outro": [
+      "Le banquet est au dernier fanion.",
+      "L'arrivée est au dernier menhir."
+    ]
+  },
+  "La Première Guerre mondiale (WW1)": {
+    "icon": "msg-lock.svg",
+    "preview_image": "assets/themes/ww1.jpg",
+    "intros": [
+      "Ordre de l'état-major.",
+      "Sortez des tranchées.",
+      "Pour la patrie !"
+    ],
+    "actions": [
+      "progressez sous le feu adverse de",
+      "avancez prudemment de",
+      "marchez de"
+    ],
+    "poi": "Sécurisez {poi}, puis",
+    "vigenere_key": "PATRIE",
+    "drapeaux_intros": [
+      "Suivez le code couleur."
+    ],
+    "drapeaux_real": [
+      "Avancez au {c}.",
+      "Ralliez le {c}.",
+      "Ligne {c}."
+    ],
+    "drapeaux_fake": [
+      "Tirs au {c}.",
+      "Piège au {c}.",
+      "Evitez le {c}."
+    ],
+    "drapeaux_outro": [
+      "Le QG est au dernier drapeau.",
+      "Finissez au dernier fanion cité."
+    ]
+  },
+  "La Seconde Guerre mondiale (WW2)": {
+    "icon": "msg-lock.svg",
+    "preview_image": "assets/themes/ww2.jpg",
+    "intros": [
+      "Message de Londres en vue.",
+      "La Résistance a besoin de nous.",
+      "Ici Londres !"
+    ],
+    "actions": [
+      "progressez furtivement de",
+      "avancez en zone ennemie de",
+      "marchez de"
+    ],
+    "poi": "Faites un rapport devant {poi}, puis",
+    "vigenere_key": "LONDRES",
+    "drapeaux_intros": [
+      "Cherchez les balises."
+    ],
+    "drapeaux_real": [
+      "Cachette au {c}.",
+      "Contact au {c}.",
+      "Piste {c}."
+    ],
+    "drapeaux_fake": [
+      "Gestapo au {c}.",
+      "Danger au {c}.",
+      "Ignorez le {c}."
+    ],
+    "drapeaux_outro": [
+      "Cachez-vous au dernier fanion.",
+      "L'arrivée est au dernier repère."
+    ]
+  },
+  "Le Seigneur des Anneaux (LOTR)": {
+    "icon": "history.svg",
+    "preview_image": "assets/themes/lotr.jpg",
+    "intros": [
+      "Pour la Terre du Milieu.",
+      "Les forces de Sauron approchent.",
+      "La Communauté se met en route."
+    ],
+    "actions": [
+      "avancez silencieusement de",
+      "marchez avec courage pendant",
+      "poursuivez votre quête de"
+    ],
+    "poi": "Observez {poi}, et",
+    "vigenere_key": "SAURON",
+    "drapeaux_intros": [
+      "Suivez les bannières elfiques."
+    ],
+    "drapeaux_real": [
+      "Suivez le {c}.",
+      "Lumière au {c}.",
+      "Allez au {c}."
+    ],
+    "drapeaux_fake": [
+      "Nazgul au {c}.",
+      "Mordor au {c}.",
+      "Fuyez le {c}."
+    ],
+    "drapeaux_outro": [
+      "Le repos est au dernier fanion.",
+      "Arrêtez-vous au dernier drapeau."
+    ]
+  },
+  "Napoléon": {
+    "icon": "drafting-compass.svg",
+    "preview_image": "assets/themes/napoleon.jpg",
+    "intros": [
+      "Vive l'Empereur !",
+      "La Grande Armée se lève.",
+      "Soldats, droit devant !"
+    ],
+    "actions": [
+      "marchez au pas de charge sur",
+      "avancez en bataillon de",
+      "progressez au rythme du tambour de"
+    ],
+    "poi": "Laissez {poi} on votre flanc, puis",
+    "vigenere_key": "EMPEREUR",
+    "drapeaux_intros": [
+      "Couleurs de l'Empire hissées."
+    ],
+    "drapeaux_real": [
+      "Pas vers l'aigle {c}.",
+      "Bataillon {c}.",
+      "Objectif {c}."
+    ],
+    "drapeaux_fake": [
+      "Prussiens au {c}.",
+      "Défaite au {c}.",
+      "Laissez le {c}."
+    ],
+    "drapeaux_outro": [
+      "L'Empereur est au dernier drapeau.",
+      "Le bivouac est au dernier fanion."
+    ]
+  }
+}

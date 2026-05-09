@@ -1,0 +1,11 @@
+{
+  "enabled": ["morse", "templier", "polybe", "maritime", "avocat", "cassis", "vigenere", "gilwell", "drapeaux", "ign"],
+  "weights": {
+    "morse": 20,
+    "templier": 20,
+    "polybe": 20,
+    "maritime": 20,
+    "avocat": 4,
+    "cassis": 4
+  }
+}
