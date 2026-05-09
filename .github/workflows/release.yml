@@ -51,8 +51,9 @@ jobs:
         run: |
           # WeasyPrint sur Windows requiert GTK3 Runtime
           # On télécharge et installe silencieusement l'installateur MSYS2/GTK3
-          curl -LO https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2022-01-04/gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe
-          ./gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe /S
+          # curl -LO https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2022-01-04/gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe
+          # ./gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe /S
+          echo "Skipping GTK3 installation for now since backend is a placeholder"
 
       - name: Build Python Backend
         shell: bash
