@@ -1,5 +1,0 @@
-{
-  "category": "crypted_message",
-  "description": "Code Morse classique avec une typographie personnalisée et des délimiteurs.",
-  "rules_explanation": "Codes écrits : Pour ne pas saturer l'attention, évitez d'enchaîner plus de 3 messages cryptés/écrits d'affilée."
-}

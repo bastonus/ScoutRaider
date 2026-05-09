@@ -1,0 +1,88 @@
+{
+  "name": "scoutraider",
+  "private": true,
+  "version": "0.3.0-beta",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron": "electron .",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\""
+  },
+  "build": {
+    "appId": "com.scoutraider.suite",
+    "productName": "ScoutRaider",
+    "directories": {
+      "output": "dist_electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "python-dist",
+        "to": "python-backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Education"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "bastonus",
+        "repo": "ScoutRaider-Suite"
+      }
+    ]
+  },
+  "dependencies": {
+    "@ckeditor/ckeditor5-build-classic": "^41.4.2",
+    "@ckeditor/ckeditor5-react": "^11.1.2",
+    "@tiptap/extension-placeholder": "^3.23.1",
+    "@tiptap/pm": "^3.23.1",
+    "@tiptap/react": "^3.23.1",
+    "@tiptap/starter-kit": "^3.23.1",
+    "archiver": "^7.0.1",
+    "dockview": "^5.2.0",
+    "electron-updater": "^6.8.3",
+    "flexlayout-react": "^0.8.19",
+    "geographiclib-geodesic": "^2.0.0",
+    "leaflet": "^1.9.4",
+    "lru-cache": "^10.2.0",
+    "lucide-react": "^0.363.0",
+    "mammoth": "^1.12.0",
+    "quill-image-resize-module-react": "^3.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1",
+    "react-quill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.21",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "electron": "^29.1.6",
+    "electron-builder": "^24.13.3",
+    "typescript": "^6.0.2",
+    "vite": "^5.2.0",
+    "vite-plugin-electron": "^0.29.1",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "wait-on": "^7.2.0"
+  }
+}

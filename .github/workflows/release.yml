@@ -8,285 +8,91 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  APP_NAME: ScoutRaider-Suite
-
 jobs:
-  # ─────────────────────────────────────────────────────────
-  # WINDOWS — PyInstaller + Inno Setup → Setup.exe
-  # ─────────────────────────────────────────────────────────
-  build-windows:
-    runs-on: windows-latest
+  build:
+    name: Build on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
 
-      - name: Install Python dependencies (skip winsdk)
-        run: |
-          pip install PySide6 folium reportlab geopy requests shapely numpy matplotlib python-dotenv python-docx odfpy geographiclib Pillow cairosvg svglib
-          pip install pyinstaller
-
-      - name: Build with PyInstaller
-        run: pyinstaller ScoutRaider-Suite.spec --noconfirm
-
-      - name: Download Inno Setup
-        run: |
-          Invoke-WebRequest -Uri "https://jrsoftware.org/download.php/is.exe" -OutFile "inno_setup.exe"
-          Start-Process -FilePath "inno_setup.exe" -ArgumentList "/VERYSILENT /NORESTART" -Wait
-
-      - name: Create installer script
-        shell: bash
-        run: |
-          # Remove 'v' from version for InnoSetup if present
-          VERSION="${GITHUB_REF_NAME#v}"
-          cat > installer.iss << EOF
-          [Setup]
-          AppName=ScoutRaider Suite
-          AppVersion=$VERSION
-          AppPublisher=Pierre-Alberic Theobald
-          DefaultDirName={autopf}\ScoutRaider Suite
-          DefaultGroupName=ScoutRaider Suite
-          OutputDir=installer_output
-          OutputBaseFilename=ScoutRaider-Suite-Windows-Setup
-          Compression=lzma
-          SolidCompression=yes
-          WizardStyle=modern
-          PrivilegesRequired=lowest
-          SetupIconFile=assets\icon.ico
-          WizardImageFile=assets\wizard_image.bmp
-          WizardSmallImageFile=assets\wizard_small.bmp
-          UninstallDisplayIcon={app}\ScoutRaider-Suite.exe
-          
-          [Languages]
-          Name: "french"; MessagesFile: "compiler:Languages\French.isl"
-          
-          [Tasks]
-          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-          
-          [Files]
-          Source: "dist\ScoutRaider-Suite\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-          
-          [Icons]
-          Name: "{group}\ScoutRaider Suite"; Filename: "{app}\ScoutRaider-Suite.exe"
-          Name: "{autodesktop}\ScoutRaider Suite"; Filename: "{app}\ScoutRaider-Suite.exe"; Tasks: desktopicon
-          
-          [Run]
-          Filename: "{app}\ScoutRaider-Suite.exe"; Description: "{cm:LaunchProgram,ScoutRaider Suite}"; Flags: nowait postinstall skipifsilent
-          EOF
-
-      - name: Compile Inno Setup installer
-        run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
-
-      - name: Upload Windows installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: ScoutRaider-Suite-Windows
-          path: installer_output/ScoutRaider-Suite-Windows-Setup.exe
-
-  # ─────────────────────────────────────────────────────────
-  # MACOS — PyInstaller + create-dmg → .dmg
-  # ─────────────────────────────────────────────────────────
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build with PyInstaller
-        run: pyinstaller ScoutRaider-Suite.spec --noconfirm
-
-      - name: Wrap as .app bundle
-        run: |
-          mkdir -p dist/ScoutRaider-Suite.app/Contents/MacOS
-          cp -r dist/ScoutRaider-Suite/* dist/ScoutRaider-Suite.app/Contents/MacOS/
-          cat > dist/ScoutRaider-Suite.app/Contents/Info.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleExecutable</key>
-              <string>ScoutRaider-Suite</string>
-              <key>CFBundleIdentifier</key>
-              <string>com.scoutraider.suite</string>
-              <key>CFBundleName</key>
-              <string>ScoutRaider Suite</string>
-              <key>CFBundleVersion</key>
-              <string>${{ github.ref_name }}</string>
-              <key>LSMinimumSystemVersion</key>
-              <string>11.0</string>
-          </dict>
-          </plist>
-          EOF
-
-      - name: Install create-dmg
-        run: brew install create-dmg
-
-      - name: Create .dmg installer
-        run: |
-          create-dmg \
-            --volname "ScoutRaider Suite" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --app-drop-link 450 185 \
-            "ScoutRaider-Suite-macOS.dmg" \
-            "dist/ScoutRaider-Suite.app"
-
-      - name: Upload macOS DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: ScoutRaider-Suite-macOS
-          path: ScoutRaider-Suite-macOS.dmg
-
-  # ─────────────────────────────────────────────────────────
-  # LINUX — PyInstaller + appimagetool → .AppImage
-  # ─────────────────────────────────────────────────────────
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install system dependencies
+      # ==========================================
+      # 🐍 DÉPENDANCES PYTHON (WEASYPRINT, ETC.)
+      # ==========================================
+      
+      - name: Install System Dependencies for WeasyPrint (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 libxkbcommon0 fuse libfuse2 libcairo2-dev pkg-config python3-dev libffi-dev
+          sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libpango1.0-dev
 
-      - name: Install Python dependencies
+      - name: Install System Dependencies for WeasyPrint (macOS)
+        if: runner.os == 'macOS'
         run: |
-          pip install -r requirements.txt
-          pip install pyinstaller pillow
+          brew install pango libffi
 
-      - name: Build with PyInstaller
-        run: pyinstaller ScoutRaider-Suite.spec --noconfirm
-
-      - name: Create AppDir structure
+      - name: Install System Dependencies for WeasyPrint (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
         run: |
-          mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
-          cp -r dist/ScoutRaider-Suite/* AppDir/usr/bin/
+          # WeasyPrint sur Windows requiert GTK3 Runtime
+          # On télécharge et installe silencieusement l'installateur MSYS2/GTK3
+          curl -LO https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases/download/2022-01-04/gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe
+          ./gtk3-runtime-3.24.31-2022-01-04-ts-win64.exe /S
+
+      - name: Build Python Backend
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller weasyprint
           
-          # AppRun launcher
-          cat > AppDir/AppRun << 'EOF'
-          #!/bin/bash
-          SELF=$(readlink -f "$0")
-          HERE=$(dirname "$SELF")
-          export PATH="$HERE/usr/bin:$PATH"
-          exec "$HERE/usr/bin/ScoutRaider-Suite" "$@"
-          EOF
-          chmod +x AppDir/AppRun
+          # TODO: Quand votre script Python sera prêt (ex: backend.py), utilisez ceci :
+          # pip install -r python-requirements.txt
+          # pyinstaller --noconfirm --onedir backend.py
           
-          # .desktop file
-          cat > AppDir/ScoutRaider-Suite.desktop << 'EOF'
-          [Desktop Entry]
-          Name=ScoutRaider Suite
-          Exec=ScoutRaider-Suite
-          Icon=ScoutRaider-Suite
-          Type=Application
-          Categories=Education;
-          Comment=Générateur de carnets de raid scout
-          EOF
-          
-          # Convert icon for Linux AppImage integration
-          cp AppDir/ScoutRaider-Suite.desktop AppDir/usr/share/applications/
-          python -c "from PIL import Image; img=Image.open('assets/icon.ico'); img.save('AppDir/ScoutRaider-Suite.png')"
-          cp AppDir/ScoutRaider-Suite.png AppDir/usr/share/icons/hicolor/256x256/apps/ScoutRaider-Suite.png
+          # Pour l'instant, on crée juste le dossier qui sera empaqueté par Electron
+          mkdir -p python-dist
+          echo "Placeholder pour l'exécutable Python" > python-dist/placeholder.txt
+          # Plus tard : cp -r dist/backend/* python-dist/
 
-      - name: Download appimagetool
-        run: |
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
-          chmod +x appimagetool
+      # ==========================================
+      # ⚛️ BUILD ELECTRON
+      # ==========================================
+      
+      - name: Install Node Dependencies
+        run: npm install
 
-      - name: Build AppImage
-        run: |
-          ARCH=x86_64 ./appimagetool AppDir ScoutRaider-Suite-Linux.AppImage
+      - name: Build React App (Vite)
+        run: npm run build
+
+      - name: Build and Publish Electron App
         env:
-          APPIMAGE_EXTRACT_AND_RUN: 1
-
-      - name: Upload Linux AppImage
-        uses: actions/upload-artifact@v4
-        with:
-          name: ScoutRaider-Suite-Linux
-          path: ScoutRaider-Suite-Linux.AppImage
-
-  # ─────────────────────────────────────────────────────────
-  # RELEASE — Attach all installers to the GitHub Release
-  # ─────────────────────────────────────────────────────────
-  release:
-    needs: [build-windows, build-macos, build-linux]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-artifacts
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "ScoutRaider Suite ${{ github.ref_name }}"
-          body: |
-            ## ScoutRaider Suite (Beta) ${{ github.ref_name }}
-            
-            ### 🎨 Refonte Totale de l'UI (Phase 1 : Map)
-            Cette version marque le début du **nouveau design system** de ScoutRaider Suite. 
-            L'interface a été simplifiée pour se concentrer sur l'essentiel, avec une refonte complète de la partie **Carte (Map)** :
-            - **Modernisation des Notifications** : Nouveau système de "pills" glassmorphiques pour les alertes et chevauchements.
-            - **Curseurs Professionnels** : Nouveaux indicateurs visuels pour chaque outil (Itinéraire, Nœud, Azimut, Encodage).
-            - **Ergonomie Améliorée** : Layout clarifié et suppression des éléments redondants.
-            
-            Cette mise à jour prépare le terrain pour la refonte de tous les outils de préparation et de l'orchestrateur.
-
-            ⚠️ **Avertissement Sécurité** : Les azimuts et métrages sont calculés algorithmiquement. Vérifiez toujours l'itinéraire manuellement sur une carte papier avant d'envoyer vos scouts sur le terrain !
-
-            ---
-
-            ### 💾 Installation
-            | Plateforme | Fichier | Instructions |
-            |---|---|---|
-            | 🪟 **Windows** | `ScoutRaider-Suite-Windows-Setup.exe` | Double-cliquez pour installer → Lancez depuis le Bureau |
-            | 🍎 **macOS** | `ScoutRaider-Suite-macOS.dmg` | Ouvrez le DMG → Glissez l'app dans Applications |
-            | 🐧 **Linux** | `ScoutRaider-Suite-Linux.AppImage` | `chmod +x *.AppImage` puis double-cliquez |
-
-            ---
-
-            ### 🌟 Fonctionnalités
-            - 🗺️ Carte interactive IGN et vue Satellite avec routage BRouter
-            - 🧭 Segmentation d'itinéraire automatique avec calcul d'azimuts et de métrages
-            - 🎲 11 Épreuves intégrées (Morse, Vigenère, Chiffres Romains, Azimut, etc.)
-            - 🚨 Détection intelligente des zones dangereuses avec alertes
-            - 📄 Générateur PDF automatique du carnet participant et du corrigé
-            - 💡 **Outil Aide Intégré (?)** : Guide complet point par point
-
-            ---
-
-            ### 💬 Vos Retours Sont Précieux !
-            👉 [Page GitHub Issues](https://github.com/bastonus/ScoutRaider-Suite/issues)
-          draft: false
-          files: |
-            release-artifacts/**/*.exe
-            release-artifacts/**/*.dmg
-            release-artifacts/**/*.AppImage
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          # npx electron-builder compile le code Electron et l'application Vite
+          # et crée l'installeur (.exe, .dmg, .AppImage) selon l'OS courant.
+          # L'option --publish always uploadera automatiquement les fichiers
+          # sur la Release GitHub associée au tag de version (v*).
+          
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            npx electron-builder --win --publish always
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            npx electron-builder --mac --publish always
+          else
+            npx electron-builder --linux --publish always
+          fi
