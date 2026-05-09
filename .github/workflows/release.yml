@@ -181,7 +181,7 @@ jobs:
             ### 💬 Vos Retours Sont Précieux !
             👉 [Page GitHub Issues](https://github.com/bastonus/ScoutRaider-Suite/issues)
           draft: false
-          prerelease: true
+          prerelease: false
           files: |
             release-artifacts/**/*.exe
             release-artifacts/**/*.dmg
