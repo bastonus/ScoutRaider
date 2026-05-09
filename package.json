@@ -2,6 +2,8 @@
   "name": "scoutraider",
   "private": true,
   "version": "0.3.0-beta",
+  "description": "Application de planification et génération de carnets de raid scout.",
+  "author": "Pierre-Albéric Théobald",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -32,14 +34,17 @@
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "build/icon.png"
     },
     "linux": {
       "target": "AppImage",
-      "category": "Education"
+      "category": "Education",
+      "icon": "build/icon.png"
     },
     "publish": [
       {
