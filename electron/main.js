@@ -98,6 +98,8 @@ function createWindow() {
     width: 1440,
     height: 900,
     backgroundColor: '#1c1c20',
+    frame: false, // Frameless window
+    titleBarStyle: 'hidden', // Hide title bar but keep traffic lights on Mac if needed
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -105,6 +107,9 @@ function createWindow() {
     },
     icon: path.join(__dirname, '../build/icon.png'),
   });
+
+  // Remove native menu
+  mainWindow.setMenu(null);
 
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173');
@@ -119,7 +124,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  createMenu();
+  // createMenu();
   createWindow();
 
   app.on('activate', () => {
