@@ -385,7 +385,7 @@ L'activation de l'Outil Encodage déclenche les changements de vue suivants :
 - [ ] Recalculer l'itinéraire entre les étapes concernées
 
 ### 25. ✅ Distribution & Packaging
-> Fichiers : `ScoutRaider-Suite.spec`, nouveaux scripts de build
+> Fichiers : `ScoutRaider.spec`, nouveaux scripts de build
 - [x] **Windows** : créer un installeur `.exe` avec PyInstaller ou Inno Setup
   - 🔧 Le fichier `.spec` existe déjà mais nécessite une mise à jour
   - [x] Inclure toutes les dépendances (PySide6, reportlab, etc.)

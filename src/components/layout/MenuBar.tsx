@@ -199,10 +199,10 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             }},
             { divider: true },
             { label: 'Guide du Raid', shortcut: 'F1', action: () => {
-                window.open('https://github.com/bastonus/ScoutRaider-Suite/wiki', '_blank');
+                window.open('https://github.com/bastonus/ScoutRaider/wiki', '_blank');
             }},
             { label: 'Suggestions & Feedback', action: () => {
-                window.open('https://github.com/bastonus/ScoutRaider-Suite/issues/new', '_blank');
+                window.open('https://github.com/bastonus/ScoutRaider/issues/new', '_blank');
             }},
             { divider: true },
             { label: 'À propos', action: () => {
