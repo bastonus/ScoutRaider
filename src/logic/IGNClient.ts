@@ -140,6 +140,31 @@ export class IGNClient {
         return { results: [], error: lastError || "network_error" };
     }
 
+    static async reverseGeocode(lat: number, lon: number): Promise<string> {
+        try {
+            const params = new URLSearchParams({ lat: lat.toString(), lon: lon.toString() });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+            const response = await fetch(`https://api-adresse.data.gouv.fr/reverse/?${params.toString()}`, {
+                signal: controller.signal,
+                headers: { "Accept": "application/json" }
+            });
+            clearTimeout(timeoutId);
+
+            if (!response.ok) return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+
+            const data = await response.json();
+            if (data.features && data.features.length > 0) {
+                const props = data.features[0].properties;
+                return props.label || props.name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+            }
+        } catch (e) {
+            console.error('[IGNClient] reverseGeocode error:', e);
+        }
+        return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    }
+
     // ── ROUTING ──────────────────────────────────────────────────────────────
 
     static async computeRoute(startCoords: [number, number], endCoords: [number, number], profile = "pedestrian"): Promise<any | null> {
@@ -264,9 +289,12 @@ export class IGNClient {
                                     const wayTagIdx = headers.indexOf("WayTags");
                                     const distIdx = headers.indexOf("Distance");
                                     
+                                    const dangerIntervals: { start: number, end: number, level: string }[] = [];
                                     let extremeDist = 0, highDist = 0, minorDist = 0;
                                     let prevD = 0;
                                     let hasMotorwayCross = false;
+                                    let lastLevel: string | null = null;
+                                    let intervalStart = 0;
 
                                     for (let m = 1; m < msgs.length; m++) {
                                         const msgLine = msgs[m];
@@ -274,30 +302,47 @@ export class IGNClient {
                                             const t = msgLine[wayTagIdx] || "";
                                             const d = parseFloat(msgLine[distIdx]) || prevD;
                                             const delta = d - prevD;
-                                            prevD = d;
-
+                                            
+                                            let currentLevel: string | null = null;
                                             if (t.includes("highway=motorway")) {
                                                 hasMotorwayCross = true;
                                                 extremeDist += delta;
+                                                currentLevel = "extreme";
                                             } else if (t.includes("highway=trunk") || t.includes("highway=primary")) {
                                                 highDist += delta;
+                                                currentLevel = "high";
                                             } else if (t.includes("highway=secondary") || t.includes("highway=tertiary")) {
                                                 minorDist += delta;
+                                                currentLevel = "minor";
                                             }
+
+                                            // If level changed, close previous interval and start new one
+                                            if (currentLevel !== lastLevel) {
+                                                if (lastLevel) {
+                                                    dangerIntervals.push({ start: intervalStart, end: d, level: lastLevel });
+                                                }
+                                                lastLevel = currentLevel;
+                                                intervalStart = d;
+                                            }
+                                            prevD = d;
                                         }
                                     }
+                                    // Close last interval
+                                    if (lastLevel) {
+                                        dangerIntervals.push({ start: intervalStart, end: prevD, level: lastLevel });
+                                    }
 
-                                    if (extremeDist > 200) dangerLevel = "extreme";
-                                    else if (highDist > 200) dangerLevel = "high";
-                                    else if (minorDist > 300) dangerLevel = "minor";
+                                    if (extremeDist > 100) dangerLevel = "extreme";
+                                    else if (highDist > 150) dangerLevel = "high";
+                                    else if (minorDist > 200) dangerLevel = "minor";
                                     else if (hasMotorwayCross) dangerLevel = "motorway_cross";
+                                    
+                                    if (!geom.properties) geom.properties = {};
+                                    geom.properties.danger_level = dangerLevel;
+                                    geom.properties.danger_intervals = dangerIntervals;
+                                    geom.properties.is_fallback = false;
                                 }
                             } catch (e) {}
-
-                            // Setup properly wrapped object
-                            if (!geom.properties) geom.properties = {};
-                            geom.properties.danger_level = dangerLevel;
-                            geom.properties.is_fallback = false;
 
                             results.push({
                                 name: `Alt ${results.length + 1}`,

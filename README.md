@@ -4,7 +4,7 @@
 
 # 🏕️ ScoutRaider — Générateur de Carnets de Raid
 
-> **Version Beta 0.3.0-beta (Nouvelle Version Electron !)** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
+> **Version Beta 0.3.1-beta (POI & Interface !)** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
 > 
 > 👉 **[📥 TÉLÉCHARGER LA DERNIÈRE VERSION (Windows, macOS, Linux)](https://github.com/bastonus/ScoutRaider-Suite/releases/latest)**
 
@@ -15,15 +15,20 @@
 
 ---
 
-## 🚀 MISE À JOUR MAJEURE : Passage à Electron
+## 🚀 MISE À JOUR : Beta 0.3.1
 
-ScoutRaider fait peau neuve ! L'application a été entièrement réécrite en **React / Vite / Electron** pour offrir une interface plus fluide, plus moderne et de meilleures performances.
+Cette version apporte des améliorations majeures sur le système de points d'intérêt (POI) et l'interface utilisateur.
 
-**Quoi de neuf dans cette Beta 0.3 :**
-- **Nouvelle Interface Utilisateur** : Design system moderne et réactif.
-- **Performances accrues** : Navigation fluide sur la carte IGN et gestion optimisée des calculs.
-- **Architecture Hybride** : Interface en React et futur moteur PDF en Python (WeasyPrint).
-- **Installeurs Natifs** : Distribution simplifiée via GitHub Actions (.exe, .dmg, .AppImage).
+**Quoi de neuf dans cette Beta 0.3.1 :**
+- **Système POI optimisé** : Fonctionne désormais pleinement sur l'application Desktop avec une récupération plus efficace via l'API Overpass (moins de requêtes, plus de rapidité).
+- **Interface Itinéraire (Panel)** : Refonte visuelle et ergonomique du panneau latéral d'itinéraire pour une meilleure lisibilité.
+- **Outil "Déplacer un nœud" fonctionnel** : Il est désormais possible de déplacer, ajouter ou supprimer des points sur un tracé existant.
+- **Interactivité de la carte** : La quasi-totalité des outils (Azimut, Encodage) est désormais opérationnelle pour une édition fluide.
+- **Détection des Voies Dangereuses** : Amélioration du système d'alerte contextuelle pour les routes à forte circulation (nouveaux icônes et messages d'alerte).
+- **Corrections Electron** : Résolution des erreurs 406 lors des appels API et meilleure gestion des ressources.
+- **Nouveau format de fichier `.srdoc`** : Passage au format "ScoutRaider Document" avec prise en charge de l'association de fichiers système.
+- **Export CSV fonctionnel** : Possibilité d'exporter les données brutes de l'itinéraire au format CSV pour un usage externe.
+- **⚠️ Note sur les exports** : Les exports PDF, HTML et DOCX sont temporairement indisponibles dans cette beta car ils sont en cours de migration vers le nouveau moteur Electron.
 
 ---
 

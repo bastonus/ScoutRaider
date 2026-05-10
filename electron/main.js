@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, session } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
@@ -12,6 +12,24 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow = null;
+let filePathToOpen = null;
+
+// Handle Windows/Linux file association via argv
+if (process.platform !== 'darwin') {
+  const argv = process.argv;
+  const fileArg = argv.find(arg => arg.endsWith('.srdoc') || arg.endsWith('.scoutproj'));
+  if (fileArg) filePathToOpen = fileArg;
+}
+
+// Handle macOS file association
+app.on('open-file', (event, path) => {
+  event.preventDefault();
+  if (mainWindow) {
+    mainWindow.webContents.send('open-project-at-path', path);
+  } else {
+    filePathToOpen = path;
+  }
+});
 
 function createMenu() {
   const isMac = process.platform === 'darwin';
@@ -118,6 +136,14 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  // Once the window is ready, if we have a file to open, send it to the renderer
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (filePathToOpen) {
+      mainWindow.webContents.send('open-project-at-path', filePathToOpen);
+      filePathToOpen = null;
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -172,6 +198,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Overpass API requires a custom User-Agent and often blocks the default Electron one (406 Not Acceptable).
+  // We set a unique identifier for the entire session.
+  const appVersion = app.getVersion();
+  const customUA = `ScoutRaider/${appVersion} (https://github.com/bastonus/ScoutRaider; ScoutRaider Desktop App)`;
+  session.defaultSession.setUserAgent(customUA);
+
   // createMenu();
   createWindow();
 
@@ -209,10 +241,17 @@ autoUpdater.on('update-downloaded', (info) => {
 });
 
 ipcMain.handle('check-for-updates', async () => {
+  if (!app.isPackaged && process.env.NODE_ENV === 'development') {
+    // In dev mode, autoUpdater will fail unless configured with a dev-app-update.yml
+    // We send a specific error that the frontend can handle gracefully.
+    if (mainWindow) mainWindow.webContents.send('update-error', 'DEV_MODE');
+    return { error: 'DEV_MODE' };
+  }
   try {
     return await autoUpdater.checkForUpdates();
   } catch (err) {
     console.error('Update check failed:', err);
+    if (mainWindow) mainWindow.webContents.send('update-error', err.toString());
     return { error: err.toString() };
   }
 });
@@ -251,11 +290,11 @@ ipcMain.handle('get-app-version', () => app.getVersion());
 ipcMain.handle('show-save-dialog', async (event, defaultName, format) => {
   const filters = format === 'pdf' ? [{ name: 'Document PDF', extensions: ['pdf'] }] :
                   format === 'html' ? [{ name: 'Page Web', extensions: ['html'] }] :
-                  [{ name: 'Projet ScoutRaider', extensions: ['scoutproj'] }];
+                  [{ name: 'Document ScoutRaider', extensions: ['srdoc', 'scoutproj'] }];
 
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
     title: 'Enregistrer',
-    defaultPath: defaultName || `projet.${format || 'scoutproj'}`,
+    defaultPath: defaultName || `projet.${format || 'srdoc'}`,
     filters
   });
 
@@ -265,23 +304,22 @@ ipcMain.handle('show-save-dialog', async (event, defaultName, format) => {
 // Show Open Dialog
 ipcMain.handle('show-open-dialog', async (event, filters) => {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-    title: 'Ouvrir',
+    title: 'Ouvrir un projet',
     properties: ['openFile'],
-    filters: filters || [{ name: 'Projets ScoutRaider', extensions: ['scoutproj'] }, { name: 'Tous les fichiers', extensions: ['*'] }]
+    filters: filters || [{ name: 'Projets ScoutRaider', extensions: ['srdoc', 'scoutproj'] }, { name: 'Tous les fichiers', extensions: ['*'] }]
   });
 
   return canceled || filePaths.length === 0 ? null : filePaths[0];
 });
 
-// Save .scoutproj
+// Save .srdoc
 ipcMain.handle('save-scoutproj', async (event, stateJSON, filepath) => {
   try {
-    let targetPath = filepath;
     if (!targetPath) {
       const { canceled, filePath: dialogPath } = await dialog.showSaveDialog(mainWindow, {
         title: 'Enregistrer le projet',
-        defaultPath: 'projet.scoutproj',
-        filters: [{ name: 'Projet ScoutRaider', extensions: ['scoutproj'] }]
+        defaultPath: 'projet.srdoc',
+        filters: [{ name: 'Document ScoutRaider', extensions: ['srdoc', 'scoutproj'] }]
       });
       if (canceled) return false;
       targetPath = dialogPath;
@@ -290,18 +328,18 @@ ipcMain.handle('save-scoutproj', async (event, stateJSON, filepath) => {
     await fs.writeFile(targetPath, stateJSON, 'utf-8');
     return targetPath;
   } catch (err) {
-    console.error('Failed to save .scoutproj:', err);
+    console.error('Failed to save .srdoc:', err);
     throw err;
   }
 });
 
-// Open .scoutproj
+// Open .srdoc
 ipcMain.handle('open-scoutproj', async () => {
   try {
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
       title: 'Ouvrir un projet',
       properties: ['openFile'],
-      filters: [{ name: 'Projet ScoutRaider', extensions: ['scoutproj'] }]
+      filters: [{ name: 'Projet ScoutRaider', extensions: ['srdoc', 'scoutproj'] }]
     });
 
     if (canceled || filePaths.length === 0) return null;
@@ -309,7 +347,7 @@ ipcMain.handle('open-scoutproj', async () => {
     const data = await fs.readFile(filePaths[0], 'utf-8');
     return { state: data, filepath: filePaths[0] };
   } catch (err) {
-    console.error('Failed to load .scoutproj:', err);
+    console.error('Failed to load .srdoc:', err);
     throw err;
   }
 });

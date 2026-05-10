@@ -64,6 +64,7 @@ export type AppAction =
     | { type: 'SET_NAV_LANGUAGE'; stepId?: string; segIdx?: number; lang: CarnetStep['navLanguage'] }
     | { type: 'TOGGLE_POI'; stepId?: string; segIdx?: number; poiId: string }
     | { type: 'TOGGLE_POIS_ON_MAP' }
+    | { type: 'TOGGLE_DANGERS_ON_MAP' }
     /**
      * Edit the plain-text of a computed (non-manual) step.
      * The new text is validated (±10% distance/azimuth tolerance) and re-encoded.
@@ -270,11 +271,26 @@ function appReducer(state: AppState, action: AppAction): AppState {
             return autoRebuildCarnet(rebuiltPolygonal);
         }
 
-        case 'SET_POLYGONAL_STEPS':
+        case 'SET_POLYGONAL_STEPS': {
+            // Intelligent leg_key assignment: match each segment to a route in state.routes
+            const enrichedSteps = action.steps.map((seg: any) => {
+                if (seg.leg_key) return seg;
+                
+                // Find a route that contains the segment's first coordinate
+                if (seg.coords && seg.coords.length > 0) {
+                    const firstPt = seg.coords[0];
+                    const matchingRoute = state.routes.find((r: any) => {
+                        const rCoords = r.geojson?.geometry?.coordinates || r.geojson?.coordinates || [];
+                        return rCoords.some((rp: any) => Math.abs(rp[0] - firstPt[0]) < 0.0001 && Math.abs(rp[1] - firstPt[1]) < 0.0001);
+                    });
+                    if (matchingRoute) return { ...seg, leg_key: matchingRoute.id };
+                }
+                return seg;
+            });
+
             // We do NOT clear segment_pois here, to prevent POIs from disappearing from the map.
-            // The stale POIs might momentarily show in the text, but the POI job will finish very quickly
-            // and replace them with the correctly aligned ones.
-            return autoRebuildCarnet({ ...state, polygonal_steps: action.steps });
+            return autoRebuildCarnet({ ...state, polygonal_steps: enrichedSteps });
+        }
 
         case 'SET_POLYGONAL_SETTINGS': {
             pushHistory(state);
@@ -320,17 +336,17 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'TOGGLE_NODE': {
             pushHistory(state);
             const { nodeIdx, mode } = action;
+            const settings = { ...state.polygonalization_settings };
             if (mode === 'mask') {
-                const masked = state.masked_nodes.includes(nodeIdx)
-                    ? state.masked_nodes.filter(n => n !== nodeIdx)
-                    : [...state.masked_nodes, nodeIdx];
-                return autoRebuildCarnet({ ...state, masked_nodes: masked });
+                settings.masked_nodes = settings.masked_nodes.includes(nodeIdx)
+                    ? settings.masked_nodes.filter(n => n !== nodeIdx)
+                    : [...settings.masked_nodes, nodeIdx];
             } else {
-                const forced = state.forced_nodes.includes(nodeIdx)
-                    ? state.forced_nodes.filter(n => n !== nodeIdx)
-                    : [...state.forced_nodes, nodeIdx];
-                return autoRebuildCarnet({ ...state, forced_nodes: forced });
+                settings.forced_nodes = settings.forced_nodes.includes(nodeIdx)
+                    ? settings.forced_nodes.filter(n => n !== nodeIdx)
+                    : [...settings.forced_nodes, nodeIdx];
             }
+            return autoRebuildCarnet({ ...state, polygonalization_settings: settings });
         }
 
         // ── Module assignment ──────────────────────────────────────────────
@@ -643,8 +659,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'TOGGLE_POIS_ON_MAP':
             return { ...state, show_pois_on_map: !state.show_pois_on_map };
 
-        case 'TOGGLE_GENERAL_MAP':
-            return { ...state, carnet_include_general_map: !state.carnet_include_general_map };
+        case 'TOGGLE_DANGERS_ON_MAP':
+            return { ...state, show_dangers_on_map: !state.show_dangers_on_map };
 
         // ── POI persistence ────────────────────────────────────────────────
         case 'SET_SEGMENT_POIS': {
@@ -859,13 +875,26 @@ function autoRebuildCarnet(state: AppState): AppState {
         const oldStep = oldSteps.find(s => !s.isManual && s.segmentIndices && s.segmentIndices[0] === firstSegIdx);
         if (oldStep) {
             newStep.navLanguage = oldStep.navLanguage;
+            newStep.mapPersist = oldStep.mapPersist;
+            
+            // If the user manually edited this step, preserve their text and flag
+            if (oldStep.isEdited) {
+                return {
+                    ...newStep,
+                    isEdited: true,
+                    solutionText: oldStep.solutionText,
+                    encodedText: oldStep.encodedText,
+                    navLanguage: oldStep.navLanguage,
+                    pois: oldStep.pois, // Preserve POI selections too
+                };
+            }
         }
         
         // ── Cache: skip regeneration if nothing that affects the text has changed ──
         if (oldStep && oldStep.solutionText) {
             const oldSelectedPoi = oldStep.pois?.find((p: any) => p.selected);
             const newSelectedPoi = newStep.pois?.find((p: any) => p.selected);
-            const oldSeg0 = state.polygonal_steps[firstSegIdx];
+            
             // Build cache key from all inputs that affect the output text
             const cacheInputs = [
                 newStep.moduleId,
@@ -895,6 +924,7 @@ function autoRebuildCarnet(state: AppState): AppState {
                     ...newStep,
                     solutionText: oldStep.solutionText,
                     encodedText: oldStep.encodedText,
+                    pois: oldStep.pois, // Preserve POI selections
                 };
             }
         }
@@ -1090,6 +1120,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     const legKey = result.legKey ?? jobId;
                     const segs: import('./logic/types').PolySegment[] = result.segments ?? result;
                     console.log(`[Pipeline ②] Azimut done  legKey=${legKey}  →  ${segs?.length ?? 0} segments`);
+                    console.timeEnd(`[Pipeline] ② Azimuts (pending after this)`);
                     dispatch({ type: 'SET_POLYGONAL_STEPS', steps: segs });
 
                     if (segs && segs.length > 0) {
@@ -1278,7 +1309,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // ── Listen for Electron menu actions ───────────────────────────────
     useEffect(() => {
         if (typeof window !== 'undefined' && (window as any).electronAPI?.onMenuAction) {
-            (window as any).electronAPI.onMenuAction(async (action: string) => {
+            const cleanup = (window as any).electronAPI.onMenuAction(async (action: string) => {
                 switch (action) {
                     case 'undo': dispatch({ type: 'UNDO' }); break;
                     case 'redo': dispatch({ type: 'REDO' }); break;
@@ -1295,7 +1326,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
                     case 'save': {
                         dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Enregistrement...' });
-                        const ok = await StateManager.saveProject(state);
+                        // Use stateRef to get the absolute latest state for saving
+                        const ok = await StateManager.saveProject(stateRef.current);
                         dispatch({ type: 'SET_LOADING', isLoading: false });
                         if (ok) {
                             dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet enregistré.', notifType: 'info', duration: 3000 });
@@ -1306,8 +1338,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     }
                 }
             });
+            return cleanup;
         }
-    }, [state]);
+    }, []); // Only run once, stateRef handles the updates
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).electronAPI?.onOpenProjectAtPath) {
+            const cleanup = (window as any).electronAPI.onOpenProjectAtPath(async (path: string) => {
+                try {
+                    const data = await (window as any).electronAPI.readFile(path);
+                    const loaded = StateManager.deserializeFromLoad(data);
+                    if (loaded) {
+                        dispatch({ type: 'LOAD_PROJECT', state: loaded });
+                        dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet chargé par association de fichier.', notifType: 'info' });
+                    }
+                } catch (e) {
+                    console.error('Failed to open file via association:', e);
+                    dispatch({ type: 'ADD_NOTIFICATION', message: 'Échec de l\'ouverture du fichier.', notifType: 'error' });
+                }
+            });
+            return cleanup;
+        }
+    }, [dispatch]);
 
     return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 };

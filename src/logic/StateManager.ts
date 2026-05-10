@@ -5,7 +5,7 @@
  * Handles:
  * - Initial state creation
  * - State mutation helpers for the reducer
- * - Serialization / deserialization for .scoutproj files
+ * - Serialization / deserialization for .srdoc files
  * - IPC wrappers for Electron save/load/export
  */
 
@@ -33,7 +33,9 @@ export class StateManager {
                 allow_offroad: false,
                 force_intersections: true,
                 min_dist: 80,
-                bypassed: false
+                bypassed: false,
+                masked_nodes: [],
+                forced_nodes: []
             },
             polygonal_steps: [],
             polygonal_legs: {},
@@ -44,15 +46,13 @@ export class StateManager {
             custom_assignments: {},
             custom_languages: {},
 
-            masked_nodes: [],
-            forced_nodes: [],
-
             active_tool: 'route',
             anchor_stage_idx: -1,
             show_azimuth_arrows: false,
             active_ign_layer: 'PLAN.IGN',
             small_roads_only: false,
             show_pois_on_map: true,
+            show_dangers_on_map: true,
             segment_pois: {},
 
             theme_id: 'Neutre',
@@ -75,7 +75,7 @@ export class StateManager {
     // ─── Serialization (for .scoutproj persistence) ───────────────────────
 
     /**
-     * Serialize state for saving to a .scoutproj file.
+     * Serialize state for saving to a .srdoc file.
      * Strips transient UI fields and adds metadata.
      */
     static serializeForSave(state: AppState): string {
@@ -96,7 +96,7 @@ export class StateManager {
     }
 
     /**
-     * Deserialize a .scoutproj JSON string back into AppState.
+     * Deserialize a .srdoc JSON string back into AppState.
      * Handles schema migration for older versions.
      */
     static deserializeFromLoad(json: string): AppState {
@@ -125,12 +125,22 @@ export class StateManager {
         // Ensure arrays exist (protection against corrupted files)
         if (!Array.isArray(migrated.stages)) migrated.stages = [];
         if (!Array.isArray(migrated.routes)) migrated.routes = [];
+        // Ensure arrays exist
         if (!Array.isArray(migrated.polygonal_steps)) migrated.polygonal_steps = [];
         if (!Array.isArray(migrated.carnet_steps)) migrated.carnet_steps = [];
-        if (!Array.isArray(migrated.enabled_annexes)) migrated.enabled_annexes = [];
-        if (!Array.isArray(migrated.export_queue)) migrated.export_queue = [];
-        if (!Array.isArray(migrated.masked_nodes)) migrated.masked_nodes = [];
-        if (!Array.isArray(migrated.forced_nodes)) migrated.forced_nodes = [];
+        
+        // Migrate legacy top-level nodes if necessary
+        const legacyMasked = (loadedState as any).masked_nodes;
+        if (Array.isArray(legacyMasked) && migrated.polygonalization_settings.masked_nodes.length === 0) {
+            migrated.polygonalization_settings.masked_nodes = legacyMasked;
+        }
+        const legacyForced = (loadedState as any).forced_nodes;
+        if (Array.isArray(legacyForced) && migrated.polygonalization_settings.forced_nodes.length === 0) {
+            migrated.polygonalization_settings.forced_nodes = legacyForced;
+        }
+
+        if (!Array.isArray(migrated.polygonalization_settings.masked_nodes)) migrated.polygonalization_settings.masked_nodes = [];
+        if (!Array.isArray(migrated.polygonalization_settings.forced_nodes)) migrated.polygonalization_settings.forced_nodes = [];
 
         return migrated;
     }
@@ -190,7 +200,7 @@ export class StateManager {
             const blob = new Blob([json], { type: 'application/json' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = filepath || 'project.scoutproj';
+            a.download = filepath || 'projet.srdoc';
             a.click();
             URL.revokeObjectURL(a.href);
             return true;
@@ -216,7 +226,39 @@ export class StateManager {
 
         // Direct JSON string (e.g. from drag-and-drop)
         if (jsonOrPath) {
-            return StateManager.deserializeFromLoad(jsonOrPath);
+            try {
+                return StateManager.deserializeFromLoad(jsonOrPath);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Web fallback: trigger file input
+        if (typeof document !== 'undefined') {
+            return new Promise((resolve) => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.srdoc,.scoutproj,application/json';
+                input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (!file) {
+                        resolve(null);
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (re) => {
+                        const content = re.target?.result as string;
+                        try {
+                            resolve(StateManager.deserializeFromLoad(content));
+                        } catch (err) {
+                            console.error('Failed to parse file:', err);
+                            resolve(null);
+                        }
+                    };
+                    reader.readAsText(file);
+                };
+                input.click();
+            });
         }
 
         return null;
@@ -259,20 +301,24 @@ export class StateManager {
     }
 
     static setPolygonalSegments(prev: AppState, legKey: string, segments: PolySegment[]): AppState {
+        const segsWithKey = segments.map(s => ({ ...s, leg_key: legKey }));
         return {
             ...prev,
             polygonal_legs: {
                 ...prev.polygonal_legs,
-                [legKey]: segments
+                [legKey]: segsWithKey
             }
         };
     }
 
     static rebuildPolygonalSteps(prev: AppState): AppState {
         let steps: PolySegment[] = [];
-        for (const legId of prev.route_chain) {
+        // Use the routes array order as the source of truth for the itinerary legs
+        for (const route of prev.routes) {
+            const legId = route.id;
             if (prev.polygonal_legs[legId]) {
-                steps = steps.concat(prev.polygonal_legs[legId]);
+                const mappedSegs = prev.polygonal_legs[legId].map(s => ({ ...s, leg_key: legId }));
+                steps = steps.concat(mappedSegs);
             }
         }
         return { ...prev, polygonal_steps: steps };

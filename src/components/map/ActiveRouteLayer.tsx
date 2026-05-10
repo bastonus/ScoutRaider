@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { Polyline, Marker, Popup, useMap, useMapEvents, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
 import { backgroundEngine } from '../../logic/BackgroundEngine';
@@ -7,6 +7,7 @@ import { ALL_MODULE_IDS, MODULE_META } from '../../logic/ModuleRegistry';
 import { themeManager } from '../../logic/ThemeManager';
 import { ModuleLogic } from '../../logic/ModuleLogic';
 import { NavigationText } from '../../logic/NavigationText';
+import { PolygonalEngine } from '../../logic/PolygonalEngine';
 
 /** Helper: Haversine distance in meters */
 const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -119,25 +120,92 @@ export default function ActiveRouteLayer() {
     }, [steps]);
 
     // ── Phase 0 Fix: Node drag now properly updates the polygonal steps ──
-    const handleNodeDragEnd = useCallback((e: any, segIdx: number) => {
-        const pt = e.target.getLatLng();
-        dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Recalcul des segments...' });
+    const [optimisticNodes, setOptimisticNodes] = useState<Record<number, [number, number]>>({});
 
-        // Re-run full polygonalisation with updated forced node
-        const allCoords = state.routes.flatMap((r: any) =>
-            r.geojson?.geometry?.coordinates || r.geojson?.coordinates || []
-        );
-        if (allCoords.length >= 2) {
-            backgroundEngine.enqueue('azimut_leg', 1, `job-node-poly-${Date.now()}`, {
-                geojson: {
-                    type: "FeatureCollection",
-                    features: [{ type: "Feature", geometry: { type: "LineString", coordinates: allCoords } }]
-                },
-                forceIntersections: false,
-                settings: state.polygonalization_settings
-            });
+    // Clear optimistic nodes when the steps actually change from the backend
+    React.useEffect(() => {
+        setOptimisticNodes({});
+    }, [steps]);
+
+    const allCoords = React.useMemo(() => state.routes.flatMap((r: any) =>
+        r.geojson?.geometry?.coordinates || r.geojson?.coordinates || []
+    ), [state.routes]);
+
+    const findClosestRoutePoint = useCallback((lat: number, lng: number) => {
+        let minPixelDist = Infinity;
+        let closestPt: [number, number] = [lat, lng];
+        let closestIdx = -1;
+
+        const p = map.latLngToContainerPoint([lat, lng]);
+
+        for (let i = 0; i < allCoords.length - 1; i++) {
+            const pt1 = allCoords[i];
+            const pt2 = allCoords[i+1];
+            // map.latLngToContainerPoint expects [lat, lng] or L.LatLng
+            const a = map.latLngToContainerPoint([pt1[1], pt1[0]]);
+            const b = map.latLngToContainerPoint([pt2[1], pt2[0]]);
+            
+            const l2 = Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2);
+            let proj;
+            if (l2 === 0) {
+                proj = a;
+            } else {
+                let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+                t = Math.max(0, Math.min(1, t));
+                proj = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
+            }
+
+            const dist = Math.sqrt(Math.pow(p.x - proj.x, 2) + Math.pow(p.y - proj.y, 2));
+
+            if (dist < minPixelDist) {
+                minPixelDist = dist;
+                const latlng = map.containerPointToLatLng(proj as any);
+                closestPt = [latlng.lat, latlng.lng];
+                
+                // For data index, we pick the closest vertex of the segment
+                const d1 = Math.pow(p.x - a.x, 2) + Math.pow(p.y - a.y, 2);
+                const d2 = Math.pow(p.x - b.x, 2) + Math.pow(p.y - b.y, 2);
+                closestIdx = d1 < d2 ? i : i + 1;
+            }
         }
-    }, [dispatch, state.routes, state.polygonalization_settings]);
+        return { idx: closestIdx, latlng: closestPt, dist: minPixelDist };
+    }, [allCoords, map]);
+
+    const handleNodeDrag = useCallback((e: any) => {
+        const { lat, lng } = e.target.getLatLng();
+        const closest = findClosestRoutePoint(lat, lng);
+        e.target.setLatLng(closest.latlng);
+    }, [findClosestRoutePoint]);
+
+    const handleNodeDragEnd = useCallback((e: any, segIdx: number) => {
+        const { lat, lng } = e.target.getLatLng();
+        const closest = findClosestRoutePoint(lat, lng);
+        const seg = steps[segIdx];
+        if (!seg || closest.idx === -1) return;
+
+        const oldStartIdx = seg.properties.start_idx;
+        
+        let newForced = [...state.polygonalization_settings.forced_nodes];
+        let newMasked = [...state.polygonalization_settings.masked_nodes];
+
+        // If it was already a forced node, we just update it.
+        if (newForced.includes(oldStartIdx)) {
+            newForced = newForced.filter(idx => idx !== oldStartIdx);
+        } else {
+            // If it was an automatic node, we mask it so it doesn't reappear at the same spot.
+            newMasked.push(oldStartIdx);
+        }
+        newForced.push(closest.idx);
+
+        // Optimistically update the node position locally to prevent "flicker" while waiting for background engine
+        setOptimisticNodes(prev => ({ ...prev, [segIdx]: [lat, lng] }));
+
+        dispatch({ type: 'SET_POLYGONAL_SETTINGS', settings: { 
+            forced_nodes: Array.from(new Set(newForced)),
+            masked_nodes: Array.from(new Set(newMasked))
+        } as any });
+        dispatch({ type: 'ADD_NOTIFICATION', message: 'Nœud déplacé.', notifType: 'info' });
+    }, [dispatch, findClosestRoutePoint, steps, state.polygonalization_settings.forced_nodes, state.polygonalization_settings.masked_nodes]);
 
     // ── Phase 0 Fix: Azimut drag now properly writes back to state ──
     const handleAzimutDragEnd = useCallback((e: any, segIdx: number) => {
@@ -153,26 +221,21 @@ export default function ActiveRouteLayer() {
 
     // ── Node context menu (remove node) ──
     const handleNodeRemove = useCallback((segIdx: number) => {
-        dispatch({ type: 'TOGGLE_NODE', nodeIdx: segIdx, mode: 'mask' });
-        // Trigger repoly with the masked node
-        const allCoords = state.routes.flatMap((r: any) =>
-            r.geojson?.geometry?.coordinates || r.geojson?.coordinates || []
-        );
-        if (allCoords.length >= 2) {
-            dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Suppression du nœud...' });
-            backgroundEngine.enqueue('azimut_leg', 1, `job-node-rm-${Date.now()}`, {
-                geojson: {
-                    type: "FeatureCollection",
-                    features: [{ type: "Feature", geometry: { type: "LineString", coordinates: allCoords } }]
-                },
-                forceIntersections: false,
-                settings: {
-                    ...state.polygonalization_settings,
-                    masked_nodes: [...state.masked_nodes, segIdx]
-                }
-            });
+        const seg = steps[segIdx];
+        if (!seg) return;
+        const startIdx = seg.properties.start_idx;
+
+        // If it's a forced node, just unforce it.
+        // If it's an automatic node, mask it.
+        if (state.polygonalization_settings.forced_nodes.includes(startIdx)) {
+            const newForced = state.polygonalization_settings.forced_nodes.filter(i => i !== startIdx);
+            dispatch({ type: 'SET_POLYGONAL_SETTINGS', settings: { forced_nodes: newForced } as any });
+        } else {
+            const newMasked = [...state.polygonalization_settings.masked_nodes, startIdx];
+            dispatch({ type: 'SET_POLYGONAL_SETTINGS', settings: { masked_nodes: newMasked } as any });
         }
-    }, [dispatch, state.routes, state.polygonalization_settings, state.masked_nodes]);
+        dispatch({ type: 'ADD_NOTIFICATION', message: 'Nœud supprimé.', notifType: 'info' });
+    }, [dispatch, steps, state.polygonalization_settings.forced_nodes, state.polygonalization_settings.masked_nodes]);
 
     // Extract alternative rendering so it shows in both modes
     const renderAlternatives = () => {
@@ -261,7 +324,7 @@ export default function ActiveRouteLayer() {
                 }
 
                 const azimut = seg.azimut;
-                const startPt = latLngs[0];
+                const startPt = optimisticNodes[idx] || latLngs[0];
                 const arrowLen = Math.max(80, Math.min(250, segDist * 0.4));
                 const destPt = azimut !== undefined ? getDestLatLng(startPt[0], startPt[1], azimut, arrowLen) : null;
 
@@ -270,17 +333,41 @@ export default function ActiveRouteLayer() {
 
                 return (
                     <React.Fragment key={`poly-seg-${idx}`}>
-                        {/* Segment Line */}
+                        {/* ── Invisible Thicker Line for easier interaction ── */}
                         <Polyline 
                             positions={latLngs} 
-                            pathOptions={{ color, weight, opacity: isDragOver ? 1 : 0.85 }}
+                            pathOptions={{ color: 'transparent', weight: 20 }}
                             eventHandlers={{
                                 click: (e: any) => {
                                     if (activeTool === 'encodage') {
                                         setEncodingPopupVal({ idx, latlng: [e.latlng.lat, e.latlng.lng] });
+                                    } else if (activeTool === 'node') {
+                                        const closest = findClosestRoutePoint(e.latlng.lat, e.latlng.lng);
+                                        if (closest.idx !== -1) {
+                                            const newForced = [...state.polygonalization_settings.forced_nodes, closest.idx];
+                                            dispatch({ type: 'SET_POLYGONAL_SETTINGS', settings: { forced_nodes: Array.from(new Set(newForced)) } as any });
+                                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Nœud ajouté.', notifType: 'info' });
+                                        }
                                     }
                                 }
                             }}
+                        >
+                            {isNodeTool && (
+                                <Tooltip sticky>
+                                    <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
+                                        <b style={{ color: 'var(--accent-default)' }}>Outil Nœud</b><br />
+                                        <span>Clic-gauche : ajouter un nœud</span><br />
+                                        <span>Clic-droit : supprimer un nœud</span>
+                                    </div>
+                                </Tooltip>
+                            )}
+                        </Polyline>
+
+                        {/* Visible Segment Line */}
+                        <Polyline 
+                            positions={latLngs} 
+                            pathOptions={{ color, weight, opacity: isDragOver ? 1 : 0.85 }}
+                            interactive={false}
                         />
 
                         {/* ── Azimut Arrows — ALWAYS rendered when zoom permits ── */}
@@ -340,6 +427,8 @@ export default function ActiveRouteLayer() {
                             icon={nodeIcon}
                             draggable={isNodeTool}
                             eventHandlers={{
+                                dragstart: (e) => e.target.closePopup(),
+                                drag: handleNodeDrag,
                                 dragend: (e) => handleNodeDragEnd(e, idx),
                                 contextmenu: (e) => {
                                     if (isNodeTool) {
@@ -369,36 +458,91 @@ export default function ActiveRouteLayer() {
             })}
 
             {/* DANGER POIs (Route safety warnings) */}
-            {state.routes.map((route: any, routeIdx: number) => {
+            {state.show_dangers_on_map && state.routes.map((route: any, routeIdx: number) => {
                 const geojson = route.geojson;
                 if (!geojson) return null;
                 
-                const features = geojson.type === 'FeatureCollection' ? geojson.features : (geojson.type === 'Feature' ? [geojson] : []);
+                // geojson can be a LineString with .properties directly attached by IGNClient
+                const features = geojson.type === 'FeatureCollection' ? geojson.features : (geojson.type === 'Feature' ? [geojson] : [{ type: 'Feature', geometry: geojson, properties: geojson.properties || {} }]);
                 if (!features || features.length === 0) return null;
                 
                 return features.map((feat: any, featIdx: number) => {
-                    const dl = feat.properties?.danger_level;
-                    if (!dl) return null;
-                    
                     const pCoords = feat.geometry.coordinates;
-                    if (pCoords.length < 2) return null;
+                    if (!pCoords || pCoords.length < 2) return null;
+
+                    const dangerIntervals = feat.properties?.danger_intervals || [];
+                    const globalDl = feat.properties?.danger_level;
+
+                    // 1. Precise intervals if available
+                    if (dangerIntervals.length > 0) {
+                        return dangerIntervals.map((di: any, diIdx: number) => {
+                            // Filter noise
+                            const intervalLength = di.end - di.start;
+                            if (intervalLength < 30 && di.level !== 'extreme') return null;
+
+                            // Find the coordinate at the midpoint of the interval
+                            const midM = (di.start + di.end) / 2;
+                            let currentM = 0;
+                            let targetPt = pCoords[0];
+                            for (let i = 0; i < pCoords.length - 1; i++) {
+                                const d = PolygonalEngine.calculateDistance(pCoords[i], pCoords[i+1]);
+                                currentM += d;
+                                if (currentM >= midM) {
+                                    targetPt = pCoords[i+1];
+                                    break;
+                                }
+                            }
+
+                            let color = '#eab308';
+                            let title = "Danger localisé";
+                            if (di.level === 'extreme') { color = '#ef4444'; title = "Attention : Voie Rapide / Autoroute"; }
+                            else if (di.level === 'motorway_cross') { color = '#ef4444'; title = "Attention : Traversée de Voie Rapide"; }
+                            else if (di.level === 'high') { color = '#ea580c'; title = "Prudence : Route Nationale"; }
+
+                            const dangerIcon = L.divIcon({
+                                className: 'danger-poi',
+                                html: `<div style="color:${color}; display:flex; align-items:center; justify-content:center; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.8));">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="${color}33" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                                </div>`,
+                                iconSize: [28, 28], iconAnchor: [14, 14]
+                            });
+
+                            return (
+                                <Marker key={`danger-${route.id}-${featIdx}-${diIdx}`} position={[targetPt[1], targetPt[0]]} icon={dangerIcon}>
+                                    <Popup closeButton={false}>
+                                        <div style={{ padding: '10px 12px', minWidth: '160px', fontFamily: 'var(--font-ui)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#fff' }}>{title}</span>
+                                            </div>
+                                        </div>
+                                    </Popup>
+                                </Marker>
+                            );
+                        });
+                    }
+
+                    // 2. Fallback to leg-center marker if no precise points
+                    if (!globalDl) return null;
                     const mid = pCoords[Math.floor(pCoords.length / 2)];
                     const pt: [number, number] = [mid[1], mid[0]];
 
                     let color = '#eab308';
                     let title = "Info : Trajet prolongé sur Départementale";
-                    if (dl === 'extreme') { color = '#ef4444'; title = "Attention : Trajet prolongé sur Autoroute"; }
-                    else if (dl === 'motorway_cross') { color = '#ef4444'; title = "Attention : Le trajet traverse une autoroute !"; }
-                    else if (dl === 'high') { color = '#ea580c'; title = "Attention : Trajet prolongé sur Nationale"; }
+                    if (globalDl === 'extreme') { color = '#ef4444'; title = "Attention : Trajet prolongé sur Autoroute"; }
+                    else if (globalDl === 'motorway_cross') { color = '#ef4444'; title = "Attention : Le trajet traverse une autoroute !"; }
+                    else if (globalDl === 'high') { color = '#ea580c'; title = "Attention : Trajet prolongé sur Nationale"; }
                     
                     const dangerIcon = L.divIcon({
                         className: 'danger-poi',
-                        html: `<div style="width:20px;height:20px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.5)"></div>`,
-                        iconSize: [20, 20], iconAnchor: [10, 10]
+                        html: `<div style="color:${color}; display:flex; align-items:center; justify-content:center; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.8));">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="${color}33" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                        </div>`,
+                        iconSize: [28, 28], iconAnchor: [14, 14]
                     });
 
                     return (
-                        <Marker key={`danger-${route.id}-${featIdx}`} position={pt} icon={dangerIcon}>
+                        <Marker key={`danger-leg-${route.id}-${featIdx}`} position={pt} icon={dangerIcon}>
                             <Popup closeButton={false}>
                                 <div style={{ padding: '12px 14px', minWidth: '180px', fontFamily: 'var(--font-ui)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>

@@ -44,7 +44,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // ─── Menu actions (main → renderer) ───────────────────────────────
     onMenuAction: (callback) => {
-        ipcRenderer.on('menu-action', (_event, action) => callback(action));
+        const listener = (_event, action) => callback(action);
+        ipcRenderer.on('menu-action', listener);
+        return () => ipcRenderer.removeListener('menu-action', listener);
+    },
+
+    onOpenProjectAtPath: (callback) => {
+        const listener = (_event, path) => callback(path);
+        ipcRenderer.on('open-project-at-path', listener);
+        return () => ipcRenderer.removeListener('open-project-at-path', listener);
     },
 
     // ─── Window Controls ──────────────────────────────────────────────
@@ -55,10 +63,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
     downloadUpdate: () => ipcRenderer.invoke('download-update'),
     quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
-    onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_event, info) => callback(info)),
-    onUpdateNotAvailable: (callback) => ipcRenderer.on('update-not-available', (_event, info) => callback(info)),
-    onUpdateError: (callback) => ipcRenderer.on('update-error', (_event, error) => callback(error)),
-    onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (_event, info) => callback(info)),
+    onUpdateAvailable: (callback) => {
+        const l = (_event, info) => callback(info);
+        ipcRenderer.on('update-available', l);
+        return () => ipcRenderer.removeListener('update-available', l);
+    },
+    onUpdateNotAvailable: (callback) => {
+        const l = (_event, info) => callback(info);
+        ipcRenderer.on('update-not-available', l);
+        return () => ipcRenderer.removeListener('update-not-available', l);
+    },
+    onUpdateError: (callback) => {
+        const l = (_event, error) => callback(error);
+        ipcRenderer.on('update-error', l);
+        return () => ipcRenderer.removeListener('update-error', l);
+    },
+    onUpdateDownloaded: (callback) => {
+        const l = (_event, info) => callback(info);
+        ipcRenderer.on('update-downloaded', l);
+        return () => ipcRenderer.removeListener('update-downloaded', l);
+    },
 
     // ─── Logging ──────────────────────────────────────────────────────
     writeLog: (level, msg) => ipcRenderer.invoke('write-log', level, msg)

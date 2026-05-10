@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import FleurDeLysLogo from './FleurDeLysLogo';
 import { useApp } from '../../AppContext';
+import { StateManager } from '../../logic/StateManager';
 import type { ViewMode } from '../../App';
 
 interface MenuBarProps {
@@ -41,38 +42,57 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const isManualCheck = useRef(false);
+
     useEffect(() => {
         const electron = (window as any).electronAPI;
         if (!electron) return;
 
-        electron.onUpdateAvailable((info: any) => {
-            setUpdateModal({ show: true, info, downloading: false, downloaded: false });
-        });
-
-        electron.onUpdateNotAvailable(() => {
-            setUpdateModal(prev => prev?.checking ? null : prev);
-            if (updateModal?.checking) {
-                dispatch({ type: 'ADD_NOTIFICATION', message: 'ScoutRaider est à jour !', notifType: 'info' });
-            }
-        });
-
-        electron.onUpdateError((err: string) => {
-            dispatch({ type: 'ADD_NOTIFICATION', message: 'Erreur de mise à jour', notifType: 'error' });
-            setUpdateModal(null);
-        });
-
-        electron.onUpdateDownloaded(() => {
-            setUpdateModal(prev => prev ? { ...prev, downloading: false, downloaded: true } : null);
-        });
-
         // Listen for native Electron menu actions (shortcuts triggered from native menu)
-        electron.onMenuAction((action: string) => {
+        const unsubMenu = electron.onMenuAction((action: string) => {
             if (action === 'new') menus['Fichier'][0].action();
             else if (action === 'open') menus['Fichier'][1].action();
             else if (action === 'save') menus['Fichier'][3].action();
             else if (action === 'undo') dispatch({ type: 'UNDO' });
             else if (action === 'redo') dispatch({ type: 'REDO' });
         });
+
+        const unsubUA = electron.onUpdateAvailable((info: any) => {
+            isManualCheck.current = false;
+            setUpdateModal({ show: true, info, downloading: false, downloaded: false });
+        });
+
+        const unsubUNA = electron.onUpdateNotAvailable(() => {
+            if (isManualCheck.current) {
+                dispatch({ type: 'ADD_NOTIFICATION', message: 'ScoutRaider est à jour !', notifType: 'info' });
+                isManualCheck.current = false;
+            }
+            setUpdateModal(null);
+        });
+
+        const unsubUE = electron.onUpdateError((err: string) => {
+            if (isManualCheck.current) {
+                if (err === 'DEV_MODE') {
+                    dispatch({ type: 'ADD_NOTIFICATION', message: 'Mises à jour indisponibles en mode développement.', notifType: 'info' });
+                } else {
+                    dispatch({ type: 'ADD_NOTIFICATION', message: 'Erreur lors de la recherche de mises à jour.', notifType: 'error' });
+                }
+                isManualCheck.current = false;
+            }
+            setUpdateModal(null);
+        });
+
+        const unsubUD = electron.onUpdateDownloaded(() => {
+            setUpdateModal(prev => prev ? { ...prev, downloading: false, downloaded: true } : null);
+        });
+
+        return () => {
+            unsubMenu();
+            unsubUA();
+            unsubUNA();
+            unsubUE();
+            unsubUD();
+        };
     }, [dispatch]);
 
     // Global keyboard shortcuts (for browser dev or when native menu misses it)
@@ -124,36 +144,32 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                 dispatch({ type: 'NEW_PROJECT' });
                 dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouveau projet créé.', notifType: 'info' });
             }},
-            { label: 'Ouvrir Projet...', shortcut: 'Ctrl+O', action: () => {
-                if ((window as any).electronAPI) {
-                    (window as any).electronAPI.openScoutproj().then((res: any) => {
-                        if (res && res.state) {
-                            dispatch({ type: 'LOAD_PROJECT', state: JSON.parse(res.state) });
-                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet chargé avec succès.', notifType: 'info' });
-                        }
-                    });
-                } else {
-                    dispatch({ type: 'ADD_NOTIFICATION', message: 'Indisponible dans le navigateur.', notifType: 'warning' });
+            { label: 'Ouvrir Projet...', shortcut: 'Ctrl+O', action: async () => {
+                const loaded = await StateManager.loadProject();
+                if (loaded) {
+                    dispatch({ type: 'LOAD_PROJECT', state: loaded });
+                    dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet chargé.', notifType: 'info' });
+                }
+            }},
+            { label: 'Importer Projet...', action: async () => {
+                const loaded = await StateManager.loadProject();
+                if (loaded) {
+                    dispatch({ type: 'LOAD_PROJECT', state: loaded });
+                    dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet importé.', notifType: 'info' });
                 }
             }},
             { divider: true },
-            { label: 'Enregistrer', shortcut: 'Ctrl+S', action: () => {
-                if ((window as any).electronAPI) {
-                    (window as any).electronAPI.saveScoutproj(JSON.stringify(state), '').then((res: any) => {
-                        if (res) dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet enregistré.', notifType: 'info' });
-                    });
-                } else {
-                    dispatch({ type: 'ADD_NOTIFICATION', message: 'Indisponible dans le navigateur.', notifType: 'warning' });
-                }
+            { label: 'Enregistrer', shortcut: 'Ctrl+S', action: async () => {
+                dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Enregistrement...' });
+                const ok = await StateManager.saveProject(state);
+                dispatch({ type: 'SET_LOADING', isLoading: false });
+                if (ok) dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet enregistré.', notifType: 'info' });
             }},
-            { label: 'Enregistrer sous...', shortcut: 'Ctrl+Shift+S', action: () => {
-                if ((window as any).electronAPI) {
-                    (window as any).electronAPI.saveScoutproj(JSON.stringify(state), '').then((res: any) => {
-                        if (res) dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet enregistré.', notifType: 'info' });
-                    });
-                } else {
-                    dispatch({ type: 'ADD_NOTIFICATION', message: 'Indisponible dans le navigateur.', notifType: 'warning' });
-                }
+            { label: 'Enregistrer sous...', shortcut: 'Ctrl+Shift+S', action: async () => {
+                dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Enregistrement...' });
+                const ok = await StateManager.saveProject(state); // In browser, this triggers another download
+                dispatch({ type: 'SET_LOADING', isLoading: false });
+                if (ok) dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet enregistré.', notifType: 'info' });
             }},
             { divider: true },
             { label: 'Exporter en PDF', shortcut: 'Ctrl+E', action: () => {
@@ -167,7 +183,8 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
         'Aide': [
             { label: 'Vérifier les mises à jour...', action: () => {
                 if ((window as any).electronAPI) {
-                    setUpdateModal({ show: false, checking: true });
+                    isManualCheck.current = true;
+                    setUpdateModal({ show: false, checking: true } as any);
                     (window as any).electronAPI.checkForUpdates();
                 } else {
                     dispatch({ type: 'ADD_NOTIFICATION', message: 'Indisponible dans le navigateur.', notifType: 'warning' });
@@ -189,7 +206,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             }},
             { divider: true },
             { label: 'À propos', action: () => {
-                dispatch({ type: 'ADD_NOTIFICATION', message: 'ScoutRaider Suite v0.3.0', notifType: 'info' });
+                dispatch({ type: 'ADD_NOTIFICATION', message: 'ScoutRaider Suite v0.3.1', notifType: 'info' });
             }},
         ]
     };

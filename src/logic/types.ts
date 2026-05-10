@@ -31,7 +31,7 @@ export interface PolySegment {
     leg_key?: string;
     /** Module assigned to this segment (for encoding tool) */
     assigned_module?: string;
-    /** POI nearest to this segment's turning point (persisted in .scoutproj) */
+    /** POI nearest to this segment's turning point (persisted in .srdoc) */
     poi?: { name: string; type: string; distance_m: number } | null;
 }
 
@@ -90,6 +90,8 @@ export interface PolygonalisationSettings {
     force_intersections: boolean; // detect & force splits at road crossings
     min_dist: number;         // minimum segment length in meters
     bypassed: boolean;        // if true, skip polygonalisation
+    masked_nodes: number[];
+    forced_nodes: number[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -396,10 +398,6 @@ export interface AppState {
     custom_assignments: Record<string, string>;
     custom_languages: Record<string, NavLanguage>;
 
-    // Node editing
-    masked_nodes: number[];
-    forced_nodes: number[];
-
     // UI
     active_tool: string;
     anchor_stage_idx: number; // -1 = no anchor, ≥0 = insert after this stage index
@@ -407,6 +405,7 @@ export interface AppState {
     active_ign_layer: string;
     small_roads_only: boolean;
     show_pois_on_map: boolean;
+    show_dangers_on_map: boolean;
 
     // Persisted POI tracking per segment
     segment_pois: Record<string, POIResult[]>;

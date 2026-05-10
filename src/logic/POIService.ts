@@ -115,7 +115,7 @@ async function fetchOverpassPOIs(
         const response = await fetch('https://overpass-api.de/api/interpreter', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ data: query }),
+            body: new URLSearchParams({ data: query }).toString(),
         });
         if (!response.ok) return [];
         const data = await response.json();
@@ -249,9 +249,7 @@ export class POIService {
             const response = await fetch('https://overpass-api.de/api/interpreter', {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'application/json',
-                    'User-Agent': 'ScoutRaider-Electron/1.0'
+                    'Content-Type': 'application/x-www-form-urlencoded'
                 },
                 body: new URLSearchParams({ data: query }).toString(),
             });

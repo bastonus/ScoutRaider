@@ -670,3 +670,16 @@ h2 { color: var(--text-primary); font-size: 13px; font-weight: 700; letter-spaci
 .ql-editor.ql-blank::before { color: var(--text-dim) !important; font-style: italic; }
 .ck-content-override .ck.ck-editor__main > .ck-editor__editable { background: transparent !important; border: none !important; box-shadow: none !important; color: var(--text-primary); }
 .ck-content-override .ck.ck-toolbar { background: transparent !important; border: none !important; border-bottom: 1px solid rgba(255,255,255,0.05) !important; }
+
+/* ═══════════════════════════════════════
+   MAP FIXES
+   ═══════════════════════════════════════ */
+.leaflet-container :focus {
+    outline: none !important;
+}
+.leaflet-interactive:focus {
+    outline: none !important;
+}
+path.leaflet-interactive:focus {
+    outline: none !important;
+}

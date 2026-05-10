@@ -9,8 +9,10 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Zap, ShieldCheck, AlertTriangle, CheckCircle, FileText, Share2, Table2, Settings2 } from 'lucide-react';
 import type { ExportJob, ExportFormat } from '../../logic/types';
 import ExportJobItem from './ExportJobItem';
-import { ExportService } from '../../logic/ExportService';
-import type { ExportPipelineOptions } from '../../logic/ExportService';
+import CsvSettingsModal from './CsvSettingsModal';
+import { ExportService, CSV_COLUMNS } from '../../logic/ExportService';
+import type { ExportPipelineOptions, CsvColumnKey } from '../../logic/ExportService';
+import { IGNClient } from '../../logic/IGNClient';
 import { useApp } from '../../AppContext';
 
 const FORMAT_LABELS: Record<ExportFormat, string> = {
@@ -53,6 +55,26 @@ export default function ExportPanel() {
     const [version, setVersion] = useState<ExportVersion>('both');
     const [pdfEngine, setPdfEngine] = useState<PdfEngine>('auto');
     const [includeAnnexes, setIncludeAnnexes] = useState(true);
+    const [csvColumns, setCsvColumns] = useState<CsvColumnKey[]>(CSV_COLUMNS.map(c => c.key));
+    const [csvSeparator, setCsvSeparator] = useState(';');
+    const [csvMaxPois, setCsvMaxPois] = useState(5);
+    const [csvModalOpen, setCsvModalOpen] = useState(false);
+    const [enrichedAddresses, setEnrichedAddresses] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        let active = true;
+        const fetchAddresses = async () => {
+            const map: Record<string, string> = {};
+            for (const stage of state.stages || []) {
+                const addr = await IGNClient.reverseGeocode(stage.coords[0], stage.coords[1]);
+                if (!active) return;
+                map[stage.id] = addr;
+            }
+            if (active) setEnrichedAddresses(map);
+        };
+        fetchAddresses();
+        return () => { active = false; };
+    }, [state.stages]);
 
     // ── Jobs queue ──
     const [jobs, setJobs] = useState<ExportJob[]>([]);
@@ -88,6 +110,10 @@ export default function ExportPanel() {
                     includeAnnexes,
                     version,
                     pdfEngine,
+                    csvColumns,
+                    csvSeparator: csvSeparator === 'tab' ? '\t' : csvSeparator,
+                    csvMaxPois,
+                    enrichedAddresses,
                 };
 
                 updateJob(job.id, { progress: 50 });
@@ -223,7 +249,7 @@ export default function ExportPanel() {
                 <button style={addBtnStyle} onClick={() => addJob('html')}>
                     <Share2 size={13} /> + HTML
                 </button>
-                <button style={addBtnStyle} onClick={() => addJob('csv')}>
+                <button style={addBtnStyle} onClick={() => setCsvModalOpen(true)}>
                     <Table2 size={13} /> + CSV
                 </button>
             </div>
@@ -319,6 +345,20 @@ export default function ExportPanel() {
                         : 'Mode Electron — export PDF via navigateur intégré.'}
                 </div>
             </div>
+
+            {csvModalOpen && (
+                <CsvSettingsModal 
+                    onClose={() => setCsvModalOpen(false)}
+                    csvColumns={csvColumns}
+                    onChangeColumns={setCsvColumns}
+                    separator={csvSeparator}
+                    onChangeSeparator={setCsvSeparator}
+                    maxPois={csvMaxPois}
+                    onChangeMaxPois={setCsvMaxPois}
+                    onAddJob={() => addJob('csv')}
+                    enrichedAddresses={enrichedAddresses}
+                />
+            )}
         </div>
     );
 }

@@ -19,6 +19,25 @@ import type { AppState, ThemeOverrides, ExportFormat, ModuleId } from './types';
 
 // ─── Export Options ───────────────────────────────────────────────────────────
 
+export type CsvColumnKey = 'step_label' | 'stage_loc' | 'stage_address' | 'number' | 'node_loc' | 'azimuth' | 'distance' | 'km_total' | 'km_leg' | 'module' | 'text_solution' | 'text_encoded' | 'pois_exploded' | 'pois_merged';
+
+export const CSV_COLUMNS: { key: CsvColumnKey; label: string }[] = [
+    { key: 'step_label',     label: 'étape' },
+    { key: 'stage_loc',      label: 'coord. étape' },
+    { key: 'stage_address',  label: 'adresse étape' },
+    { key: 'number',         label: 'nœud #' },
+    { key: 'node_loc',       label: 'coord. nœud' },
+    { key: 'azimuth',        label: 'azimut (°)' },
+    { key: 'distance',       label: 'segment (m)' },
+    { key: 'km_leg',         label: 'cumul étape (m)' },
+    { key: 'km_total',       label: 'cumul total (m)' },
+    { key: 'module',         label: 'module' },
+    { key: 'text_encoded',   label: 'énigme' },
+    { key: 'text_solution',  label: 'solution' },
+    { key: 'pois_exploded',  label: 'landmarks (colonnes)' },
+    { key: 'pois_merged',    label: 'landmarks (liste)' },
+];
+
 export interface ExportPipelineOptions {
     title: string;
     subtitle: string;
@@ -28,6 +47,14 @@ export interface ExportPipelineOptions {
     version: 'participant' | 'solution' | 'both';
     /** 'weasyprint' | 'electron' | 'auto' */
     pdfEngine: 'weasyprint' | 'electron' | 'auto';
+    /** Columns to include in CSV export */
+    csvColumns?: CsvColumnKey[];
+    /** Separator for CSV export (default: ';') */
+    csvSeparator?: string;
+    /** Max number of POI columns to include */
+    csvMaxPois?: number;
+    /** Map of stage id -> reverse geocoded address */
+    enrichedAddresses?: Record<string, string>;
 }
 
 // ─── Electron API type ────────────────────────────────────────────────────────
@@ -269,50 +296,246 @@ export class ExportService {
 
     // ─── CSV Export ───────────────────────────────────────────────────────────
 
-    static async exportCSV(
+    /**
+     * Génère la chaîne de caractères du fichier CSV.
+     */
+    static generateCSVString(
         state: AppState,
-        options: { title: string; subtitle: string; includeGeneralMap: boolean }
-    ): Promise<boolean> {
+        options: ExportPipelineOptions
+    ): string {
         const BOM = '\uFEFF';
-        const SEP = ';';
+        const SEP = options.csvSeparator || ';';
         const NL = '\r\n';
 
-        const headers = [
-            'N°', 'Module', 'Distance (m)', 'Azimut (°)',
-            'De', 'Vers', 'Texte Solution', 'Texte Encodé', 'POIs'
-        ];
+        // ── Helpers ─────────────────────────────────────────────────────────
+        const q = (s: string) => `"${(s || '').replace(/"/g, '""')}"`;
+        /** Format a number: if decimals > 0, use comma as decimal separator (French locale). */
+        const fmt = (n: number, decimals = 0) =>
+            decimals > 0 ? n.toFixed(decimals).replace('.', ',') : String(Math.round(n));
+        const fmtKm = (m: number) => fmt(m / 1000, 3);
+        const fmtM  = (m: number) => String(Math.round(m));
+        
+        const formatCoords = (coords?: [number, number]) => {
+            if (!coords) return '';
+            const lat = coords[0];
+            const lon = coords[1];
+            
+            const toDMS = (coord: number, isLat: boolean) => {
+                const absolute = Math.abs(coord);
+                const degrees = Math.floor(absolute);
+                const minutesNotTruncated = (absolute - degrees) * 60;
+                const minutes = Math.floor(minutesNotTruncated);
+                const seconds = Math.floor((minutesNotTruncated - minutes) * 60);
+                const dir = isLat ? (coord >= 0 ? "N" : "S") : (coord >= 0 ? "E" : "W");
+                return `${degrees}°${minutes}'${seconds}"${dir}`;
+            };
+            return `${toDMS(lat, true)} ${toDMS(lon, false)}`;
+        };
+
+        const cols = options.csvColumns || CSV_COLUMNS.map(c => c.key);
+        const stages = state.stages || [];
+        const addresses = options.enrichedAddresses || {};
+        const computedSteps = state.carnet_steps.filter(s => !s.isManual);
+
+        // Calculate max POIs across all segments to size the columns correctly
+        let autoMaxPois = 0;
+        if (cols.includes('pois_exploded')) {
+            for (const step of state.carnet_steps) {
+                if (step.isManual) continue;
+                for (const segIdx of step.segmentIndices || []) {
+                    const segPois = state.segment_pois?.[segIdx.toString()] || [];
+                    autoMaxPois = Math.max(autoMaxPois, segPois.length);
+                }
+            }
+        }
+        const maxPois = options.csvMaxPois !== undefined ? options.csvMaxPois : (autoMaxPois || 1);
+
+        // ── 1. En-tête du projet ─────────────────────────────────────────────
+        const dateStr = options.subtitle || new Date().toLocaleDateString('fr-FR');
+        const title   = options.title || 'Carnet de Route';
 
         let csv = BOM;
-        csv += `# ${options.title || 'Carnet de Route'} — ${options.subtitle || new Date().toLocaleDateString('fr-FR')}` + NL;
+        const totalCols = cols.length + (cols.includes('pois_exploded') ? maxPois - 1 : 0);
+        csv += `${q(title)}${SEP.repeat(totalCols)}${NL}`;
+        csv += `Date${SEP}${q(dateStr)}${SEP.repeat(Math.max(0, totalCols - 1))}${NL}`;
+        csv += NL;
+
+        // ── 2. Unified Table Header ──────────────────────────────────────────
+        const headers: string[] = [];
+        for (const c of cols) {
+            if (c === 'pois_exploded') {
+                for (let i = 1; i <= maxPois; i++) headers.push(`poi #${i}`);
+            } else {
+                headers.push(CSV_COLUMNS.find(x => x.key === c)?.label || c);
+            }
+        }
         csv += headers.join(SEP) + NL;
 
-        state.carnet_steps.forEach((step, idx) => {
-            const moduleLabel = MODULE_META[step.moduleId as ModuleId]?.label || step.moduleId;
-            const poiNames = step.pois?.filter(p => p.selected).map(p => p.name).join(', ') || '';
-            const row = [
-                idx + 1,
-                `"${moduleLabel}"`,
-                Math.round(step.distanceM),
-                step.azimuth,
-                `"${step.fromLabel || ''}"`,
-                `"${step.toLabel || ''}"`,
-                `"${(step.solutionText || '').replace(/"/g, '""')}"`,
-                `"${(step.encodedText || '').replace(/"/g, '""')}"`,
-                `"${poiNames}"`
-            ];
-            csv += row.join(SEP) + NL;
-        });
+        // ── 3. Table Rows ────────────────────────────────────────────────────
+        let cumulativeM  = 0;
+        let lastLegLabel = '';
+        let legCumulM    = 0;
+        let stepNumber   = 0;
+        let isFirstRowOfLeg = false;
 
-        const totalDist = state.carnet_steps.reduce((s, step) => s + step.distanceM, 0);
-        csv += NL + `TOTAL${SEP}${SEP}${Math.round(totalDist)}${SEP}${SEP}${SEP}${SEP}${SEP}${SEP}` + NL;
+        let lastLegKey = '';
+        const processedLegs = new Set<string>();
 
-        const defaultFilename = `Carnet_${(options.title || 'Route').replace(/\s+/g, '_')}_${Date.now()}.csv`;
+        for (const step of state.carnet_steps) {
+            if (step.isManual) {
+                const row: string[] = [];
+                for (const c of cols) {
+                    if (c === 'module') row.push(q('Manuel'));
+                    else if (c === 'text_solution') row.push(q(step.solutionText || ''));
+                    else if (c === 'text_encoded') row.push(q(step.encodedText || ''));
+                    else if (c === 'pois_exploded') {
+                        for (let i = 0; i < maxPois; i++) row.push('');
+                    } else {
+                        row.push('');
+                    }
+                }
+                csv += row.join(SEP) + NL;
+                continue;
+            }
+
+            const segmentIndices = step.segmentIndices || [];
+            const solutionLines  = (step.solutionText || '').split('\n');
+            const encodedLines   = (step.encodedText || '').split('\n');
+            
+            for (let i = 0; i < segmentIndices.length; i++) {
+                const segIdx = segmentIndices[i];
+                const seg = state.polygonal_steps[segIdx];
+                if (!seg) continue;
+
+                const currentLegKey = seg.leg_key || '';
+                const isNewLeg = !processedLegs.has(currentLegKey);
+
+                if (isNewLeg) {
+                    if (processedLegs.size > 0) csv += NL;
+                    processedLegs.add(currentLegKey);
+                    lastLegKey = currentLegKey;
+                    legCumulM = 0;
+                    isFirstRowOfLeg = true;
+                }
+
+                // Robust stage detection: the N-th leg processed corresponds to the N-th stage as "From"
+                const legOrderIdx = processedLegs.size - 1; 
+                const fromStage = state.stages[legOrderIdx];
+                let stepFrom = fromStage?.label || '';
+                
+                // Fallback to carnet step label if stages array is inconsistent
+                if (!stepFrom && isFirstRowOfLeg) stepFrom = step.fromLabel || '';
+
+                stepNumber++;
+                legCumulM   += seg.distance || 0;
+                cumulativeM += seg.distance || 0;
+
+                const moduleLabel = MODULE_META[step.moduleId as ModuleId]?.label || step.moduleId;
+                const segPois = state.segment_pois?.[segIdx.toString()] || [];
+
+                const row: string[] = [];
+                for (const c of cols) {
+                    switch(c) {
+                        case 'step_label': 
+                            row.push(isFirstRowOfLeg ? q(stepFrom || '?') : ''); 
+                            break;
+                        case 'stage_loc': 
+                            row.push(isFirstRowOfLeg ? q(formatCoords(fromStage?.coords)) : ''); 
+                            break;
+                        case 'stage_address': 
+                            const addr = fromStage ? (addresses[fromStage.id] || fromStage.address || '—') : '—';
+                            row.push(isFirstRowOfLeg ? q(addr) : ''); 
+                            break;
+                        case 'number': 
+                            row.push(`"#${stepNumber}"`); 
+                            break;
+                        case 'node_loc': 
+                            row.push(q(formatCoords(seg.coords?.[0]))); 
+                            break;
+                        case 'azimuth': 
+                            row.push(seg.azimut !== undefined ? q(fmt(seg.azimut)) : ''); 
+                            break;
+                        case 'distance': 
+                            row.push(fmtM(seg.distance || 0)); 
+                            break;
+                        case 'km_total': 
+                            row.push(fmtM(cumulativeM)); 
+                            break;
+                        case 'km_leg': 
+                            row.push(fmtM(legCumulM)); 
+                            break;
+                        case 'module': 
+                            row.push(q(moduleLabel)); 
+                            break;
+                        case 'text_solution': 
+                            row.push(q(solutionLines[i] || '')); 
+                            break;
+                        case 'text_encoded': 
+                            row.push(q(encodedLines[i] || '')); 
+                            break;
+                        case 'pois_exploded':
+                            for (let j = 0; j < maxPois; j++) {
+                                const p = segPois[j];
+                                row.push(p ? q(p.name) : '');
+                            }
+                            break;
+                        case 'pois_merged':
+                            const selectedPois = segPois.filter(p => p.selected).map(p => p.name);
+                            const otherPois    = segPois.filter(p => !p.selected).map(p => p.name);
+                            let poisStr = '';
+                            if (selectedPois.length > 0) poisStr += selectedPois.join(', ');
+                            if (otherPois.length > 0)    poisStr += (poisStr ? ' | autres: ' : '') + otherPois.join(', ');
+                            row.push(q(poisStr));
+                            break;
+                        default:
+                            row.push('');
+                            break;
+                    }
+                }
+
+                csv += row.join(SEP) + NL;
+                isFirstRowOfLeg = false;
+            }
+        }
+
+        // ── 4. Total ─────────────────────────────────────────────────────────
+        const totalDist = computedSteps.reduce((s, step) => s + step.distanceM, 0);
+        csv += NL;
+        const totalRow: string[] = [];
+        for (const c of cols) {
+            if (c === 'step_label' || (c === 'number' && !cols.includes('step_label'))) totalRow.push(q('TOTAL'));
+            else if (c === 'distance') totalRow.push(q(fmt(totalDist) + 'm'));
+            else if (c === 'km_total') totalRow.push(fmtKm(totalDist));
+            else if (c === 'pois_exploded') {
+                for (let i = 0; i < maxPois; i++) totalRow.push('');
+            } else {
+                totalRow.push('');
+            }
+        }
+        csv += totalRow.join(SEP) + NL;
+
+        return csv;
+    }
+
+    /**
+     * Génère et sauvegarde le fichier CSV.
+     */
+    static async exportCSV(
+        state: AppState,
+        options: ExportPipelineOptions
+    ): Promise<boolean> {
+        const csv = this.generateCSVString(state, options);
+        const title = options.title || 'Carnet de Route';
+
+        // ── Sauvegarde ───────────────────────────────────────────────────────
+        const defaultFilename = `Carnet_${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
         const api = getElectronAPI();
 
         if (api) {
             const outputPath = await api.showSaveDialog(defaultFilename, 'csv');
             if (!outputPath) return false;
             await api.writeFile(outputPath, csv);
+            console.log(`[ExportService] CSV saved to ${outputPath}`);
             return true;
         } else {
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });

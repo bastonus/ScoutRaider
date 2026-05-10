@@ -14,7 +14,7 @@ interface AccordionSectionProps {
 
 function AccordionSection({ title, isOpen, onToggle, children }: AccordionSectionProps) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: isOpen ? 1 : 'none', overflow: 'hidden', flexShrink: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flexGrow: isOpen ? 1 : 0, flexShrink: 0, flexBasis: isOpen ? '0%' : 'auto', overflow: 'hidden' }}>
       <div 
         onClick={onToggle}
         style={{

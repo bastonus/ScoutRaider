@@ -6,6 +6,7 @@ import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import type { CarnetStep, ModuleId, CarnetView } from '../../logic/types';
 import { MODULE_META } from '../../logic/ModuleRegistry';
 import { useApp } from '../../AppContext';
+import { PolygonalEngine } from '../../logic/PolygonalEngine';
 import InlineEditor from './InlineEditor';
 import MiniMap from './MiniMap';
 
@@ -69,6 +70,87 @@ export default function CarnetStepBlock({
 
             {(() => {
                 const seenLabels = new Set<string>();
+
+                const getDangerLevel = (segIdx?: number) => {
+                    if (segIdx === undefined) return null;
+                    const seg = state.polygonal_steps[segIdx];
+                    if (!seg) return null;
+                    
+                    let legKey = seg.leg_key;
+                    let relativeIdx = -1;
+                    if (state.route_chain && state.polygonal_legs) {
+                        let count = 0;
+                        for (const lId of state.route_chain) {
+                            const lSegs = state.polygonal_legs[lId];
+                            if (lSegs) {
+                                if (segIdx >= count && segIdx < count + lSegs.length) {
+                                    legKey = lId;
+                                    relativeIdx = segIdx - count;
+                                    break;
+                                }
+                                count += lSegs.length;
+                            }
+                        }
+                    }
+                    
+                    if (!legKey) return null;
+                    const route = state.routes.find((r: any) => r.id === legKey);
+                    if (!route || !route.geojson) return null;
+                    
+                    // 1. Calculate the precise original distance interval [startM, endM]
+                    // We must use the GLOBAL concatenated geometry because indices (start_idx) 
+                    // are relative to the full path used during the azimut step.
+                    const allOriginalCoords = state.routes.flatMap((r: any) => 
+                        r.geojson?.geometry?.coordinates || r.geojson?.coordinates || []
+                    );
+
+                    const startIdx = seg.properties?.start_idx || 0;
+                    const endIdx = seg.properties?.point_idx || 0;
+                    
+                    let startM = 0;
+                    for (let i = 0; i < startIdx; i++) {
+                        if (allOriginalCoords[i] && allOriginalCoords[i+1]) {
+                            startM += PolygonalEngine.calculateDistance(allOriginalCoords[i], allOriginalCoords[i+1]);
+                        }
+                    }
+                    let endM = startM;
+                    for (let i = startIdx; i < endIdx; i++) {
+                        if (allOriginalCoords[i] && allOriginalCoords[i+1]) {
+                            endM += PolygonalEngine.calculateDistance(allOriginalCoords[i], allOriginalCoords[i+1]);
+                        }
+                    }
+
+                    // 2. Check danger_intervals from IGNClient
+                    const props = route.geojson.properties || (route.geojson.type === 'Feature' ? route.geojson.properties : {});
+                    const dangerIntervals = props?.danger_intervals || [];
+                    
+                    if (dangerIntervals.length > 0) {
+                        let maxDl: string | null = null;
+                        const dlPriority: Record<string, number> = { 'extreme': 4, 'motorway_cross': 3, 'high': 2, 'minor': 1 };
+                        
+                        for (const di of dangerIntervals) {
+                            // Filter noise: ignore very short intervals unless they are extreme
+                            const intervalLength = di.end - di.start;
+                            if (intervalLength < 30 && di.level !== 'extreme') continue;
+
+                            // Check for overlap between [startM, endM] and [di.start, di.end]
+                            const overlapStart = Math.max(startM, di.start);
+                            const overlapEnd = Math.min(endM, di.end);
+                            
+                            if (overlapStart < overlapEnd) {
+                                if (!maxDl || dlPriority[di.level] > dlPriority[maxDl]) {
+                                    maxDl = di.level;
+                                }
+                            }
+                        }
+                        if (maxDl) return maxDl;
+                    }
+
+                    // Fallback to legacy behavior
+                    if (props?.danger_level) return props.danger_level;
+                    return null;
+                };
+
                 return encodedLines.map((line: string, idx: number) => {
                     const segIdx = step.segmentIndices?.[idx];
                     const originalSeg = segIdx !== undefined ? state.polygonal_steps[segIdx] : null;
@@ -105,6 +187,7 @@ export default function CarnetStepBlock({
                                 distance={distance} azimuth={azimuth}
                                 isFirst={idx === 0} isSolutionView={isSolution} isVisual={isVisual}
                                 lineLabel={lineLabel}
+                                dangerLevel={getDangerLevel(segIdx)}
                                 navLanguage={segIdx !== undefined ? state.custom_languages?.[segIdx.toString()] : step.navLanguage}
                                 pois={segIdx !== undefined ? state.segment_pois?.[segIdx.toString()] : step.pois}
                                 onModuleChange={(mod: string) => {
@@ -340,7 +423,7 @@ function ManualCodeBlock({ step, onManualContentChange, onRemoveStep, isSolution
 
 function ComputedStepLine({
     step, lineIdx, segIdx, encodedLine, solutionLine, distance, azimuth, isFirst, isSolutionView, isVisual,
-    lineLabel, navLanguage, pois, onModuleChange, onNavLanguageChange, onLineClick, onPoiToggle, onRemoveStep
+    lineLabel, navLanguage, pois, dangerLevel, onModuleChange, onNavLanguageChange, onLineClick, onPoiToggle, onRemoveStep
 }: any) {
     const [hovered, setHovered] = useState(false);
     const [modulePickerOpen, setModulePickerOpen] = useState(false);
@@ -359,6 +442,13 @@ function ComputedStepLine({
     const warnColor = hasWarnings ? (step.warnings.some((w: any) => w.severity === 'error') ? '#ef4444' : '#f59e0b') : undefined;
 
     const isEncoded = !isSolutionView && !isVisual && encodedLine !== solutionLine;
+
+    let dangerColor: string | undefined = undefined;
+    let dangerText: string | undefined = undefined;
+    if (dangerLevel === 'extreme') { dangerColor = '#ef4444'; dangerText = "Attention : Ce tronçon emprunte ou traverse une voie rapide (Autoroute). Prudence absolue !"; }
+    else if (dangerLevel === 'motorway_cross') { dangerColor = '#ef4444'; dangerText = "Attention : Ce tronçon traverse une voie rapide. Regardez bien avant de traverser !"; }
+    else if (dangerLevel === 'high') { dangerColor = '#ea580c'; dangerText = "Prudence : Ce tronçon emprunte une route très passante (Nationale)."; }
+    else if (dangerLevel === 'minor') { dangerColor = '#eab308'; dangerText = "Prudence : Passage prolongé sur route départementale."; }
 
     return (
         <div 
@@ -407,6 +497,15 @@ function ComputedStepLine({
                     <div style={{ position: 'absolute', top: '12px', left: '16px', right: '16px', zIndex: 5 }}>
                         <div style={{ padding: '6px 10px', background: `${warnColor}15`, borderLeft: `3px solid ${warnColor}`, borderRadius: '4px', fontSize: '11px', color: warnColor }}>
                             {step.warnings[0]?.message}
+                        </div>
+                    </div>
+                )}
+                
+                {dangerText && (
+                    <div style={{ position: 'absolute', top: (isFirst && hasWarnings) ? '48px' : '12px', left: '16px', right: '16px', zIndex: 4 }}>
+                        <div style={{ padding: '6px 10px', background: `${dangerColor}15`, borderLeft: `3px solid ${dangerColor}`, borderRadius: '4px', fontSize: '11px', color: dangerColor, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                            {dangerText}
                         </div>
                     </div>
                 )}
@@ -496,28 +595,28 @@ function ComputedStepLine({
                     </div>
                 )}
 
-                <div style={{ marginTop: (isFirst && hasWarnings) ? '40px' : '0' }}>
+                <div style={{ marginTop: (isFirst && hasWarnings) ? '40px' : '0', paddingTop: dangerText ? ((isFirst && hasWarnings) ? '32px' : '36px') : '0' }}>
                     {isEditing ? (
                         <InlineEditor stepId={step.id} solutionText={solutionLine} moduleId={step.moduleId} lineIdx={lineIdx} onClose={() => setIsEditing(false)} />
                     ) : !isVisual && (
                         <div style={{ marginBottom: '8px', cursor: 'pointer' }} onClick={onLineClick}>
                             {isSolutionView ? (
-                                <div style={{ fontSize: '13px', color: 'var(--semantic-green)', fontWeight: 600, lineHeight: 1.5 }}>
+                                <div style={{ fontSize: '13px', color: dangerColor || 'var(--semantic-green)', fontWeight: dangerColor ? 700 : 600, lineHeight: 1.5 }}>
                                     <HighlightedText text={solutionLine} pois={pois} isEncoded={false} />
                                 </div>
                             ) : isEncoded ? (
                                 <>
-                                    <div style={{ fontFamily: font, fontSize: fontSize, color: 'var(--text-primary)', wordBreak: 'break-all', letterSpacing: step.moduleId === 'morse' ? '2px' : '0.02em', lineHeight: 1.4 }}>
+                                    <div style={{ fontFamily: font, fontSize: fontSize, color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', wordBreak: 'break-all', letterSpacing: step.moduleId === 'morse' ? '2px' : '0.02em', lineHeight: 1.4 }}>
                                         <HighlightedText text={encodedLine} pois={pois} isEncoded={true} />
                                     </div>
                                     {(hovered || solutionVisible) && (
-                                        <div style={{ fontSize: '11px', color: 'var(--semantic-green)', marginTop: '4px', fontWeight: 600 }}>
+                                        <div style={{ fontSize: '11px', color: dangerColor || 'var(--semantic-green)', marginTop: '4px', fontWeight: 600 }}>
                                             <HighlightedText text={solutionLine} pois={pois} isEncoded={false} />
                                         </div>
                                     )}
                                 </>
                             ) : (
-                                <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                                <div style={{ fontSize: '13px', color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', lineHeight: 1.5 }}>
                                     <HighlightedText text={encodedLine} pois={pois} isEncoded={false} />
                                 </div>
                             )}
