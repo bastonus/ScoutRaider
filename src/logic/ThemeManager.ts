@@ -7,7 +7,7 @@ import type { ThemeData, ThemesFile } from './types';
 const NEUTRAL_FALLBACK: ThemeData = {
     intros: ['Il est temps de se mettre en route.', 'Prochaine étape.', 'En avant.'],
     actions: ['avancez de', 'marchez sur', 'poursuivez sur'],
-    poi: 'Passez devant {poi}, et',
+    poi: ['Passez devant {poi}, et'],
     vigenere_key: 'MOUSTACHE',
     drapeaux_intros: ['Piste aux fanions.'],
     drapeaux_real: ['Allez au {c}.', 'Rejoignez le {c}.', 'Marchez vers le {c}.'],
@@ -47,7 +47,7 @@ export class ThemeManager {
 
     async load(): Promise<void> {
         try {
-            const res = await fetch('/config/themes.json');
+            const res = await fetch('config/themes.json');
             const raw = await res.json();
             // Strip _help key if present
             if (raw._help) delete raw._help;

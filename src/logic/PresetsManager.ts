@@ -16,7 +16,7 @@ export class PresetsManager {
 
     async load(): Promise<void> {
         try {
-            const res = await fetch('/config/presets.json');
+            const res = await fetch('config/presets.json');
             this.data = await res.json();
             this._activeId = this.data.active_preset;
             this.resolveActivePreset();

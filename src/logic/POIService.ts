@@ -23,44 +23,46 @@ export interface RawOSMPOI {
 const pickSynonym = (id: number, options: string[]) => options[id % options.length];
 
 const POI_TYPE_LABELS: Array<{
+    type: string;
     test: (tags: Record<string, string>) => boolean;
     label: (tags: Record<string, string>, id: number) => string;
 }> = [
     // Bars, cafes, pubs
-    { test: t => ['pub', 'bar', 'cafe'].includes(t.amenity), label: (t, id) => pickSynonym(id, ['un bar', 'un café', 'une taverne', 'un bistrot', 'un estaminet', 'un troquet', 'un pub']) },
+    { type: 'bar', test: t => ['pub', 'bar', 'cafe'].includes(t.amenity), label: (t, id) => pickSynonym(id, ['un bar', 'un café', 'une taverne', 'un bistrot', 'un estaminet', 'un troquet', 'un pub']) },
     // Churches, worship
-    { test: t => ['church', 'place_of_worship'].includes(t.amenity), label: (t, id) => pickSynonym(id, ['une église', 'une chapelle', 'un lieu de culte', 'une paroisse', 'un temple']) },
+    { type: 'church', test: t => ['church', 'place_of_worship'].includes(t.amenity), label: (t, id) => pickSynonym(id, ['une église', 'une chapelle', 'un lieu de culte', 'une paroisse', 'un temple']) },
     // Police
-    { test: t => t.amenity === 'police', label: (t, id) => pickSynonym(id, ['un poste de police', 'la gendarmerie', 'le commissariat']) },
-    { test: t => t.amenity === 'bank', label: () => 'une banque' },
-    { test: t => t.amenity === 'hospital', label: () => "un hôpital" },
-    { test: t => t.shop === 'bakery', label: () => 'une boulangerie' },
-    { test: t => t.shop === 'alcohol', label: () => 'un caviste' },
-    { test: t => ['monument', 'castle', 'ruins'].includes(t.historic), label: (t, id) => t.name ? `un monument` : pickSynonym(id, ["un monument", "des ruines", "un édifice historique", "un vieux bâtiment"]) },
+    { type: 'police', test: t => t.amenity === 'police', label: (t, id) => pickSynonym(id, ['un poste de police', 'la gendarmerie', 'le commissariat']) },
+    { type: 'bank', test: t => t.amenity === 'bank', label: () => 'une banque' },
+    { type: 'hospital', test: t => t.amenity === 'hospital', label: () => "un hôpital" },
+    { type: 'bakery', test: t => t.shop === 'bakery', label: () => 'une boulangerie' },
+    { type: 'alcohol', test: t => t.shop === 'alcohol', label: () => 'un caviste' },
+    { type: 'castle', test: t => ['monument', 'castle', 'ruins'].includes(t.historic), label: (t, id) => t.name ? `un monument` : pickSynonym(id, ["un monument", "des ruines", "un édifice historique", "un vieux bâtiment"]) },
     // Generic natural / hiking landmarks
-    { test: t => t.amenity === 'fountain' || t.amenity === 'drinking_water', label: (t, id) => pickSynonym(id, ["un point d'eau", "une fontaine"]) },
-    { test: t => t.historic === 'wayside_cross', label: () => 'un calvaire' },
-    { test: t => t.historic === 'wayside_shrine', label: () => 'un oratoire' },
-    { test: t => t.historic === 'memorial', label: (t, id) => pickSynonym(id, ['un mémorial', 'un monument aux morts', 'une stèle commemorative', 'un lieu de mémoire']) },
-    { test: t => t.natural === 'peak', label: () => 'un sommet' },
-    { test: t => t.waterway === 'waterfall', label: () => 'une cascade' },
-    { test: t => t.man_made === 'water_tower', label: () => "un château d'eau" },
-    { test: t => t.amenity === 'shelter', label: () => 'un abri' },
-    { test: t => t.amenity === 'hunting_stand', label: () => 'une palombière' },
+    { type: 'water', test: t => t.amenity === 'fountain' || t.amenity === 'drinking_water', label: (t, id) => pickSynonym(id, ["un point d'eau", "une fontaine"]) },
+    { type: 'cross', test: t => t.historic === 'wayside_cross', label: () => 'un calvaire' },
+    { type: 'shrine', test: t => t.historic === 'wayside_shrine', label: () => 'un oratoire' },
+    { type: 'memorial', test: t => t.historic === 'memorial', label: (t, id) => pickSynonym(id, ['un mémorial', 'un monument aux morts', 'une stèle commemorative', 'un lieu de mémoire']) },
+    { type: 'peak', test: t => t.natural === 'peak', label: () => 'un sommet' },
+    { type: 'waterfall', test: t => t.waterway === 'waterfall', label: () => 'une cascade' },
+    { type: 'water_tower', test: t => t.man_made === 'water_tower', label: () => "un château d'eau" },
+    { type: 'shelter', test: t => t.amenity === 'shelter', label: () => 'un abri' },
+    { type: 'hunting_stand', test: t => t.amenity === 'hunting_stand', label: () => 'une palombière' },
     // Fallback: named node
-    { test: t => !!t.name, label: (t) => t.name as string },
+    { type: 'landmark', test: t => !!t.name, label: (t) => t.name as string },
 ];
 
-function getPOILabel(tags: Record<string, string>, id: number): string | null {
+function getPOIData(tags: Record<string, string>, id: number): { label: string; type: string } | null {
     for (const entry of POI_TYPE_LABELS) {
         if (entry.test(tags)) {
             const label = entry.label(tags, id);
             // Append name if we have one and it's not already the label
             const name = tags.name;
+            let finalLabel = label;
             if (name && label !== name && !label.includes(name)) {
-                return `${label} ${name}`;
+                finalLabel = `${label} ${name}`;
             }
-            return label;
+            return { label: finalLabel, type: entry.type };
         }
     }
     return null;
@@ -267,22 +269,25 @@ export class POIService {
                 Logger.info(`[POIService] Overpass returned ${rawPOIs.length} elements in ${fetchTimeMs}ms.`);
 
                 // Assign these rawPOIs exclusively to the nearest segment
-                const globalCandidates: Array<{ label: string; lat: number; lon: number; rawId: number }> = [];
+                const globalCandidates: Array<{ label: string; type: string; lat: number; lon: number; rawId: number }> = [];
                 const usedLabels = new Set<string>();
 
                 for (const p of rawPOIs) {
-                    let label = getPOILabel(p.tags, p.id);
+                    const data = getPOIData(p.tags, p.id);
+                    let label = data?.label;
+                    let type = data?.type || 'landmark';
+                    
                     if (!label && p.tags.highway && p.tags.name) {
                         label = p.tags.name; // Fallback for named roads
                     }
                     if (!label || usedLabels.has(label)) continue;
                     usedLabels.add(label);
-                    globalCandidates.push({ label, lat: p.lat, lon: p.lon, rawId: p.id });
+                    globalCandidates.push({ label, type, lat: p.lat, lon: p.lon, rawId: p.id });
                 }
 
                 Logger.info(`[POIService] Parsed ${globalCandidates.length} unique labels. Assigning to ${missingSegments.length} segments...`);
 
-                const segPoiMap: Record<number, Array<{ label: string; dist: number; rawId: number; lat: number; lon: number }>> = {};
+                const segPoiMap: Record<number, Array<{ label: string; type: string; dist: number; rawId: number; lat: number; lon: number }>> = {};
 
                 for (const c of globalCandidates) {
                     let bestSegIdx = -1;
@@ -298,7 +303,7 @@ export class POIService {
 
                     if (bestSegIdx === -1 || bestDist > radiusM) continue;
                     if (!segPoiMap[bestSegIdx]) segPoiMap[bestSegIdx] = [];
-                    segPoiMap[bestSegIdx].push({ label: c.label, dist: bestDist, rawId: c.rawId, lat: c.lat, lon: c.lon });
+                    segPoiMap[bestSegIdx].push({ label: c.label, type: c.type, dist: bestDist, rawId: c.rawId, lat: c.lat, lon: c.lon });
                 }
 
                 let totalAssigned = 0;
@@ -308,6 +313,7 @@ export class POIService {
                     const mapped = pois.slice(0, 5).map((c, idx) => ({
                         id: `poi-${mid.idx}-${c.rawId}-${idx}`,
                         name: c.label,
+                        type: c.type,
                         selected: idx === 0,
                         lat: c.lat,
                         lon: c.lon

@@ -34,7 +34,7 @@ export class CarnetEngine {
         const navTexts = segments.map((seg, i) => {
             const globalIdx = startIdx + i;
             const prevAzimuth = globalIdx > 0 ? globalSegments[globalIdx - 1].azimut : undefined;
-            return NavigationText.generate(seg.distance || 0, seg.azimut || 0, seg.poi?.name || null, theme, prevAzimuth);
+            return NavigationText.generate(seg.distance || 0, seg.azimut || 0, seg.poi || null, theme, prevAzimuth);
         });
         const navText = navTexts.join('\n');
 

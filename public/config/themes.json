@@ -18,37 +18,109 @@
     ]
   },
   "Neutre": {
-    "description": "",
+    "description": "Un thème sobre et direct pour toutes les situations.",
     "icon": "globe-off.svg",
     "preview_image": "assets/themes/neutre.jpg",
     "intros": [
       "Il est temps de se mettre en route.",
       "Prochaine étape.",
-      "En avant."
+      "En avant.",
+      "Poursuivez votre chemin.",
+      "La suite de l'itinéraire commence ici.",
+      "Reprenez la marche.",
+      "Nouvelle direction à suivre.",
+      "Direction la suite du parcours.",
+      "Le sentier continue.",
+      "Voici la prochaine consigne.",
+      "Gardez le rythme.",
+      "Ne vous arrêtez pas en si bon chemin.",
+      "L'objectif se rapproche.",
+      "Étape suivante du raid.",
+      "On continue la progression.",
+      "Voici la route à suivre.",
+      "Le tracé vous mène par ici.",
+      "Un pas après l'autre.",
+      "Concentrez-vous sur la boussole.",
+      "Le point suivant vous attend."
     ],
     "actions": [
       "avancez de",
       "marchez sur",
-      "poursuivez sur"
+      "poursuivez sur",
+      "progressez de",
+      "parcourez",
+      "longez le chemin pendant",
+      "faites environ",
+      "suivez la route sur",
+      "dirigez-vous sur",
+      "maintenez votre effort pendant",
+      "cheminerez sur",
+      "couvrez une distance de",
+      "déplacez-vous de",
+      "allez de l'avant sur",
+      "poursuivez votre progression de"
     ],
-    "poi": "Passez devant {poi}, et",
+    "poi": [
+      "Passez devant {poi}, et",
+      "Laissez {poi} sur votre côté, puis",
+      "Dépassez {poi} avant de continuer.",
+      "Une fois à hauteur de {poi},",
+      "En vue de {poi},",
+      "Contournez {poi} et",
+      "Passez à proximité de {poi},"
+    ],
+    "poi_contextual": {
+      "bakery": [
+        "Humez l'odeur du pain frais de la boulangerie {poi}, puis",
+        "Passez devant la vitrine de {poi} et",
+        "Laissez les viennoiseries de {poi} derrière vous,"
+      ],
+      "church": [
+        "Passez sous l'ombre du clocher de {poi},",
+        "Laissez l'église {poi} sur votre droite et",
+        "Saluez le parvis de {poi} avant de"
+      ],
+      "cross": [
+        "Passez au pied de la croix {poi} et",
+        "Laissez ce calvaire {poi} sur le côté,",
+        "Priez un instant devant {poi}, puis"
+      ],
+      "forest": [
+        "Entrez sous la futaie de {poi} et",
+        "Suivez l'orée du bois {poi},",
+        "Laissez les arbres de {poi} vous guider,"
+      ],
+      "bridge": [
+        "Traversez le pont de {poi} et",
+        "Passez au-dessus de l'eau à {poi},",
+        "Franchissez {poi} avec prudence,"
+      ]
+    },
     "vigenere_key": "MOUSTACHE",
     "drapeaux_intros": [
-      "Piste aux fanions."
+      "Piste aux fanions.",
+      "Observez bien les signaux.",
+      "Défi des drapeaux lancé."
     ],
     "drapeaux_real": [
       "Allez au {c}.",
       "Rejoignez le {c}.",
-      "Marchez vers le {c}."
+      "Marchez vers le {c}.",
+      "Visez le fanion {c}.",
+      "Cap sur le {c}."
     ],
     "drapeaux_fake": [
       "Le {c} est un piège.",
       "N'allez pas au {c}.",
-      "Fuyez le {c}."
+      "Fuyez le {c}.",
+      "Ignorez le {c}.",
+      "Le {c} est une fausse piste."
     ],
     "drapeaux_outro": [
       "Le dernier fanion cité est votre arrivée.",
-      "Arrêtez-vous au dernier fanion."
+      "Arrêtez-vous au dernier fanion.",
+      "C'est ici que la piste s'arrête.",
+      "Votre destination est au pied du dernier signal."
     ],
     "labels": {
       "filename": "Carnet_De_Raid",
@@ -79,31 +151,97 @@
       "Le boss veut qu'on bouge.",
       "Les flics rodent.",
       "La planque est compromise.",
-      "Don Moustache a passé un ordre."
+      "Don Moustache a passé un ordre.",
+      "Pas de temps à perdre, filez.",
+      "On déballe le matos et on se tire.",
+      "Évitez les regards indiscrets.",
+      "La marchandise doit arriver à bon port.",
+      "Le parrain vous regarde.",
+      "Une nouvelle mission pour la famille.",
+      "Restez dans l'ombre.",
+      "Le contrat continue.",
+      "Nettoyez la zone et avancez.",
+      "Pas un mot à personne.",
+      "Le syndicat attend des résultats.",
+      "Faites ça proprement.",
+      "Les fédéraux sont sur nos talons.",
+      "Le plan se déroule comme prévu.",
+      "Il faut livrer le colis.",
+      "La loyauté avant tout."
     ],
     "actions": [
       "filez sur",
       "marchez discrètement pendant",
-      "avancez sans vous faire repérer de"
+      "avancez sans vous faire repérer de",
+      "disparaissez dans la ruelle sur",
+      "tracez votre route de",
+      "progressez en silence sur",
+      "esquivez les patrouilles sur",
+      "poursuivez votre cavale de",
+      "ne laissez aucune trace sur",
+      "faites vrombir le moteur pendant",
+      "gardez la main sur le flingue sur",
+      "avancez la tête basse de",
+      "longez les murs sur",
+      "accélérez le pas pendant",
+      "traversez le quartier de"
     ],
-    "poi": "Longez silencieusement {poi}, puis",
+    "poi": [
+      "Longez silencieusement {poi}, puis",
+      "Vérifiez que personne ne vous suit devant {poi},",
+      "Dépassez {poi} sans attirer l'attention,",
+      "Le contact vous attendait près de {poi}, continuez.",
+      "Faites un signe discret devant {poi},",
+      "Ignorez les passants à {poi} et",
+      "Passez rapidement devant {poi},"
+    ],
+    "poi_contextual": {
+      "bakery": [
+        "Le boulanger de {poi} est dans le coup, passez devant.",
+        "Cachez le matos derrière la boulangerie {poi},",
+        "L'odeur du pain frais à {poi} couvrira votre passage."
+      ],
+      "church": [
+        "Allez vous confesser à {poi} avant la suite,",
+        "L'ombre de l'église {poi} est votre alliée,",
+        "Passez devant {poi}, que Dieu vous pardonne."
+      ],
+      "cross": [
+        "Un dernier signe de croix devant {poi},",
+        "Le calvaire {poi} marque le début de la zone rouge,",
+        "Passez devant la croix {poi} sans vous arrêter."
+      ],
+      "bar": [
+        "Le informateur est au bar {poi}, passez devant.",
+        "Évitez les ivrognes devant {poi} et",
+        "La planque est juste après le bar {poi}."
+      ]
+    },
     "vigenere_key": "MOUSTACHE",
     "drapeaux_intros": [
-      "Suivez les couleurs de la famille."
+      "Suivez les couleurs de la famille.",
+      "Code couleur activé.",
+      "Les signaux du clan sont en place."
     ],
     "drapeaux_real": [
       "Passez au {c}.",
       "Contact au {c}.",
-      "Foncez au {c}."
+      "Foncez au {c}.",
+      "Le colis est au {c}.",
+      "Ralliez le point {c}."
     ],
     "drapeaux_fake": [
       "Le {c} est faux.",
       "Flics au {c}.",
-      "Oubliez le {c}."
+      "Oubliez le {c}.",
+      "C'est une embuscade au {c}.",
+      "Le {c} pue le flic."
     ],
     "drapeaux_outro": [
       "La planque est au dernier fanion.",
-      "Livraison au dernier point cité."
+      "Livraison au dernier point cité.",
+      "C'est ici que tu touches ta part.",
+      "La marchandise est au pied du dernier drapeau."
     ],
     "labels": {
       "filename": "Carnet_Mafia",
@@ -133,31 +271,98 @@
     "intros": [
       "Odin nous observe.",
       "Les drakkars nous attendent.",
-      "Pour le Valhalla !"
+      "Pour le Valhalla !",
+      "Thor gronde dans le ciel.",
+      "La conquête ne s'arrête jamais.",
+      "Le sang de nos ancêtres bout dans nos veines.",
+      "Suivez la rune de la destinée.",
+      "Le loup Fenrir est à l'affût.",
+      "Par la barbe d'Ymir !",
+      "Les Skalds chanteront vos exploits.",
+      "La brume se lève sur le fjord.",
+      "Cherchez la terre promise par les dieux.",
+      "La hache à la main, avancez.",
+      "Vers de nouveaux horizons.",
+      "Le destin est écrit par les Nornes.",
+      "Affrontez le vent du nord.",
+      "La traversée continue.",
+      "Pour la gloire de Midgard.",
+      "Ne craignez pas la mort.",
+      "Le banquet éternel vous attend."
     ],
     "actions": [
       "marchez d'un pas lourd sur",
       "avancez fièrement de",
-      "bravez les éléments sur"
+      "bravez les éléments sur",
+      "conquérez la route de",
+      "poursuivez votre raid sur",
+      "traversez ces terres hostiles de",
+      "naviguez sur le sentier de",
+      "progressez comme un berserker sur",
+      "tracez votre chemin de guerrier de",
+      "foulez le sol sacré de",
+      "chargez vers l'horizon sur",
+      "écrasez la distance de",
+      "chevauchez les vents sur",
+      "marchez sans faiblir de",
+      "rejoignez le champ de bataille sur"
     ],
-    "poi": "Saluez les dieux devant {poi}, et",
+    "poi": [
+      "Saluez les dieux devant {poi}, et",
+      "Dépassez {poi} tel un conquérant,",
+      "Laissez {poi} derrière votre bouclier,",
+      "Près de {poi}, invoquez la protection de Freyja,",
+      "Franchissez la zone de {poi} sans trembler,",
+      "Que l'esprit de {poi} vous guide,",
+      "Passez devant {poi} en silence,"
+    ],
+    "poi_contextual": {
+      "forest": [
+        "Cachez-vous dans les bois de {poi} comme un traqueur,",
+        "L'esprit de la forêt {poi} vous observe,",
+        "Traversez les arbres millénaires de {poi},"
+      ],
+      "water": [
+        "Remplissez vos gourdes à la source de {poi},",
+        "Saluez l'esprit de l'eau à {poi},",
+        "Traversez le courant près de {poi},"
+      ],
+      "cross": [
+        "Un monument étranger à {poi}, passez votre chemin,",
+        "Le calvaire {poi} ne peut rien contre Odin,",
+        "Passez devant {poi} en ignorant leurs idoles."
+      ],
+      "bridge": [
+        "Franchissez le Bifröst de {poi} et",
+        "Traversez le pont de {poi} avec vaillance,",
+        "Le passage de {poi} est sous bonne garde."
+      ]
+    },
     "vigenere_key": "VALHALLA",
     "drapeaux_intros": [
-      "Suivez les étendards."
+      "Suivez les étendards.",
+      "Les bannières de guerre flottent.",
+      "Piste des runes colorées."
     ],
     "drapeaux_real": [
       "Marchez au {c}.",
       "Ralliez le {c}.",
-      "Naviguez vers le {c}."
+      "Naviguez vers le {c}.",
+      "Visez le clan {c}.",
+      "Cap sur le {c}."
     ],
     "drapeaux_fake": [
       "Le {c} est maudit.",
       "Piège au {c}.",
-      "Laissez le {c}."
+      "Laissez le {c}.",
+      "L'esprit de Loki est au {c}.",
+      "Fuyez la trahison du {c}."
     ],
     "drapeaux_outro": [
       "Le drakkar attend au dernier fanion.",
-      "La course s'arrête au dernier fanion."
+      "La course s'arrête au dernier fanion.",
+      "Le port est au bout du dernier signal.",
+      "Débarquez au dernier point cité."
     ]
   },
   "Le Roi Soleil": {
@@ -166,31 +371,98 @@
     "intros": [
       "Sa Majesté l'exige.",
       "La cour se déplace.",
-      "Pour la gloire de Versailles."
+      "Pour la gloire de Versailles.",
+      "L'étiquette nous impose la marche.",
+      "Le bon plaisir du Roi vous guide.",
+      "Rayonnez comme l'astre solaire.",
+      "Une promenade de santé pour la noblesse.",
+      "L'honneur de la France est en jeu.",
+      "Suivez le protocole à la lettre.",
+      "Un ordre signé de la main de Louis.",
+      "Les jardins nous attendent.",
+      "Majesté et rigueur sont de mise.",
+      "Une nouvelle étape de ce noble voyage.",
+      "La Gazette commentera vos exploits.",
+      "Que votre grâce illumine le chemin.",
+      "Pour le prestige de la couronne.",
+      "L'intendant a tracé cette voie.",
+      "Suivez le destin manifeste du Royaume.",
+      "Point de repos pour les serviteurs de l'État.",
+      "L'Europe nous observe."
     ],
     "actions": [
       "poursuivez votre noble marche de",
       "avancez avec majesté de",
-      "parcourez"
+      "parcourez",
+      "défilez sur la distance de",
+      "arpentez les allées de",
+      "conduisez votre escorte sur",
+      "glissez avec élégance sur",
+      "progressez sous les regards de la cour de",
+      "maintenez votre rang sur",
+      "chevauchez fièrement de",
+      "traversez les terres de Sa Majesté sur",
+      "avancez en bon courtisan de",
+      "poursuivez votre itinéraire royal sur",
+      "marchez d'un pas aristocratique de",
+      "tracez votre destinée majestueuse sur"
     ],
-    "poi": "Passez dignement devant {poi}, puis",
+    "poi": [
+      "Passez dignement devant {poi}, puis",
+      "Saluez la splendeur de {poi},",
+      "Laissez {poi} sur votre flanc gauche,",
+      "Contemplez l'architecture de {poi} et",
+      "Une halte est proscrite devant {poi}, avancez.",
+      "Le Roi a fait bâtir {poi}, admirez.",
+      "Dépassez {poi} avec la distinction qui vous sied,"
+    ],
+    "poi_contextual": {
+      "garden": [
+        "Admirez les parterres de {poi},",
+        "Les fontaines de {poi} chantent pour vous,",
+        "Passez dans les bosquets de {poi},"
+      ],
+      "church": [
+        "Rendez grâce devant l'église {poi},",
+        "Le clocher de {poi} sonne l'heure du Roi,",
+        "Laissez {poi} à la dévotion des fidèles,"
+      ],
+      "cross": [
+        "Un humble calvaire à {poi}, inclinez-vous.",
+        "La croix de {poi} veille sur le Royaume,",
+        "Passez devant {poi} avec piété."
+      ],
+      "castle": [
+        "Le domaine de {poi} appartient à la couronne,",
+        "Laissez le château de {poi} sur votre droite,",
+        "Le gouverneur de {poi} vous salue."
+      ]
+    },
     "vigenere_key": "VERSAILLES",
     "drapeaux_intros": [
-      "Observez les pavillons royaux."
+      "Observez les pavillons royaux.",
+      "La parade des couleurs commence.",
+      "Suivez les bannières de la cour."
     ],
     "drapeaux_real": [
       "Allez au pavillon {c}.",
       "Honneurs au {c}.",
-      "Vers le {c}."
+      "Vers le {c}.",
+      "Ralliez l'étendard {c}.",
+      "Cap sur la livrée {c}."
     ],
     "drapeaux_fake": [
       "Complot au {c}.",
       "Le {c} est vil.",
-      "Fuyez le {c}."
+      "Fuyez le {c}.",
+      "Lèse-majesté au {c} !",
+      "Ignorez la trahison du {c}."
     ],
     "drapeaux_outro": [
       "Le Roi vous attend au dernier pavillon.",
-      "La parade cesse au dernier fanion."
+      "La parade cesse au dernier fanion.",
+      "Votre audience a lieu au dernier signal.",
+      "Le carrosse vous attend au dernier point."
     ]
   },
   "La Chevalerie": {
@@ -199,31 +471,98 @@
     "intros": [
       "Pour notre seigneur !",
       "La quête se poursuit.",
-      "Montjoie Saint Denis !"
+      "Montjoie Saint Denis !",
+      "Défendez votre honneur.",
+      "L'ennemi recule devant notre bravoure.",
+      "Le Graal nous appelle.",
+      "Suivez la voie de la vertu.",
+      "Les trompettes résonnent dans la vallée.",
+      "Que votre épée soit votre guide.",
+      "Une noble tâche vous incombe.",
+      "Chevauchez vers la gloire.",
+      "La dame de vos pensées vous observe.",
+      "Point de félonie en ces lieux.",
+      "Le tournoi approche.",
+      "Portez haut vos couleurs.",
+      "La route est longue mais la cause est juste.",
+      "Franchissez les frontières du fief.",
+      "Votre serment vous engage.",
+      "Le destin d'un chevalier est dans le mouvement.",
+      "Que Saint Georges vous protège."
     ],
     "actions": [
       "chevauchez sur",
       "marchez vaillamment pendant",
-      "avancez fièrement de"
+      "avancez fièrement de",
+      "galopez sur",
+      "poursuivez votre épopée de",
+      "traversez ces terres de",
+      "progressez sous votre bannière sur",
+      "chargez sur la distance de",
+      "maintenez votre allure de paladin sur",
+      "déplacez-vous avec panache sur",
+      "conquérez le chemin de",
+      "foulez la plaine sur",
+      "avancez sans peur de",
+      "poursuivez votre noble quête sur",
+      "dirigez votre monture sur"
     ],
-    "poi": "Honorez {poi}, puis",
+    "poi": [
+      "Honorez {poi}, puis",
+      "Saluez le châtelain de {poi},",
+      "Dépassez {poi} en baissant votre lance,",
+      "Près de {poi}, faites vœu de silence,",
+      "Laissez {poi} sur votre destrier,",
+      "Le siège de {poi} est terminé, avancez.",
+      "Passez devant {poi} tel un preux,"
+    ],
+    "poi_contextual": {
+      "castle": [
+        "Le donjon de {poi} domine la vallée,",
+        "Laissez la forteresse de {poi} derrière vous,",
+        "Franchissez les douves de {poi},"
+      ],
+      "church": [
+        "Recueillez-vous en l'abbaye {poi},",
+        "Laissez la cathédrale {poi} sur votre droite,",
+        "Passez sous les vitraux de {poi},"
+      ],
+      "cross": [
+        "Inclinez-vous devant le calvaire {poi},",
+        "La croix {poi} marque la limite du comté,",
+        "Priez devant {poi} avant de charger."
+      ],
+      "forest": [
+        "Traversez la forêt profonde de {poi},",
+        "Prenez garde aux brigands dans le bois {poi},",
+        "L'orée de {poi} est enfin en vue."
+      ]
+    },
     "vigenere_key": "MONTJOIE",
     "drapeaux_intros": [
-      "Cherchez les oriflammes."
+      "Cherchez les oriflammes.",
+      "Les bannières sont déployées.",
+      "Piste des blasons colorés."
     ],
     "drapeaux_real": [
       "Chargez au {c}.",
       "Bannière {c}.",
-      "Chevauchez vers le {c}."
+      "Chevauchez vers le {c}.",
+      "Ralliez l'oriflamme {c}.",
+      "Cap sur le blason {c}."
     ],
     "drapeaux_fake": [
       "Embuscade au {c}.",
       "Le {c} est faux.",
-      "Marauds au {c}."
+      "Marauds au {c}.",
+      "Trahison au {c} !",
+      "Évitez le piège du {c}."
     ],
     "drapeaux_outro": [
       "Le graal est au dernier oriflamme.",
-      "Le repos a lieu au dernier fanion."
+      "Le repos a lieu au dernier fanion.",
+      "Le château est au bout du dernier signal.",
+      "La quête s'achève au dernier point."
     ]
   },
   "Les Gaulois": {
@@ -232,31 +571,98 @@
     "intros": [
       "Par Toutatis !",
       "Le ciel va nous tomber sur la tête !",
-      "Pour la tribu !"
+      "Pour la tribu !",
+      "Il est fou ces Romains !",
+      "Le druide a préparé la potion.",
+      "Une bonne bagarre en perspective.",
+      "Cherchez le menhir perdu.",
+      "La chasse au sanglier commence.",
+      "Par Belenos !",
+      "Ne tombez pas dans la marmite.",
+      "Le village compte sur vous.",
+      "Attention aux patrouilles de César.",
+      "Une petite balade dans la forêt gauloise.",
+      "La potion magique fait effet.",
+      "Suivez les traces de l'imperméable.",
+      "Vers de nouvelles aventures armoricaines.",
+      "Le barde a promis de ne pas chanter.",
+      "Il faut ramener des victuailles pour le banquet.",
+      "Gardez un œil sur le camp retranché.",
+      "La tribu se déplace."
     ],
     "actions": [
       "marchez d'un bon pas sur",
       "faufilez-vous sur",
-      "avancez dans la forêt de"
+      "avancez dans la forêt de",
+      "courez comme après un sanglier sur",
+      "poursuivez votre vadrouille de",
+      "traversez la Gaule sur",
+      "progressez sous les arbres de",
+      "faites quelques pas de géant sur",
+      "longez le talus pendant",
+      "avancez en chantant (faux) de",
+      "dirigez-vous vers l'aventure sur",
+      "marchez de bon cœur sur",
+      "fuyez les légionnaires de",
+      "poursuivez votre périple sur",
+      "avancez la moustache au vent de"
     ],
-    "poi": "Longez {poi}, et",
+    "poi": [
+      "Longez {poi}, et",
+      "Dépassez {poi} en cherchant des truffes,",
+      "Laissez {poi} sur votre gauche,",
+      "Passez devant {poi} sans faire de bruit (pour les Romains),",
+      "Près de {poi}, ajustez vos braies,",
+      "Une belle pierre à {poi}, continuez.",
+      "Passez devant {poi} avec appétit,"
+    ],
+    "poi_contextual": {
+      "forest": [
+        "C'est une belle forêt à {poi},",
+        "Cherchez du gui dans les bois de {poi},",
+        "Le druide ramasse des herbes à {poi},"
+      ],
+      "stone": [
+        "Un beau menhir à {poi},",
+        "Laissez ce dolmen {poi} tranquille,",
+        "Livrez votre pierre à {poi},"
+      ],
+      "cross": [
+        "Un monument bizarre à {poi}, passez vite.",
+        "Le calvaire {poi} ne nous dit rien qui vaille,",
+        "Passez devant {poi} en saluant Toutatis."
+      ],
+      "bakery": [
+        "L'odeur du sanglier rôti à {poi} ?",
+        "Passez devant la cuisine de {poi},",
+        "Laissez les galettes de {poi} pour plus tard."
+      ]
+    },
     "vigenere_key": "TOUTATIS",
     "drapeaux_intros": [
-      "Suivez les menhirs colorés."
+      "Suivez les menhirs colorés.",
+      "La piste des totems est ouverte.",
+      "Regardez les boucliers."
     ],
     "drapeaux_real": [
       "Sanglier au {c}.",
       "Druide au {c}.",
-      "Courez au {c}."
+      "Courez au {c}.",
+      "Ralliez le menhir {c}.",
+      "Visez la hutte {c}."
     ],
     "drapeaux_fake": [
       "Romains au {c}.",
       "César au {c}.",
-      "Oubliez le {c}."
+      "Oubliez le {c}.",
+      "Bagarre au {c} !",
+      "Ignorez le camp {c}."
     ],
     "drapeaux_outro": [
       "Le banquet est au dernier fanion.",
-      "L'arrivée est au dernier menhir."
+      "L'arrivée est au dernier menhir.",
+      "Le barde attend au dernier point.",
+      "La potion est au bout du dernier signal."
     ]
   },
   "La Première Guerre mondiale (WW1)": {
@@ -265,31 +671,98 @@
     "intros": [
       "Ordre de l'état-major.",
       "Sortez des tranchées.",
-      "Pour la patrie !"
+      "Pour la patrie !",
+      "Le clairon a sonné.",
+      "La relève arrive bientôt.",
+      "Tenez vos positions.",
+      "Le message doit passer coûte que coûte.",
+      "Restez groupés sous le feu.",
+      "En avant les gars !",
+      "La victoire est au bout du fusil.",
+      "Suivez le capitaine.",
+      "Le gaz se dissipe, avancez.",
+      "Pour les poilus !",
+      "L'assaut est lancé.",
+      "Ne lâchez rien.",
+      "Le terrain est lourd mais l'esprit est fort.",
+      "Direction la ligne de front.",
+      "Une mission de reconnaissance.",
+      "Le devoir vous appelle.",
+      "Le soleil se lève sur la Somme."
     ],
     "actions": [
       "progressez sous le feu adverse de",
       "avancez prudemment de",
-      "marchez de"
+      "marchez de",
+      "rampez sur",
+      "poursuivez votre avancée de",
+      "traversez le no man's land sur",
+      "progressez dans la boue de",
+      "maintenez la liaison sur",
+      "marchez au pas cadencé de",
+      "foncez vers la position sur",
+      "avancez avec courage de",
+      "poursuivez votre marche forcée sur",
+      "dirigez-vous vers l'objectif de",
+      "longez le boyau de communication sur",
+      "couvrez la zone de"
     ],
-    "poi": "Sécurisez {poi}, puis",
+    "poi": [
+      "Sécurisez {poi}, puis",
+      "Établissez un poste de garde devant {poi},",
+      "Dépassez {poi} en restant baissés,",
+      "Vérifiez l'absence d'ennemis à {poi},",
+      "Laissez {poi} sur votre flanc droit,",
+      "Le fort de {poi} est en vue, continuez.",
+      "Passez devant {poi} sans traîner,"
+    ],
+    "poi_contextual": {
+      "ruins": [
+        "Passez dans les décombres de {poi},",
+        "Laissez les ruines de {poi} derrière vous,",
+        "L'église bombardée de {poi} est à gauche."
+      ],
+      "church": [
+        "Le clocher de {poi} sert d'observatoire, méfiance.",
+        "Passez devant l'église en ruine de {poi},",
+        "Laissez {poi} aux mains de l'aumônier."
+      ],
+      "cross": [
+        "Un calvaire épargné à {poi}, une chance.",
+        "Passez devant la croix de {poi} en silence,",
+        "Le monument de {poi} veille sur les tombes."
+      ],
+      "forest": [
+        "Entrez dans le bois mitraillé de {poi},",
+        "Laissez les arbres déchiquetés de {poi},",
+        "Passez l'orée du bois {poi} prudemment."
+      ]
+    },
     "vigenere_key": "PATRIE",
     "drapeaux_intros": [
-      "Suivez le code couleur."
+      "Suivez le code couleur.",
+      "Balisez le terrain.",
+      "Les signaux optiques sont prêts."
     ],
     "drapeaux_real": [
       "Avancez au {c}.",
       "Ralliez le {c}.",
-      "Ligne {c}."
+      "Ligne {c}.",
+      "Secteur {c}.",
+      "Visez le poste {c}."
     ],
     "drapeaux_fake": [
       "Tirs au {c}.",
       "Piège au {c}.",
-      "Evitez le {c}."
+      "Evitez le {c}.",
+      "Gaz au {c} !",
+      "Position ennemie au {c}."
     ],
     "drapeaux_outro": [
       "Le QG est au dernier drapeau.",
-      "Finissez au dernier fanion cité."
+      "Finissez au dernier fanion cité.",
+      "Le ravitaillement est au dernier signal.",
+      "Le repos est au bout du dernier point."
     ]
   },
   "La Seconde Guerre mondiale (WW2)": {
@@ -298,31 +771,98 @@
     "intros": [
       "Message de Londres en vue.",
       "La Résistance a besoin de nous.",
-      "Ici Londres !"
+      "Ici Londres !",
+      "Les carottes sont cuites.",
+      "Sabotez les lignes arrières.",
+      "Évitez les barrages routiers.",
+      "Le parachutage est pour bientôt.",
+      "Transmettez les codes secrets.",
+      "La liberté est au bout du chemin.",
+      "Un réseau de renseignement vous attend.",
+      "Le débarquement approche.",
+      "Gardez le silence radio.",
+      "Passez entre les mailles du filet.",
+      "Le maquis recrute.",
+      "L'occupant est partout, soyez vigilants.",
+      "Direction la zone libre.",
+      "Une mission pour le BCRA.",
+      "Le message personnel a été diffusé.",
+      "L'heure H a sonné.",
+      "Pour la France libre !"
     ],
     "actions": [
       "progressez furtivement de",
       "avancez en zone ennemie de",
-      "marchez de"
+      "marchez de",
+      "disparaissez dans le paysage sur",
+      "poursuivez votre infiltration de",
+      "traversez le secteur occupé sur",
+      "progressez de nuit (ou presque) de",
+      "maintenez le contact visuel sur",
+      "avancez sans faire de bruit de",
+      "filez vers la planque sur",
+      "poursuivez votre mission de sabotage de",
+      "glissez-vous entre les patrouilles sur",
+      "marchez d'un pas déterminé de",
+      "évitez les routes principales sur",
+      "couvrez la distance en silence de"
     ],
-    "poi": "Faites un rapport devant {poi}, puis",
+    "poi": [
+      "Faites un rapport devant {poi}, puis",
+      "Laissez {poi} sur votre gauche en restant discret,",
+      "Dépassez {poi} sans vous faire repérer,",
+      "Le contact est caché près de {poi}, continuez.",
+      "Vérifiez l'absence de patrouilles à {poi},",
+      "Passez devant {poi} tel un agent secret,",
+      "Détournez le regard devant {poi} et"
+    ],
+    "poi_contextual": {
+      "bakery": [
+        "Le boulanger de {poi} est un résistant, passez devant.",
+        "Une boîte aux lettres morte est cachée à {poi},",
+        "Laissez l'odeur du pain de {poi} vous motiver."
+      ],
+      "church": [
+        "Le clocher de {poi} cache un émetteur radio,",
+        "Laissez l'église {poi} aux mains de l'occupant,",
+        "Passez devant le parvis de {poi} sans traîner."
+      ],
+      "cross": [
+        "Le calvaire {poi} marque le point de ralliement,",
+        "Passez devant la croix {poi} en faisant le signe V,",
+        "Un message est gravé sous {poi}."
+      ],
+      "forest": [
+        "Disparaissez dans les bois de {poi},",
+        "Le maquis de {poi} vous abritera,",
+        "Traversez la forêt de {poi} avec prudence."
+      ]
+    },
     "vigenere_key": "LONDRES",
     "drapeaux_intros": [
-      "Cherchez les balises."
+      "Cherchez les balises.",
+      "Le terrain de parachutage est balisé.",
+      "Piste des signaux de reconnaissance."
     ],
     "drapeaux_real": [
       "Cachette au {c}.",
       "Contact au {c}.",
-      "Piste {c}."
+      "Piste {c}.",
+      "Zone {c}.",
+      "Visez le repère {c}."
     ],
     "drapeaux_fake": [
       "Gestapo au {c}.",
       "Danger au {c}.",
-      "Ignorez le {c}."
+      "Ignorez le {c}.",
+      "Patrouille au {c} !",
+      "Le {c} est piégé."
     ],
     "drapeaux_outro": [
       "Cachez-vous au dernier fanion.",
-      "L'arrivée est au dernier repère."
+      "L'arrivée est au dernier repère.",
+      "La mission se termine au dernier signal.",
+      "Le sous-marin attend au dernier point."
     ]
   },
   "Le Seigneur des Anneaux (LOTR)": {
@@ -331,31 +871,98 @@
     "intros": [
       "Pour la Terre du Milieu.",
       "Les forces de Sauron approchent.",
-      "La Communauté se met en route."
+      "La Communauté se met en route.",
+      "Un anneau pour les gouverner tous.",
+      "L'ombre s'étend sur le monde.",
+      "L'espoir renaît à l'ouest.",
+      "Fuyez, pauvres fous !",
+      "Même la plus petite personne peut changer le cours du destin.",
+      "Les aigles arrivent !",
+      "Vers la Montagne du Destin.",
+      "Les Elfes quittent ces rivages.",
+      "Réveillez les Ents.",
+      "Le Gondor appelle à l'aide.",
+      "Suivez la lumière d'Eärendil.",
+      "Une nouvelle quête commence.",
+      "La route se poursuit sans fin.",
+      "L'oeil de Barad-dûr vous observe.",
+      "Pour Frodon !",
+      "Ne vous détournez pas de votre chemin.",
+      "Le destin d'Arda est entre vos mains."
     ],
     "actions": [
       "avancez silencieusement de",
       "marchez avec courage pendant",
-      "poursuivez votre quête de"
+      "poursuivez votre quête de",
+      "traversez les terres sauvages sur",
+      "progressez tel un rôdeur sur",
+      "fuyez les Orques sur la distance de",
+      "marchez vers l'Anduin sur",
+      "grimpez les sentiers de",
+      "poursuivez votre périple de",
+      "avancez dans la brume sur",
+      "maintenez votre allure de Hobbit sur",
+      "parcourez les plaines du Rohan de",
+      "dirigez-vous vers la Lorien sur",
+      "suivez le sillage de la Communauté de",
+      "avancez sans regarder derrière vous sur"
     ],
-    "poi": "Observez {poi}, et",
+    "poi": [
+      "Observez {poi}, et",
+      "Saluez les anciens de {poi},",
+      "Dépassez {poi} en restant invisible,",
+      "Une halte est bienvenue à {poi}, puis repartez.",
+      "Laissez {poi} sur votre flanc d'Elfe,",
+      "Le souvenir de {poi} vous accompagnera,",
+      "Passez devant {poi} tel un héritier d'Isildur,"
+    ],
+    "poi_contextual": {
+      "forest": [
+        "Entrez dans la forêt de Fangorn à {poi},",
+        "Traversez les bois dorés de {poi},",
+        "Prenez garde aux araignées dans le bois {poi}."
+      ],
+      "statue": [
+        "Les Argonath de {poi} vous surveillent,",
+        "Laissez la statue brisée de {poi} derrière vous,",
+        "Saluez la mémoire des rois à {poi}."
+      ],
+      "church": [
+        "Un temple oublié à {poi}, passez votre chemin.",
+        "Laissez le sanctuaire de {poi} à son silence,",
+        "Passez devant {poi} en invoquant Elbereth."
+      ],
+      "river": [
+        "Franchissez le gué de {poi},",
+        "Suivez le cours de l'eau à {poi},",
+        "Traversez le pont de Khazad-dûm à {poi} !"
+      ]
+    },
     "vigenere_key": "SAURON",
     "drapeaux_intros": [
-      "Suivez les bannières elfiques."
+      "Suivez les bannières elfiques.",
+      "Les feux d'alarme sont allumés.",
+      "Piste des runes de pouvoir."
     ],
     "drapeaux_real": [
       "Suivez le {c}.",
       "Lumière au {c}.",
-      "Allez au {c}."
+      "Allez au {c}.",
+      "Ralliez le blanc {c}.",
+      "Cap sur l'étendard {c}."
     ],
     "drapeaux_fake": [
       "Nazgul au {c}.",
       "Mordor au {c}.",
-      "Fuyez le {c}."
+      "Fuyez le {c}.",
+      "Uruk-hai au {c} !",
+      "Le {c} est corrompu."
     ],
     "drapeaux_outro": [
       "Le repos est au dernier fanion.",
-      "Arrêtez-vous au dernier drapeau."
+      "Arrêtez-vous au dernier drapeau.",
+      "La Comté est au bout du dernier signal.",
+      "La quête s'achève au dernier point cité."
     ]
   },
   "Napoléon": {
@@ -364,27 +971,92 @@
     "intros": [
       "Vive l'Empereur !",
       "La Grande Armée se lève.",
-      "Soldats, droit devant !"
+      "Soldats, droit devant !",
+      "Du haut de ces pyramides, quarante siècles vous contemplent.",
+      "Chaque soldat porte dans sa giberne le bâton de maréchal.",
+      "La garde meurt mais ne se rend pas !",
+      "L'Europe est à nos pieds.",
+      "Une nouvelle campagne commence.",
+      "Pour la gloire de l'Empire.",
+      "Suivez l'aigle impérial.",
+      "Le soleil d'Austerlitz se lève.",
+      "Préparez-vous à la bataille.",
+      "L'Empereur a tracé le plan.",
+      "La victoire est dans la rapidité.",
+      "Vers de nouveaux trophées.",
+      "La France compte sur sa jeunesse.",
+      "Le destin de l'Empire est en marche.",
+      "Soldats, je suis content de vous.",
+      "Franchissez les Alpes !",
+      "En avant vers la destinée."
     ],
     "actions": [
       "marchez au pas de charge sur",
       "avancez en bataillon de",
-      "progressez au rythme du tambour de"
+      "progressez au rythme du tambour de",
+      "manœuvrez sur la distance de",
+      "poursuivez votre marche forcée sur",
+      "traversez les plaines de",
+      "progressez en colonne de",
+      "maintenez la formation sur",
+      "avancez bride abattue de",
+      "foncez vers l'ennemi sur",
+      "poursuivez votre offensive de",
+      "déployez-vous sur",
+      "marchez vers la gloire de",
+      "suivez l'itinéraire de l'état-major sur",
+      "avancez sans regarder en arrière de"
     ],
-    "poi": "Laissez {poi} on votre flanc, puis",
+    "poi": [
+      "Laissez {poi} sur votre flanc, puis",
+      "Établissez votre bivouac devant {poi},",
+      "Dépassez {poi} tel un grenadier de la garde,",
+      "Vérifiez les positions ennemies à {poi},",
+      "Laissez {poi} à l'arrière-garde,",
+      "Le clocher de {poi} marque votre objectif, avancez.",
+      "Passez devant {poi} sous l'œil de l'Empereur,"
+    ],
+    "poi_contextual": {
+      "castle": [
+        "La place forte de {poi} doit tomber,",
+        "Laissez le château de {poi} sur votre droite,",
+        "Franchissez les remparts de {poi}."
+      ],
+      "church": [
+        "Le clocher de {poi} sert de repère à l'artillerie,",
+        "Laissez l'église {poi} aux mains des civils,",
+        "Passez devant le parvis de {poi} au galop."
+      ],
+      "cross": [
+        "Un calvaire à {poi}, saluez-le,",
+        "Passez devant la croix de {poi} en silence,",
+        "La croix {poi} marque le carrefour des armées."
+      ],
+      "bridge": [
+        "Prenez le pont d'Arcole à {poi} !",
+        "Franchissez le passage de {poi} avec audace,",
+        "Le pont de {poi} est la clé de la victoire."
+      ]
+    },
     "vigenere_key": "EMPEREUR",
     "drapeaux_intros": [
-      "Couleurs de l'Empire hissées."
+      "Couleurs de l'Empire hissées.",
+      "Regardez les aigles.",
+      "Piste des fanions de la garde."
     ],
     "drapeaux_real": [
       "Pas vers l'aigle {c}.",
       "Bataillon {c}.",
-      "Objectif {c}."
+      "Objectif {c}.",
+      "Ralliez le {c}.",
+      "Visez l'étendard {c}."
     ],
     "drapeaux_fake": [
       "Prussiens au {c}.",
       "Défaite au {c}.",
-      "Laissez le {c}."
+      "Laissez le {c}.",
+      "Embuscade au {c} !",
+      "Le {c} est aux mains de l'ennemi."
     ],
     "drapeaux_outro": [
       "L'Empereur est au dernier drapeau.",

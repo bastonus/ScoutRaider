@@ -1004,11 +1004,13 @@ function regenerateStepTexts(step: CarnetStep, state: AppState): CarnetStep {
         const segPois = state.segment_pois?.[globalIdx.toString()];
         const segSelectedPoi = segPois?.find(p => p.selected);
         const poiName = segSelectedPoi ? segSelectedPoi.name : (seg.poi?.name || null);
-        
+        const poiType = segSelectedPoi ? 'landmark' : (seg.poi?.type || 'landmark');
+        const poiObj = poiName ? { name: poiName, type: poiType } : null;
+
         // Fetch segment-specific Language
         const segLang = state.custom_languages?.[globalIdx.toString()] || step.navLanguage;
-        
-        return NavigationText.generate(seg.distance || 0, seg.azimut || 0, poiName || null, theme, prevAzimuth, segLang);
+
+        return NavigationText.generate(seg.distance || 0, seg.azimut || 0, poiObj, theme, prevAzimuth, segLang);
     });
     const navText = navTexts.join('\n');
 

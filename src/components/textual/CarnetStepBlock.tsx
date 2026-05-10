@@ -215,7 +215,16 @@ function ManualStepHtml({ step, onManualContentChange, onRemoveStep }: any) {
     const [hovered, setHovered] = useState(false);
     const isEmpty = !step.solutionText || step.solutionText === '<p>&nbsp;</p>' || step.solutionText.trim() === '' || step.solutionText === '<p></p>';
     return (
-        <div style={{ display: 'flex', position: 'relative', minHeight: '60px' }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+        <div 
+            style={{ 
+                display: 'flex', 
+                position: 'relative', 
+                minHeight: '60px',
+                zIndex: hovered ? 50 : 1
+            }} 
+            onMouseEnter={() => setHovered(true)} 
+            onMouseLeave={() => setHovered(false)}
+        >
             <div style={{ width: '80px', flexShrink: 0, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ position: 'absolute', top: 0, bottom: 0, width: '2px', background: 'var(--bg-border)', zIndex: 1 }} />
                 <div style={{ marginTop: '12px', zIndex: 2, width: '10px', height: '10px', borderRadius: '50%', background: 'var(--bg-base)', border: `2px solid #6b7280` }} />
@@ -260,7 +269,12 @@ function ManualCodeBlock({ step, onManualContentChange, onRemoveStep, isSolution
 
     return (
         <div
-            style={{ display: 'flex', position: 'relative', minHeight: '72px' }}
+            style={{ 
+                display: 'flex', 
+                position: 'relative', 
+                minHeight: '72px',
+                zIndex: hovered ? 50 : 1
+            }}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
         >
@@ -347,7 +361,16 @@ function ComputedStepLine({
     const isEncoded = !isSolutionView && !isVisual && encodedLine !== solutionLine;
 
     return (
-        <div style={{ display: 'flex', position: 'relative', minHeight: lineLabel ? '84px' : '60px' }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => { setHovered(false); setModulePickerOpen(false); setLangPickerOpen(false); setPoiPickerOpen(false); }}>
+        <div 
+            style={{ 
+                display: 'flex', 
+                position: 'relative', 
+                minHeight: lineLabel ? '84px' : '60px',
+                zIndex: hovered ? 50 : 1
+            }} 
+            onMouseEnter={() => setHovered(true)} 
+            onMouseLeave={() => { setHovered(false); setModulePickerOpen(false); setLangPickerOpen(false); setPoiPickerOpen(false); }}
+        >
             <div style={{ width: '80px', flexShrink: 0, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ position: 'absolute', top: 0, bottom: 0, width: '2px', background: 'var(--bg-border)', zIndex: 1 }} />
                 
@@ -390,6 +413,9 @@ function ComputedStepLine({
 
                 {hovered && !isEditing && (
                     <div style={{ position: 'absolute', top: '-28px', right: '12px', zIndex: 500, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '4px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}>
+                        {/* Spatial bridge: maintains hover while moving mouse from line up to this menu */}
+                        <div style={{ position: 'absolute', top: '100%', left: -20, right: 0, height: '40px', zIndex: -1 }} />
+                        
                         {!step.isManual && !isVisual && (
                             <button onClick={() => setIsEditing(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
                                 <Edit2 size={12} /> Éditer la phrase

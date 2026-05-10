@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // ─── Window Controls ──────────────────────────────────────────────
     windowControl: (action) => ipcRenderer.invoke('window-control', action),
+    toggleDevTools: () => ipcRenderer.invoke('toggle-devtools'),
 
     // ─── Auto Updater ─────────────────────────────────────────────────
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),

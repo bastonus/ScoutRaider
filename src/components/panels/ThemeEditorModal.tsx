@@ -176,17 +176,21 @@ export default function ThemeEditorModal({ onClose, activeThemeId, onSelectTheme
                     />
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600 }}>PHRASE POI (utiliser {'{poi}'})</label>
-                    <input 
-                      type="text" 
-                      value={selectedData.poi || ''} 
-                      onChange={e => handleChange('poi', e.target.value)}
-                      style={{
-                        padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--glass-border)',
-                        background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)', outline: 'none'
-                      }}
-                    />
+                  {/* POI Sentences */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600 }}>PHRASES POI (utiliser {'{poi}'})</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {(Array.isArray(selectedData.poi) ? selectedData.poi : [selectedData.poi || '']).map((poiPhrase, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: '8px' }}>
+                            <input 
+                                type="text" value={poiPhrase} onChange={e => handleArrayChange('poi', idx, e.target.value)}
+                                style={{ flex: 1, padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)' }}
+                            />
+                            <button className="btn-icon" onClick={() => removeArrayItem('poi', idx)}><Minus size={14} /></button>
+                        </div>
+                      ))}
+                      <button className="btn-secondary" onClick={() => addArrayItem('poi')} style={{ alignSelf: 'flex-start', fontSize: '11px', padding: '4px 8px' }}>+ Ajouter une phrase POI</button>
+                    </div>
                   </div>
 
                   {/* Intro Sentences */}

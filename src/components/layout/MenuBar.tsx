@@ -173,6 +173,13 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     dispatch({ type: 'ADD_NOTIFICATION', message: 'Indisponible dans le navigateur.', notifType: 'warning' });
                 }
             }},
+            { label: 'Console de développement', shortcut: 'F12', action: () => {
+                if ((window as any).electronAPI) {
+                    (window as any).electronAPI.toggleDevTools();
+                } else {
+                    dispatch({ type: 'ADD_NOTIFICATION', message: 'Indisponible dans le navigateur.', notifType: 'warning' });
+                }
+            }},
             { divider: true },
             { label: 'Guide du Raid', shortcut: 'F1', action: () => {
                 window.open('https://github.com/bastonus/ScoutRaider-Suite/wiki', '_blank');

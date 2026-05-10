@@ -121,6 +121,54 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Add context menu with Inspect Element, standard edit actions, and DevTools
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    const template = [
+      {
+        label: 'Inspecter l\'élément',
+        click: () => {
+          mainWindow.webContents.inspectElement(params.x, params.y);
+        }
+      },
+      { type: 'separator' }
+    ];
+
+    // Add edit actions if applicable
+    if (params.editFlags.canCopy) template.push({ role: 'copy', label: 'Copier' });
+    if (params.editFlags.canCut) template.push({ role: 'cut', label: 'Couper' });
+    if (params.editFlags.canPaste) template.push({ role: 'paste', label: 'Coller' });
+    if (params.editFlags.canSelectAll) template.push({ role: 'selectAll', label: 'Tout sélectionner' });
+
+    if (template.length > 2) {
+      template.push({ type: 'separator' });
+    }
+
+    template.push(
+      {
+        label: 'Recharger la page',
+        role: 'reload'
+      },
+      {
+        label: 'Ouvrir la console',
+        accelerator: 'F12',
+        click: () => {
+          mainWindow.webContents.toggleDevTools();
+        }
+      }
+    );
+
+    const contextMenu = Menu.buildFromTemplate(template);
+    contextMenu.popup();
+  });
+
+  // Handle F12 shortcut for DevTools
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
 }
 
 app.whenReady().then(() => {
@@ -188,6 +236,11 @@ ipcMain.handle('window-control', (event, action) => {
     else win.maximize();
   }
   if (action === 'close') win.close();
+});
+
+ipcMain.handle('toggle-devtools', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) win.webContents.toggleDevTools();
 });
 
 // ─── IPC Handlers ─────────────────────────────────────────────────────────

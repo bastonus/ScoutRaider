@@ -130,7 +130,8 @@ export interface ThemeData {
     preview_image?: string;
     intros: string[];
     actions: string[];
-    poi: string;
+    poi: string | string[]; // Allow string for backward compatibility, but target is string[]
+    poi_contextual?: Record<string, string[]>;
     vigenere_key: string;
     drapeaux_intros: string[];
     drapeaux_real: string[];
@@ -263,6 +264,7 @@ export type NavLanguage = 'Horaire' | 'Cardinaux' | 'Azimut' | 'Tournant';
 export interface POIResult {
     id: string;
     name: string;
+    type: string; // e.g. "bakery", "church", "landmark"
     selected: boolean;
     lat: number;
     lon: number;

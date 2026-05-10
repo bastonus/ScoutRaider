@@ -78,7 +78,7 @@ export class NavigationText {
     static generate(
         distanceM: number,
         azimuth: number,
-        poiStr: string | null,
+        poi: { name: string; type: string } | null,
         theme: ThemeData | null,
         prevAzimuth?: number,
         style?: NavLanguage,
@@ -86,7 +86,7 @@ export class NavigationText {
         const t = theme || {
             intros: ['Prochaine étape.'],
             actions: ['avancez de'],
-            poi: 'Passez devant {poi}, et',
+            poi: ['Passez devant {poi}, et'],
             vigenere_key: 'MOUSTACHE',
             drapeaux_intros: [],
             drapeaux_real: [],
@@ -125,8 +125,26 @@ export class NavigationText {
         const action = pickRandom(t.actions);
 
         let poiPart = '';
-        if (poiStr) {
-            poiPart = t.poi.replace('{poi}', poiStr) + ' ';
+        if (poi && poi.name) {
+            let poiTemplate = '';
+            
+            // Check for contextual POI phrase
+            if (t.poi_contextual && poi.type && t.poi_contextual[poi.type]) {
+                poiTemplate = pickRandom(t.poi_contextual[poi.type]);
+            } 
+            
+            // Fallback to general POI phrases
+            if (!poiTemplate) {
+                if (Array.isArray(t.poi)) {
+                    poiTemplate = pickRandom(t.poi);
+                } else {
+                    poiTemplate = t.poi; // Backward compatibility
+                }
+            }
+
+            if (poiTemplate) {
+                poiPart = poiTemplate.replace('{poi}', poi.name) + ' ';
+            }
         }
 
         return `${intro} ${poiPart}${action} ${distStr} ${directionStr}.`;
