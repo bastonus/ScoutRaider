@@ -4,8 +4,9 @@ import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import os from 'os';
 import { execFile } from 'child_process';
-import pkg from 'electron-updater';
-const { autoUpdater } = pkg;
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { autoUpdater } = require('electron-updater');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
