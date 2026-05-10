@@ -3,7 +3,6 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import DifficultyLibrary from '../panels/DifficultyLibrary';
 import ThemePanel from '../panels/ThemePanel';
 import LibraryPanel from '../panels/LibraryPanel';
-import ExportPanel from '../panels/ExportPanel';
 
 interface AccordionSectionProps {
   title: string;
@@ -100,14 +99,6 @@ export default function RightSidebar({ activeSection, onSectionChange, width }: 
         onToggle={() => toggle('modules')}
       >
         <LibraryPanel />
-      </AccordionSection>
-
-      <AccordionSection 
-        title="Export & Génération" 
-        isOpen={activeSection === 'export'} 
-        onToggle={() => toggle('export')}
-      >
-        <ExportPanel />
       </AccordionSection>
       
     </div>

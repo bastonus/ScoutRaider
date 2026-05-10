@@ -101,7 +101,7 @@ export default function CarnetStepBlock({
                     // We must use the GLOBAL concatenated geometry because indices (start_idx) 
                     // are relative to the full path used during the azimut step.
                     const allOriginalCoords = state.routes.flatMap((r: any) => 
-                        r.geojson?.geometry?.coordinates || r.geojson?.coordinates || []
+                        r?.geojson?.geometry?.coordinates || r?.geojson?.coordinates || []
                     );
 
                     const startIdx = seg.properties?.start_idx || 0;
@@ -450,6 +450,14 @@ function ComputedStepLine({
     else if (dangerLevel === 'high') { dangerColor = '#ea580c'; dangerText = "Prudence : Ce tronçon emprunte une route très passante (Nationale)."; }
     else if (dangerLevel === 'minor') { dangerColor = '#eab308'; dangerText = "Prudence : Passage prolongé sur route départementale."; }
 
+    const { state } = useApp();
+    let dotColor = 'var(--accent-default)';
+    if (lineLabel) {
+        const stageIdx = state.stages.findIndex((st: any) => st.label === lineLabel);
+        if (stageIdx === 0) dotColor = 'var(--semantic-green)';
+        else if (stageIdx === state.stages.length - 1 && stageIdx > 0) dotColor = 'var(--semantic-red)';
+    }
+
     return (
         <div 
             style={{ 
@@ -467,9 +475,9 @@ function ComputedStepLine({
                 {lineLabel ? (
                     <div style={{ 
                         marginTop: '12px', zIndex: 2, width: '24px', height: '24px', 
-                        borderRadius: '50%', background: 'var(--bg-base)', border: `2px solid var(--semantic-green)`, 
+                        borderRadius: '8px', background: 'var(--bg-dark)', border: `2px solid ${dotColor}`, 
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'var(--semantic-green)', fontWeight: 800, fontSize: '11px',
+                        color: dotColor, fontWeight: 800, fontSize: '11px',
                     }}>
                         {lineLabel}
                     </div>

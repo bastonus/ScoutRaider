@@ -7,6 +7,29 @@ interface FloatingToolbarProps {
 
 export default function FloatingToolbar({ activeTool, onToolChange }: FloatingToolbarProps) {
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target.isContentEditable
+      ) return;
+
+      const key = e.key.toLowerCase();
+      switch (key) {
+        case 'p': onToolChange('route'); break;
+        case 'h': onToolChange('route_direct'); break;
+        case 'n': onToolChange('node'); break;
+        case 'a': onToolChange('azimut'); break;
+        case 'e': onToolChange('encodage'); break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onToolChange]);
+
   const renderTool = (id: string, icon: React.ReactNode, label: string) => (
     <button 
       key={id}
@@ -68,12 +91,9 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
             <path d="M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" />
             <circle cx="10" cy="10" r="3" />
           </svg>
-        ), "Tracer l'itinéraire")}
+        ), "Tracé pédestre (P)")}
 
-        <Separator />
-
-        {/* GROUPE 2 : NODES & AZIMUT */}
-        {renderTool('node', (
+        {renderTool('route_direct', (
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m10.586 5.414-5.172 5.172" />
             <path d="m18.586 13.414-5.172 5.172" />
@@ -83,7 +103,19 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
             <circle cx="20" cy="12" r="2" />
             <circle cx="4" cy="12" r="2" />
           </svg>
-        ), "Déplacer un nœud")}
+        ), "Tracé hors piste (H)")}
+
+        <Separator />
+
+        {/* GROUPE 2 : NODES & AZIMUT */}
+        {renderTool('node', (
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12.034 12.681a.498.498 0 0 1 .647-.647l9 3.5a.5.5 0 0 1-.033.943l-3.444 1.068a1 1 0 0 0-.66.66l-1.067 3.443a.5.5 0 0 1-.943.033z"/>
+            <path d="M5 17A12 12 0 0 1 17 5"/>
+            <circle cx="19" cy="5" r="2"/>
+            <circle cx="5" cy="19" r="2"/>
+          </svg>
+        ), "Déplacer un nœud (N)")}
 
         {renderTool('azimut', (
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -93,7 +125,7 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
             <path d="m3 21 8.02-14.26" />
             <circle cx="12" cy="5" r="2" />
           </svg>
-        ), "Ajuster l'azimut")}
+        ), "Ajuster l'azimut (A)")}
 
         <Separator />
 
@@ -104,7 +136,7 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
             <path d="M20 15v-2a2 2 0 0 0-4 0v2" />
             <rect x="14" y="15" width="8" height="5" rx="1" />
           </svg>
-        ), "Encodage d'itinéraire")}
+        ), "Encodage d'itinéraire (E)")}
       </div>
     </div>
   );

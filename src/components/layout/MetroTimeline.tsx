@@ -30,7 +30,7 @@ export default function MetroTimeline() {
         // Calculate the boundary index in the flattened allCoords array for each route
         let cumulativePoints = 0;
         const boundaries = state.routes.map(r => {
-            const pts = r.geojson?.geometry?.coordinates || r.geojson?.coordinates || [];
+            const pts = r?.geojson?.geometry?.coordinates || r?.geojson?.coordinates || [];
             cumulativePoints += pts.length;
             return cumulativePoints;
         });
@@ -46,7 +46,7 @@ export default function MetroTimeline() {
             while (currentLegIdx < boundaries.length - 1 && startIdx >= boundaries[currentLegIdx]) {
                 if (currentSegments.length > 0) {
                     groupedLegs.push({
-                        legKey: state.routes[currentLegIdx].id,
+                        legKey: state.routes[currentLegIdx]?.id || `leg_missing_${currentLegIdx}`,
                         startLabel: stages[currentLegIdx]?.label || '?',
                         endLabel: stages[currentLegIdx + 1]?.label || '?',
                         segments: currentSegments

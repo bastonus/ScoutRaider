@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import MenuBar from './components/layout/MenuBar';
 import ProjectWorkspace from './components/layout/ProjectWorkspace';
 import RoutePanel from './components/panels/RoutePanel';
 import RightSidebar from './components/layout/RightSidebar';
 import NotificationOverlay from './components/map/NotificationOverlay';
 import TextualHeader from './components/textual/TextualHeader';
+import ExportModal from './components/panels/ExportModal';
 import { List, Library, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export type ViewMode = 'map' | 'text' | 'split';
@@ -16,6 +17,7 @@ function App() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [activeRightSection, setActiveRightSection] = useState<SectionId>('orchestration');
   const [viewMode, setViewMode] = useState<ViewMode>('map');
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
@@ -70,10 +72,21 @@ function App() {
     }
   };
 
-  const handleExportRequest = () => {
-    setRightSidebarOpen(true);
-    setActiveRightSection('export');
-  };
+  const handleExportRequest = useCallback(() => {
+    setExportModalOpen(true);
+  }, []);
+
+  // Global Ctrl+E
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        setExportModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
 
   const panelToggleStyle: React.CSSProperties = {
     position: 'absolute', top: '16px', zIndex: 900,
@@ -99,7 +112,7 @@ function App() {
       overflow: 'hidden',
       background: 'var(--bg-base)'
     }}>
-      <MenuBar onToggleSidebar={toggleSidebar} viewMode={viewMode} onViewModeChange={setViewMode} />
+      <MenuBar onToggleSidebar={toggleSidebar} viewMode={viewMode} onViewModeChange={setViewMode} onExport={handleExportRequest} />
       
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
         
@@ -216,6 +229,9 @@ function App() {
 
       {/* Global Notifications */}
       <NotificationOverlay />
+
+      {/* Export Modal */}
+      {exportModalOpen && <ExportModal onClose={() => setExportModalOpen(false)} />}
     </div>
   );
 }

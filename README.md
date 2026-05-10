@@ -4,7 +4,7 @@
 
 # 🏕️ ScoutRaider — Générateur de Carnets de Raid
 
-> **Version Beta 0.3.1-beta (POI & Interface !)** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
+> **Version Beta 0.3.2-beta (Export & Hors-piste !)** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
 > 
 > 👉 **[📥 TÉLÉCHARGER LA DERNIÈRE VERSION (Windows, macOS, Linux)](https://github.com/bastonus/ScoutRaider/releases/latest)**
 
@@ -12,6 +12,18 @@
 [![Electron](https://img.shields.io/badge/App-Electron-47848f?logo=electron&logoColor=white)](#)
 [![Releases](https://img.shields.io/github/v/release/bastonus/ScoutRaider)](https://github.com/bastonus/ScoutRaider/releases)
 [![Beta](https://img.shields.io/badge/Status-Beta-orange)](#avertissement-de-sécurité)
+
+---
+
+## 🚀 MISE À JOUR : Beta 0.3.2
+
+Cette version apporte une refonte complète de la fenêtre d'exportation et un nouvel outil de tracé hors-piste.
+
+**Quoi de neuf dans cette Beta 0.3.2 :**
+- **Nouveau panneau d'exportation** : Une fenêtre d'exportation toute neuve, beaucoup plus propre.
+- **Support CSV & TSV** : Prise en charge des formats de données tabulaires (CSV et TSV), préparant la future implémentation des formats de documents tels que le DOCX, le PDF et le HTML.
+- **Nouvel outil "Hors-piste"** : Situé juste après l'outil de tracé d'itinéraire principal, cet outil permet de tracer des parcours hors-piste (points en vol d'oiseau formant des polygones).
+- **Corrections des outils** : Réparations et améliorations sur les problèmes rencontrés avec les quatre outils principaux de la carte.
 
 ---
 

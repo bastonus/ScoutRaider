@@ -59,6 +59,26 @@ function MapResizer() {
 export let satLayerRef: { current: L.TileLayer | null } = { current: null };
 export let planLayerRef: { current: L.TileLayer | null } = { current: null };
 
+function MapTooltipManager() {
+    const map = useMap();
+    useEffect(() => {
+        const onTooltipOpen = (e: any) => {
+            const openedTooltip = e.tooltip;
+            map.eachLayer((layer: any) => {
+                if (typeof layer.getTooltip === 'function') {
+                    const layerTooltip = layer.getTooltip();
+                    if (layerTooltip && layerTooltip !== openedTooltip && typeof layer.isTooltipOpen === 'function' && layer.isTooltipOpen()) {
+                        layer.closeTooltip();
+                    }
+                }
+            });
+        };
+        map.on('tooltipopen', onTooltipOpen);
+        return () => { map.off('tooltipopen', onTooltipOpen); };
+    }, [map]);
+    return null;
+}
+
 function SatelliteLayer({ active }: { active: boolean }) {
     const map = useMap();
     useEffect(() => {
@@ -124,9 +144,17 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
     const stages = state.stages;
     const smallRoads = state.small_roads_only;
 
+    // Keep refs so the click callback always sees fresh data (avoids stale closure)
+    const stagesRef = React.useRef(stages);
+    const routesRef = React.useRef(state.routes);
+    const anchorRef = React.useRef(state.anchor_stage_idx);
+    React.useEffect(() => { stagesRef.current = stages; }, [stages]);
+    React.useEffect(() => { routesRef.current = state.routes; }, [state.routes]);
+    React.useEffect(() => { anchorRef.current = state.anchor_stage_idx; }, [state.anchor_stage_idx]);
+
     useMapEvents({
         mousemove(e) {
-            if (activeTool === 'route' && stages.length > 0) {
+            if ((activeTool === 'route' || activeTool === 'route_direct') && stages.length > 0) {
                 setCursorPos([e.latlng.lat, e.latlng.lng]);
             } else {
                 setCursorPos(null);
@@ -139,46 +167,51 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
             const lat = e.latlng.lat;
             const lon = e.latlng.lng;
 
-            if (activeTool === 'route') {
-                const anchorIdx = state.anchor_stage_idx;
-                const nextLabel = String.fromCharCode(65 + stages.length);
+            if (activeTool === 'route' || activeTool === 'route_direct') {
+                const isDirect = activeTool === 'route_direct';
+                // Capture BEFORE dispatch so routing sees pre-add state
+                const currentStages = stagesRef.current;
+                const currentRoutes = routesRef.current;
+                const anchorIdx = anchorRef.current;
 
-                const anchorStage = anchorIdx >= 0 && anchorIdx < stages.length
-                    ? stages[anchorIdx] : null;
-                const nextOfAnchor = anchorIdx >= 0 && anchorIdx < stages.length - 1
-                    ? stages[anchorIdx + 1] : null;
+                const anchorStage = anchorIdx >= 0 && anchorIdx < currentStages.length
+                    ? currentStages[anchorIdx] : null;
+                const nextOfAnchor = anchorIdx >= 0 && anchorIdx < currentStages.length - 1
+                    ? currentStages[anchorIdx + 1] : null;
 
-                dispatch({ type: 'ADD_STAGE', lat, lon, label: nextLabel });
+                dispatch({ type: 'ADD_STAGE', lat, lon, label: '-' });
 
                 if (anchorStage && nextOfAnchor) {
-                    if (state.routes[anchorIdx]) {
-                        dispatch({ type: 'REMOVE_ROUTE', id: state.routes[anchorIdx].id });
+                    // Inserting between anchorIdx and anchorIdx+1
+                    if (currentRoutes[anchorIdx]) {
+                        dispatch({ type: 'REMOVE_ROUTE', id: currentRoutes[anchorIdx].id });
                     }
-                    dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Routage (BRouter)...' });
+                    dispatch({ type: 'SET_LOADING', isLoading: true, text: isDirect ? 'Ligne droite...' : 'Routage (BRouter)...' });
                     backgroundEngine.enqueue('route_leg', 0, `job-route-${Date.now()}-a`, {
                         p1: [anchorStage.coords[0], anchorStage.coords[1]],
                         p2: [lat, lon],
-                        profile: 'pedestrian',
+                        profile: isDirect ? 'direct' : 'pedestrian',
                         small_roads: smallRoads,
                         insertIdx: anchorIdx
                     });
                     backgroundEngine.enqueue('route_leg', 0, `job-route-${Date.now()}-b`, {
                         p1: [lat, lon],
                         p2: [nextOfAnchor.coords[0], nextOfAnchor.coords[1]],
-                        profile: 'pedestrian',
+                        profile: isDirect ? 'direct' : 'pedestrian',
                         small_roads: smallRoads,
                         insertIdx: anchorIdx + 1
                     });
-                } else if (stages.length > 0) {
-                    const lastStage = anchorStage || stages[stages.length - 1];
+                } else if (currentStages.length > 0) {
+                    // Appending at end
+                    const lastStage = anchorStage || currentStages[currentStages.length - 1];
                     const jobId = `job-route-${Date.now()}`;
-                    dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Routage (BRouter)...' });
+                    dispatch({ type: 'SET_LOADING', isLoading: true, text: isDirect ? 'Ligne droite...' : 'Routage (BRouter)...' });
                     backgroundEngine.enqueue('route_leg', 0, jobId, {
                         p1: [lastStage.coords[0], lastStage.coords[1]],
                         p2: [lat, lon],
-                        profile: 'pedestrian',
+                        profile: isDirect ? 'direct' : 'pedestrian',
                         small_roads: smallRoads,
-                        insertIdx: stages.length - 1
+                        insertIdx: currentStages.length - 1
                     });
                 }
             } else if (activeTool === 'node') {
@@ -188,6 +221,7 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
     });
     return null;
 }
+
 
 export default function MapComponent() {
     const { state, dispatch } = useApp();
@@ -263,7 +297,7 @@ export default function MapComponent() {
             <MapContainer
                 center={position}
                 zoom={13}
-                style={{ height: '100%', width: '100%', cursor: ['route', 'node', 'azimut'].includes(state.active_tool) ? 'crosshair' : 'grab' }}
+                style={{ height: '100%', width: '100%', cursor: ['route', 'route_direct', 'node', 'azimut'].includes(state.active_tool) ? 'crosshair' : 'grab' }}
                 zoomControl={false}
             >
                 <TileLayer
@@ -273,6 +307,7 @@ export default function MapComponent() {
                 <SatelliteLayer active={isSatellite} />
                 <MapRefCapture />
                 <MapResizer />
+                <MapTooltipManager />
                 <MapEvents setCursorPos={setCursorPos} />
                 <PoiLayer />
                 <ActiveRouteLayer />

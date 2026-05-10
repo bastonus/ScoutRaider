@@ -78,6 +78,7 @@ export interface RouteDict {
     visible?: boolean;
     locked?: boolean;
     order?: number;
+    profile?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -406,6 +407,7 @@ export interface AppState {
     small_roads_only: boolean;
     show_pois_on_map: boolean;
     show_dangers_on_map: boolean;
+    show_stages_on_map: boolean;
 
     // Persisted POI tracking per segment
     segment_pois: Record<string, POIResult[]>;

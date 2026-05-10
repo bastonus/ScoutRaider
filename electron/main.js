@@ -290,6 +290,7 @@ ipcMain.handle('get-app-version', () => app.getVersion());
 ipcMain.handle('show-save-dialog', async (event, defaultName, format) => {
   const filters = format === 'pdf' ? [{ name: 'Document PDF', extensions: ['pdf'] }] :
                   format === 'html' ? [{ name: 'Page Web', extensions: ['html'] }] :
+                  format === 'csv' ? [{ name: 'Fichier CSV', extensions: ['csv'] }] :
                   [{ name: 'Document ScoutRaider', extensions: ['srdoc', 'scoutproj'] }];
 
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
@@ -315,6 +316,7 @@ ipcMain.handle('show-open-dialog', async (event, filters) => {
 // Save .srdoc
 ipcMain.handle('save-scoutproj', async (event, stateJSON, filepath) => {
   try {
+    let targetPath = filepath;
     if (!targetPath) {
       const { canceled, filePath: dialogPath } = await dialog.showSaveDialog(mainWindow, {
         title: 'Enregistrer le projet',

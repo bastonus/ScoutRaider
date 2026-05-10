@@ -26,8 +26,7 @@ export default function InfoPills() {
         display: 'flex',
         alignItems: 'center',
         gap: '10px',
-        pointerEvents: 'all',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+        pointerEvents: 'all'
       }}>
         {state.is_loading ? (
             <>

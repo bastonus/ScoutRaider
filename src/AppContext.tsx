@@ -29,8 +29,8 @@ export type AppAction =
     | { type: 'REMOVE_ROUTE'; id: string }
 
     // Stage management
-    | { type: 'ADD_STAGE'; lat: number; lon: number; label: string; address?: string }
-    | { type: 'INSERT_STAGE'; afterIdx: number; lat: number; lon: number }
+    | { type: 'ADD_STAGE'; lat: number; lon: number; label: string; address?: string; id?: string }
+    | { type: 'INSERT_STAGE'; afterIdx: number; lat: number; lon: number; id?: string }
     | { type: 'REMOVE_STAGE'; id: string }
     | { type: 'MOVE_STAGE'; id: string; lat: number; lon: number; address?: string }
     | { type: 'REORDER_STAGES'; stages: Stage[] }
@@ -65,6 +65,7 @@ export type AppAction =
     | { type: 'TOGGLE_POI'; stepId?: string; segIdx?: number; poiId: string }
     | { type: 'TOGGLE_POIS_ON_MAP' }
     | { type: 'TOGGLE_DANGERS_ON_MAP' }
+    | { type: 'TOGGLE_STAGES_ON_MAP' }
     /**
      * Edit the plain-text of a computed (non-manual) step.
      * The new text is validated (±10% distance/azimuth tolerance) and re-encoded.
@@ -144,54 +145,60 @@ function appReducer(state: AppState, action: AppAction): AppState {
             pushHistory(state);
             const anchorIdx = state.anchor_stage_idx;
             const newStage: Stage = {
-                id: `stage-${Date.now()}`,
+                id: action.id || `stage-${Date.now()}`,
                 coords: [action.lat, action.lon],
                 label: '-',
                 address: action.address
             };
             let newStages: Stage[];
+            let newRoutes = [...state.routes];
             if (anchorIdx >= 0 && anchorIdx < state.stages.length) {
                 // Insert after anchor index (legacy insertion mode)
                 newStages = [...state.stages];
                 newStages.splice(anchorIdx + 1, 0, newStage);
+                newRoutes.splice(anchorIdx + 1, 0, null as any);
             } else {
                 newStages = [...state.stages, newStage];
+                if (state.stages.length > 0) newRoutes.push(null as any);
             }
             // Re-label sequentially A, B, C…
             const labeledStages = newStages.map((s, i) => ({ ...s, label: String.fromCharCode(65 + i) }));
             // After insertion, move anchor to end of list
             const newAnchor = labeledStages.length - 1;
-            return { ...state, stages: labeledStages, anchor_stage_idx: newAnchor };
+            return { ...state, stages: labeledStages, routes: newRoutes, anchor_stage_idx: newAnchor };
         }
 
         case 'INSERT_STAGE': {
             pushHistory(state);
             const newStage: Stage = {
-                id: `stage-${Date.now()}`,
+                id: action.id || `stage-${Date.now()}`,
                 coords: [action.lat, action.lon],
                 label: '-'
             };
             const inserted = [...state.stages];
             inserted.splice(action.afterIdx + 1, 0, newStage);
+            const newRoutes = [...state.routes];
+            newRoutes.splice(action.afterIdx + 1, 0, null as any);
             const relabeled = inserted.map((s, i) => ({ ...s, label: String.fromCharCode(65 + i) }));
-            return { ...state, stages: relabeled, anchor_stage_idx: relabeled.length - 1 };
+            return { ...state, stages: relabeled, routes: newRoutes, anchor_stage_idx: relabeled.length - 1 };
         }
 
         case 'REMOVE_STAGE': {
             pushHistory(state);
             const idx = state.stages.findIndex(s => s.id === action.id);
+            if (idx === -1) return state;
             const newStages = state.stages.filter(s => s.id !== action.id);
             // Re-label remaining stages A, B, C...
             const relabeled = newStages.map((s, i) => ({
                 ...s,
                 label: String.fromCharCode(65 + i)
             }));
-            // Remove associated route legs
+            // Remove associated route legs to keep routes perfectly aligned (length = stages.length - 1)
             const newRoutes = [...state.routes];
             if (idx > 0 && idx < state.stages.length - 1) {
-                // Remove the route after, then the route before (reverse order to preserve indices)
+                // Removing middle stage: the two surrounding routes merge into one.
                 newRoutes.splice(idx, 1);
-                newRoutes.splice(idx - 1, 1);
+                newRoutes[idx - 1] = null as any; // awaiting bridge route
             } else if (idx === 0 && newRoutes.length > 0) {
                 newRoutes.splice(0, 1); // remove first leg
             } else if (idx > 0 && idx === state.stages.length - 1 && newRoutes.length > 0) {
@@ -230,13 +237,16 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         // ── Route management ───────────────────────────────────────────────
-        case 'ADD_ROUTE':
-            if (action.insertIdx !== undefined && action.insertIdx >= 0 && action.insertIdx <= state.routes.length) {
-                const newRoutes = [...state.routes];
-                newRoutes.splice(action.insertIdx, 0, action.route);
-                return { ...state, routes: newRoutes };
+        case 'ADD_ROUTE': {
+            const newRoutes = [...state.routes];
+            if (action.insertIdx !== undefined && action.insertIdx >= 0 && action.insertIdx < Math.max(1, state.stages.length)) {
+                newRoutes[action.insertIdx] = action.route;
+            } else {
+                // Fallback (should not happen if mapped properly)
+                newRoutes.push(action.route);
             }
-            return StateManager.addRoute(state, action.route);
+            return { ...state, routes: newRoutes };
+        }
 
         case 'UPDATE_ROUTE':
             return StateManager.updateRoute(state, action.id, action.updater);
@@ -262,7 +272,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'REMOVE_ROUTE':
-            return { ...state, routes: state.routes.filter(r => r.id !== action.id) };
+            return { ...state, routes: state.routes.map(r => r?.id === action.id ? (null as any) : r) };
 
         // ── Polygonalisation ───────────────────────────────────────────────
         case 'SET_POLYGONAL_LEGS': {
@@ -280,6 +290,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 if (seg.coords && seg.coords.length > 0) {
                     const firstPt = seg.coords[0];
                     const matchingRoute = state.routes.find((r: any) => {
+                        if (!r) return false;
                         const rCoords = r.geojson?.geometry?.coordinates || r.geojson?.coordinates || [];
                         return rCoords.some((rp: any) => Math.abs(rp[0] - firstPt[0]) < 0.0001 && Math.abs(rp[1] - firstPt[1]) < 0.0001);
                     });
@@ -661,6 +672,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
         case 'TOGGLE_DANGERS_ON_MAP':
             return { ...state, show_dangers_on_map: !state.show_dangers_on_map };
+
+        case 'TOGGLE_STAGES_ON_MAP':
+            return { ...state, show_stages_on_map: !state.show_stages_on_map };
 
         // ── POI persistence ────────────────────────────────────────────────
         case 'SET_SEGMENT_POIS': {
@@ -1088,9 +1102,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     dispatch({ type: 'SET_LOADING', isLoading: pendingRoutes > 0, text: pendingRoutes > 0 ? `BRouter — ${pendingRoutes} tronçon(s) restants...` : '' });
 
                     const props = result.alts?.[0]?.geometry?.properties || {};
+
+                    // — Recompute insertIdx from p1/p2 coordinates at dispatch time —
+                    let safeInsertIdx = result.insertIdx;
+                    let isValid = true;
+                    if (result.p1 && result.p2) {
+                        const currentStages = stateRef.current.stages;
+                        const COORD_TOL = 0.0002; // ~20m tolerance
+                        let bestIdx = -1;
+                        for (let i = 0; i < currentStages.length - 1; i++) {
+                            const s1 = currentStages[i].coords;
+                            const s2 = currentStages[i + 1].coords;
+                            const p1MatchesS1 = Math.abs(s1[0] - result.p1[0]) < COORD_TOL && Math.abs(s1[1] - result.p1[1]) < COORD_TOL;
+                            const p2MatchesS2 = Math.abs(s2[0] - result.p2[0]) < COORD_TOL && Math.abs(s2[1] - result.p2[1]) < COORD_TOL;
+                            if (p1MatchesS1 && p2MatchesS2) { bestIdx = i; break; }
+                        }
+                        if (bestIdx !== -1) {
+                            safeInsertIdx = bestIdx;
+                            console.log(`[Pipeline ①] Remapped insertIdx ${result.insertIdx} → ${bestIdx} from stage coords`);
+                        } else {
+                            console.warn(`[Pipeline ①] Dropping obsolete route (stages have changed/deleted since request)`);
+                            isValid = false;
+                        }
+                    }
+
+                    if (!isValid) {
+                        dispatch({ type: 'SET_LOADING', isLoading: pendingRoutes > 0 });
+                        return;
+                    }
+
                     dispatch({
                         type: 'ADD_ROUTE',
-                        insertIdx: result.insertIdx,
+                        insertIdx: safeInsertIdx,
                         route: {
                             id: jobId,
                             distance_m: result.distance || 0,
@@ -1099,9 +1142,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                                 properties: props,
                                 geometry: { type: 'LineString', coordinates: result.coordinates }
                             },
-                            alternatives: result.alts || []
+                            alternatives: result.alts || [],
+                            profile: result.profile
                         }
                     });
+
 
                     // ── ⑤ Danger check (BRouter WayTags parsed by IGNClient) ──────
                     if (props.danger_level === 'extreme') {
@@ -1202,8 +1247,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prevRoutesRef.current = state.routes;
 
         azimutTimer.current = setTimeout(() => {
+            // Do not compute azimut/POI if some routes are still loading (null)
+            // This waits for all rapid BRouter/Direct conversions to finish first!
+            if (state.routes.some(r => !r)) {
+                console.log('[Pipeline] ⏳ Waiting for all route segments to finish loading...');
+                return;
+            }
+
             const allCoords = state.routes.flatMap((r: any) =>
-                r.geojson?.geometry?.coordinates || r.geojson?.coordinates || []
+                r?.geojson?.geometry?.coordinates || r?.geojson?.coordinates || []
             );
             if (allCoords.length < 2) return;
 
@@ -1305,6 +1357,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (saveTimeout.current) clearTimeout(saveTimeout.current);
         };
     }, [state]);
+
+    // ── Save Preferences to LocalStorage ───────────────────────────────
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const prefs = {
+                active_ign_layer: state.active_ign_layer,
+                show_pois_on_map: state.show_pois_on_map,
+                show_dangers_on_map: state.show_dangers_on_map,
+                show_stages_on_map: state.show_stages_on_map,
+            };
+            try {
+                localStorage.setItem('scoutraider_prefs', JSON.stringify(prefs));
+            } catch (e) {
+                console.warn('Failed to save preferences to localStorage', e);
+            }
+        }
+    }, [
+        state.active_ign_layer,
+        state.show_pois_on_map,
+        state.show_dangers_on_map,
+        state.show_stages_on_map
+    ]);
 
     // ── Listen for Electron menu actions ───────────────────────────────
     useEffect(() => {

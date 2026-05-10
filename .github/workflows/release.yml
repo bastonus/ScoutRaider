@@ -155,15 +155,16 @@ jobs:
           body: |
             ## 🏕️ ScoutRaider ${{ github.ref_name }} — Version Beta
 
-            ### 🚀 Mise à jour Majeure : Migration Electron
-            Cette version marque le passage à une architecture moderne en **React / Electron**. 
-            L'interface a été entièrement repensée pour être plus fluide et intuitive.
+            ### 🚀 Mise à jour de la Beta 0.3.2
+            - **Nouveau panneau d'exportation** : Une fenêtre d'exportation toute neuve, beaucoup plus propre.
+            - **Support CSV & TSV** : Prise en charge des formats de données tabulaires (CSV et TSV), préparant la future implémentation des formats de documents tels que le DOCX, le PDF et le HTML.
+            - **Nouvel outil "Hors-piste"** : Cet outil permet de tracer des parcours hors-piste (points en vol d'oiseau formant des polygones).
+            - **Corrections des outils** : Réparations et améliorations sur les problèmes rencontrés avec les quatre outils principaux.
 
-            ### ✨ Nouveautés de la Beta 0.3
-            - **Nouveau Design System** : Interface glassmorphique sombre et moderne.
+            ### ✨ Nouveautés générales de la branche Beta 0.3
+            - **Migration Electron** : Passage à une architecture moderne en **React / Electron**.
+            - **Design System** : Interface glassmorphique sombre et moderne.
             - **Carte Interactive** : Intégration optimisée de Leaflet avec routage automatique.
-            - **Timeline Métro** : Visualisation claire de l'itinéraire et des étapes.
-            - **Performance** : Temps de chargement réduits et réactivité accrue.
 
             ⚠️ **Avertissement Sécurité** : Les azimuts et métrages sont calculés algorithmiquement. Vérifiez toujours l'itinéraire manuellement sur une carte papier avant d'envoyer vos scouts sur le terrain !
 

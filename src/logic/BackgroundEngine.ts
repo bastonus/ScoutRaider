@@ -34,13 +34,13 @@ const MAX_CONCURRENT: Record<JobType, number> = {
 // ─── BRouter result cache ─────────────────────────────────────────────────────
 const _routeCache = new Map<string, { coordinates: [number, number][]; alts: any[] | null }>();
 
-function routeCacheKey(p1: [number, number], p2: [number, number]): string {
-    return `${p1[0].toFixed(6)},${p1[1].toFixed(6)}-${p2[0].toFixed(6)},${p2[1].toFixed(6)}`;
+function routeCacheKey(p1: [number, number], p2: [number, number], profile: string): string {
+    return `${p1[0].toFixed(6)},${p1[1].toFixed(6)}-${p2[0].toFixed(6)},${p2[1].toFixed(6)}-${profile}`;
 }
 
 export function clearRouteCache() { _routeCache.clear(); }
-export function invalidateRouteCacheForLeg(p1: [number, number], p2: [number, number]) {
-    _routeCache.delete(routeCacheKey(p1, p2));
+export function invalidateRouteCacheForLeg(p1: [number, number], p2: [number, number], profile: string) {
+    _routeCache.delete(routeCacheKey(p1, p2, profile));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -190,24 +190,27 @@ export class BackgroundEngine {
         insertIdx?: number;
         legKey?: string;
     }) {
-        const cacheKey = routeCacheKey(data.p1, data.p2);
+        const cacheKey = routeCacheKey(data.p1, data.p2, data.profile || 'pedestrian');
 
         if (_routeCache.has(cacheKey)) {
             const cached = _routeCache.get(cacheKey)!;
             console.log(`[Queue] route_leg CACHE HIT  leg=${data.legKey ?? cacheKey}`);
-            return { ...cached, insertIdx: data.insertIdx, legKey: data.legKey, fromCache: true };
+            return { ...cached, insertIdx: data.insertIdx, legKey: data.legKey, fromCache: true, p1: data.p1, p2: data.p2, profile: data.profile };
         }
 
-        const alts = await IGNClient.computeRouteAlternatives(
-            data.p1, data.p2, data.profile, 1, data.small_roads
-        );
+        let alts: any[] = [];
+        if (data.profile !== 'direct') {
+            alts = await IGNClient.computeRouteAlternatives(
+                data.p1, data.p2, data.profile, 1, data.small_roads
+            );
+        }
 
         const entry = alts.length > 0
             ? { coordinates: alts[0].geometry.coordinates as [number,number][], alts }
             : { coordinates: [[data.p1[1], data.p1[0]], [data.p2[1], data.p2[0]]] as [number,number][], alts: null };
 
         _routeCache.set(cacheKey, entry);
-        return { ...entry, insertIdx: data.insertIdx, legKey: data.legKey, fromCache: false };
+        return { ...entry, insertIdx: data.insertIdx, legKey: data.legKey, fromCache: false, p1: data.p1, p2: data.p2, profile: data.profile };
     }
 
     private async handleAzimutLeg(data: {

@@ -6,7 +6,7 @@ export default function MapHUD() {
     const { state } = useApp();
 
     // Calc total distance from routes
-    const totalDist = state.routes.reduce((acc, r) => acc + (r.distance_m || 0), 0) / 1000;
+    const totalDist = state.routes.reduce((acc, r) => acc + (r?.distance_m || 0), 0) / 1000;
 
     return (
         <div style={{

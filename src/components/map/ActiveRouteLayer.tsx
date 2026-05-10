@@ -128,7 +128,7 @@ export default function ActiveRouteLayer() {
     }, [steps]);
 
     const allCoords = React.useMemo(() => state.routes.flatMap((r: any) =>
-        r.geojson?.geometry?.coordinates || r.geojson?.coordinates || []
+        r?.geojson?.geometry?.coordinates || r?.geojson?.coordinates || []
     ), [state.routes]);
 
     const findClosestRoutePoint = useCallback((lat: number, lng: number) => {
@@ -208,6 +208,23 @@ export default function ActiveRouteLayer() {
     }, [dispatch, findClosestRoutePoint, steps, state.polygonalization_settings.forced_nodes, state.polygonalization_settings.masked_nodes]);
 
     // ── Phase 0 Fix: Azimut drag now properly writes back to state ──
+    const handleAzimutDrag = useCallback((e: any, segIdx: number) => {
+        const handle = e.target;
+        const latlng = handle.getLatLng();
+        const line = (window as any).__aziLines?.[segIdx];
+        if (line) {
+            const currentLatLngs = line.getLatLngs();
+            if (currentLatLngs.length === 2) {
+                line.setLatLngs([currentLatLngs[0], latlng]);
+                const startPt = currentLatLngs[0];
+                const newAzimut = Math.round(getBearing(startPt.lat, startPt.lng, latlng.lat, latlng.lng));
+                if (handle.getTooltip()) {
+                    handle.getTooltip().setContent(`<span style="font-weight:bold;color:#2d8ceb">${newAzimut}°</span>`);
+                }
+            }
+        }
+    }, []);
+
     const handleAzimutDragEnd = useCallback((e: any, segIdx: number) => {
         const handle = e.target.getLatLng();
         const seg = steps[segIdx];
@@ -218,6 +235,7 @@ export default function ActiveRouteLayer() {
 
         dispatch({ type: 'UPDATE_AZIMUT', segIdx, azimut: newAzimut });
     }, [dispatch, steps]);
+
 
     // ── Node context menu (remove node) ──
     const handleNodeRemove = useCallback((segIdx: number) => {
@@ -237,10 +255,26 @@ export default function ActiveRouteLayer() {
         dispatch({ type: 'ADD_NOTIFICATION', message: 'Nœud supprimé.', notifType: 'info' });
     }, [dispatch, steps, state.polygonalization_settings.forced_nodes, state.polygonalization_settings.masked_nodes]);
 
+    const recalculateRouteLeg = useCallback((idx: number, newProfile: string) => {
+        const stageA = state.stages[idx];
+        const stageB = state.stages[idx + 1];
+        if (!stageA || !stageB) return;
+
+        dispatch({ type: 'REMOVE_ROUTE', id: state.routes[idx].id });
+        dispatch({ type: 'SET_LOADING', isLoading: true, text: newProfile === 'direct' ? 'Ligne droite...' : 'Routage (BRouter)...' });
+        backgroundEngine.enqueue('route_leg', 0, `job-route-${Date.now()}`, {
+            p1: [stageA.coords[0], stageA.coords[1]],
+            p2: [stageB.coords[0], stageB.coords[1]],
+            profile: newProfile,
+            small_roads: state.small_roads_only,
+            insertIdx: idx
+        });
+    }, [state.stages, state.routes, state.small_roads_only, dispatch]);
+
     // Extract alternative rendering so it shows in both modes
     const renderAlternatives = () => {
         return state.routes.map((route: any) => {
-            if (!route.alternatives || route.alternatives.length <= 1) return null;
+            if (!route || !route.alternatives || route.alternatives.length <= 1) return null;
             
             return route.alternatives.map((alt: any, altIdx: number) => {
                 // Skip if this is the currently active alternative (check by matching distance)
@@ -283,16 +317,57 @@ export default function ActiveRouteLayer() {
         return (
             <>
                 {renderAlternatives()}
-                {state.routes.map((r: any) => (
-                    <Polyline 
-                        key={`route-${r.id}`} 
-                        positions={(r.geojson?.geometry?.coordinates || r.geojson?.coordinates || []).map((c: any) => [c[1], c[0]])} 
-                        color="#2d8ceb"
-                        weight={6}
-                        opacity={0.8}
-                        interactive={false}
-                    />
-                ))}
+                {state.routes.map((r: any, idx: number) => {
+                    if (!r) return null;
+                    const positions = (r.geojson?.geometry?.coordinates || r.geojson?.coordinates || []).map((c: any) => [c[1], c[0]]);
+                    return (
+                        <React.Fragment key={`route-${r.id}`}>
+                            {/* Invisible wide line for clicking */}
+                            <Polyline
+                                positions={positions}
+                                color="transparent"
+                                weight={30}
+                                interactive={true}
+                                eventHandlers={{
+                                    click: (e: any) => {
+                                        L.DomEvent.stop(e.originalEvent);
+                                        if (activeTool === 'route_direct' && r.profile !== 'direct') {
+                                            recalculateRouteLeg(idx, 'direct');
+                                        } else if (activeTool === 'route' && r.profile === 'direct') {
+                                            recalculateRouteLeg(idx, 'pedestrian');
+                                        }
+                                    },
+                                    mouseover: () => {
+                                        if ((activeTool === 'route_direct' && r.profile !== 'direct') || (activeTool === 'route' && r.profile === 'direct')) {
+                                            (window as any).__isHoveringCompatible = true;
+                                        }
+                                    },
+                                    mouseout: () => {
+                                        (window as any).__isHoveringCompatible = false;
+                                    }
+                                }}
+                            >
+                                {(activeTool === 'route_direct' || activeTool === 'route') && (
+                                    <Tooltip sticky>
+                                        <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
+                                            <b style={{ color: 'var(--accent-default)' }}>{r.profile === 'direct' ? 'Hors piste' : 'Tracé pédestre'}</b><br />
+                                            {activeTool === 'route_direct' && r.profile !== 'direct' && <span>Clic : convertir en hors piste</span>}
+                                            {activeTool === 'route' && r.profile === 'direct' && <span>Clic : convertir en tracé BRouter</span>}
+                                        </div>
+                                    </Tooltip>
+                                )}
+                            </Polyline>
+                            {/* Visible route line */}
+                            <Polyline 
+                                positions={positions} 
+                                color="#2d8ceb"
+                                weight={6}
+                                opacity={0.8}
+                                interactive={false}
+                            />
+                        </React.Fragment>
+                    );
+                })}
             </>
         );
     }
@@ -380,8 +455,9 @@ export default function ActiveRouteLayer() {
                                         <Polyline 
                                             positions={[startPt, destPt]} 
                                             color="#2d8ceb" 
-                                            weight={2} 
-                                            opacity={0.9} 
+                                            weight={3} 
+                                            opacity={1} 
+                                            ref={(ref: any) => { if (ref) { (window as any).__aziLines = (window as any).__aziLines || {}; (window as any).__aziLines[idx] = ref; } }}
                                         />
                                         <Marker 
                                             position={destPt} 
@@ -392,7 +468,15 @@ export default function ActiveRouteLayer() {
                                                 iconSize: [14, 14], iconAnchor: [7, 7]
                                             })}
                                             eventHandlers={{
-                                                dragend: (e) => handleAzimutDragEnd(e, idx)
+                                                dragstart: (e) => {
+                                                    const handle = e.target;
+                                                    handle.bindTooltip(`<span style="font-weight:bold;color:#2d8ceb">${azimut || 0}°</span>`, { permanent: true, direction: 'top', offset: [0, -10] }).openTooltip();
+                                                },
+                                                drag: (e) => handleAzimutDrag(e, idx),
+                                                dragend: (e) => {
+                                                    handleAzimutDragEnd(e, idx);
+                                                    e.target.unbindTooltip();
+                                                }
                                             }}
                                         />
                                     </>
@@ -425,19 +509,19 @@ export default function ActiveRouteLayer() {
                         <Marker 
                             position={startPt}
                             icon={nodeIcon}
-                            draggable={isNodeTool}
+                            draggable={isNodeTool || isAzimutTool}
                             eventHandlers={{
                                 dragstart: (e) => e.target.closePopup(),
                                 drag: handleNodeDrag,
                                 dragend: (e) => handleNodeDragEnd(e, idx),
                                 contextmenu: (e) => {
-                                    if (isNodeTool) {
+                                    if (isNodeTool || isAzimutTool) {
                                         L.DomEvent.preventDefault(e as any);
                                         handleNodeRemove(idx);
                                     }
                                 },
                                 click: (e) => {
-                                    if (isNodeTool && e.originalEvent && e.originalEvent.altKey) {
+                                    if ((isNodeTool || isAzimutTool) && e.originalEvent && e.originalEvent.altKey) {
                                         handleNodeRemove(idx);
                                     }
                                 }
@@ -459,6 +543,7 @@ export default function ActiveRouteLayer() {
 
             {/* DANGER POIs (Route safety warnings) */}
             {state.show_dangers_on_map && state.routes.map((route: any, routeIdx: number) => {
+                if (!route) return null;
                 const geojson = route.geojson;
                 if (!geojson) return null;
                 

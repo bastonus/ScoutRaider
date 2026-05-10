@@ -21,6 +21,21 @@ async function searchIGN(query: string): Promise<SearchResult[]> {
     } catch { return []; }
 }
 
+/** Try to parse a raw coordinate string like "48.8566, 2.3522" or "48.8566 2.3522".
+ *  Accepts comma or space as separator, and both '.' and ',' as decimal mark. */
+function parseCoords(raw: string): { lat: number; lon: number } | null {
+    // Normalise: replace commas used as decimal marks inside numbers, then split on remaining comma/semicolon/space
+    const s = raw.trim();
+    // Pattern: two floating-point numbers separated by comma, semicolon, or whitespace
+    const m = s.match(/^(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)$/);
+    if (!m) return null;
+    const lat = parseFloat(m[1].replace(',', '.'));
+    const lon = parseFloat(m[2].replace(',', '.'));
+    if (isNaN(lat) || isNaN(lon)) return null;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+    return { lat, lon };
+}
+
 function reRouteAdjacentLegs(stages: Stage[], routes: any[], smallRoads: boolean, dispatch: any, movedIdx: number, newLat: number, newLon: number) {
     if (movedIdx > 0) {
         const prev = stages[movedIdx - 1];
@@ -82,6 +97,8 @@ function StageRow({ stage, idx, total, isDragged, onDragStart, onDragOver, onDro
     }, []);
     useEffect(() => {
         if (!isFocused) return;
+        // Don't search if it looks like raw coordinates
+        if (parseCoords(query)) { setResults([]); setShowResults(false); return; }
         const t = setTimeout(async () => {
             if (query.trim().length >= 3) { const res = await searchIGN(query); setResults(res); setShowResults(res.length > 0); }
             else { setResults([]); setShowResults(false); }
@@ -94,6 +111,19 @@ function StageRow({ stage, idx, total, isDragged, onDragStart, onDragOver, onDro
         dispatch({ type: 'MOVE_STAGE', id: stage.id, lat: r.lat, lon: r.lon, address: r.label });
         reRouteAdjacentLegs(state.stages, state.routes, state.small_roads_only, dispatch, idx, r.lat, r.lon);
     };
+
+    const handleCommit = () => {
+        const coords = parseCoords(query);
+        if (coords) {
+            const label = `${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`;
+            setQuery(label); setShowResults(false); setIsFocused(false);
+            dispatch({ type: 'MOVE_STAGE', id: stage.id, lat: coords.lat, lon: coords.lon, address: label });
+            reRouteAdjacentLegs(state.stages, state.routes, state.small_roads_only, dispatch, idx, coords.lat, coords.lon);
+        } else if (results.length > 0) {
+            handleSelect(results[0]);
+        }
+    };
+
     const handleDelete = () => {
         dispatch({ type: 'REMOVE_STAGE', id: stage.id });
         if (idx > 0 && idx < state.stages.length - 1) {
@@ -128,7 +158,8 @@ function StageRow({ stage, idx, total, isDragged, onDragStart, onDragOver, onDro
                 <input type="text" value={query} onChange={e => setQuery(e.target.value)}
                     onFocus={() => { setIsFocused(true); if (results.length > 0) setShowResults(true); }}
                     onBlur={() => setTimeout(() => setIsFocused(false), 150)}
-                    placeholder="Adresse ou lieu…"
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCommit(); } }}
+                    placeholder="Adresse, lieu ou lat, lon…"
                     style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '12px', fontFamily: 'var(--font-ui)', minWidth: 0 }} />
                 <button type="button" onClick={handleDelete} title="Supprimer"
                     style={{ width: '22px', height: '22px', borderRadius: '6px', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.15s', flexShrink: 0 }}
@@ -149,6 +180,11 @@ function AddStageRow() {
     const [showResults, setShowResults] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    // Keep a ref to current stages so the callback always sees fresh data
+    const stagesRef = useRef(state.stages);
+    const routesRef = useRef(state.routes);
+    useEffect(() => { stagesRef.current = state.stages; }, [state.stages]);
+    useEffect(() => { routesRef.current = state.routes; }, [state.routes]);
 
     useEffect(() => {
         const h = (e: MouseEvent) => { if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) { setShowResults(false); setIsFocused(false); } };
@@ -156,6 +192,8 @@ function AddStageRow() {
         return () => document.removeEventListener('mousedown', h);
     }, []);
     useEffect(() => {
+        // Don't trigger IGN search for raw coordinate input
+        if (parseCoords(query)) { setResults([]); setShowResults(false); return; }
         const t = setTimeout(async () => {
             if (query.trim().length >= 3) { const res = await searchIGN(query); setResults(res); setShowResults(res.length > 0); }
             else { setResults([]); setShowResults(false); }
@@ -165,19 +203,31 @@ function AddStageRow() {
 
     const handleSelect = (r: SearchResult) => {
         setQuery(''); setShowResults(false); setIsFocused(false);
+        // Capture anchor BEFORE dispatching ADD_STAGE (state is still pre-add here)
+        const stages = stagesRef.current;
+        const routes = routesRef.current;
+        const anchorIdx = state.anchor_stage_idx >= 0 ? state.anchor_stage_idx : stages.length - 1;
         dispatch({ type: 'ADD_STAGE', lat: r.lat, lon: r.lon, label: '-', address: r.label });
-        const anchorIdx = state.anchor_stage_idx >= 0 ? state.anchor_stage_idx : state.stages.length - 1;
-        if (anchorIdx >= 0 && anchorIdx < state.stages.length) {
-            const prev = state.stages[anchorIdx];
+        if (anchorIdx >= 0 && anchorIdx < stages.length) {
+            const prev = stages[anchorIdx];
             dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Calcul du tronçon...' });
             backgroundEngine.enqueue('route_leg', 0, `job-add-${Date.now()}`, { p1: [prev.coords[0], prev.coords[1]], p2: [r.lat, r.lon], profile: 'pedestrian', small_roads: state.small_roads_only, insertIdx: anchorIdx });
-            if (anchorIdx < state.stages.length - 1) {
-                const next = state.stages[anchorIdx + 1];
-                if (state.routes[anchorIdx]) dispatch({ type: 'REMOVE_ROUTE', id: state.routes[anchorIdx].id });
+            if (anchorIdx < stages.length - 1) {
+                const next = stages[anchorIdx + 1];
+                if (routes[anchorIdx]) dispatch({ type: 'REMOVE_ROUTE', id: routes[anchorIdx].id });
                 backgroundEngine.enqueue('route_leg', 0, `job-add-next-${Date.now()}`, { p1: [r.lat, r.lon], p2: [next.coords[0], next.coords[1]], profile: 'pedestrian', small_roads: state.small_roads_only, insertIdx: anchorIdx + 1 });
             }
         }
         dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
+    };
+
+    const handleCommit = () => {
+        const coords = parseCoords(query);
+        if (coords) {
+            handleSelect({ label: `${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`, lat: coords.lat, lon: coords.lon });
+        } else if (results.length > 0) {
+            handleSelect(results[0]);
+        }
     };
 
     return (
@@ -194,7 +244,8 @@ function AddStageRow() {
                 <input type="text" value={query} onChange={e => setQuery(e.target.value)}
                     onFocus={() => { setIsFocused(true); if (results.length > 0) setShowResults(true); }}
                     onBlur={() => setTimeout(() => setIsFocused(false), 150)}
-                    placeholder="Ajouter une étape…"
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCommit(); } }}
+                    placeholder="Adresse, lieu ou lat, lon…"
                     style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '12px', fontFamily: 'var(--font-ui)', minWidth: 0 }} />
             </div>
             {showResults && results.length > 0 && <SmartDropdown results={results} onSelect={handleSelect} anchorRef={wrapperRef} />}
@@ -203,7 +254,7 @@ function AddStageRow() {
 }
 
 // ── Drop Zone between stages ───────────────────────────────────────────────────
-function DropZone({ insertAfterIdx, dist, onDrop }: { insertAfterIdx: number; dist?: string; onDrop: (idx: number) => void; }) {
+function DropZone({ insertAfterIdx, dist, isDirect, onDrop, onToggleDirect }: { insertAfterIdx: number; dist?: string; isDirect?: boolean; onDrop: (idx: number) => void; onToggleDirect?: () => void }) {
     const [over, setOver] = useState(false);
     return (
         <div
@@ -228,11 +279,31 @@ function DropZone({ insertAfterIdx, dist, onDrop }: { insertAfterIdx: number; di
                 transition: 'background 0.15s',
             }} />
             {dist && !over && (
-                <span style={{
-                    fontSize: '10px', color: 'var(--text-dim)', fontWeight: 600,
-                    background: 'var(--bg-dark)', border: '1px solid var(--bg-border)',
-                    borderRadius: '6px', padding: '2px 7px',
-                }}>{dist}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                        fontSize: '10px', color: 'var(--text-dim)', fontWeight: 600,
+                        background: 'var(--bg-dark)', border: '1px solid var(--bg-border)',
+                        borderRadius: '6px', padding: '2px 7px',
+                    }}>{dist}</span>
+                    {onToggleDirect && (
+                        <label style={{
+                            display: 'flex', alignItems: 'center', gap: '4px',
+                            cursor: 'pointer', fontSize: '10px', color: 'var(--text-dim)',
+                            opacity: 0.6, transition: 'opacity 0.15s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                        onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                        >
+                            <input 
+                                type="checkbox" 
+                                checked={isDirect || false} 
+                                onChange={onToggleDirect}
+                                style={{ width: '10px', height: '10px', cursor: 'pointer', accentColor: 'var(--accent-default)' }}
+                            />
+                            Hors piste
+                        </label>
+                    )}
+                </div>
             )}
             {over && (
                 <span style={{ fontSize: '10px', color: 'var(--accent-default)', fontWeight: 600 }}>
@@ -306,6 +377,27 @@ export default function RoutePanel() {
         performReorder(draggedIdx, targetIdx);
     };
 
+    const handleToggleProfile = (idx: number) => {
+        const stageA = state.stages[idx];
+        const stageB = state.stages[idx + 1];
+        if (!stageA || !stageB) return;
+        const currentRoute = state.routes[idx];
+        if (!currentRoute) return;
+
+        const newProfile = currentRoute.profile === 'direct' ? 'pedestrian' : 'direct';
+
+        dispatch({ type: 'REMOVE_ROUTE', id: currentRoute.id });
+        dispatch({ type: 'SET_LOADING', isLoading: true, text: newProfile === 'direct' ? 'Ligne droite...' : 'Routage (BRouter)...' });
+        
+        backgroundEngine.enqueue('route_leg', 0, `job-route-${Date.now()}`, {
+            p1: [stageA.coords[0], stageA.coords[1]],
+            p2: [stageB.coords[0], stageB.coords[1]],
+            profile: newProfile,
+            small_roads: state.small_roads_only,
+            insertIdx: idx
+        });
+    };
+
     const performReorder = (fromIdx: number, toIdx: number) => {
         const newStages = [...stages];
         const [moved] = newStages.splice(fromIdx, 1);
@@ -367,6 +459,8 @@ export default function RoutePanel() {
                                 <DropZone
                                     insertAfterIdx={idx - 1}
                                     dist={getStageDistance(idx)}
+                                    isDirect={state.routes[idx - 1]?.profile === 'direct'}
+                                    onToggleDirect={() => handleToggleProfile(idx - 1)}
                                     onDrop={handleDropOnConnector}
                                 />
                             )}

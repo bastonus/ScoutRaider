@@ -35,22 +35,19 @@ export default function ControlToolbar() {
                 zIndex: 1100, pointerEvents: 'none',
                 display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'flex-end',
             }}>
-                {/* DANGERS TOGGLE PILL */}
-                <div style={pillStyle}>
+                {/* VISIBILITY TOGGLES PILL (vertical) */}
+                <div style={{ ...pillStyle, flexDirection: 'column', gap: '2px' }}>
                     <button
                         type="button"
-                        onClick={() => dispatch({ type: 'TOGGLE_DANGERS_ON_MAP' })}
-                        style={{ ...btnStyle, color: state.show_dangers_on_map ? '#ef4444' : 'var(--text-dim)', background: state.show_dangers_on_map ? 'rgba(239,68,68,0.1)' : 'transparent' }}
-                        title="Afficher/Masquer les dangers sur la carte"
-                        onMouseEnter={e => { e.currentTarget.style.background = state.show_dangers_on_map ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = state.show_dangers_on_map ? '#ef4444' : 'var(--text-primary)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = state.show_dangers_on_map ? 'rgba(239,68,68,0.1)' : 'transparent'; e.currentTarget.style.color = state.show_dangers_on_map ? '#ef4444' : 'var(--text-dim)'; }}
+                        onClick={() => dispatch({ type: 'TOGGLE_STAGES_ON_MAP' })}
+                        style={{ ...btnStyle, color: state.show_stages_on_map ? '#2d8ceb' : 'var(--text-dim)', background: state.show_stages_on_map ? 'rgba(45,140,235,0.1)' : 'transparent' }}
+                        title="Afficher/Masquer les étapes sur la carte"
+                        onMouseEnter={e => { e.currentTarget.style.background = state.show_stages_on_map ? 'rgba(45,140,235,0.2)' : 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = state.show_stages_on_map ? '#2d8ceb' : 'var(--text-primary)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = state.show_stages_on_map ? 'rgba(45,140,235,0.1)' : 'transparent'; e.currentTarget.style.color = state.show_stages_on_map ? '#2d8ceb' : 'var(--text-dim)'; }}
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                     </button>
-                </div>
-
-                {/* POI TOGGLE PILL */}
-                <div style={pillStyle}>
+                    <div style={{ width: '24px', height: '1px', background: 'rgba(110, 201, 126, 0.12)', margin: '2px 4px' }} />
                     <button
                         type="button"
                         onClick={togglePois}
@@ -64,6 +61,17 @@ export default function ControlToolbar() {
                             <circle cx="12" cy="8" r="2"/>
                             <path d="M8.714 14h-3.71a1 1 0 0 0-.948.683l-2.004 6A1 1 0 0 0 3 22h18a1 1 0 0 0 .948-1.316l-2-6a1 1 0 0 0-.949-.684h-3.712"/>
                         </svg>
+                    </button>
+                    <div style={{ width: '24px', height: '1px', background: 'rgba(110, 201, 126, 0.12)', margin: '2px 4px' }} />
+                    <button
+                        type="button"
+                        onClick={() => dispatch({ type: 'TOGGLE_DANGERS_ON_MAP' })}
+                        style={{ ...btnStyle, color: state.show_dangers_on_map ? '#ef4444' : 'var(--text-dim)', background: state.show_dangers_on_map ? 'rgba(239,68,68,0.1)' : 'transparent' }}
+                        title="Afficher/Masquer les dangers sur la carte"
+                        onMouseEnter={e => { e.currentTarget.style.background = state.show_dangers_on_map ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = state.show_dangers_on_map ? '#ef4444' : 'var(--text-primary)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = state.show_dangers_on_map ? 'rgba(239,68,68,0.1)' : 'transparent'; e.currentTarget.style.color = state.show_dangers_on_map ? '#ef4444' : 'var(--text-dim)'; }}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
                     </button>
                 </div>
 

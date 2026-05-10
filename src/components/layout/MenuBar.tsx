@@ -22,9 +22,10 @@ interface MenuBarProps {
     onToggleSidebar?: (side: 'left' | 'right') => void;
     viewMode?: ViewMode;
     onViewModeChange?: (mode: ViewMode) => void;
+    onExport?: () => void;
 }
 
-export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeChange }: MenuBarProps) {
+export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeChange, onExport }: MenuBarProps) {
     const { state, dispatch } = useApp();
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     const [showNotifHistory, setShowNotifHistory] = useState(false);
@@ -100,6 +101,10 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.ctrlKey || e.metaKey) {
                 switch(e.key.toLowerCase()) {
+                    case 'e':
+                        e.preventDefault();
+                        onExport?.();
+                        break;
                     case 's':
                         e.preventDefault();
                         if (e.shiftKey) menus['Fichier'][4].action(); // Save as
@@ -172,9 +177,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                 if (ok) dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet enregistré.', notifType: 'info' });
             }},
             { divider: true },
-            { label: 'Exporter en PDF', shortcut: 'Ctrl+E', action: () => {
-                dispatch({ type: 'ADD_NOTIFICATION', message: 'Veuillez utiliser l\'onglet Exporter.', notifType: 'info' });
-            }},
+            { label: 'Exporter...', shortcut: 'Ctrl+E', action: () => onExport?.() },
         ],
         'Édition': [
             { label: 'Annuler', shortcut: 'Ctrl+Z', action: () => dispatch({ type: 'UNDO' }) },
@@ -206,7 +209,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             }},
             { divider: true },
             { label: 'À propos', action: () => {
-                dispatch({ type: 'ADD_NOTIFICATION', message: 'ScoutRaider Suite v0.3.1', notifType: 'info' });
+                dispatch({ type: 'ADD_NOTIFICATION', message: 'ScoutRaider Suite v0.3.2-beta', notifType: 'info' });
             }},
         ]
     };

@@ -17,6 +17,30 @@ export class StateManager {
 
     // ─── Initial State ────────────────────────────────────────────────────
     static getInitialState(): AppState {
+        // Default preferences
+        let prefs = {
+            active_ign_layer: 'PLAN.IGN',
+            show_pois_on_map: true,
+            show_dangers_on_map: true,
+            show_stages_on_map: true,
+        };
+
+        // Attempt to load from localStorage
+        if (typeof window !== 'undefined') {
+            try {
+                const storedPrefs = localStorage.getItem('scoutraider_prefs');
+                if (storedPrefs) {
+                    const parsed = JSON.parse(storedPrefs);
+                    if (parsed.active_ign_layer) prefs.active_ign_layer = parsed.active_ign_layer;
+                    if (parsed.show_pois_on_map !== undefined) prefs.show_pois_on_map = parsed.show_pois_on_map;
+                    if (parsed.show_dangers_on_map !== undefined) prefs.show_dangers_on_map = parsed.show_dangers_on_map;
+                    if (parsed.show_stages_on_map !== undefined) prefs.show_stages_on_map = parsed.show_stages_on_map;
+                }
+            } catch (e) {
+                console.warn('Failed to load preferences from localStorage', e);
+            }
+        }
+
         return {
             version: CURRENT_SCHEMA_VERSION,
             active_mode: 'map',
@@ -49,10 +73,11 @@ export class StateManager {
             active_tool: 'route',
             anchor_stage_idx: -1,
             show_azimuth_arrows: false,
-            active_ign_layer: 'PLAN.IGN',
+            active_ign_layer: prefs.active_ign_layer,
             small_roads_only: false,
-            show_pois_on_map: true,
-            show_dangers_on_map: true,
+            show_pois_on_map: prefs.show_pois_on_map,
+            show_dangers_on_map: prefs.show_dangers_on_map,
+            show_stages_on_map: prefs.show_stages_on_map,
             segment_pois: {},
 
             theme_id: 'Neutre',
