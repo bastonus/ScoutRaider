@@ -4,7 +4,7 @@
 
 # 🏕️ ScoutRaider — Générateur de Carnets de Raid
 
-> **Version Beta 0.3.2-beta (Export & Hors-piste !)** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
+> **Version Beta 0.3.3-beta (Galerie de Cartes & UX !)** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
 > 
 > 👉 **[📥 TÉLÉCHARGER LA DERNIÈRE VERSION (Windows, macOS, Linux)](https://github.com/bastonus/ScoutRaider/releases/latest)**
 
@@ -12,6 +12,20 @@
 [![Electron](https://img.shields.io/badge/App-Electron-47848f?logo=electron&logoColor=white)](#)
 [![Releases](https://img.shields.io/github/v/release/bastonus/ScoutRaider)](https://github.com/bastonus/ScoutRaider/releases)
 [![Beta](https://img.shields.io/badge/Status-Beta-orange)](#avertissement-de-sécurité)
+
+---
+
+## 🚀 MISE À JOUR : Beta 0.3.3
+
+Cette version transforme radicalement l'expérience de découverte et de sélection des cartes avec une toute nouvelle galerie visuelle et des optimisations d'interface majeures.
+
+**Quoi de neuf dans cette Beta 0.3.3 :**
+- **Bibliothèque de Cartes (Galerie Mode)** : Passage d'une simple liste à une galerie visuelle premium. Naviguez parmi tous les fonds de carte (IGN, Mapy.cz, OSM) avec des aperçus en plein format.
+- **Badges Contextuels** : Identification immédiate du type de carte (SATELLITE, BLOQUÉ, FAVORI) grâce à un nouveau système de badges groupés.
+- **Activation Fluide** : Cliquez n'importe où sur une fiche pour activer la carte. Les fonds nécessitant une clé API (IGN, Mapy.cz) affichent un bouton dédié avec le logo officiel du fournisseur.
+- **Interface Itinéraire (RoutePanel) Épurée** : Suppression des en-têtes inutiles et uniformisation des hauteurs (40px) pour un alignement parfait et un gain d'espace vertical.
+- **Connecteurs de Segments Redessinés** : Le métrage et le sélecteur "Hors piste" sont maintenant plus clairs, plus contrastés et mieux intégrés au design système.
+- **Corrections & Stabilité** : Correction de la priorité des notifications (z-index) et harmonisation des barres de recherche dans toute l'application.
 
 ---
 
