@@ -1,3 +1,8 @@
+todo aussi autre chose que je voulais implémenter. Mais qui n'a pas qui n'a pas été bien implémenté, c'est quand on clique sur un tronçon. Si ce tronçon de nature Brouter donc qui suit les chemins et qu'on est avec l'outil polygone le deuxième outil le tracé h hors-piste. Et ben alors le tracé entre les par le chemin entre les deux étapes va se transformer en hors-piste. À l'inverse si on était sur le tracé pédestre p. Si on modifie si on clique entre le cours entre A et B et autres B et C sur sur le chemin tout le chemin va se transformer s'il était en tracé azimutale enfin tracer hors-piste en ligne droite, il va se transformer en chemin GPS Brouter. Et c'est donc ça qui n'a pas été bien implémenté pour l'instant. Tu dois peut-être avoir des traces de Scott mais en tout cas ça marche pas.
+
+
+ajouter dans des paramètres en haut à droite la possibilité de changer les fonds de carte ign, notement les fonds gratuits de carte.gouv.fr, d'openstreetmap. et la possibilité d'ajouter les fonds de map de mapy.com avec une clé api (ajouter un tuto avec les liens précis pour y parvenir, la procédure étant expliquée dans https://developer.mapy.com/rest-api-mapy-cz/how-to-start/). également la possibilité d'ajouter les fonds de carte de communautés de l'ign (notemment le classique scan 25/100 il faut créer un compte sur https://cartes.gouv.fr/ puis aller sur https://cartes.gouv.fr/rejoindre-des-communautes rechercher scan 25/100 et faire une demande admin)
+
 # Backend Modernization — Final Implementation Plan
 
 > Integrates: `instruction ui.md` · `new forge instructions.md` · `next-features.md` · Full frontend audit · User decisions Q1–Q4

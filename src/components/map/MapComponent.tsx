@@ -20,16 +20,7 @@ L.Marker.prototype.options.icon = DefaultIcon;
 // Global map ref accessible from sibling components
 export const mapRef: { current: L.Map | null } = { current: null };
 
-// ── Satellite layer URLs (IGN France) ────────────────────────────────────────
-export const IGN_PLAN_URL =
-    'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile' +
-    '&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png' +
-    '&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
-
-export const IGN_SAT_URL =
-    'https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile' +
-    '&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg' +
-    '&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
+import { MAP_LAYERS } from '../../logic/MapConfig';
 
 // ── Inner component: captures map instance ───────────────────────────────────
 function MapRefCapture() {
@@ -79,22 +70,49 @@ function MapTooltipManager() {
     return null;
 }
 
-function SatelliteLayer({ active }: { active: boolean }) {
-    const map = useMap();
-    useEffect(() => {
-        if (!satLayerRef.current) {
-            satLayerRef.current = L.tileLayer(IGN_SAT_URL, { attribution: '&copy; IGN', maxZoom: 19 });
-        }
-        if (!planLayerRef.current) {
-            // plan layer is already added by TileLayer JSX; just grab reference
-        }
-        if (active) {
-            if (!map.hasLayer(satLayerRef.current)) satLayerRef.current.addTo(map);
-        } else {
-            if (map.hasLayer(satLayerRef.current)) map.removeLayer(satLayerRef.current);
-        }
-    }, [active, map]);
-    return null;
+// ── Tile Layer Wrapper ───────────────────────────────────────────────────────
+function DynamicTileLayer() {
+    const { state } = useApp();
+    const layerId = state.active_ign_layer || 'PLAN.IGN';
+    const layer = MAP_LAYERS[layerId] || MAP_LAYERS['PLAN.IGN'];
+    
+    // Inject API key if needed
+    let finalUrl = layer.url;
+    if (layerId.startsWith('MAPY_')) {
+        finalUrl = finalUrl.replace('{key}', state.mapy_api_key || '');
+    } else if (layer.category === 'IGN (Privé)') {
+        finalUrl = finalUrl.replace('{key}', state.ign_api_key || '');
+    }
+
+    return (
+        <TileLayer
+            key={layerId + (state.mapy_api_key || '') + (state.ign_api_key || '')}
+            url={finalUrl}
+            maxZoom={layer.maxZoom}
+        />
+    );
+}
+
+// ── Custom Attribution ───────────────────────────────────────────────────────
+function CustomAttribution() {
+    const { state } = useApp();
+    const layerId = state.active_ign_layer || 'PLAN.IGN';
+    const layer = MAP_LAYERS[layerId] || MAP_LAYERS['PLAN.IGN'];
+
+    return (
+        <div style={{
+            position: 'absolute', bottom: '8px', left: '8px', zIndex: 1100,
+            background: 'rgba(14, 22, 17, 0.65)', backdropFilter: 'blur(10px)',
+            padding: '3px 10px', borderRadius: 'var(--radius-pill)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            fontSize: '9px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.45)',
+            pointerEvents: 'none', letterSpacing: '0.02em',
+            display: 'flex', alignItems: 'center', gap: '6px'
+        }}>
+            <span style={{ color: 'var(--accent-default)', opacity: 0.8 }}>DATA</span>
+            <span>{layer.attribution}</span>
+        </div>
+    );
 }
 
 // ── POI Layer ────────────────────────────────────────────────────────────────
@@ -154,6 +172,11 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
 
     useMapEvents({
         mousemove(e) {
+            // If we are dragging a marker, don't update cursor preview to avoid re-renders
+            if ((window as any).__markerDragging) {
+                if (setCursorPos) setCursorPos(null);
+                return;
+            }
             if ((activeTool === 'route' || activeTool === 'route_direct') && stages.length > 0) {
                 setCursorPos([e.latlng.lat, e.latlng.lng]);
             } else {
@@ -164,6 +187,10 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
             setCursorPos(null);
         },
         click(e) {
+            // Guard: if a stage marker was just dragged, ignore this click.
+            // Leaflet can fire a residual map click at the drop position after dragend.
+            if ((window as any).__markerDragging) return;
+
             const lat = e.latlng.lat;
             const lon = e.latlng.lng;
 
@@ -299,12 +326,10 @@ export default function MapComponent() {
                 zoom={13}
                 style={{ height: '100%', width: '100%', cursor: ['route', 'route_direct', 'node', 'azimut'].includes(state.active_tool) ? 'crosshair' : 'grab' }}
                 zoomControl={false}
+                attributionControl={false}
             >
-                <TileLayer
-                    attribution='&copy; <a href="https://www.ign.fr/">IGN</a>'
-                    url={IGN_PLAN_URL}
-                />
-                <SatelliteLayer active={isSatellite} />
+                <DynamicTileLayer />
+                <CustomAttribution />
                 <MapRefCapture />
                 <MapResizer />
                 <MapTooltipManager />

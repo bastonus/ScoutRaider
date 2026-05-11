@@ -404,6 +404,8 @@ export interface AppState {
     anchor_stage_idx: number; // -1 = no anchor, ≥0 = insert after this stage index
     show_azimuth_arrows: boolean;
     active_ign_layer: string;
+    mapy_api_key: string;
+    ign_api_key: string;
     small_roads_only: boolean;
     show_pois_on_map: boolean;
     show_dangers_on_map: boolean;

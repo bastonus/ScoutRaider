@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { mapRef } from './MapComponent';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
+import { MAP_LAYERS } from '../../logic/MapConfig';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface SearchResult {
@@ -55,20 +56,43 @@ interface FloatingSearchProps {
 }
 
 export default function FloatingSearch({ isSplitMode = false }: FloatingSearchProps) {
-    const { state } = useApp();
+    const { state, dispatch } = useApp();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [showResults, setShowResults] = useState(false);
     const [isSatellite, setIsSatellite] = useState(false);
     const [geoState, setGeoState] = useState<GeoState>('idle');
+
+    useEffect(() => {
+        const layer = MAP_LAYERS[state.active_ign_layer || 'PLAN.IGN'];
+        const isSat = layer?.isSatellite || false;
+        setIsSatellite(isSat);
+        
+        // Save current layer as last used for its type
+        if (isSat) {
+            localStorage.setItem('lastSatLayerId', state.active_ign_layer);
+        } else {
+            localStorage.setItem('lastPlanLayerId', state.active_ign_layer);
+        }
+    }, [state.active_ign_layer]);
+
     const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
     const containerRef = useRef<HTMLDivElement>(null);
 
     // ── Satellite toggle ────────────────────────────────────────────────────────
     const handleSatellite = () => {
-        const toggler = (window as any).__mapToggleSatellite;
-        if (toggler) toggler();
-        setIsSatellite(p => !p);
+        const layer = MAP_LAYERS[state.active_ign_layer || 'PLAN.IGN'];
+        const isSat = layer?.isSatellite || false;
+        
+        if (isSat) {
+            // Switch to last plan
+            const lastPlan = localStorage.getItem('lastPlanLayerId') || 'PLAN.IGN';
+            dispatch({ type: 'SET_IGN_LAYER', layer: lastPlan });
+        } else {
+            // Switch to last sat
+            const lastSat = localStorage.getItem('lastSatLayerId') || 'SAT.IGN';
+            dispatch({ type: 'SET_IGN_LAYER', layer: lastSat });
+        }
     };
 
     // ── Geolocation ─────────────────────────────────────────────────────────────

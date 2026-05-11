@@ -3,6 +3,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import DifficultyLibrary from '../panels/DifficultyLibrary';
 import ThemePanel from '../panels/ThemePanel';
 import LibraryPanel from '../panels/LibraryPanel';
+import MapLibraryPanel from '../panels/MapLibraryPanel';
 
 interface AccordionSectionProps {
   title: string;
@@ -47,15 +48,16 @@ function AccordionSection({ title, isOpen, onToggle, children }: AccordionSectio
   );
 }
 
-export type SectionId = 'orchestration' | 'themes' | 'modules' | 'export';
+export type SectionId = 'orchestration' | 'themes' | 'modules' | 'maps' | 'export';
 
 interface RightSidebarProps {
   activeSection: SectionId;
   onSectionChange: (id: SectionId) => void;
+  onPreferencesOpen?: () => void;
   width: number;
 }
 
-export default function RightSidebar({ activeSection, onSectionChange, width }: RightSidebarProps) {
+export default function RightSidebar({ activeSection, onSectionChange, onPreferencesOpen, width }: RightSidebarProps) {
   const toggle = (id: SectionId) => {
     onSectionChange(id);
   };
@@ -99,6 +101,17 @@ export default function RightSidebar({ activeSection, onSectionChange, width }: 
         onToggle={() => toggle('modules')}
       >
         <LibraryPanel />
+      </AccordionSection>
+
+      <AccordionSection 
+        title="Bibliothèque de Cartes" 
+        isOpen={activeSection === 'maps'} 
+        onToggle={() => toggle('maps')}
+      >
+        <MapLibraryPanel 
+          onSetRightSection={onSectionChange} 
+          onPreferencesOpen={onPreferencesOpen}
+        />
       </AccordionSection>
       
     </div>

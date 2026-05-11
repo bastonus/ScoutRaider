@@ -20,6 +20,8 @@ export class StateManager {
         // Default preferences
         let prefs = {
             active_ign_layer: 'PLAN.IGN',
+            mapy_api_key: '',
+            ign_api_key: '',
             show_pois_on_map: true,
             show_dangers_on_map: true,
             show_stages_on_map: true,
@@ -32,6 +34,8 @@ export class StateManager {
                 if (storedPrefs) {
                     const parsed = JSON.parse(storedPrefs);
                     if (parsed.active_ign_layer) prefs.active_ign_layer = parsed.active_ign_layer;
+                    if (parsed.mapy_api_key) prefs.mapy_api_key = parsed.mapy_api_key;
+                    if (parsed.ign_api_key) prefs.ign_api_key = parsed.ign_api_key;
                     if (parsed.show_pois_on_map !== undefined) prefs.show_pois_on_map = parsed.show_pois_on_map;
                     if (parsed.show_dangers_on_map !== undefined) prefs.show_dangers_on_map = parsed.show_dangers_on_map;
                     if (parsed.show_stages_on_map !== undefined) prefs.show_stages_on_map = parsed.show_stages_on_map;
@@ -74,6 +78,8 @@ export class StateManager {
             anchor_stage_idx: -1,
             show_azimuth_arrows: false,
             active_ign_layer: prefs.active_ign_layer,
+            mapy_api_key: prefs.mapy_api_key,
+            ign_api_key: prefs.ign_api_key,
             small_roads_only: false,
             show_pois_on_map: prefs.show_pois_on_map,
             show_dangers_on_map: prefs.show_dangers_on_map,
@@ -109,6 +115,8 @@ export class StateManager {
         delete persistable.is_loading;
         delete persistable.loading_text;
         delete persistable.notifications;
+        delete persistable.mapy_api_key;
+        delete persistable.ign_api_key;
 
         const envelope = {
             _scoutproj: true,
@@ -118,6 +126,22 @@ export class StateManager {
         };
 
         return JSON.stringify(envelope, null, 2);
+    }
+
+    /**
+     * Save only global preferences to localStorage.
+     */
+    static savePreferences(state: AppState) {
+        if (typeof window === 'undefined') return;
+        const prefs = {
+            active_ign_layer: state.active_ign_layer,
+            mapy_api_key: state.mapy_api_key,
+            ign_api_key: state.ign_api_key,
+            show_pois_on_map: state.show_pois_on_map,
+            show_dangers_on_map: state.show_dangers_on_map,
+            show_stages_on_map: state.show_stages_on_map,
+        };
+        localStorage.setItem('scoutraider_prefs', JSON.stringify(prefs));
     }
 
     /**

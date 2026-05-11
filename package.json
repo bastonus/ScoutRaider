@@ -1,7 +1,7 @@
 {
   "name": "scoutraider",
   "private": true,
-  "version": "0.3.2-beta",
+  "version": "0.3.3-beta",
   "description": "Application de planification et génération de carnets de raid scout.",
   "author": "Pierre-Albéric Théobald",
   "type": "module",

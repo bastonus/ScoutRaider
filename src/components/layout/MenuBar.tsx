@@ -15,7 +15,7 @@ import {
 import FleurDeLysLogo from './FleurDeLysLogo';
 import { useApp } from '../../AppContext';
 import { StateManager } from '../../logic/StateManager';
-import type { ViewMode } from '../../App';
+import type { ViewMode, SectionId } from '../../App';
 
 interface MenuBarProps {
     onSearch?: (query: string) => void;
@@ -23,9 +23,11 @@ interface MenuBarProps {
     viewMode?: ViewMode;
     onViewModeChange?: (mode: ViewMode) => void;
     onExport?: () => void;
+    onPreferencesOpen?: () => void;
+    onSetRightSection?: (id: SectionId) => void;
 }
 
-export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeChange, onExport }: MenuBarProps) {
+export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeChange, onExport, onPreferencesOpen, onSetRightSection }: MenuBarProps) {
     const { state, dispatch } = useApp();
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     const [showNotifHistory, setShowNotifHistory] = useState(false);
@@ -184,11 +186,19 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             { label: 'Rétablir', shortcut: 'Ctrl+Y', action: () => dispatch({ type: 'REDO' }) },
         ],
         'Aide': [
-            { label: 'Vérifier les mises à jour...', action: () => {
+            { label: 'Vérifier les mises à jour...', action: async () => {
                 if ((window as any).electronAPI) {
                     isManualCheck.current = true;
-                    setUpdateModal({ show: false, checking: true } as any);
-                    (window as any).electronAPI.checkForUpdates();
+                    dispatch({ type: 'ADD_NOTIFICATION', message: 'Recherche de mises à jour...', notifType: 'info' });
+                    try {
+                        const result = await (window as any).electronAPI.checkForUpdates();
+                        if (result && result.error) {
+                            // Error is already handled by the onUpdateError listener, 
+                            // but we can add extra logic here if needed.
+                        }
+                    } catch (e) {
+                        console.error("Check for updates failed", e);
+                    }
                 } else {
                     dispatch({ type: 'ADD_NOTIFICATION', message: 'Indisponible dans le navigateur.', notifType: 'warning' });
                 }
@@ -208,8 +218,14 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                 window.open('https://github.com/bastonus/ScoutRaider/issues/new', '_blank');
             }},
             { divider: true },
-            { label: 'À propos', action: () => {
-                dispatch({ type: 'ADD_NOTIFICATION', message: 'ScoutRaider Suite v0.3.2-beta', notifType: 'info' });
+            { label: 'À propos', action: async () => {
+                let version = 'v0.3.2-beta';
+                if ((window as any).electronAPI) {
+                    try {
+                        version = `v${await (window as any).electronAPI.getAppVersion()}`;
+                    } catch {}
+                }
+                dispatch({ type: 'ADD_NOTIFICATION', message: `ScoutRaider Suite ${version}`, notifType: 'info' });
             }},
         ]
     };
@@ -371,6 +387,14 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px', position: 'relative' }}>
                     <button 
                         className="btn-icon btn-sm" 
+                        title="Préférences (Ctrl+P)"
+                        onClick={onPreferencesOpen}
+                    >
+                        <Settings size={17} strokeWidth={2.2} />
+                    </button>
+
+                    <button 
+                        className="btn-icon btn-sm" 
                         title="Historique des notifications"
                         onClick={() => {
                             setShowNotifHistory(!showNotifHistory);
@@ -485,6 +509,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     </div>
                 </div>
             )}
+            {/* UPDATE MODAL OVERLAY REMOVED FOR BREVITY IF NOT CHANGED */}
         </header>
     );
 }

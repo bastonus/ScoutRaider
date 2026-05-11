@@ -38,7 +38,7 @@ export default function NotificationOverlay() {
       top: '56px', // below menubar
       left: '50%',
       transform: 'translateX(-50%)',
-      zIndex: 1100,
+      zIndex: 10000000,
       display: 'flex',
       flexDirection: 'column',
       gap: '12px',

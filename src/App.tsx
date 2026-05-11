@@ -6,11 +6,12 @@ import RightSidebar from './components/layout/RightSidebar';
 import NotificationOverlay from './components/map/NotificationOverlay';
 import TextualHeader from './components/textual/TextualHeader';
 import ExportModal from './components/panels/ExportModal';
+import PreferencesModal from './components/panels/PreferencesModal';
 import { List, Library, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export type ViewMode = 'map' | 'text' | 'split';
 
-export type SectionId = 'orchestration' | 'themes' | 'modules' | 'export';
+export type SectionId = 'orchestration' | 'themes' | 'modules' | 'maps' | 'export';
 
 function App() {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
@@ -18,6 +19,7 @@ function App() {
   const [activeRightSection, setActiveRightSection] = useState<SectionId>('orchestration');
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
 
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
@@ -88,6 +90,18 @@ function App() {
     return () => window.removeEventListener('keydown', h);
   }, []);
 
+  // Global Ctrl+P
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setPreferencesModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+
   const panelToggleStyle: React.CSSProperties = {
     position: 'absolute', top: '16px', zIndex: 900,
     height: '38px', padding: '0 10px',
@@ -112,7 +126,14 @@ function App() {
       overflow: 'hidden',
       background: 'var(--bg-base)'
     }}>
-      <MenuBar onToggleSidebar={toggleSidebar} viewMode={viewMode} onViewModeChange={setViewMode} onExport={handleExportRequest} />
+      <MenuBar 
+        onToggleSidebar={toggleSidebar} 
+        viewMode={viewMode} 
+        onViewModeChange={setViewMode} 
+        onExport={handleExportRequest} 
+        onPreferencesOpen={() => setPreferencesModalOpen(true)}
+        onSetRightSection={setActiveRightSection}
+      />
       
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
         
@@ -211,7 +232,7 @@ function App() {
               onMouseDown={(e) => { e.preventDefault(); rightResizing.current = true; document.body.style.cursor = 'col-resize'; }}
               style={{ width: '4px', cursor: 'col-resize', background: 'var(--bg-border)', zIndex: 10, marginLeft: '-2px', marginRight: '-2px' }}
             />
-            <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} width={rightWidth} />
+            <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} width={rightWidth} />
           </>
         )}
 
@@ -232,6 +253,9 @@ function App() {
 
       {/* Export Modal */}
       {exportModalOpen && <ExportModal onClose={() => setExportModalOpen(false)} />}
+
+      {/* Preferences Modal */}
+      {preferencesModalOpen && <PreferencesModal onClose={() => setPreferencesModalOpen(false)} />}
     </div>
   );
 }

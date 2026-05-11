@@ -5,7 +5,19 @@ Tous les changements notables apportés à ce projet seront documentés dans ce 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.3-beta] - 2026-05-11
+### Ajouté
+- **Bibliothèque de Cartes (Galerie)** : Refonte complète de la sélection de fonds de carte. Passage d'une simple liste à une galerie visuelle avec aperçus, badges contextuels (Satellite, Bloqué, Favori) et logos de services.
+- **Support des logos dynamiques** : Les boutons de déblocage intègrent désormais les logos officiels (IGN, Mapy.cz) directement dans le texte pour une expérience plus premium.
+
+### Modifié
+- **Interface Itinéraire (RoutePanel)** : Suppression de l'en-tête redondant et uniformisation des hauteurs de lignes (40px) pour un alignement parfait avec le champ de recherche.
+- **Sélecteur "Hors piste"** : Nouveau design plus compact et contrasté pour basculer entre le routage automatique et la ligne droite entre deux étapes.
+- **Design Système** : Harmonisation des barres de recherche et des couleurs de fond entre les panneaux gauche et droit.
+
+### Corrigé
+- **Priorité des Notifications** : Ajustement du z-index pour s'assurer que les notifications s'affichent toujours au-dessus des fenêtres modales (Préférences, Export).
+- **Stabilité visuelle** : Correction des problèmes d'écrasement des fiches dans la galerie de cartes.
 
 ## [0.3.2-beta] - 2026-05-10
 ### Ajouté

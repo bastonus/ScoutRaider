@@ -83,6 +83,7 @@ export type AppAction =
     | { type: 'SET_PRESET'; presetId: string }
     | { type: 'SET_SMALL_ROADS'; enabled: boolean }
     | { type: 'SET_IGN_LAYER'; layer: string }
+    | { type: 'SET_MAP_API_KEYS'; mapyKey?: string; ignKey?: string }
 
     // Persistence
     | { type: 'UNDO' }
@@ -678,49 +679,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
         // ── POI persistence ────────────────────────────────────────────────
         case 'SET_SEGMENT_POIS': {
-            // action.segment_pois: Record<number, POIResult[]>
-            // Update each carnet_step.pois from the per-segment POI map
-            const segPois = action.segment_pois as Record<number, import('./logic/types').POIResult[]>;
-
-            // 1. Update polygonal_steps with poi field (nearest = first in list)
-            const newPolySteps = state.polygonal_steps.map((seg, idx) => {
-                const candidates = segPois[idx];
-                if (!candidates) return seg;
-                const nearest = candidates[0] || null;
-                return {
-                    ...seg,
-                    poi: nearest ? { name: nearest.name, type: 'landmark', distance_m: 0 } : null
-                };
-            });
-
-            // 2. Update carnet_steps.pois from their segment indices
-            const newCarnetStepsPoi = state.carnet_steps.map(step => {
-                if (step.isManual || !step.segmentIndices) return step;
-                // Collect all POI candidates from all segments in this step
-                const allCandidates: import('./logic/types').POIResult[] = [];
-                const seenNames = new Set<string>();
-                for (const segIdx of step.segmentIndices) {
-                    const cands = segPois[segIdx] || [];
-                    for (const c of cands) {
-                        if (!seenNames.has(c.name)) {
-                            seenNames.add(c.name);
-                            allCandidates.push(c);
-                        }
-                    }
-                }
-                if (allCandidates.length === 0) return step;
-                // Do not pre-select any POI at the step level. This allows each segment to use its own POI by default.
-                const pois = allCandidates.map((p) => ({ ...p, selected: false }));
-                // Regenerate text with the new selected POI
-                const withPois = { ...step, pois };
-                return regenerateStepTexts(withPois, { ...state, polygonal_steps: newPolySteps });
-            });
-
-            // 3. Also persist segment_pois in state for future rebuilds.
-            // We completely REPLACE it, rather than merging, so that old segments (if the route shrank) are removed.
-            const newSegmentPois = segPois as Record<string, import('./logic/types').POIResult[]>;
-
-            return { ...state, polygonal_steps: newPolySteps, carnet_steps: newCarnetStepsPoi, segment_pois: newSegmentPois };
+            const newSegmentPois = action.segment_pois as Record<string, import('./logic/types').POIResult[]>;
+            return autoRebuildCarnet({ ...state, segment_pois: newSegmentPois });
         }
 
         // ── Configuration ──────────────────────────────────────────────────
@@ -744,8 +704,21 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'SET_SMALL_ROADS':
             return { ...state, small_roads_only: action.enabled };
 
-        case 'SET_IGN_LAYER':
-            return { ...state, active_ign_layer: action.layer };
+        case 'SET_IGN_LAYER': {
+            const next = { ...state, active_ign_layer: action.layer };
+            StateManager.savePreferences(next);
+            return next;
+        }
+
+        case 'SET_MAP_API_KEYS': {
+            const next = { 
+                ...state, 
+                mapy_api_key: action.mapyKey !== undefined ? action.mapyKey : state.mapy_api_key,
+                ign_api_key: action.ignKey !== undefined ? action.ignKey : state.ign_api_key
+            };
+            StateManager.savePreferences(next);
+            return next;
+        }
 
         // ── Persistence (Undo / Redo / Load) ───────────────────────────────
         case 'UNDO': {
@@ -847,10 +820,15 @@ function autoRebuildCarnet(state: AppState): AppState {
     const assignments = orchestrator.calculateAssignments();
     const plan = orchestrator.generateExportPlan();
 
-    const updatedPolySteps = state.polygonal_steps.map((seg, idx) => ({
-        ...seg,
-        assigned_module: assignments[idx.toString()] || 'texte_clair'
-    }));
+    const updatedPolySteps = state.polygonal_steps.map((seg, idx) => {
+        const segPois = state.segment_pois?.[idx.toString()] || [];
+        const selected = segPois.find(p => p.selected) || segPois[0] || null;
+        return {
+            ...seg,
+            assigned_module: assignments[idx.toString()] || 'texte_clair',
+            poi: selected ? { name: selected.name, type: 'landmark', distance_m: 0 } : seg.poi
+        };
+    });
 
     const newComputedSteps = CarnetEngine.generateStepsFromPlan(
         plan,
@@ -1163,6 +1141,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
                 } else if (type === 'azimut_leg') {
                     const legKey = result.legKey ?? jobId;
+                    latestAziKeyRef.current = legKey;
                     const segs: import('./logic/types').PolySegment[] = result.segments ?? result;
                     console.log(`[Pipeline ②] Azimut done  legKey=${legKey}  →  ${segs?.length ?? 0} segments`);
                     console.timeEnd(`[Pipeline] ② Azimuts (pending after this)`);
@@ -1170,14 +1149,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
                     if (segs && segs.length > 0) {
                         dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Recherche de points d\'intérêt...' });
-                        // ③ POI — per-leg dedup key so we never double-fetch the same leg
+                        // ③ POI — Clear any stale pending searches first
+                        backgroundEngine.clearByType('poi_search');
+                        backgroundEngine.clearByType('carnet_update');
                         backgroundEngine.enqueue('poi_search', 2, `job-poi-${legKey}`, {
                             segments: segs,
                             oldSegments: stateRef.current.polygonal_steps,
                             oldPois: stateRef.current.segment_pois,
                             radiusM: 250,
                             legKey,
-                        }, `poi-${legKey}`);
+                        }, 'poi-global'); // Stable dedup key
                     } else {
                         // No azimut segments → jump straight to carnet
                         dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Mise à jour du carnet...' });
@@ -1186,6 +1167,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
                 } else if (type === 'poi_search') {
                     const legKey = result.legKey ?? jobId;
+                    if (legKey !== latestAziKeyRef.current) {
+                        console.log(`[Pipeline ③] Skipping stale POI result legKey=${legKey} (current=${latestAziKeyRef.current})`);
+                        return;
+                    }
                     const nPois = result?.segmentPois ? Object.keys(result.segmentPois).length : 0;
                     console.log(`[Pipeline ③] POI done  legKey=${legKey}  →  ${nPois} segment(s) enriched`);
 
@@ -1305,6 +1290,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // ── Keyboard shortcuts ─────────────────────────────────────────────
     const stateRef = useRef(state);
+    const latestAziKeyRef = useRef<string | null>(null);
     stateRef.current = state;
 
     useEffect(() => {
@@ -1362,10 +1348,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const prefs = {
-                active_ign_layer: state.active_ign_layer,
                 show_pois_on_map: state.show_pois_on_map,
                 show_dangers_on_map: state.show_dangers_on_map,
                 show_stages_on_map: state.show_stages_on_map,
+                mapy_api_key: state.mapy_api_key,
+                ign_api_key: state.ign_api_key,
             };
             try {
                 localStorage.setItem('scoutraider_prefs', JSON.stringify(prefs));

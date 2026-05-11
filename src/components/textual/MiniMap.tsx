@@ -7,6 +7,7 @@ import { MapContainer, TileLayer, Polyline, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
 import { MODULE_META } from '../../logic/ModuleRegistry';
+import { MAP_LAYERS } from '../../logic/MapConfig';
 
 interface MiniMapProps {
     stepId: string;
@@ -35,6 +36,28 @@ function MapPersister({ stepId }: { stepId: string }) {
     return null;
 }
 
+function MiniDynamicTileLayer() {
+    const { state } = useApp();
+    const layerId = state.active_ign_layer || 'PLAN.IGN';
+    const layer = MAP_LAYERS[layerId] || MAP_LAYERS['PLAN.IGN'];
+    
+    // Inject API key if needed
+    let finalUrl = layer.url;
+    if (layerId.startsWith('MAPY_')) {
+        finalUrl = finalUrl.replace('{key}', state.mapy_api_key || '');
+    } else if (layer.category === 'IGN (Privé)') {
+        finalUrl = finalUrl.replace('{key}', state.ign_api_key || '');
+    }
+
+    return (
+        <TileLayer
+            key={layerId + (state.mapy_api_key || '') + (state.ign_api_key || '')}
+            url={finalUrl}
+            maxZoom={layer.maxZoom}
+        />
+    );
+}
+
 export default function MiniMap({ stepId, moduleId, coords, initialPersist }: MiniMapProps) {
     if (coords.length < 2) return null;
 
@@ -55,7 +78,7 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
                 style={{ height: '100%', width: '100%' }}
                 scrollWheelZoom={true}
             >
-                <TileLayer url="https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}" />
+                <MiniDynamicTileLayer />
                 <Polyline positions={latLngs} pathOptions={{ color, weight: 4, opacity: 0.9 }} />
                 <MapPersister stepId={stepId} />
             </MapContainer>

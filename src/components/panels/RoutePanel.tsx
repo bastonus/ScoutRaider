@@ -87,7 +87,9 @@ function StageRow({ stage, idx, total, isDragged, onDragStart, onDragOver, onDro
     const [results, setResults] = useState<SearchResult[]>([]);
     const [showResults, setShowResults] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
+    const [isDraggingRow, setIsDraggingRow] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const rowRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => { if (!isFocused) setQuery(stage.address || `${stage.coords[0].toFixed(5)}, ${stage.coords[1].toFixed(5)}`); }, [stage.address, stage.coords, isFocused]);
     useEffect(() => {
@@ -136,18 +138,51 @@ function StageRow({ stage, idx, total, isDragged, onDragStart, onDragOver, onDro
     const isFirst = idx === 0, isLast = idx === total - 1;
     const dotColor = isFirst ? 'var(--semantic-green)' : isLast ? 'var(--semantic-red)' : 'var(--accent-default)';
 
+    // ── Drag handlers: only initiate drag from the grip handle ──
+    const handleGripMouseDown = () => {
+        // Make the row draggable when the user presses the grip
+        if (rowRef.current) rowRef.current.setAttribute('draggable', 'true');
+    };
+    const handleRowDragStart = (e: React.DragEvent) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(idx));
+        setIsDraggingRow(true);
+        onDragStart(e);
+    };
+    const handleRowDragEnd = (e: React.DragEvent) => {
+        // Remove draggable so clicking/focusing the row normally doesn't accidentally drag
+        if (rowRef.current) rowRef.current.setAttribute('draggable', 'false');
+        setIsDraggingRow(false);
+        onDragEnd(e);
+    };
+
     return (
         <div ref={wrapperRef} style={{ position: 'relative' }}>
-            <div draggable onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd}
+            <div
+                ref={rowRef}
+                draggable={false}
+                onDragStart={handleRowDragStart}
+                onDragOver={(e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver(e); }}
+                onDrop={onDrop}
+                onDragEnd={handleRowDragEnd}
                 style={{
-                    display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px 7px 8px',
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '0 10px 0 8px',
+                    minHeight: '40px',
                     background: isFocused ? 'var(--bg-dark)' : 'var(--bg-surface)',
                     border: `1px solid ${isFocused ? 'var(--accent-default)' : 'var(--glass-border)'}`,
                     borderRadius: '12px', transition: 'background 0.2s, border-color 0.2s, box-shadow 0.2s',
-                    boxShadow: isFocused ? '0 0 0 3px var(--accent-transparent)' : 'none',
-                    opacity: isDragged ? 0.35 : 1, cursor: 'grab',
+                    boxShadow: isFocused ? '0 0 0 3px var(--accent-transparent)' : isDraggingRow ? '0 0 0 2px var(--accent-default)' : 'none',
+                    opacity: isDragged ? 0.35 : 1,
                 }}>
-                <GripVertical size={13} style={{ color: 'var(--text-dim)', opacity: 0.35, flexShrink: 0 }} />
+                {/* Grip handle — this is the only drag initiator */}
+                <div
+                    onMouseDown={handleGripMouseDown}
+                    onMouseUp={() => { if (rowRef.current) rowRef.current.setAttribute('draggable', 'false'); }}
+                    title="Glisser pour réordonner"
+                    style={{ cursor: 'grab', padding: '2px', marginLeft: '-2px', flexShrink: 0, display: 'flex', alignItems: 'center' }}
+                >
+                    <GripVertical size={13} style={{ color: 'var(--text-dim)', opacity: isDraggingRow ? 0.9 : 0.45, transition: 'opacity 0.15s' }} />
+                </div>
                 <div style={{
                     width: '24px', height: '24px', borderRadius: '8px',
                     background: isFocused ? dotColor : 'var(--bg-dark)', border: `2px solid ${dotColor}`,
@@ -155,12 +190,19 @@ function StageRow({ stage, idx, total, isDragged, onDragStart, onDragOver, onDro
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     transition: 'background 0.2s, color 0.2s',
                 }}>{stage.label}</div>
-                <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+                {/* Input: draggable=false prevents native text-drag from hijacking row drag */}
+                <input
+                    type="text"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
                     onFocus={() => { setIsFocused(true); if (results.length > 0) setShowResults(true); }}
                     onBlur={() => setTimeout(() => setIsFocused(false), 150)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCommit(); } }}
+                    onDragStart={e => e.preventDefault()}
+                    draggable={false}
                     placeholder="Adresse, lieu ou lat, lon…"
-                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '12px', fontFamily: 'var(--font-ui)', minWidth: 0 }} />
+                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '12px', fontFamily: 'var(--font-ui)', minWidth: 0 }}
+                />
                 <button type="button" onClick={handleDelete} title="Supprimer"
                     style={{ width: '22px', height: '22px', borderRadius: '6px', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.15s', flexShrink: 0 }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(217,95,95,0.15)'; (e.currentTarget as HTMLElement).style.color = 'var(--semantic-red)'; }}
@@ -234,7 +276,8 @@ function AddStageRow() {
         <div ref={wrapperRef} style={{ position: 'relative' }}>
             <div onClick={() => { if (state.active_tool !== 'route') dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' }); }}
                 style={{
-                    display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px 7px 10px',
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '0 10px',
+                    minHeight: '40px',
                     background: isFocused ? 'var(--bg-dark)' : 'rgba(92,189,110,0.04)',
                     border: `1.5px dashed ${isFocused ? 'var(--accent-default)' : 'rgba(92,189,110,0.25)'}`,
                     borderRadius: '12px', cursor: 'text', transition: '0.2s',
@@ -262,51 +305,80 @@ function DropZone({ insertAfterIdx, dist, isDirect, onDrop, onToggleDirect }: { 
             onDragLeave={() => setOver(false)}
             onDrop={e => { e.preventDefault(); setOver(false); onDrop(insertAfterIdx); }}
             style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                marginLeft: '8px', paddingLeft: '2px',
-                height: over ? '28px' : '20px',
-                transition: 'height 0.15s, background 0.15s',
-                borderRadius: '8px',
+                display: 'flex', alignItems: 'center',
+                paddingLeft: '11px',
+                height: over ? '40px' : '32px',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                borderRadius: '12px',
                 background: over ? 'var(--accent-transparent)' : 'transparent',
-                border: over ? '1px dashed var(--accent-default)' : '1px solid transparent',
+                border: over ? '1px dashed var(--accent-default)' : 'none',
                 cursor: 'default',
+                margin: '2px 0'
             }}
         >
+            {/* Vertical Line Connector */}
             <div style={{
-                width: '2px', alignSelf: 'stretch',
-                marginLeft: '13px',
-                background: over ? 'var(--accent-default)' : 'var(--bg-border)',
-                transition: 'background 0.15s',
+                width: '2px', height: '100%',
+                marginLeft: '10px',
+                background: over ? 'var(--accent-default)' : 'rgba(255,255,255,0.06)',
+                borderRadius: '1px',
+                transition: 'background 0.2s',
             }} />
+
+            {/* Info Badges */}
             {dist && !over && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                        fontSize: '10px', color: 'var(--text-dim)', fontWeight: 600,
-                        background: 'var(--bg-dark)', border: '1px solid var(--bg-border)',
-                        borderRadius: '6px', padding: '2px 7px',
-                    }}>{dist}</span>
+                <div style={{ 
+                    display: 'flex', alignItems: 'center', gap: '6px', 
+                    marginLeft: '12px',
+                    animation: 'fadeInScale 0.2s ease-out'
+                }}>
+                    {/* Distance Badge */}
+                    <div style={{
+                        fontSize: '9px', color: 'rgba(255,255,255,0.7)', fontWeight: 800,
+                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '6px', padding: '3px 8px', letterSpacing: '0.02em'
+                    }}>{dist}</div>
+
+                    {/* Profile Toggle Badge */}
                     {onToggleDirect && (
-                        <label style={{
-                            display: 'flex', alignItems: 'center', gap: '4px',
-                            cursor: 'pointer', fontSize: '10px', color: 'var(--text-dim)',
-                            opacity: 0.6, transition: 'opacity 0.15s'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                        onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                        <div 
+                            onClick={(e) => { e.stopPropagation(); onToggleDirect(); }}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                cursor: 'pointer', padding: '3px 8px', borderRadius: '6px',
+                                background: isDirect ? 'rgba(201, 149, 74, 0.15)' : 'rgba(255,255,255,0.04)',
+                                border: '1px solid',
+                                borderColor: isDirect ? 'rgba(201, 149, 74, 0.3)' : 'rgba(255,255,255,0.08)',
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.borderColor = isDirect ? 'rgba(201, 149, 74, 0.5)' : 'rgba(255,255,255,0.2)';
+                                e.currentTarget.style.background = isDirect ? 'rgba(201, 149, 74, 0.25)' : 'rgba(255,255,255,0.08)';
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.borderColor = isDirect ? 'rgba(201, 149, 74, 0.3)' : 'rgba(255,255,255,0.08)';
+                                e.currentTarget.style.background = isDirect ? 'rgba(201, 149, 74, 0.15)' : 'rgba(255,255,255,0.04)';
+                            }}
                         >
-                            <input 
-                                type="checkbox" 
-                                checked={isDirect || false} 
-                                onChange={onToggleDirect}
-                                style={{ width: '10px', height: '10px', cursor: 'pointer', accentColor: 'var(--accent-default)' }}
-                            />
-                            Hors piste
-                        </label>
+                            <div style={{
+                                width: '6px', height: '6px', borderRadius: '50%',
+                                background: isDirect ? '#c9954a' : 'rgba(255,255,255,0.2)',
+                                transition: 'background 0.2s'
+                            }} />
+                            <span style={{ 
+                                fontSize: '9px', fontWeight: 700, 
+                                color: isDirect ? '#c9954a' : 'rgba(255,255,255,0.4)',
+                                textTransform: 'uppercase', letterSpacing: '0.03em'
+                            }}>
+                                Hors piste
+                            </span>
+                        </div>
                     )}
                 </div>
             )}
+
             {over && (
-                <span style={{ fontSize: '10px', color: 'var(--accent-default)', fontWeight: 600 }}>
+                <span style={{ fontSize: '10px', color: 'var(--accent-default)', fontWeight: 800, marginLeft: '12px' }}>
                     Déposer ici
                 </span>
             )}
@@ -422,35 +494,25 @@ export default function RoutePanel() {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-            {/* Header */}
-            <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 12px 10px 14px', borderBottom: '1px solid var(--bg-border)', flexShrink: 0,
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <MapPin size={13} style={{ color: 'var(--accent-default)', opacity: 0.9 }} />
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em', userSelect: 'none' }}>
-                        Itinéraire
-                    </span>
-                    {stages.length > 0 && (
-                        <span style={{ fontSize: '10px', fontWeight: 700, background: 'var(--accent-transparent)', color: 'var(--accent-default)', border: '1px solid rgba(92,189,110,0.2)', borderRadius: '6px', padding: '1px 6px' }}>
-                            {stages.length}
-                        </span>
-                    )}
-                </div>
-                <div style={{ display: 'flex', gap: '2px' }}>
-                    <button type="button" title="Plus d'options"
-                        style={{ width: '26px', height: '26px', borderRadius: '8px', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.15s' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-surface)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'; }}>
-                        <MoreHorizontal size={13} />
-                    </button>
-                </div>
-            </div>
-
+        <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            height: '100%', 
+            overflow: 'hidden',
+            background: 'var(--bg-panel)',
+            borderRight: '1px solid var(--bg-border)'
+        }}>
             {/* Steps */}
-            <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 10px', scrollBehavior: 'smooth' }}>
+            <div ref={scrollRef} style={{ 
+                flex: 1, 
+                overflowY: 'auto', 
+                padding: '16px', 
+                scrollBehavior: 'smooth',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                background: 'rgba(0,0,0,0.15)'
+            }}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                     {stages.map((stage, idx) => (
                         <React.Fragment key={stage.id}>

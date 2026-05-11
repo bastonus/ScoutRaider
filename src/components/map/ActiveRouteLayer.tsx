@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Polyline, Marker, Popup, useMap, useMapEvents, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
@@ -48,6 +48,47 @@ const nodeIcon = L.divIcon({
     html: '<div style="width:10px;height:10px;background:#fff;border:2px solid #555;border-radius:1px;cursor:pointer;box-sizing:border-box;box-shadow:0 1px 2px rgba(0,0,0,0.5)"></div>',
     iconSize: [10, 10], 
     iconAnchor: [5, 5]
+});
+
+// ── Isolated Azimut Handle to ensure imperative drag persists ──
+const AzimutHandle = React.memo(({ idx, position, azimut, onDrag, onDragEnd }: { 
+    idx: number, position: [number, number], azimut: number, 
+    onDrag: (e: any, idx: number) => void, onDragEnd: (e: any, idx: number) => void 
+}) => {
+    const markerRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (markerRef.current) {
+            const leafletEl = markerRef.current._leaflet_id ? markerRef.current : markerRef.current._marker || markerRef.current;
+            if (leafletEl?.dragging) leafletEl.dragging.enable();
+        }
+    }, []);
+
+    return (
+        <Marker 
+            ref={markerRef}
+            position={position}
+            draggable={true}
+            zIndexOffset={2000}
+            icon={L.divIcon({
+                className: 'azi-handle',
+                html: '<div style="width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #2d8ceb;cursor:move;box-shadow:0 1px 6px rgba(0,0,0,0.5);pointer-events:all;"></div>',
+                iconSize: [18, 18], iconAnchor: [9, 9]
+            })}
+            eventHandlers={{
+                dragstart: (e) => {
+                    const handle = e.target;
+                    if (handle.dragging) handle.dragging.enable();
+                    handle.bindTooltip(`<span style="font-weight:bold;color:#2d8ceb">${azimut || 0}°</span>`, { permanent: true, direction: 'top', offset: [0, -12] }).openTooltip();
+                },
+                drag: (e) => onDrag(e, idx),
+                dragend: (e) => {
+                    onDragEnd(e, idx);
+                    e.target.unbindTooltip();
+                }
+            }}
+        />
+    );
 });
 
 export default function ActiveRouteLayer() {
@@ -423,6 +464,18 @@ export default function ActiveRouteLayer() {
                                             dispatch({ type: 'SET_POLYGONAL_SETTINGS', settings: { forced_nodes: Array.from(new Set(newForced)) } as any });
                                             dispatch({ type: 'ADD_NOTIFICATION', message: 'Nœud ajouté.', notifType: 'info' });
                                         }
+                                    } else if (activeTool === 'route' || activeTool === 'route_direct') {
+                                        // Use the leg_key to find which route leg to toggle
+                                        const leg_key = (seg as any).leg_key;
+                                        const legIdx = state.routes.findIndex(r => r && r.id === leg_key);
+                                        if (legIdx !== -1) {
+                                            const route = state.routes[legIdx];
+                                            if (activeTool === 'route_direct' && route.profile !== 'direct') {
+                                                recalculateRouteLeg(legIdx, 'direct');
+                                            } else if (activeTool === 'route' && route.profile === 'direct') {
+                                                recalculateRouteLeg(legIdx, 'pedestrian');
+                                            }
+                                        }
                                     }
                                 }
                             }}
@@ -433,6 +486,15 @@ export default function ActiveRouteLayer() {
                                         <b style={{ color: 'var(--accent-default)' }}>Outil Nœud</b><br />
                                         <span>Clic-gauche : ajouter un nœud</span><br />
                                         <span>Clic-droit : supprimer un nœud</span>
+                                    </div>
+                                </Tooltip>
+                            )}
+                            {(activeTool === 'route_direct' || activeTool === 'route') && (
+                                <Tooltip sticky>
+                                    <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
+                                        <b style={{ color: 'var(--accent-default)' }}>Conversion de tracé</b><br />
+                                        {activeTool === 'route_direct' && <span>Clic : convertir ce tronçon en hors piste (ligne droite)</span>}
+                                        {activeTool === 'route' && <span>Clic : convertir ce tronçon en tracé pédestre (BRouter)</span>}
                                     </div>
                                 </Tooltip>
                             )}
@@ -456,28 +518,17 @@ export default function ActiveRouteLayer() {
                                             positions={[startPt, destPt]} 
                                             color="#2d8ceb" 
                                             weight={3} 
-                                            opacity={1} 
+                                            dashArray="5, 8"
+                                            opacity={1}
+                                            interactive={false}
                                             ref={(ref: any) => { if (ref) { (window as any).__aziLines = (window as any).__aziLines || {}; (window as any).__aziLines[idx] = ref; } }}
                                         />
-                                        <Marker 
-                                            position={destPt} 
-                                            draggable={true}
-                                            icon={L.divIcon({
-                                                className: 'azi-handle',
-                                                html: '<div style="width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid #2d8ceb;cursor:move;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
-                                                iconSize: [14, 14], iconAnchor: [7, 7]
-                                            })}
-                                            eventHandlers={{
-                                                dragstart: (e) => {
-                                                    const handle = e.target;
-                                                    handle.bindTooltip(`<span style="font-weight:bold;color:#2d8ceb">${azimut || 0}°</span>`, { permanent: true, direction: 'top', offset: [0, -10] }).openTooltip();
-                                                },
-                                                drag: (e) => handleAzimutDrag(e, idx),
-                                                dragend: (e) => {
-                                                    handleAzimutDragEnd(e, idx);
-                                                    e.target.unbindTooltip();
-                                                }
-                                            }}
+                                        <AzimutHandle 
+                                            idx={idx}
+                                            position={destPt}
+                                            azimut={azimut || 0}
+                                            onDrag={handleAzimutDrag}
+                                            onDragEnd={handleAzimutDragEnd}
                                         />
                                     </>
                                 ) : (
@@ -485,7 +536,7 @@ export default function ActiveRouteLayer() {
                                     <>
                                         <Polyline 
                                             positions={[startPt, destPt]} 
-                                            color="#ef4444" 
+                                            color="#2d8ceb" 
                                             weight={2} 
                                             dashArray="5, 8" 
                                             opacity={0.8} 
@@ -495,7 +546,7 @@ export default function ActiveRouteLayer() {
                                             interactive={false}
                                             icon={L.divIcon({
                                                 className: 'azi-label',
-                                                html: `<span style="color:#ef4444;font-weight:700;font-size:12px;text-shadow:1px 1px 2px rgba(255,255,255,0.8)">${azimut}°</span>`,
+                                                html: `<span style="color:#2d8ceb;font-weight:700;font-size:12px;text-shadow:1px 1px 2px rgba(255,255,255,0.8)">${azimut}°</span>`,
                                                 iconAnchor: [-6, 12]
                                             })}
                                         />

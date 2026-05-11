@@ -11,6 +11,18 @@ const { autoUpdater } = require('electron-updater');
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ─── Logging System ───────────────────────────────────────────────────────
+const logFilePath = path.join(__dirname, '../scoutraider.log');
+
+const logToFileSync = (level, msg) => {
+  const timestamp = new Date().toISOString();
+  const formattedMsg = `[${timestamp}] [${level.toUpperCase()}] ${msg}\n`;
+  // Use appendFile from fs/promises (imported as fs)
+  fs.appendFile(logFilePath, formattedMsg, 'utf-8').catch(e => {
+    console.error("Failed to write to log file", e);
+  });
+};
+
 let mainWindow = null;
 let filePathToOpen = null;
 
@@ -207,6 +219,15 @@ app.whenReady().then(() => {
   // createMenu();
   createWindow();
 
+  // Automatic update check on startup (packaged app only)
+  if (app.isPackaged) {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(err => {
+        logToFileSync('ERROR', `Initial update check failed: ${err.toString()}`);
+      });
+    }, 5000); // Wait 5s to ensure window is ready and stable
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -224,15 +245,29 @@ app.on('window-all-closed', () => {
 
 autoUpdater.autoDownload = false;
 
+// Configure autoUpdater to use our logging system
+autoUpdater.logger = {
+  info: (msg) => logToFileSync('INFO', `[Updater] ${msg}`),
+  warn: (msg) => logToFileSync('WARN', `[Updater] ${msg}`),
+  error: (msg) => logToFileSync('ERROR', `[Updater] ${msg}`),
+};
+
+autoUpdater.on('checking-for-update', () => {
+  logToFileSync('INFO', 'Checking for update...');
+});
+
 autoUpdater.on('update-available', (info) => {
+  logToFileSync('INFO', `Update available: ${info.version}`);
   if (mainWindow) mainWindow.webContents.send('update-available', info);
 });
 
 autoUpdater.on('update-not-available', (info) => {
+  logToFileSync('INFO', 'Update not available.');
   if (mainWindow) mainWindow.webContents.send('update-not-available', info);
 });
 
 autoUpdater.on('error', (err) => {
+  logToFileSync('ERROR', `Update error: ${err.toString()}`);
   if (mainWindow) mainWindow.webContents.send('update-error', err.toString());
 });
 
@@ -482,13 +517,6 @@ ipcMain.handle('convert-html-to-pdf', async (event, html, outputPath) => {
 });
 
 // ─── Custom Logger ────────────────────────────────────────────────────────
-const logFilePath = path.join(__dirname, '../scoutraider.log');
 ipcMain.handle('write-log', async (event, level, msg) => {
-  try {
-    const timestamp = new Date().toISOString();
-    const formattedMsg = `[${timestamp}] [${level.toUpperCase()}] ${msg}\n`;
-    await fs.appendFile(logFilePath, formattedMsg, 'utf-8');
-  } catch (e) {
-    console.error("Failed to write to log file", e);
-  }
+  logToFileSync(level, msg);
 });

@@ -34,8 +34,6 @@ export default function MapWorkspace({ isSplitMode = false }: MapWorkspaceProps)
             
             {!showMetro && <ControlToolbar />}
             
-            
-            
             {activeTool === 'encodage' && <LegendOverlay />}
         </div>
     );

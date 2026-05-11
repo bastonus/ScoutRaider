@@ -1,0 +1,87 @@
+var en = function(n, ord
+) {
+  var s = String(n).split('.'), v0 = !s[1], t0 = Number(s[0]) == n,
+      n10 = t0 && s[0].slice(-1), n100 = t0 && s[0].slice(-2);
+  if (ord) return (n10 == 1 && n100 != 11) ? 'one'
+      : (n10 == 2 && n100 != 12) ? 'two'
+      : (n10 == 3 && n100 != 13) ? 'few'
+      : 'other';
+  return (n == 1 && v0) ? 'one' : 'other';
+};
+var plural = function (value, offset, lcfunc, data, isOrdinal) {
+  if ({}.hasOwnProperty.call(data, value)) return data[value];
+  if (offset) value -= offset;
+  var key = lcfunc(value, isOrdinal);
+  return key in data ? data[key] : data.other;
+};
+
+(function (root, G) {
+  if (typeof define === "function" && define.amd) { define(G); }
+  else if (typeof exports === "object") { module.exports = G; }
+  else { root.i18nDataAPI = G; }
+					SMap._ = function(str, d) { return G[str](d); };
+})(this, {
+  controlLayer: function(d) { return "Switch map"; },
+  controlCopyright: function(d) { return "and <a href=\"#\" data-others=\"1\">more</a>"; },
+  controlOrientation: function(d) { return "Rotate"; },
+  controlLogo: function(d) { return "Show on Mapy.com"; },
+  panoUnsupported: function(d) { return "We're sorry, 3D is not supported."; },
+  "map.unsupported": function(d) { return "Unfortunately, you are using an old web browser not supported by the Mapy.com mapping API. Please try to use one of the following <a href='//napoveda.seznam.cz/cz/podporovane-internetove-prohlizece.html'>supported browsers</a>."; },
+  "map.zoomIn": function(d) { return "Zoom in"; },
+  "map.zoomOut": function(d) { return "Zoom out"; },
+  "map.move": function(d) { return "Move map"; },
+  "map.zooms.world": function(d) { return "World"; },
+  "map.zooms.states": function(d) { return "Country"; },
+  "map.zooms.districts": function(d) { return "Region"; },
+  "map.zooms.cities": function(d) { return "Town/city"; },
+  "map.zooms.municipalities": function(d) { return "Municipality"; },
+  "map.zooms.streets": function(d) { return "Street"; },
+  "map.zooms.houses": function(d) { return "House"; },
+  "map.zooms.birdEye": function(d) { return "Bird's-eye view"; },
+  "trafficDetail.load": function(d) { return "level of service " + d.load; },
+  "trafficDetail.delay": function(d) { return "The expected delay is " + plural(d.hours, 0, en, { "0": "", one: d.hours + " hour", other: d.hours + " hours" }) + plural(d.hours, 0, en, { "0": plural(d.minutes, 0, en, { "0": "0 minutes", other: "" }), other: plural(d.minutes, 0, en, { "0": "", other: "\\u0020" }) }) + plural(d.minutes, 0, en, { "0": "", one: d.minutes + " minute", other: d.minutes + " minutes" }) + "."; },
+  "trafficDetail.speed": function(d) { return plural(d.actSpeed, 0, en, { "0": "Speed limit " + d.maxSpeed + " km/h.", other: "Current speed " + d.actSpeed + " km/h (speed limit " + d.maxSpeed + " km/h)" }); },
+  "separators.decimal": function(d) { return "."; },
+  "separators.thousand": function(d) { return ","; },
+  "mapsetLabel.base": function(d) { return "Political"; },
+  "mapsetLabel.ophoto": function(d) { return "Aerial"; },
+  "mapsetLabel.turist": function(d) { return "Outdoor"; },
+  "mapsetLabel.geography": function(d) { return "Physical"; },
+  "mapsetLabel.winter": function(d) { return "Winter"; },
+  "mapsetLabel.historic": function(d) { return "Historical"; },
+  "mapsetLabel.ophoto0203": function(d) { return "Aerial 03"; },
+  "mapsetLabel.ophoto0406": function(d) { return "Aerial 06"; },
+  "mapsetLabel.ophoto1415": function(d) { return "Aerial 15"; },
+  "mapsetLabel.ophoto1618": function(d) { return "Aerial 18"; },
+  "mapsetLabel.summer": function(d) { return "Summer"; },
+  "mapsetLabel.ophoto1012": function(d) { return "Aerial 2012"; },
+  "mapsetTitle.historic": function(d) { return "Historical 1836-1852"; },
+  "mapsetTitle.ophoto0203": function(d) { return "Aerial 2002-2003"; },
+  "mapsetTitle.ophoto0406": function(d) { return "Aerial 2004-2006"; },
+  "mapsetTitle.ophoto1415": function(d) { return "Aerial 2014-2015"; },
+  "mapsetTitle.ophoto1618": function(d) { return "Aerial 2016-2018"; },
+  "mapsetTitle.summer": function(d) { return "Summer"; },
+  newest: function(d) { return "Most recent"; },
+  "pano.notAvail": function(d) { return "We do not have a Panorama for the year you selected. We are displaying an image from " + d.year + "."; },
+  "pano.contextLost": function(d) { return "Problem displaying panorama, please restart your browser and clear your cookies. If this does not help, please contact us via the \"Mistake on the map\" icon."; },
+  "pano.contextRestore": function(d) { return "The browser has stopped displaying the panorama due to inactivity."; },
+  "pano.restoreBtn": function(d) { return "Refresh panorama"; },
+  "pano.close": function(d) { return "Close"; },
+  "pano.error.previewImage": function(d) { return "Unable to load panorama preview"; },
+  "pano.error.missingApiKey": function(d) { return "Missing API key"; },
+  "pano.error.wrongApiKey": function(d) { return "Incorrect API key"; },
+  "pano.error.wrongApiKey2": function(d) { return "Invalid or missing API key. Please provide a valid API key to access Panoramas."; },
+  "pano.error.getBest": function(d) { return "No panorama found for coordinates with lon " + d.lon + ", lat " + d.lat + ", and radius " + d.radius; },
+  "pano.error.getDetail": function(d) { return "No panorama found for pid " + d.pid; },
+  endingConsole: function(d) { return "You are using an outdated version of the Mapy.com JS SDK library. This library will soon no longer be supported. We recommend switching to the new Mapy.com REST API. You can find more information here: " + d.link; },
+  endingTooltip: function(d) { return "Support for this API is ending on" + d.bl + d.date + "."; },
+  endingPopup: function(d) { return "Support for this API is ending on " + d.date + ". Connect to the new API to restore the service."; },
+  endingFullscreen: function(d) { return "JS API support was discontinued on " + d.date + ". Connect to the new API To restore the service."; },
+  endingMoreAboutApi: function(d) { return "Learn more"; },
+  endingMoreAboutApi2: function(d) { return "You'll find more information here"; },
+  endingMoreAboutApiFullscreen: function(d) { return "I want a new API from Mapy.com"; },
+  endingMap: function(d) { return "This website uses a library for displaying the map that is no longer supported."; },
+  endingPano: function(d) { return "This website uses a library for displaying panoramas that is no longer supported."; },
+  endingSuggest: function(d) { return "This website uses a search library that is no longer supported."; },
+  endingDevs: function(d) { return "Notice for developers"; }
+});

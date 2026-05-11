@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<!-- saved from url=(0043)https://h.seznam.cz/html/cmp.html?v=2.596.1 -->
+<html lang="en"><script src="chrome-extension://eppiocemhmnlbhjplcgkofciiegomcon/libs/extend-native-history-api.js"></script><script src="chrome-extension://eppiocemhmnlbhjplcgkofciiegomcon/libs/requests.js"></script><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><script bis_use="true" type="text/javascript" charset="utf-8" data-bis-config="{&quot;blacklistIframeSrc&quot;:[&quot;facebook.com/&quot;,&quot;twitter.com/&quot;,&quot;youtube-nocookie.com/embed/&quot;,&quot;//vk.com/&quot;,&quot;//www.vk.com/&quot;,&quot;linkedin.com/&quot;,&quot;//www.linkedin.com/&quot;,&quot;//instagram.com/&quot;,&quot;//www.instagram.com/&quot;,&quot;//www.google.com/recaptcha/api2/&quot;,&quot;//www.google.com/recaptcha/enterprise/anchor&quot;,&quot;//hangouts.google.com/webchat/&quot;,&quot;//www.google.com/calendar/&quot;,&quot;//www.google.com/maps/embed&quot;,&quot;spotify.com/&quot;,&quot;soundcloud.com/&quot;,&quot;//player.vimeo.com/&quot;,&quot;//disqus.com/&quot;,&quot;//tgwidget.com/&quot;,&quot;//js.driftt.com/&quot;,&quot;friends2follow.com&quot;,&quot;/widget&quot;,&quot;login&quot;,&quot;//video.bigmir.net/&quot;,&quot;blogger.com&quot;,&quot;//smartlock.google.com/&quot;,&quot;//keep.google.com/&quot;,&quot;/web.tolstoycomments.com/&quot;,&quot;moz-extension://&quot;,&quot;chrome-extension://&quot;,&quot;/auth/&quot;,&quot;//analytics.google.com/&quot;,&quot;adclarity.com&quot;,&quot;paddle.com/checkout&quot;,&quot;hcaptcha.com&quot;,&quot;recaptcha.net&quot;,&quot;2captcha.com&quot;,&quot;accounts.google.com&quot;,&quot;www.google.com/shopping/customerreviews&quot;,&quot;buy.tinypass.com&quot;,&quot;gstatic.com&quot;,&quot;secureir.ebaystatic.com&quot;,&quot;docs.google.com&quot;,&quot;contacts.google.com&quot;,&quot;github.com&quot;,&quot;mail.google.com&quot;,&quot;chat.google.com&quot;,&quot;audio.xpleer.com&quot;,&quot;keepa.com&quot;,&quot;static.xx.fbcdn.net&quot;,&quot;sas.selleramp.com&quot;,&quot;1plus1.video&quot;,&quot;console.googletagservices.com&quot;,&quot;//lnkd.demdex.net/&quot;,&quot;//radar.cedexis.com/&quot;,&quot;//li.protechts.net/&quot;,&quot;challenges.cloudflare.com/&quot;,&quot;ogs.google.com&quot;,&quot;//www.ukrnafta.com/data/map/&quot;,&quot;//maps.google.com/maps&quot;,&quot;//www.openstreetmap.org/export/embed.html&quot;,&quot;//www.google.com/maps/d/u/3/embed&quot;,&quot;//itm.ebaydesc.com/itmdesc&quot;,&quot;//books.google.com/books&quot;,&quot;//embed.podcasts.apple.com&quot;,&quot;//www.paypal.com/smartchat&quot;,&quot;//www.centurylink.com/assets/includes/common/sfChatiFrame.html&quot;,&quot;//macmillan-prod-gen.ada.support/embed&quot;,&quot;//macmillan-prod-gen.ada.support/chat&quot;,&quot;//ctl-consumer.my.site.com/&quot;],&quot;whitelistDomainsForPostBody&quot;:[&quot;youtube.com&quot;]}" data-dynamic-id="8bfa7c12-7870-4bc0-97dc-cced03816889" src="chrome-extension://eppiocemhmnlbhjplcgkofciiegomcon/executors/200.js"></script>
+		
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta http-equiv="X-UA-Compatible" content="ie=edge">
+		<title>CMP2</title>
+		<script>
+			function dispatchPostMessage(content) {
+				window.parent.postMessage(JSON.stringify(content), '*');
+			}
+
+			function sendMessage(type, cookie) {
+				var method = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 'get';
+
+				dispatchPostMessage({
+					cmp: 'szn',
+					type: type,
+					cookie: cookie,
+					method: method,
+				});
+			}
+
+			function sendError(type) {
+				dispatchPostMessage({
+					cmp: 'szn',
+					type: type,
+					error: true,
+				});
+			}
+
+			function sendConfirm(type) {
+				var method = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'set';
+
+				dispatchPostMessage({
+					cmp: 'szn',
+					type: type,
+					confirm: true,
+					method: method,
+				});
+			}
+
+			function buildCookieName(type, v2) {
+				if (!v2) {
+					return type;
+				}
+
+				return type + 'CMPCookie-v2';
+			}
+
+			function isCookieAllowed(type, value) {
+				return Boolean(['int', 'ext', 'szncmpone'].includes(type) && value && value.length < 500);
+			}
+
+			function setCookie(type, value, v2) {
+				if (!isCookieAllowed(type, value)) {
+					sendError('InvalidCookieType');
+
+					return;
+				}
+
+				document.cookie =
+					buildCookieName(type, v2) +
+					'=' +
+					value +
+					'; expires=' +
+					new Date(new Date().getTime() + 365 * 24 * 60 * 60 * 1000).toUTCString() +
+					'; path=/; domain=.seznam.cz; SameSite=None; Secure';
+
+				sendConfirm(type);
+			}
+
+			function setPurposeOne(value) {
+				setCookie('szncmpone', value);
+				sendConfirm('szncmpone');
+			}
+
+			function removeCookie(type, v2) {
+				document.cookie =
+					type +
+					'CMPCookie' +
+					(v2 ? '-v2' : '') +
+					'=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=None; Secure';
+
+				sendConfirm(type);
+			}
+
+			function getCookie(type, v2) {
+				var cookieValue = getCookieFromDocument(type, v2);
+
+				if (cookieValue) {
+					sendMessage(type, cookieValue);
+				} else {
+					sendError('NoCookie');
+				}
+			}
+
+			function getCookieFromDocument(type, v2) {
+				var name = type + 'CMPCookie' + (v2 ? '-v2' : '') + '=';
+				var decodedCookie = decodeURIComponent(document.cookie);
+				var cookieArray = decodedCookie.split(';');
+
+				for (var i = 0; i < cookieArray.length; i++) {
+					var cookie = cookieArray[i].trim();
+
+					if (cookie.indexOf(name) === 0) {
+						return cookie.substring(name.length, cookie.length);
+					}
+				}
+
+				return null;
+			}
+
+			function handleMessage(data) {
+				switch (data.method) {
+					case 'getCookie':
+						getCookie(data.type, data.v2);
+						break;
+
+					case 'setCookie':
+						setCookie(data.type, data.cookie, data.v2);
+						break;
+
+					case 'removeCookie':
+						removeCookie(data.type, data.v2);
+						break;
+
+					case 'setPurposeOne':
+						data.value !== undefined ? setPurposeOne(data.value) : sendError('NoPurposeOneValue');
+						break;
+				}
+			}
+
+			function receiveMessage(event) {
+				try {
+					var data = JSON.parse(event.data);
+
+					if (data && data.method) {
+						handleMessage(data);
+					}
+				} catch (_unused2) {
+					sendError('ParseDataError');
+				}
+			}
+
+			window.addEventListener('message', receiveMessage);
+		</script>
+	</head>
+	<body __processed_202258bf-b2be-4f1b-8ea6-2958f5428dd9__="true" bis_status="ok" bis_frame_id="372" bis_body_id="fr_ghaei2spwlvwti09hb6uia" bis_depth="0" bis_chainid="2" bis_size="{&quot;x&quot;:0,&quot;y&quot;:0,&quot;w&quot;:0,&quot;h&quot;:0,&quot;abs_x&quot;:0,&quot;abs_y&quot;:0}">
+
+</body></html>
