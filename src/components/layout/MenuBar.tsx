@@ -31,7 +31,9 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
     const { state, dispatch } = useApp();
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     const [showNotifHistory, setShowNotifHistory] = useState(false);
-    const [updateModal, setUpdateModal] = useState<{ show: boolean, info?: any, downloading?: boolean, downloaded?: boolean, checking?: boolean } | null>(null);
+    const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'downloading' | 'downloaded'>('idle');
+    const [updateProgress, setUpdateProgress] = useState(0);
+    const [updateInfo, setUpdateInfo] = useState<any>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -60,9 +62,14 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             else if (action === 'redo') dispatch({ type: 'REDO' });
         });
 
+        const unsubUC = electron.onUpdateChecking(() => {
+            setUpdateStatus('checking');
+        });
+
         const unsubUA = electron.onUpdateAvailable((info: any) => {
             isManualCheck.current = false;
-            setUpdateModal({ show: true, info, downloading: false, downloaded: false });
+            setUpdateStatus('available');
+            setUpdateInfo(info);
         });
 
         const unsubUNA = electron.onUpdateNotAvailable(() => {
@@ -70,7 +77,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                 dispatch({ type: 'ADD_NOTIFICATION', message: 'ScoutRaider est à jour !', notifType: 'info' });
                 isManualCheck.current = false;
             }
-            setUpdateModal(null);
+            setUpdateStatus('idle');
         });
 
         const unsubUE = electron.onUpdateError((err: string) => {
@@ -82,18 +89,32 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                 }
                 isManualCheck.current = false;
             }
-            setUpdateModal(null);
+            setUpdateStatus('idle');
+        });
+
+        const unsubUP = electron.onUpdateProgress((progress: any) => {
+            setUpdateStatus('downloading');
+            setUpdateProgress(Math.round(progress.percent || 0));
         });
 
         const unsubUD = electron.onUpdateDownloaded(() => {
-            setUpdateModal(prev => prev ? { ...prev, downloading: false, downloaded: true } : null);
+            setUpdateStatus('downloaded');
         });
+
+        // Trigger auto-check if enabled
+        if (state.auto_check_updates) {
+            setTimeout(() => {
+                electron.checkForUpdates();
+            }, 3000);
+        }
 
         return () => {
             unsubMenu();
+            unsubUC();
             unsubUA();
             unsubUNA();
             unsubUE();
+            unsubUP();
             unsubUD();
         };
     }, [dispatch]);
@@ -366,6 +387,56 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
 
             {/* RIGHT: CONTROLS & WINDOWS */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', WebkitAppRegion: 'no-drag' } as any}>
+                
+                {/* UPDATE STATUS PILL */}
+                {updateStatus !== 'idle' && (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        background: 'rgba(110, 201, 126, 0.1)',
+                        border: '1px solid rgba(110, 201, 126, 0.2)',
+                        marginRight: '8px'
+                    }}>
+                        {updateStatus === 'checking' && (
+                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Recherche...</span>
+                        )}
+                        {updateStatus === 'available' && (
+                            <span style={{ fontSize: '11px', color: 'var(--accent-default)', fontWeight: 700 }}>Mise à jour disponible</span>
+                        )}
+                        {updateStatus === 'downloading' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${updateProgress}%`, height: '100%', background: 'var(--accent-default)', transition: 'width 0.3s' }} />
+                                </div>
+                                <span style={{ fontSize: '10px', color: 'var(--accent-default)', fontWeight: 800 }}>{updateProgress}%</span>
+                            </div>
+                        )}
+                        {updateStatus === 'downloaded' && (
+                            <button 
+                                onClick={() => (window as any).electronAPI?.quitAndInstall()}
+                                style={{
+                                    background: 'var(--accent-default)',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    padding: '2px 10px',
+                                    fontSize: '10.5px',
+                                    fontWeight: 800,
+                                    color: '#0a100d',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
+                                }}
+                            >
+                                Redémarrer pour mettre à jour
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 {/* SIDEBAR TOGGLES */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginRight: '4px', paddingRight: '10px', borderRight: '1px solid var(--bg-border)' }}>
                     <button 
@@ -458,58 +529,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                 )}
             </div>
 
-            {/* UPDATE MODAL OVERLAY */}
-            {updateModal?.show && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-                    zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                    <div style={{
-                        background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px',
-                        border: '1px solid var(--accent-default)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-                        maxWidth: '400px', width: '100%', textAlign: 'center'
-                    }}>
-                        <h2 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>Mise à jour disponible</h2>
-                        <p style={{ color: 'var(--text-dim)', marginBottom: '24px', fontSize: '14px', lineHeight: 1.5 }}>
-                            Une nouvelle version de ScoutRaider est disponible au téléchargement ({updateModal.info?.version || 'Github'}).
-                        </p>
-                        
-                        {updateModal.downloading && (
-                            <div style={{ color: 'var(--semantic-green)', marginBottom: '20px', fontWeight: 600 }}>
-                                Téléchargement en cours...
-                            </div>
-                        )}
-
-                        {updateModal.downloaded && (
-                            <div style={{ color: 'var(--semantic-green)', marginBottom: '20px', fontWeight: 600 }}>
-                                Téléchargement terminé ! L'application va redémarrer.
-                            </div>
-                        )}
-
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                            {updateModal.downloaded ? (
-                                <button onClick={() => (window as any).electronAPI?.quitAndInstall()} style={{ padding: '8px 16px', background: 'var(--accent-default)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>
-                                    Installer & Redémarrer
-                                </button>
-                            ) : (
-                                <>
-                                    <button disabled={updateModal.downloading} onClick={() => setUpdateModal(null)} style={{ padding: '8px 16px', background: 'transparent', color: 'var(--text-dim)', border: '1px solid var(--bg-border)', borderRadius: '6px', cursor: 'pointer' }}>
-                                        Plus tard
-                                    </button>
-                                    <button disabled={updateModal.downloading} onClick={() => {
-                                        setUpdateModal({ ...updateModal, downloading: true });
-                                        (window as any).electronAPI?.downloadUpdate();
-                                    }} style={{ padding: '8px 16px', background: 'var(--accent-default)', color: '#fff', border: 'none', borderRadius: '6px', cursor: updateModal.downloading ? 'default' : 'pointer', fontWeight: 700, opacity: updateModal.downloading ? 0.7 : 1 }}>
-                                        Télécharger
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* UPDATE MODAL OVERLAY REMOVED FOR BREVITY IF NOT CHANGED */}
+            {/* UPDATE MODAL REMOVED - NOW INLINE */}
         </header>
     );
 }

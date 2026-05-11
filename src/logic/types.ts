@@ -410,6 +410,7 @@ export interface AppState {
     show_pois_on_map: boolean;
     show_dangers_on_map: boolean;
     show_stages_on_map: boolean;
+    auto_check_updates: boolean;
 
     // Persisted POI tracking per segment
     segment_pois: Record<string, POIResult[]>;

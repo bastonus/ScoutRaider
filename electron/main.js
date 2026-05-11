@@ -219,14 +219,7 @@ app.whenReady().then(() => {
   // createMenu();
   createWindow();
 
-  // Automatic update check on startup (packaged app only)
-  if (app.isPackaged) {
-    setTimeout(() => {
-      autoUpdater.checkForUpdates().catch(err => {
-        logToFileSync('ERROR', `Initial update check failed: ${err.toString()}`);
-      });
-    }, 5000); // Wait 5s to ensure window is ready and stable
-  }
+  // Update check is now triggered by MenuBar.tsx to respect preferences.
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -243,7 +236,7 @@ app.on('window-all-closed', () => {
 
 // ─── Auto Updater ─────────────────────────────────────────────────────────
 
-autoUpdater.autoDownload = false;
+autoUpdater.autoDownload = true;
 
 // Configure autoUpdater to use our logging system
 autoUpdater.logger = {
@@ -254,6 +247,7 @@ autoUpdater.logger = {
 
 autoUpdater.on('checking-for-update', () => {
   logToFileSync('INFO', 'Checking for update...');
+  if (mainWindow) mainWindow.webContents.send('update-checking');
 });
 
 autoUpdater.on('update-available', (info) => {
@@ -271,21 +265,25 @@ autoUpdater.on('error', (err) => {
   if (mainWindow) mainWindow.webContents.send('update-error', err.toString());
 });
 
+autoUpdater.on('download-progress', (progress) => {
+  if (mainWindow) mainWindow.webContents.send('update-progress', progress);
+});
+
 autoUpdater.on('update-downloaded', (info) => {
+  logToFileSync('INFO', 'Update downloaded.');
   if (mainWindow) mainWindow.webContents.send('update-downloaded', info);
 });
 
 ipcMain.handle('check-for-updates', async () => {
   if (!app.isPackaged && process.env.NODE_ENV === 'development') {
-    // In dev mode, autoUpdater will fail unless configured with a dev-app-update.yml
-    // We send a specific error that the frontend can handle gracefully.
     if (mainWindow) mainWindow.webContents.send('update-error', 'DEV_MODE');
     return { error: 'DEV_MODE' };
   }
   try {
-    return await autoUpdater.checkForUpdates();
+    const result = await autoUpdater.checkForUpdates();
+    return result;
   } catch (err) {
-    console.error('Update check failed:', err);
+    logToFileSync('ERROR', `Manual update check failed: ${err.toString()}`);
     if (mainWindow) mainWindow.webContents.send('update-error', err.toString());
     return { error: err.toString() };
   }

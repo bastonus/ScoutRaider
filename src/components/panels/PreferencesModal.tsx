@@ -183,9 +183,23 @@ export default function PreferencesModal({ onClose, initialCategory = 'maps_api'
                         )}
 
                         {activeCategory === 'general' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                 <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>Paramètres Généraux</div>
-                                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>D'autres réglages seront disponibles prochainement.</div>
+                                
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>Recherche automatique de mises à jour</div>
+                                            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>Vérifie si une nouvelle version est disponible au lancement de l'application.</div>
+                                        </div>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={state.auto_check_updates}
+                                            onChange={(e) => dispatch({ type: 'SET_AUTO_CHECK_UPDATES', enabled: e.target.checked })}
+                                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-default)', cursor: 'pointer' }}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         )}
 

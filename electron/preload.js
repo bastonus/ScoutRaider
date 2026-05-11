@@ -63,6 +63,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
     downloadUpdate: () => ipcRenderer.invoke('download-update'),
     quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+    onUpdateChecking: (callback) => {
+        const l = () => callback();
+        ipcRenderer.on('update-checking', l);
+        return () => ipcRenderer.removeListener('update-checking', l);
+    },
     onUpdateAvailable: (callback) => {
         const l = (_event, info) => callback(info);
         ipcRenderer.on('update-available', l);
@@ -77,6 +82,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         const l = (_event, error) => callback(error);
         ipcRenderer.on('update-error', l);
         return () => ipcRenderer.removeListener('update-error', l);
+    },
+    onUpdateProgress: (callback) => {
+        const l = (_event, progress) => callback(progress);
+        ipcRenderer.on('update-progress', l);
+        return () => ipcRenderer.removeListener('update-progress', l);
     },
     onUpdateDownloaded: (callback) => {
         const l = (_event, info) => callback(info);

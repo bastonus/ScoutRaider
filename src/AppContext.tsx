@@ -84,6 +84,7 @@ export type AppAction =
     | { type: 'SET_SMALL_ROADS'; enabled: boolean }
     | { type: 'SET_IGN_LAYER'; layer: string }
     | { type: 'SET_MAP_API_KEYS'; mapyKey?: string; ignKey?: string }
+    | { type: 'SET_AUTO_CHECK_UPDATES'; enabled: boolean }
 
     // Persistence
     | { type: 'UNDO' }
@@ -765,6 +766,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 ...state,
                 notifications: state.notifications.filter(n => n.id !== action.id)
             };
+
+        case 'SET_AUTO_CHECK_UPDATES':
+            return { ...state, auto_check_updates: action.enabled };
 
         default:
             return state;

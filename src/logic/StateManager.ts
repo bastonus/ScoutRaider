@@ -25,6 +25,7 @@ export class StateManager {
             show_pois_on_map: true,
             show_dangers_on_map: true,
             show_stages_on_map: true,
+            auto_check_updates: true,
         };
 
         // Attempt to load from localStorage
@@ -39,6 +40,7 @@ export class StateManager {
                     if (parsed.show_pois_on_map !== undefined) prefs.show_pois_on_map = parsed.show_pois_on_map;
                     if (parsed.show_dangers_on_map !== undefined) prefs.show_dangers_on_map = parsed.show_dangers_on_map;
                     if (parsed.show_stages_on_map !== undefined) prefs.show_stages_on_map = parsed.show_stages_on_map;
+                    if (parsed.auto_check_updates !== undefined) prefs.auto_check_updates = parsed.auto_check_updates;
                 }
             } catch (e) {
                 console.warn('Failed to load preferences from localStorage', e);
@@ -84,6 +86,7 @@ export class StateManager {
             show_pois_on_map: prefs.show_pois_on_map,
             show_dangers_on_map: prefs.show_dangers_on_map,
             show_stages_on_map: prefs.show_stages_on_map,
+            auto_check_updates: prefs.auto_check_updates,
             segment_pois: {},
 
             theme_id: 'Neutre',
@@ -140,6 +143,7 @@ export class StateManager {
             show_pois_on_map: state.show_pois_on_map,
             show_dangers_on_map: state.show_dangers_on_map,
             show_stages_on_map: state.show_stages_on_map,
+            auto_check_updates: state.auto_check_updates,
         };
         localStorage.setItem('scoutraider_prefs', JSON.stringify(prefs));
     }

@@ -238,16 +238,6 @@ function App() {
 
       </div>
 
-      <div className="status-bar" style={{ 
-        height: '24px', 
-        background: 'var(--bg-dark)', 
-        borderTop: '1px solid var(--glass-border)',
-        fontSize: '11px', color: 'var(--text-dim)',
-        display: 'flex', alignItems: 'center', padding: '0 12px'
-      }}>
-        Prêt
-      </div>
-
       {/* Global Notifications */}
       <NotificationOverlay />
 
