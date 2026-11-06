@@ -18,6 +18,19 @@
 
 ---
 
+## ✨ La magie de ScoutRaider
+
+**Vous dessinez vos étapes. ScoutRaider fait le reste — puis vous gardez la main.**
+
+1. **🖐️ Vous tracez vos étapes** sur la carte, comme sur une carte papier. Ajoutez, déplacez ou supprimez vos points : le terrain reste votre point de départ.
+2. **🧭 Il calcule le vrai itinéraire** : ScoutRaider relie vos étapes par les routes et sentiers réels (routage BRouter), puis calcule pour chaque segment la distance exacte, l'azimut et le cap.
+3. **✍️ Il trouve les mots justes** : à partir des **données réelles des lieux traversés** — points d'intérêt, noms de lieux, commerces, passages remarquables — il rédige des consignes de navigation vivantes et thématisées, ancrées dans le terrain plutôt que génériques.
+4. **🪄 Vous éditez librement** : chaque étape, azimut, distance, texte et épreuve reste modifiable. Vous réécrivez, déplacez, changez le style de navigation — le carnet se régénère instantanément.
+
+> **En résumé : vous pensez terrain, ScoutRaider rédige le carnet. Vous gardez toujours le dernier mot.**
+
+---
+
 ## 🚀 MISE À JOUR : Beta 0.3.8 — Dessin vectoriel & sous-calques
 
 Cette version apporte un éditeur de dessin vectoriel complet et une gestion de calques hiérarchique.
