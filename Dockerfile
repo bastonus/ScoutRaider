@@ -8,11 +8,14 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Prevent Electron from downloading the heavy 120MB+ desktop binary during web build
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
+
 # Copy dependency manifests
 COPY package*.json ./
 
-# Install dependencies (fallback to npm install if lockfile has slight discrepancies)
-RUN npm ci || npm install
+# Install dependencies fast (fallback to npm install if lockfile has slight discrepancies)
+RUN npm ci || npm install --no-audit --no-fund
 
 # Copy source code and configuration
 COPY . .
