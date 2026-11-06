@@ -1,6 +1,6 @@
 # ScoutRaider — Générateur de Carnets de Raid
 
-Version Beta 0.3.8-beta · Application de planification de raids scouts, disponible sur navigateur et en application de bureau.
+Version Beta 0.3.9-beta · Application de planification de raids scouts, disponible sur navigateur et en application de bureau.
 
 ## 📸 Démo — Ce que l'app peut faire
 
