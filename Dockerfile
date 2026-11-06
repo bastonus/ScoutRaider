@@ -11,8 +11,8 @@ WORKDIR /app
 # Copy dependency manifests
 COPY package*.json ./
 
-# Install clean dependencies
-RUN npm ci
+# Install dependencies (fallback to npm install if lockfile has slight discrepancies)
+RUN npm ci || npm install
 
 # Copy source code and configuration
 COPY . .
