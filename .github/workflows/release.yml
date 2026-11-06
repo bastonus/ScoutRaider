@@ -189,6 +189,8 @@ jobs:
   # ─────────────────────────────────────────────────────────
   # RELEASE — Attach all installers to the GitHub Release
   # Waits for all builds (Electron + Docker)
+  # Each artifact is downloaded independently to avoid one
+  # transient failure blocking the entire release.
   # ─────────────────────────────────────────────────────────
   release:
     needs: [build-windows, build-macos, build-linux, build-docker]
@@ -196,10 +198,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download Windows artifact
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
-          path: release-artifacts
+          name: ScoutRaider-Windows
+          path: release-artifacts/ScoutRaider-Windows
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ScoutRaider-macOS
+          path: release-artifacts/ScoutRaider-macOS
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ScoutRaider-Linux
+          path: release-artifacts/ScoutRaider-Linux
+
+      - name: List downloaded artifacts
+        run: find release-artifacts -type f | sort || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -215,12 +236,14 @@ jobs:
             | 🍎 **macOS** | `ScoutRaider.dmg` | Ouvrez le DMG → Glissez l'app dans Applications |
             | 🐧 **Linux** | `ScoutRaider.AppImage` | `chmod +x *.AppImage` puis lancez |
 
-            ### 🌐 Installation — Web (Docker / Coolify)
-            Image Docker publiée sur GitHub Container Registry :
+            ### 🌐 Version Web
+            👉 **[scoutraider.silverhorse.fr](https://scoutraider.silverhorse.fr/)**
+
+            Image Docker disponible sur GitHub Container Registry :
             ```
             docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
             ```
-            Ou utilisez le tag `latest` pour toujours avoir la dernière version :
+            Ou toujours la dernière version :
             ```
             docker pull ghcr.io/${{ github.repository }}:latest
             ```

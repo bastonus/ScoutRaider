@@ -206,6 +206,29 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             { label: 'Annuler', shortcut: 'Ctrl+Z', action: () => dispatch({ type: 'UNDO' }) },
             { label: 'Rétablir', shortcut: 'Ctrl+Y', action: () => dispatch({ type: 'REDO' }) },
         ],
+        'Vue': [
+            {
+                label: `${state.show_stages_on_map ? '✓' : '  '} Étapes sur la carte`,
+                action: () => dispatch({ type: 'TOGGLE_STAGES_ON_MAP' })
+            },
+            {
+                label: `${state.show_pois_on_map ? '✓' : '  '} Points d'intérêt (POI)`,
+                action: () => dispatch({ type: 'TOGGLE_POIS_ON_MAP' })
+            },
+            {
+                label: `${state.show_dangers_on_map ? '✓' : '  '} Coloration danger des tracés`,
+                action: () => dispatch({ type: 'TOGGLE_DANGERS_ON_MAP' })
+            },
+            { divider: true },
+            {
+                label: `${state.show_azimuth_arrows ? '✓' : '  '} Flèches d'azimut`,
+                action: () => dispatch({ type: 'TOGGLE_AZIMUTH_ARROWS' })
+            },
+            { divider: true },
+            { label: 'Carte seule', shortcut: 'Alt+1', action: () => onViewModeChange?.('map') },
+            { label: 'Texte seul', shortcut: 'Alt+2', action: () => onViewModeChange?.('text') },
+            { label: 'Vue côte à côte', shortcut: 'Alt+3', action: () => onViewModeChange?.('split') },
+        ],
         'Aide': [
             { label: 'Vérifier les mises à jour...', action: async () => {
                 if ((window as any).electronAPI) {

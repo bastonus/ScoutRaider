@@ -15,6 +15,28 @@ import { ModuleLogic } from './logic/ModuleLogic';
 import { backgroundEngine } from './logic/BackgroundEngine';
 import { calculatePolygonArea, formatArea } from './logic/GeoUtils';
 
+// ── Helper: build display polygon from control vertices + per-edge BRouter paths ──
+// edgeRoutes[i] = detailed path from coords[i] → coords[(i+1)%n], or null for straight
+export function buildAreaDisplayCoords(
+    coords: [number, number][],
+    edgeRoutes?: ([number, number][] | null)[]
+): [number, number][] {
+    if (!coords || coords.length < 2) return coords || [];
+    if (!edgeRoutes || edgeRoutes.every(e => !e)) return coords;
+    const n = coords.length;
+    const result: [number, number][] = [];
+    for (let i = 0; i < n; i++) {
+        const edge = edgeRoutes[i];
+        if (edge && edge.length >= 2) {
+            // Add all points of this edge except the last (which is the next vertex)
+            result.push(...edge.slice(0, -1));
+        } else {
+            result.push(coords[i]);
+        }
+    }
+    return result.length >= 3 ? result : coords;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ACTION TYPES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,8 +183,37 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'SET_MODE':
             return { ...state, active_mode: action.mode };
 
-        case 'SET_ACTIVE_TOOL':
-            return { ...state, active_tool: action.tool, anchor_stage_idx: -1 };
+        case 'SET_ACTIVE_TOOL': {
+            // Auto-cleanup: remove empty itineraries on tool switch
+            // (keeps at least one itinerary — the app requires a minimum of 1)
+            let cleanItins = state.itineraries || [];
+            const activeId = state.active_itinerary_id;
+            if (cleanItins.length > 1) {
+                // Remove any non-active itinerary with 0 stages
+                cleanItins = cleanItins.filter(it => it.id === activeId || (it.stages?.length || 0) > 0);
+            }
+            // If the active itinerary itself is empty and there are other non-empty ones, switch + remove
+            const activeItin = cleanItins.find(it => it.id === activeId);
+            let newActiveId = activeId;
+            if (activeItin && (activeItin.stages?.length || 0) === 0 && cleanItins.length > 1) {
+                // Switch active to first non-empty itinerary
+                const nextItin = cleanItins.find(it => it.id !== activeId && (it.stages?.length || 0) > 0);
+                if (nextItin) {
+                    newActiveId = nextItin.id;
+                    cleanItins = cleanItins.filter(it => it.id !== activeId);
+                }
+            }
+            // Auto-cleanup: remove area annotations with < 3 coords (incomplete zones)
+            const cleanAreas = (state.area_annotations || []).filter(a => (a.coords?.length || 0) >= 3);
+            return {
+                ...state,
+                active_tool: action.tool,
+                anchor_stage_idx: -1,
+                itineraries: cleanItins,
+                active_itinerary_id: newActiveId,
+                area_annotations: cleanAreas,
+            };
+        }
 
         case 'SET_ANCHOR_STAGE':
             return { ...state, anchor_stage_idx: action.idx };
@@ -487,7 +538,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             const areaCount = (state.area_annotations?.length || 0) + 1;
             const m2 = calculatePolygonArea(action.area.coords);
             const newArea: AreaAnnotation = {
-                id: `area-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                // Use provided id if any (allows caller to track it for updates)
+                id: (action.area as any).id || `area-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 type: 'area',
                 layerId: action.area.layerId || 'layer-areas',
                 title: action.area.title || `Zone ${areaCount}`,
@@ -1507,8 +1559,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             (jobId, type, result) => {
                 if (type === 'route_leg') {
                     const legKey = result.legKey ?? jobId;
-                    const fromCache = result.fromCache ? ' [CACHED]' : '';
-                    console.log(`[Pipeline ①] BRouter done  legKey=${legKey}${fromCache}`);
+
+                    // ── Area edge routing (zone BRouter per-edge) ──────────
+                    // legKey format: "area-edge-{areaId}-{edgeIdx}"
+                    if (legKey.startsWith('area-edge-')) {
+                        const pendingRoutes = backgroundEngine.pendingCount('route_leg');
+                        dispatch({ type: 'SET_LOADING', isLoading: pendingRoutes > 0, text: pendingRoutes > 0 ? `BRouter — ${pendingRoutes} arête(s) restantes...` : '' });
+
+                        const parts = legKey.split('-'); // ["area","edge",areaId,edgeIdx]
+                        const edgeIdx = parseInt(parts[parts.length - 1], 10);
+                        const areaId = parts.slice(2, parts.length - 1).join('-');
+
+                        // Build edgePts [lat,lon] from BRouter result (coordinates are [lon,lat])
+                        const edgePts: [number, number][] = result.coordinates
+                            ? result.coordinates.map((c: any) => [c[1], c[0]] as [number, number])
+                            : null;
+
+                        // Fetch current area to merge edgeRoutes
+                        const currentArea = stateRef.current.area_annotations?.find((a: any) => a.id === areaId);
+                        if (currentArea && edgePts && !isNaN(edgeIdx)) {
+                            const newEdgeRoutes = [...(currentArea.edgeRoutes || Array(currentArea.coords.length).fill(null))];
+                            newEdgeRoutes[edgeIdx] = edgePts;
+                            // Recompute area from full display polygon
+                            const displayPoly = buildAreaDisplayCoords(currentArea.coords, newEdgeRoutes);
+                            const m2 = displayPoly.length >= 3 ? calculatePolygonArea(displayPoly) : 0;
+                            dispatch({
+                                type: 'UPDATE_AREA_ANNOTATION',
+                                id: areaId,
+                                patch: { edgeRoutes: newEdgeRoutes, area_m2: m2, formatted_area: formatArea(m2) }
+                            });
+                        }
+                        return;
+                    }
+
+                    // ── Normal route_leg pipeline ─────────────────────────
 
                     const pendingRoutes = backgroundEngine.pendingCount('route_leg');
                     dispatch({ type: 'SET_LOADING', isLoading: pendingRoutes > 0, text: pendingRoutes > 0 ? `BRouter — ${pendingRoutes} tronçon(s) restants...` : '' });

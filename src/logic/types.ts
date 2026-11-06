@@ -417,9 +417,11 @@ export interface AreaAnnotation {
     layerId: string;
     title: string;
     text?: string;
-    coords: [number, number][]; // [[lat, lon], ...]
-    routedCoords?: [number, number][]; // Detailed boundary following trails
-    followRoads?: boolean; // If true, edges snap to trails/roads via BRouter
+    coords: [number, number][]; // [[lat, lon], ...] — control vertices
+    /** Per-edge BRouter path from coords[i] → coords[(i+1)%n]. null = straight segment. */
+    edgeRoutes?: ([number, number][] | null)[];
+    routedCoords?: [number, number][]; // Legacy: full routed boundary (kept for compat)
+    followRoads?: boolean;
     color: string;
     fillOpacity: number;
     visible: boolean;

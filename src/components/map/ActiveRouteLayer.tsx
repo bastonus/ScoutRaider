@@ -106,6 +106,10 @@ export default function ActiveRouteLayer() {
     const showPolygons = steps.length > 0;
     const showArrows = zoom >= 14;
 
+    // Active itinerary color — used when danger coloring is OFF
+    const activeItin = (state.itineraries || []).find((it: any) => it.id === state.active_itinerary_id);
+    const itinColor = activeItin?.color || '#f97316';
+
     const [encodingPopupVal, setEncodingPopupVal] = useState<{ idx: number, latlng: [number, number] } | null>(null);
     const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
@@ -401,9 +405,9 @@ export default function ActiveRouteLayer() {
                             {/* Visible route line */}
                             <Polyline 
                                 positions={positions} 
-                                color="#2d8ceb"
+                                color={itinColor}
                                 weight={6}
-                                opacity={0.8}
+                                opacity={0.85}
                                 interactive={false}
                             />
                         </React.Fragment>
@@ -422,13 +426,14 @@ export default function ActiveRouteLayer() {
                 if (latLngs.length < 2) return null;
 
                 const mod = seg.assigned_module || 'unassigned';
-                let color = modColors[mod] || '#6b7280';
+                // When danger coloring is OFF, use the itinerary's own color
+                let color = state.show_dangers_on_map ? (modColors[mod] || '#6b7280') : itinColor;
                 let weight = 5;
                 let isDragOver = dragOverIdx === idx;
                 
                 if (isDragOver) {
                     const draggingMod = (window as any).__draggingModuleId;
-                    if (draggingMod && modColors[draggingMod]) {
+                    if (state.show_dangers_on_map && draggingMod && modColors[draggingMod]) {
                         color = modColors[draggingMod];
                     }
                     weight = 12; // Thicker to show drop target

@@ -23,8 +23,8 @@ export class StateManager {
             active_ign_layer: 'PLAN.IGN',
             mapy_api_key: '',
             ign_api_key: '',
-            show_pois_on_map: true,
-            show_dangers_on_map: true,
+            show_pois_on_map: false,
+            show_dangers_on_map: false,
             show_stages_on_map: true,
             auto_check_updates: true,
         };

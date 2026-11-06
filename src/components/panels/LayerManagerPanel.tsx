@@ -191,6 +191,12 @@ export default function LayerManagerPanel() {
                                 >
                                     {/* Detail */}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                                        {/* Rename */}
+                                        <input type="text" value={itin.name}
+                                            onChange={e => dispatch({ type: 'UPDATE_ITINERARY', id: itin.id, name: e.target.value })}
+                                            placeholder="Nom de l'itinéraire..."
+                                            style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '5px', padding: '4px 7px', color: '#fff', fontSize: '11px', outline: 'none' }}
+                                        />
                                         {/* Color */}
                                         <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                                             {PRESET_COLORS.map(c => (

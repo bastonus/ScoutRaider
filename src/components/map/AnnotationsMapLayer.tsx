@@ -1,68 +1,66 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Marker, Polygon, Polyline, Tooltip, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
-import { PointAnnotation, AreaAnnotation, AnnotationIcon } from '../../logic/types';
+import { buildAreaDisplayCoords } from '../../AppContext';
+import { AreaAnnotation } from '../../logic/types';
 import { calculatePolygonArea, formatArea, computeRoutedAreaBoundary } from '../../logic/GeoUtils';
+import { backgroundEngine, invalidateRouteCacheForLeg } from '../../logic/BackgroundEngine';
+import { IGNClient } from '../../logic/IGNClient';
 import { PRESET_COLORS } from './AnnotationModals';
-import { Check, X, Trash2, Edit2, Move, Trees, Compass, Plus, CornerDownRight } from 'lucide-react';
+import { Trash2, Trees } from 'lucide-react';
 
-const svgIcons: Record<AnnotationIcon, string> = {
-    pin: `<path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/>`,
-    camp: `<path d="M19 21 12 4 5 21"/><path d="m19 21-7-8-7 8"/><path d="M2 21h20"/>`,
-    flag: `<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>`,
-    water: `<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>`,
-    danger: `<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>`,
-    star: `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,
-    info: `<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>`,
-};
-
-function createPointIcon(color: string, iconType: AnnotationIcon = 'pin', isSelected: boolean = false) {
-    const iconPath = svgIcons[iconType] || svgIcons.pin;
+// ── Teardrop marker icon — title embedded in HTML, always visible ─────────────
+function createPointIcon(color: string, title: string, isSelected = false) {
+    const escaped = (title || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     return L.divIcon({
         className: 'annotation-point-marker',
-        html: `
+        html: `<div style="position:relative;display:inline-block;pointer-events:none;">
             <div style="
-                width: 28px;
-                height: 28px;
-                border-radius: 50% 50% 50% 0;
-                transform: rotate(-45deg);
-                background: ${color};
-                border: 2px solid #ffffff;
-                box-shadow: ${isSelected ? `0 0 0 3px #fff, 0 0 12px ${color}` : '0 2px 8px rgba(0,0,0,0.5)'};
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: grab;
-            ">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);">
-                    ${iconPath}
-                </svg>
-            </div>
-        `,
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
-        popupAnchor: [0, -26]
+                position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);
+                white-space:nowrap;color:#fff;font-size:13px;font-weight:800;
+                font-family:Inter,system-ui,sans-serif;letter-spacing:0.02em;
+                text-shadow:0 1px 4px rgba(0,0,0,0.98),0 0 12px rgba(0,0,0,0.85),
+                    1px 1px 0 rgba(0,0,0,0.9),-1px -1px 0 rgba(0,0,0,0.9),
+                    1px -1px 0 rgba(0,0,0,0.9),-1px 1px 0 rgba(0,0,0,0.9);
+                pointer-events:none;line-height:1;
+            ">${escaped}</div>
+            <svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg"
+                style="filter:drop-shadow(0 2px 5px rgba(0,0,0,0.55));cursor:grab;display:block;">
+                <path d="M13,1 C7,1 2,6 2,12 C2,20 13,33 13,33 C13,33 24,20 24,12 C24,6 19,1 13,1 Z"
+                    fill="${color}" stroke="${isSelected ? '#fff' : 'rgba(255,255,255,0.75)'}"
+                    stroke-width="${isSelected ? 2.5 : 1.5}"/>
+                <circle cx="13" cy="12" r="${isSelected ? 4 : 3}"
+                    fill="${isSelected ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.65)'}"/>
+            </svg>
+        </div>`,
+        iconSize: [26, 34], iconAnchor: [13, 33], popupAnchor: [0, -50]
     });
 }
 
-function createVertexHandleIcon(color: string, isFirst: boolean = false) {
+function createVertexIcon(color: string, isFirst = false, isDraft = false) {
+    const s = isFirst ? 14 : 11;
+    const border = isDraft ? `3px solid ${color}` : `${isFirst ? 3 : 2}px solid ${color}`;
     return L.divIcon({
         className: 'area-vertex-handle',
-        html: `
-            <div style="
-                width: ${isFirst ? '14px' : '11px'};
-                height: ${isFirst ? '14px' : '11px'};
-                border-radius: 50%;
-                background: ${isFirst ? '#ffffff' : '#ffffff'};
-                border: ${isFirst ? '3px' : '2px'} solid ${color};
-                box-shadow: 0 1px 6px rgba(0,0,0,0.65);
-                cursor: move;
-            "></div>
-        `,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7]
+        html: `<div style="width:${s}px;height:${s}px;border-radius:50%;background:#fff;border:${border};box-shadow:0 1px 6px rgba(0,0,0,0.65);cursor:move;"></div>`,
+        iconSize: [s, s], iconAnchor: [s / 2, s / 2]
     });
+}
+
+// ── BRouter edge request for area annotations ─────────────────────────────────
+// legKey format: "area-edge-{areaId}-{edgeIdx}"
+// Results are handled in AppContext BackgroundEngine listener.
+function enqueueAreaEdge(areaId: string, edgeIdx: number, p1: [number, number], p2: [number, number]) {
+    const legKey = `area-edge-${areaId}-${edgeIdx}`;
+    invalidateRouteCacheForLeg(p1, p2, 'pedestrian');
+    backgroundEngine.enqueue('route_leg', 0, legKey, {
+        p1, p2,
+        profile: 'pedestrian',
+        small_roads: false,
+        legKey,
+    }, legKey); // dedupKey = legKey → new drag cancels the pending one
 }
 
 export default function AnnotationsMapLayer() {
@@ -70,153 +68,192 @@ export default function AnnotationsMapLayer() {
     const map = useMap();
     const activeTool = state.active_tool;
 
-    // Selected item for interaction
+    // ── Selection ─────────────────────────────────────────────────────────────
     const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
     const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
 
-    // Live dragging vertex state (areaId, vertexIdx, live coordinates during drag)
+    // ── Point hover / geocode cache ───────────────────────────────────────────
+    const [hoveringPointId, setHoveringPointId] = useState<string | null>(null);
+    const addressCache = useRef<Record<string, string>>({});
+
+    // ── Live vertex drag (60fps preview) ─────────────────────────────────────
     const [liveDragVertex, setLiveDragVertex] = useState<{ areaId: string; vertexIdx: number; coords: [number, number] } | null>(null);
 
-    // ── DRAWING STATE: accumulate vertices locally (not committed to store until validated)
-    // Vertices are stored in state for real-time preview, but the area is marked "draft" until confirmed.
-    // draft vertices stored locally for preview line
-    const [draftVertices, setDraftVertices] = useState<[number, number][]>([]);
+    // ── AREA DRAWING state (pure local → auto-committed per click) ────────────
+    const [draftCoords, setDraftCoords] = useState<[number, number][]>([]);
+    const draftCoordsRef = useRef<[number, number][]>([]);
+    // draftEdgeRoutes mirrors store edgeRoutes for the in-progress area
+    const [draftEdgeRoutes, setDraftEdgeRoutes] = useState<([number, number][] | null)[]>([]);
+    const draftEdgeRoutesRef = useRef<([number, number][] | null)[]>([]);
     const [draftAreaId, setDraftAreaId] = useState<string | null>(null);
+    const draftAreaIdRef = useRef<string | null>(null);
+    const [cursorPos, setCursorPos] = useState<[number, number] | null>(null);
+    const ignoreNextClick = useRef(false);
 
-    // Finish / validate the current drawing (called on double-click or "Terminer" button)
-    const finishDrawing = useCallback(() => {
-        if (!draftAreaId) return;
-        const area = state.area_annotations.find(a => a.id === draftAreaId);
-        if (!area || area.coords.length < 3) {
-            dispatch({ type: 'ADD_NOTIFICATION', message: 'Tracez au moins 3 sommets pour valider la zone.', notifType: 'warning' });
+    const isDrawingArea = activeTool === 'annotate_area' || activeTool === 'annotate_area_routed';
+
+    // Sync draftEdgeRoutes from store (BackgroundEngine populates them via AppContext listener)
+    useEffect(() => {
+        if (!draftAreaIdRef.current) return;
+        const area = state.area_annotations?.find(a => a.id === draftAreaIdRef.current);
+        if (area?.edgeRoutes) {
+            draftEdgeRoutesRef.current = area.edgeRoutes;
+            setDraftEdgeRoutes([...area.edgeRoutes]);
+        }
+    }, [state.area_annotations]);
+
+    // Auto-cancel when tool switches away externally
+    useEffect(() => {
+        if (!isDrawingArea && draftAreaIdRef.current) {
+            draftCoordsRef.current = [];
+            draftEdgeRoutesRef.current = [];
+            draftAreaIdRef.current = null;
+            setDraftCoords([]);
+            setDraftEdgeRoutes([]);
+            setDraftAreaId(null);
+            setCursorPos(null);
+        }
+    }, [isDrawingArea]);
+
+    // ── Reset draft ───────────────────────────────────────────────────────────
+    const resetDraft = useCallback(() => {
+        draftCoordsRef.current = [];
+        draftEdgeRoutesRef.current = [];
+        draftAreaIdRef.current = null;
+        setDraftCoords([]);
+        setDraftEdgeRoutes([]);
+        setDraftAreaId(null);
+        setCursorPos(null);
+    }, []);
+
+    // ── Finish drawing ────────────────────────────────────────────────────────
+    const finishDrawing = useCallback((toolOverride?: string) => {
+        const coords = draftCoordsRef.current;
+        const id = draftAreaIdRef.current;
+        const tool = toolOverride ?? activeTool;
+
+        if (!id) return;
+
+        if (coords.length < 3) {
+            dispatch({ type: 'REMOVE_AREA_ANNOTATION', id });
+            resetDraft();
             return;
         }
-        // The area is already in state (committed incrementally), just clear the draft state
-        setDraftAreaId(null);
-        setDraftVertices([]);
-        dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
-        dispatch({ type: 'ADD_NOTIFICATION', message: `Zone "${area.title}" validée (${area.formatted_area || formatArea(calculatePolygonArea(area.coords))}).`, notifType: 'info' });
-    }, [draftAreaId, state.area_annotations, dispatch]);
 
-    // Cancel the current drawing
-    const cancelDrawing = useCallback(() => {
-        if (draftAreaId) {
-            dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: draftAreaId });
+        // For routed tool: request the closing edge (last → first)
+        if (tool === 'annotate_area_routed' && coords.length >= 3) {
+            const n = coords.length;
+            enqueueAreaEdge(id, n - 1, coords[n - 1], coords[0]);
         }
-        setDraftAreaId(null);
-        setDraftVertices([]);
+
+        const displayCoords = buildAreaDisplayCoords(coords, draftEdgeRoutesRef.current);
+        const m2 = calculatePolygonArea(displayCoords.length >= 3 ? displayCoords : coords);
+        dispatch({
+            type: 'UPDATE_AREA_ANNOTATION', id,
+            patch: { coords, area_m2: m2, formatted_area: formatArea(m2) }
+        });
+
+        resetDraft();
         dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
-    }, [draftAreaId, dispatch]);
+    }, [activeTool, dispatch, resetDraft]);
 
-    // Filter points & areas by layer visibility
-    const layersMap = new Map((state.annotation_layers || []).map(l => [l.id, l.visible]));
-    const visiblePoints = (state.point_annotations || []).filter(p => {
-        const layerVisible = layersMap.has(p.layerId) ? layersMap.get(p.layerId) : true;
-        return layerVisible && p.visible;
-    });
-    const visibleAreas = (state.area_annotations || []).filter(a => {
-        const layerVisible = layersMap.has(a.layerId) ? layersMap.get(a.layerId) : true;
-        return layerVisible && a.visible;
-    });
+    // ── Cancel drawing ────────────────────────────────────────────────────────
+    const cancelDrawing = useCallback(() => {
+        const id = draftAreaIdRef.current;
+        if (id) {
+            backgroundEngine.clearByType('route_leg'); // cancel pending edge requests
+            dispatch({ type: 'REMOVE_AREA_ANNOTATION', id });
+        }
+        resetDraft();
+        dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
+    }, [dispatch, resetDraft]);
 
-    // Toggle route trail following for an area
+    // ── Toggle road-follow on existing area ───────────────────────────────────
     const handleToggleRoadFollow = useCallback(async (area: AreaAnnotation) => {
         const newFollow = !area.followRoads;
         if (!newFollow) {
-            dispatch({
-                type: 'UPDATE_AREA_ANNOTATION',
-                id: area.id,
-                patch: { followRoads: false, routedCoords: undefined }
-            });
+            dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { followRoads: false, edgeRoutes: undefined, routedCoords: undefined } });
             return;
         }
-
-        setIsRoutingArea(true);
-        dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Calcul du tracé sur les chemins...' });
-
-        try {
-            const routed = await computeRoutedAreaBoundary(area.coords, 'pedestrian');
-            const m2 = calculatePolygonArea(routed);
-            dispatch({
-                type: 'UPDATE_AREA_ANNOTATION',
-                id: area.id,
-                patch: {
-                    followRoads: true,
-                    routedCoords: routed,
-                    area_m2: m2,
-                    formatted_area: formatArea(m2)
-                }
-            });
-            dispatch({ type: 'ADD_NOTIFICATION', message: `Arêtes ajustées sur les chemins (${formatArea(m2)})`, notifType: 'info' });
-        } catch (e) {
-            console.error('Failed to route area edges:', e);
-            dispatch({ type: 'ADD_NOTIFICATION', message: 'Impossible de router toutes les arêtes.', notifType: 'warning' });
-        } finally {
-            setIsRoutingArea(false);
-            dispatch({ type: 'SET_LOADING', isLoading: false });
+        // Request all edges via BackgroundEngine
+        dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Calcul des arêtes...' });
+        const n = area.coords.length;
+        const newEdgeRoutes: ([number, number][] | null)[] = Array(n).fill(null);
+        dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { followRoads: true, edgeRoutes: newEdgeRoutes } });
+        for (let i = 0; i < n; i++) {
+            enqueueAreaEdge(area.id, i, area.coords[i], area.coords[(i + 1) % n]);
         }
     }, [dispatch]);
 
-    // Map click / dblclick events
+    // Filter visible
+    const layersMap = new Map((state.annotation_layers || []).map(l => [l.id, l.visible]));
+    const visiblePoints = (state.point_annotations || []).filter(p => {
+        const lv = layersMap.has(p.layerId) ? layersMap.get(p.layerId) : true;
+        return lv && p.visible;
+    });
+    const visibleAreas = (state.area_annotations || []).filter(a => {
+        if (a.id === draftAreaId) return false; // rendered via local preview
+        const lv = layersMap.has(a.layerId) ? layersMap.get(a.layerId) : true;
+        return lv && a.visible;
+    });
+
+    // ── Map events ────────────────────────────────────────────────────────────
     useMapEvents({
+        mousemove(e) {
+            if (isDrawingArea) setCursorPos([e.latlng.lat, e.latlng.lng]);
+        },
+
         click(e) {
             if ((window as any).__markerDragging) return;
+            if (ignoreNextClick.current) { ignoreNextClick.current = false; return; }
 
             if (activeTool === 'annotate_point') {
-                // INSTANT point placement on click
                 const ptCount = (state.point_annotations?.length || 0) + 1;
                 const coords: [number, number] = [e.latlng.lat, e.latlng.lng];
                 dispatch({
                     type: 'ADD_POINT_ANNOTATION',
-                    point: {
-                        type: 'point' as const,
-                        title: `Repère ${ptCount}`,
-                        text: '',
-                        coords,
-                        color: '#3b82f6',
-                        icon: 'pin' as const,
-                        layerId: 'layer-points',
-                        visible: true
-                    }
+                    point: { type: 'point' as const, title: `Repère ${ptCount}`, text: '', coords, color: '#3b82f6', icon: 'pin' as const, layerId: 'layer-points', visible: true }
                 });
-                dispatch({ type: 'ADD_NOTIFICATION', message: `Repère ${ptCount} placé. Clic droit pour supprimer, glisser pour déplacer.`, notifType: 'info' });
 
-            } else if (activeTool === 'annotate_area') {
-                const clickedPt: [number, number] = [e.latlng.lat, e.latlng.lng];
+            } else if (activeTool === 'annotate_area' || activeTool === 'annotate_area_routed') {
+                const pt: [number, number] = [e.latlng.lat, e.latlng.lng];
+                const prevCoords = draftCoordsRef.current;
+                const newCoords: [number, number][] = [...prevCoords, pt];
+                draftCoordsRef.current = newCoords;
+                setDraftCoords([...newCoords]);
 
-                if (!draftAreaId) {
-                    // Start a NEW draft area — create it in state with 1 vertex
-                    const areaCount = (state.area_annotations?.length || 0) + 1;
+                if (!draftAreaIdRef.current) {
+                    // First click — create area in store
                     const newId = `area-annot-${Date.now()}`;
+                    draftAreaIdRef.current = newId;
+                    setDraftAreaId(newId);
+                    const areaCount = (state.area_annotations?.length || 0) + 1;
                     dispatch({
                         type: 'ADD_AREA_ANNOTATION',
                         area: {
-                            id: newId,
-                            type: 'area' as const,
-                            title: `Zone ${areaCount}`,
-                            text: '',
-                            layerId: 'layer-areas',
-                            coords: [clickedPt],
-                            color: '#10b981',
-                            fillOpacity: 0.22,
-                            visible: true,
-                            followRoads: false
+                            id: newId, type: 'area' as const,
+                            title: `Zone ${areaCount}`, text: '',
+                            layerId: 'layer-areas', coords: [pt],
+                            color: '#5b6af0', fillOpacity: 0.3,
+                            visible: true, followRoads: activeTool === 'annotate_area_routed',
+                            edgeRoutes: [],
                         } as any
                     });
-                    setDraftAreaId(newId);
-                    setDraftVertices([clickedPt]);
                 } else {
-                    // Append vertex to the existing draft
-                    const area = state.area_annotations.find(a => a.id === draftAreaId);
-                    if (!area) return;
-                    const newCoords: [number, number][] = [...area.coords, clickedPt];
+                    // Subsequent clicks
+                    const id = draftAreaIdRef.current;
+                    const edgeIdx = prevCoords.length - 1; // edge from prevCoords[last] → pt
+
+                    // For routed tool: enqueue BRouter for the new edge
+                    if (activeTool === 'annotate_area_routed' && prevCoords.length >= 1) {
+                        enqueueAreaEdge(id, edgeIdx, prevCoords[prevCoords.length - 1], pt);
+                    }
+
                     const m2 = newCoords.length >= 3 ? calculatePolygonArea(newCoords) : 0;
                     dispatch({
-                        type: 'UPDATE_AREA_ANNOTATION',
-                        id: draftAreaId,
-                        patch: { coords: newCoords, routedCoords: undefined, area_m2: m2, formatted_area: formatArea(m2) }
+                        type: 'UPDATE_AREA_ANNOTATION', id,
+                        patch: { coords: newCoords, area_m2: m2, formatted_area: newCoords.length >= 3 ? formatArea(m2) : '' }
                     });
-                    setDraftVertices(newCoords);
                 }
 
             } else {
@@ -226,191 +263,167 @@ export default function AnnotationsMapLayer() {
         },
 
         dblclick(e) {
-            // Double-click to finish drawing (also fires a click first — we need to prevent double-add)
-            if (activeTool === 'annotate_area' && draftAreaId) {
-                // The last click already added a vertex; remove it and finish
-                const area = state.area_annotations.find(a => a.id === draftAreaId);
-                if (area && area.coords.length > 3) {
-                    // Remove the last duplicate vertex added by the click event
-                    const trimmed = area.coords.slice(0, -1);
-                    const m2 = calculatePolygonArea(trimmed);
-                    dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: draftAreaId, patch: { coords: trimmed, area_m2: m2, formatted_area: formatArea(m2) } });
-                }
-                finishDrawing();
+            if ((activeTool === 'annotate_area' || activeTool === 'annotate_area_routed') && draftAreaIdRef.current) {
+                ignoreNextClick.current = true;
+                const before = draftCoordsRef.current;
+                const trimmed = before.length > 3 ? before.slice(0, -1) : before;
+                draftCoordsRef.current = trimmed;
+                setDraftCoords([...trimmed]);
+                finishDrawing(activeTool);
                 L.DomEvent.stopPropagation(e as any);
+            }
+        },
+
+        keydown(e: any) {
+            if (activeTool === 'annotate_area' || activeTool === 'annotate_area_routed') {
+                if (e.originalEvent?.key === 'Escape') cancelDrawing();
+                if (e.originalEvent?.key === 'Enter') finishDrawing(activeTool);
             }
         }
     });
 
-    // Handle vertex drag live in real-time
-    const handleVertexDrag = (areaId: string, vertexIdx: number, e: any) => {
-        const latlng = e.target.getLatLng();
-        setLiveDragVertex({
-            areaId,
-            vertexIdx,
-            coords: [latlng.lat, latlng.lng]
-        });
+    // ── Vertex drag on finalized areas ────────────────────────────────────────
+    const handleVertexDrag = (areaId: string, vIdx: number, e: any) => {
+        const ll = e.target.getLatLng();
+        setLiveDragVertex({ areaId, vertexIdx: vIdx, coords: [ll.lat, ll.lng] });
     };
 
-    const handleVertexDragEnd = (areaId: string, vertexIdx: number, e: any) => {
-        const latlng = e.target.getLatLng();
+    const handleVertexDragEnd = (areaId: string, vIdx: number, e: any) => {
+        const ll = e.target.getLatLng();
         const area = state.area_annotations.find(a => a.id === areaId);
         setLiveDragVertex(null);
-
         if (!area) return;
-        const newCoords: [number, number][] = [...area.coords];
-        newCoords[vertexIdx] = [latlng.lat, latlng.lng];
-        const m2 = calculatePolygonArea(newCoords);
 
-        dispatch({
-            type: 'UPDATE_AREA_ANNOTATION',
-            id: areaId,
-            patch: {
-                coords: newCoords,
-                routedCoords: undefined, // reset routed coords on vertex move
-                area_m2: m2,
-                formatted_area: formatArea(m2)
-            }
-        });
+        const nc = [...area.coords] as [number, number][];
+        nc[vIdx] = [ll.lat, ll.lng];
+        const n = nc.length;
 
-        // If followRoads was active, recompute in background
+        // Reset edge routes for the two adjacent edges
+        const newEdgeRoutes = area.edgeRoutes ? [...area.edgeRoutes] : Array(n).fill(null);
+        const prevIdx = (vIdx - 1 + n) % n;
+        newEdgeRoutes[prevIdx] = null; // edge from prev vertex → moved vertex
+        newEdgeRoutes[vIdx] = null;    // edge from moved vertex → next vertex
+
+        const displayPoly = buildAreaDisplayCoords(nc, newEdgeRoutes);
+        const m2 = calculatePolygonArea(displayPoly.length >= 3 ? displayPoly : nc);
+        dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: areaId, patch: { coords: nc, edgeRoutes: newEdgeRoutes, area_m2: m2, formatted_area: formatArea(m2) } });
+
+        // Re-route the two adjacent edges (if area uses road-following)
         if (area.followRoads) {
-            computeRoutedAreaBoundary(newCoords, 'pedestrian').then(routed => {
-                const routedM2 = calculatePolygonArea(routed);
-                dispatch({
-                    type: 'UPDATE_AREA_ANNOTATION',
-                    id: areaId,
-                    patch: {
-                        routedCoords: routed,
-                        area_m2: routedM2,
-                        formatted_area: formatArea(routedM2)
-                    }
-                });
-            }).catch(() => {});
+            enqueueAreaEdge(areaId, prevIdx, nc[prevIdx], nc[vIdx]);
+            enqueueAreaEdge(areaId, vIdx, nc[vIdx], nc[(vIdx + 1) % n]);
         }
 
         setTimeout(() => { (window as any).__markerDragging = false; }, 100);
     };
 
-    // Handle deleting a vertex of an area
-    const handleDeleteVertex = (areaId: string, vertexIdx: number) => {
-        const area = state.area_annotations.find(a => a.id === areaId);
-        if (!area || area.coords.length <= 3) {
-            dispatch({ type: 'ADD_NOTIFICATION', message: 'Une zone doit comporter au moins 3 sommets.', notifType: 'warning' });
-            return;
-        }
+    // ── Toggle individual edge: BRouter ↔ straight ───────────────────────────
+    const handleToggleEdge = useCallback((area: AreaAnnotation, edgeIdx: number) => {
+        const n = area.coords.length;
+        const newEdgeRoutes: ([number, number][] | null)[] = area.edgeRoutes
+            ? [...area.edgeRoutes]
+            : Array(n).fill(null);
+        // Ensure array is the right length
+        while (newEdgeRoutes.length < n) newEdgeRoutes.push(null);
 
-        dispatch({ type: 'DELETE_AREA_VERTEX', areaId, vertexIdx });
-        dispatch({ type: 'ADD_NOTIFICATION', message: `Sommet #${vertexIdx + 1} supprimé.`, notifType: 'info' });
-    };
+        const isCurrentlyRouted = !!(newEdgeRoutes[edgeIdx] && newEdgeRoutes[edgeIdx]!.length >= 2);
+
+        if (isCurrentlyRouted) {
+            // Switch to straight
+            newEdgeRoutes[edgeIdx] = null;
+            const dp = buildAreaDisplayCoords(area.coords, newEdgeRoutes);
+            const m2 = calculatePolygonArea(dp.length >= 3 ? dp : area.coords);
+            dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { edgeRoutes: newEdgeRoutes, area_m2: m2, formatted_area: formatArea(m2) } });
+        } else {
+            // Switch to BRouter — enqueue and mark pending (null = will be filled by engine)
+            newEdgeRoutes[edgeIdx] = null;
+            dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { edgeRoutes: newEdgeRoutes } });
+            enqueueAreaEdge(area.id, edgeIdx, area.coords[edgeIdx], area.coords[(edgeIdx + 1) % n]);
+        }
+    }, [dispatch]);
+
+    // ── Draft display polygon (combines local coords + BRouter edges from store) ─
+    const draftDisplayCoords = buildAreaDisplayCoords(draftCoords, draftEdgeRoutes);
 
     return (
         <>
-            {/* ── 1. RENDER POINT ANNOTATIONS (DRAGGABLE + PERMANENT LABELS) ── */}
+            {/* ── 1. POINT ANNOTATIONS ──────────────────────────────────────── */}
             {visiblePoints.map(point => {
                 const isSelected = selectedPointId === point.id;
-                const icon = createPointIcon(point.color || '#3b82f6', point.icon || 'pin', isSelected);
-
                 return (
                     <Marker
                         key={point.id}
                         position={point.coords}
-                        icon={icon}
+                        icon={createPointIcon(point.color || '#3b82f6', point.title || '', isSelected)}
                         draggable={true}
                         eventHandlers={{
-                            dragstart: () => {
-                                (window as any).__markerDragging = true;
-                            },
+                            dragstart: () => { (window as any).__markerDragging = true; },
                             dragend: (e: any) => {
-                                const pos = e.target.getLatLng();
-                                dispatch({
-                                    type: 'UPDATE_POINT_ANNOTATION',
-                                    id: point.id,
-                                    patch: { coords: [pos.lat, pos.lng] }
-                                });
+                                const p = e.target.getLatLng();
+                                dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { coords: [p.lat, p.lng] } });
+                                delete addressCache.current[point.id];
                                 setTimeout(() => { (window as any).__markerDragging = false; }, 100);
                             },
-                            click: (e: any) => {
-                                setSelectedPointId(point.id);
+                            click: () => setSelectedPointId(point.id === selectedPointId ? null : point.id),
+                            mouseover: async () => {
+                                setHoveringPointId(point.id);
+                                if (!addressCache.current[point.id]) {
+                                    const addr = await IGNClient.reverseGeocode(point.coords[0], point.coords[1]);
+                                    addressCache.current[point.id] = addr;
+                                    setHoveringPointId(id => id);
+                                }
                             },
+                            mouseout: () => setHoveringPointId(null),
                             contextmenu: (e: any) => {
-                                // RIGHT-CLICK DELETES THE POINT IMMEDIATELY!
                                 L.DomEvent.stopPropagation(e);
                                 dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: point.id });
-                                dispatch({ type: 'ADD_NOTIFICATION', message: `Point "${point.title}" supprimé.`, notifType: 'info' });
                             }
                         }}
                     >
-                        {/* PERMANENT LABEL DIRECTLY VISIBLE ON THE MAP */}
-                        <Tooltip
-                            permanent={true}
-                            direction="bottom"
-                            offset={[0, 4]}
-                            className="sr-map-label-point"
-                        >
-                            <span style={{ color: point.color || '#3b82f6', marginRight: '4px' }}>●</span>
-                            <span>{point.title}</span>
-                        </Tooltip>
-
-                        {/* Interactive edit card on click */}
-                        <Popup className="sr-annotation-popup" autoPanPadding={[40, 40]}>
-                            <div style={{
-                                minWidth: '220px', padding: '10px',
-                                background: '#141e17', borderRadius: '10px',
-                                border: `1px solid ${point.color || '#3b82f6'}55`,
-                                color: '#e8f0eb', fontFamily: 'var(--font-ui, sans-serif)'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: point.color, flexShrink: 0 }} />
-                                    <input
-                                        type="text"
-                                        value={point.title}
-                                        onChange={e => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { title: e.target.value } })}
-                                        style={{
-                                            flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-                                            borderRadius: '6px', padding: '4px 6px', color: '#fff', fontWeight: 700, fontSize: '12px', outline: 'none'
-                                        }}
-                                        placeholder="Nom du repère..."
-                                    />
+                        {/* Hover card — description + address (shown on hover only) */}
+                        {hoveringPointId === point.id && (point.text || addressCache.current[point.id]) && (
+                            <Tooltip permanent direction="top" offset={[0, -60]} className="sr-map-label-point-hover">
+                                {point.text && (
+                                    <div style={{ marginBottom: '4px', fontSize: '11px', color: '#e2e8f0', maxWidth: '200px', whiteSpace: 'normal', lineHeight: 1.4 }}>
+                                        {point.text}
+                                    </div>
+                                )}
+                                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
+                                    {addressCache.current[point.id] || `${point.coords[0].toFixed(5)}, ${point.coords[1].toFixed(5)}`}
                                 </div>
+                            </Tooltip>
+                        )}
 
-                                <textarea
-                                    rows={2}
-                                    value={point.text || ''}
-                                    onChange={e => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { text: e.target.value } })}
-                                    placeholder="Notes, consignes..."
-                                    style={{
-                                        width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.25)',
-                                        border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '5px',
-                                        color: '#cbd5e1', fontSize: '11px', outline: 'none', resize: 'vertical', marginBottom: '8px'
-                                    }}
+                        {/* Edit popup */}
+                        <Popup className="sr-annotation-popup" autoPanPadding={[40, 40]}>
+                            <div style={{ minWidth: '210px', padding: '10px', background: '#141e17', borderRadius: '10px', border: `1px solid ${point.color || '#3b82f6'}55`, color: '#e8f0eb' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: point.color || '#3b82f6', flexShrink: 0 }} />
+                                    <span style={{ fontWeight: 800, fontSize: '13px', color: '#fff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{point.title}</span>
+                                </div>
+                                <input type="text" value={point.title}
+                                    onChange={e => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { title: e.target.value } })}
+                                    placeholder="Nom du repère..."
+                                    style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '4px 8px', color: '#fff', fontWeight: 600, fontSize: '11px', outline: 'none', marginBottom: '8px' }}
                                 />
-
-                                <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginBottom: '8px' }}>
+                                <textarea rows={2} value={point.text || ''}
+                                    onChange={e => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { text: e.target.value } })}
+                                    placeholder="Notes..."
+                                    style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '5px', color: '#cbd5e1', fontSize: '11px', outline: 'none', resize: 'vertical', marginBottom: '8px' }}
+                                />
+                                <div style={{ display: 'flex', gap: '5px', marginBottom: '8px' }}>
                                     {PRESET_COLORS.map(c => (
-                                        <div
-                                            key={c.value}
-                                            title={c.label}
+                                        <div key={c.value} title={c.label}
                                             onClick={() => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { color: c.value } })}
-                                            style={{
-                                                width: '14px', height: '14px', borderRadius: '50%', background: c.value, cursor: 'pointer',
-                                                boxShadow: point.color === c.value ? '0 0 0 2px #fff' : 'none'
-                                            }}
+                                            style={{ width: '14px', height: '14px', borderRadius: '50%', background: c.value, cursor: 'pointer', boxShadow: point.color === c.value ? '0 0 0 2px #fff' : 'none' }}
                                         />
                                     ))}
                                 </div>
-
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '9px', color: 'rgba(255,255,255,0.4)', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px' }}>
-                                    <span>Glisser pour déplacer · Clic droit pour supprimer</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: point.id })}
-                                        style={{
-                                            background: 'transparent', border: 'none', color: '#ef4444',
-                                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px'
-                                        }}
-                                    >
-                                        <Trash2 size={11} /> Supprimer
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'rgba(255,255,255,0.4)', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px' }}>
+                                    <span>Glisser · Clic droit = supprimer</span>
+                                    <button type="button" onClick={() => dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: point.id })}
+                                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}>
+                                        <Trash2 size={11} />
                                     </button>
                                 </div>
                             </div>
@@ -419,278 +432,244 @@ export default function AnnotationsMapLayer() {
                 );
             })}
 
-            {/* ── 2. RENDER AREA ANNOTATIONS (REAL-TIME LIVE DRAG + ROUTED EDGES) ── */}
-            {visibleAreas.map(area => {
-                const isSelected = selectedAreaId === area.id || draftAreaId === area.id;
-                
-                // Build live display coordinates (if dragging a vertex, update it in 60fps real-time!)
-                let displayCoords = area.followRoads && area.routedCoords && area.routedCoords.length >= 3
-                    ? area.routedCoords
-                    : area.coords;
+            {/* ── 2. DRAFT POLYGON PREVIEW ──────────────────────────────────── */}
+            {isDrawingArea && draftCoords.length > 0 && (
+                <>
+                    {/* Closed polygon preview */}
+                    {draftDisplayCoords.length >= 3 && (
+                        <Polygon
+                            positions={draftDisplayCoords}
+                            pathOptions={{ color: '#5b6af0', fillColor: '#5b6af0', fillOpacity: 0.2, weight: 2, dashArray: '6 4' }}
+                            interactive={false}
+                        />
+                    )}
+                    {/* Open polyline when < 3 control points */}
+                    {draftCoords.length >= 2 && draftDisplayCoords.length < 3 && (
+                        <Polyline
+                            positions={draftDisplayCoords}
+                            pathOptions={{ color: '#5b6af0', weight: 2, dashArray: '6 4' }}
+                            interactive={false}
+                        />
+                    )}
+                    {/* Rubber-band to cursor */}
+                    {cursorPos && draftCoords.length > 0 && (
+                        <Polyline
+                            positions={[draftCoords[draftCoords.length - 1], cursorPos]}
+                            pathOptions={{ color: '#5b6af0', weight: 2, dashArray: '4 4', opacity: 0.6 }}
+                            interactive={false}
+                        />
+                    )}
+                    {/* Draft vertex dots — tooltip hint on hover */}
+                    {draftCoords.map((v, i) => (
+                        <Marker
+                            key={`draft-v-${i}`}
+                            position={v}
+                            icon={createVertexIcon('#5b6af0', i === 0, true)}
+                            interactive={true}
+                        >
+                            <Tooltip direction="top" offset={[0, -8]}>
+                                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.75)' }}>
+                                    {i === 0
+                                        ? <span>S1 — <b>Double-clic</b> pour fermer · Échap pour annuler</span>
+                                        : <span>S{i + 1}{draftCoords.length >= 3 && i === draftCoords.length - 1 ? ' — Double-clic pour terminer' : ''}</span>
+                                    }
+                                    {activeTool === 'annotate_area_routed' && i > 0 && draftEdgeRoutes[i - 1] && (
+                                        <span style={{ color: '#10b981', marginLeft: '4px' }}>⛰ routé</span>
+                                    )}
+                                </div>
+                            </Tooltip>
+                        </Marker>
+                    ))}
+                </>
+            )}
 
-                if (liveDragVertex && liveDragVertex.areaId === area.id && !area.followRoads) {
-                    const modified = [...area.coords];
-                    modified[liveDragVertex.vertexIdx] = liveDragVertex.coords;
-                    displayCoords = modified;
+            {/* ── 3. FINALIZED AREAS (from store, draft excluded) ───────────── */}
+            {visibleAreas.map(area => {
+                const isSelected = selectedAreaId === area.id;
+
+                // Build display coords: use edgeRoutes if available, else straight
+                let displayCoords = buildAreaDisplayCoords(area.coords, area.edgeRoutes);
+
+                // Live drag preview overrides the moved vertex and clears adjacent routed edges
+                if (liveDragVertex && liveDragVertex.areaId === area.id) {
+                    const nc = [...area.coords] as [number, number][];
+                    nc[liveDragVertex.vertexIdx] = liveDragVertex.coords;
+                    const n = nc.length;
+                    const tempEdges = area.edgeRoutes ? [...area.edgeRoutes] : Array(n).fill(null);
+                    tempEdges[(liveDragVertex.vertexIdx - 1 + n) % n] = null;
+                    tempEdges[liveDragVertex.vertexIdx] = null;
+                    displayCoords = buildAreaDisplayCoords(nc, tempEdges);
                 }
 
-                // If area has fewer than 3 points (during very initial click), draw polyline instead of polygon
                 const isComplete = displayCoords.length >= 3;
-                const liveAreaM2 = isComplete ? calculatePolygonArea(displayCoords) : 0;
-                const formatted = isComplete ? (area.formatted_area || formatArea(liveAreaM2)) : '';
+                const liveM2 = isComplete ? calculatePolygonArea(displayCoords) : 0;
+                const formatted = isComplete ? (area.formatted_area || formatArea(liveM2)) : '';
+                const hasRouted = area.edgeRoutes?.some(e => e && e.length > 0);
+                const n = area.coords.length;
 
                 return (
                     <React.Fragment key={area.id}>
+
+                        {/* ── Fill polygon (non-interactive when selected: clicks go to edges) ── */}
                         {isComplete ? (
                             <Polygon
                                 positions={displayCoords}
                                 pathOptions={{
-                                    color: area.color || '#10b981',
-                                    fillColor: area.color || '#10b981',
-                                    fillOpacity: isSelected ? 0.35 : (area.fillOpacity ?? 0.22),
-                                    weight: isSelected ? 3.5 : 2,
-                                    dashArray: area.followRoads ? undefined : undefined
+                                    color: isSelected ? 'transparent' : (area.color || '#5b6af0'),
+                                    fillColor: area.color || '#5b6af0',
+                                    fillOpacity: isSelected ? 0.18 : (area.fillOpacity ?? 0.22),
+                                    weight: isSelected ? 0 : 2,
                                 }}
                                 eventHandlers={{
                                     click: (e: any) => {
+                                        if (isSelected) return; // clicks go to edge polylines when selected
                                         L.DomEvent.stopPropagation(e);
-                                        setSelectedAreaId(isSelected ? null : area.id);
+                                        setSelectedAreaId(area.id);
                                     }
                                 }}
                             >
-                                {/* PERMANENT LABEL DIRECTLY VISIBLE ON THE MAP */}
-                                <Tooltip
-                                    permanent={true}
-                                    sticky={true}
-                                    direction="center"
-                                    className="sr-map-label-area"
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        {area.followRoads && <Trees size={12} style={{ color: '#10b981' }} />}
-                                        <span style={{ color: area.color || '#10b981' }}>{area.title}</span>
-                                        <span style={{ opacity: 0.8, fontWeight: 500 }}>({formatted})</span>
-                                    </div>
-                                </Tooltip>
-
-                                {/* Popup for inline adjustment */}
-                                <Popup className="sr-annotation-popup">
-                                    <div style={{
-                                        minWidth: '230px', padding: '10px',
-                                        background: '#141e17', borderRadius: '10px',
-                                        border: `1px solid ${area.color || '#10b981'}55`,
-                                        color: '#e8f0eb', fontFamily: 'var(--font-ui, sans-serif)'
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                                            <input
-                                                type="text"
-                                                value={area.title}
-                                                onChange={e => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { title: e.target.value } })}
-                                                style={{
-                                                    flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-                                                    borderRadius: '6px', padding: '4px 6px', color: '#fff', fontWeight: 700, fontSize: '12px', outline: 'none'
-                                                }}
-                                                placeholder="Nom de la zone..."
-                                            />
-                                        </div>
-
-                                        <div style={{
-                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                            fontSize: '11px', color: '#10b981', fontWeight: 700,
-                                            background: 'rgba(16, 185, 129, 0.12)', padding: '4px 8px', borderRadius: '6px',
-                                            marginBottom: '6px'
-                                        }}>
-                                            <span>Superficie :</span>
-                                            <span>{formatted}</span>
-                                        </div>
-
-                                        {/* Road / Trail Following Toggle */}
-                                        <button
-                                            type="button"
-                                            onClick={() => handleToggleRoadFollow(area)}
-                                            style={{
-                                                width: '100%', padding: '6px 8px', borderRadius: '6px',
-                                                background: area.followRoads ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                                                border: `1px solid ${area.followRoads ? '#10b981' : 'rgba(255, 255, 255, 0.15)'}`,
-                                                color: area.followRoads ? '#6ee7b7' : 'var(--text-bright)',
-                                                fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                                                marginBottom: '8px'
-                                            }}
-                                        >
-                                            <Trees size={14} style={{ color: area.followRoads ? '#10b981' : 'inherit' }} />
-                                            <span>{area.followRoads ? 'Arêtes sur sentiers (Actif)' : 'Suivre les chemins (BRouter)'}</span>
-                                        </button>
-
-                                        <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginBottom: '8px' }}>
-                                            {PRESET_COLORS.map(c => (
-                                                <div
-                                                    key={c.value}
-                                                    title={c.label}
-                                                    onClick={() => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { color: c.value } })}
-                                                    style={{
-                                                        width: '14px', height: '14px', borderRadius: '50%', background: c.value, cursor: 'pointer',
-                                                        boxShadow: area.color === c.value ? '0 0 0 2px #fff' : 'none'
-                                                    }}
-                                                />
-                                            ))}
-                                        </div>
-
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px', fontSize: '10px' }}>
-                                            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '9px' }}>
-                                                Glisser les sommets pour déformer · Clic droit sur sommet pour supprimer
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: area.id });
-                                                    setSelectedAreaId(null);
-                                                }}
-                                                style={{
-                                                    background: 'transparent', border: 'none', color: '#ef4444',
-                                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px'
-                                                }}
-                                            >
-                                                <Trash2 size={11} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </Popup>
+                                {!isSelected && (
+                                    <Tooltip permanent sticky direction="center" className="sr-map-label-area">
+                                        <span style={{ color: area.color || '#5b6af0' }}>{area.title}</span>
+                                        {' '}<span style={{ opacity: 0.75 }}>({formatted})</span>
+                                        {hasRouted && <span style={{ marginLeft: '4px', color: '#10b981' }}>⛰</span>}
+                                    </Tooltip>
+                                )}
                             </Polygon>
                         ) : (
-                            // Less than 3 points (draft line)
                             <Polyline
                                 positions={displayCoords}
-                                pathOptions={{
-                                    color: area.color || '#10b981',
-                                    weight: 2.5,
-                                    dashArray: '5, 5'
-                                }}
+                                pathOptions={{ color: area.color || '#5b6af0', weight: 2, dashArray: '6 4' }}
+                                eventHandlers={{ click: () => setSelectedAreaId(area.id) }}
                             />
                         )}
 
-                        {/* Interactive draggable vertex handles shown when zone is selected or active! */}
-                        {isSelected && area.coords.map((vertex, vIdx) => {
-                            // If this vertex is currently being live-dragged, use the live coordinates
-                            const pos = liveDragVertex && liveDragVertex.areaId === area.id && liveDragVertex.vertexIdx === vIdx
-                                ? liveDragVertex.coords
-                                : vertex;
+                        {/* ── Per-edge interactive polylines (selected only) ──────────── */}
+                        {isSelected && isComplete && area.coords.map((_, eIdx) => {
+                            const nextIdx = (eIdx + 1) % n;
+                            const edgeRoute = area.edgeRoutes?.[eIdx];
+                            const isRouted = !!(edgeRoute && edgeRoute.length >= 2);
+                            // Visible path: use routed if available, else straight from control points
+                            const visiblePts: [number,number][] = isRouted
+                                ? edgeRoute!
+                                : [area.coords[eIdx], area.coords[nextIdx]];
+                            // Live drag correction
+                            const edgePts: [number,number][] = (liveDragVertex && liveDragVertex.areaId === area.id)
+                                ? (() => {
+                                    const nc = [...area.coords] as [number,number][];
+                                    nc[liveDragVertex.vertexIdx] = liveDragVertex.coords;
+                                    const tempEdges = area.edgeRoutes ? [...area.edgeRoutes] : Array(n).fill(null);
+                                    const pIdx = (liveDragVertex.vertexIdx - 1 + n) % n;
+                                    tempEdges[pIdx] = null;
+                                    tempEdges[liveDragVertex.vertexIdx] = null;
+                                    if (eIdx === pIdx || eIdx === liveDragVertex.vertexIdx) {
+                                        return [nc[eIdx], nc[nextIdx]];
+                                    }
+                                    return visiblePts;
+                                  })()
+                                : visiblePts;
 
+                            return (
+                                <Polyline
+                                    key={`edge-${area.id}-${eIdx}`}
+                                    positions={edgePts}
+                                    pathOptions={{
+                                        color: isRouted ? '#10b981' : (area.color || '#5b6af0'),
+                                        weight: 3,
+                                        dashArray: isRouted ? undefined : '6 4',
+                                        opacity: 0.9,
+                                    }}
+                                    eventHandlers={{
+                                        click: (e: any) => {
+                                            L.DomEvent.stopPropagation(e);
+                                            handleToggleEdge(area, eIdx);
+                                        },
+                                        mouseover: (e: any) => { e.target.setStyle({ weight: 5, opacity: 1 }); },
+                                        mouseout:  (e: any) => { e.target.setStyle({ weight: 3, opacity: 0.9 }); },
+                                    }}
+                                >
+                                    <Tooltip sticky direction="top">
+                                        <div style={{ fontSize: '10px' }}>
+                                            {isRouted
+                                                ? <><span style={{ color: '#10b981' }}>⛰ BRouter</span> — <span style={{ color: 'rgba(255,255,255,0.5)' }}>clic → trait droit</span></>
+                                                : <>— Droit — <span style={{ color: '#10b981' }}>clic → router</span></>
+                                            }
+                                        </div>
+                                    </Tooltip>
+                                </Polyline>
+                            );
+                        })}
+
+                        {/* ── Draggable vertex handles (selected only) ─────────────────── */}
+                        {isSelected && area.coords.map((vertex, vIdx) => {
+                            const pos = liveDragVertex && liveDragVertex.areaId === area.id && liveDragVertex.vertexIdx === vIdx
+                                ? liveDragVertex.coords : vertex;
                             return (
                                 <Marker
                                     key={`vertex-${area.id}-${vIdx}`}
                                     position={pos}
-                                    icon={createVertexHandleIcon(area.color || '#10b981', vIdx === 0)}
+                                    icon={createVertexIcon(area.color || '#5b6af0', vIdx === 0)}
                                     draggable={true}
                                     eventHandlers={{
-                                        dragstart: () => {
-                                            (window as any).__markerDragging = true;
-                                        },
-                                        drag: (e: any) => {
-                                            // REAL-TIME VERTEX DRAGGING: updates polygon shape live at 60fps!
-                                            handleVertexDrag(area.id, vIdx, e);
-                                        },
-                                        dragend: (e: any) => {
-                                            handleVertexDragEnd(area.id, vIdx, e);
-                                        },
-                                        contextmenu: (e: any) => {
-                                            // RIGHT CLICK DELETES THIS VERTEX!
-                                            L.DomEvent.stopPropagation(e);
-                                            handleDeleteVertex(area.id, vIdx);
-                                        }
+                                        dragstart: () => { (window as any).__markerDragging = true; },
+                                        drag:    (e: any) => handleVertexDrag(area.id, vIdx, e),
+                                        dragend: (e: any) => handleVertexDragEnd(area.id, vIdx, e),
                                     }}
                                 >
                                     <Tooltip direction="top" offset={[0, -8]}>
                                         <div style={{ fontSize: '10px' }}>
-                                            <b>Sommet #{vIdx + 1}</b><br />
-                                            Glisser pour déformer l'aire en direct<br />
-                                            <span style={{ color: '#ef4444' }}>Clic droit pour supprimer</span>
+                                            <b>S{vIdx + 1}</b> — glisser pour déformer
                                         </div>
                                     </Tooltip>
                                 </Marker>
                             );
                         })}
+
+                        {/* ── Label (selected state) + Edit popup ──────────────────────── */}
+                        {isSelected && isComplete && (
+                            <Polygon
+                                positions={displayCoords}
+                                pathOptions={{ color: 'transparent', fillOpacity: 0, weight: 0 }}
+                                eventHandlers={{ click: (e: any) => { L.DomEvent.stopPropagation(e); } }}
+                            >
+                                <Tooltip permanent sticky direction="center" className="sr-map-label-area">
+                                    <span style={{ color: area.color || '#5b6af0' }}>{area.title}</span>
+                                    {' '}<span style={{ opacity: 0.75 }}>({formatted})</span>
+                                    {hasRouted && <span style={{ marginLeft: '4px', color: '#10b981' }}>⛰</span>}
+                                </Tooltip>
+                                <Popup className="sr-annotation-popup">
+                                    <div style={{ minWidth: '220px', padding: '10px', background: '#141e17', borderRadius: '10px', border: `1px solid ${area.color || '#5b6af0'}55`, color: '#e8f0eb' }}>
+                                        <input type="text" value={area.title}
+                                            onChange={e => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { title: e.target.value } })}
+                                            style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '4px 8px', color: '#fff', fontWeight: 700, fontSize: '12px', outline: 'none', marginBottom: '6px' }}
+                                        />
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#6ee7b7', fontWeight: 700, background: 'rgba(16,185,129,0.1)', padding: '4px 8px', borderRadius: '5px', marginBottom: '8px' }}>
+                                            <span>Superficie</span>
+                                            <span>{formatted}</span>
+                                        </div>
+                                        <div style={{ marginBottom: '8px', fontSize: '10px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+                                            Cliquer une arête pour basculer BRouter ↔ droit
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '5px', marginBottom: '8px' }}>
+                                            {PRESET_COLORS.map(c => (
+                                                <div key={c.value} onClick={() => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { color: c.value } })}
+                                                    style={{ width: '14px', height: '14px', borderRadius: '50%', background: c.value, cursor: 'pointer', boxShadow: area.color === c.value ? '0 0 0 2px #fff' : 'none' }}
+                                                />
+                                            ))}
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px' }}>
+                                            <button type="button" onClick={() => { dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: area.id }); setSelectedAreaId(null); }}
+                                                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }}>
+                                                <Trash2 size={11} /> Supprimer la zone
+                                            </button>
+                                        </div>
+                                    </div>
+                                </Popup>
+                            </Polygon>
+                        )}
                     </React.Fragment>
                 );
             })}
-
-            {/* ── 3. FLOATING HUD FOR AREA DRAWING TOOL ─────────────────── */}
-            {activeTool === 'annotate_area' && (() => {
-                const draftArea = draftAreaId ? state.area_annotations.find(x => x.id === draftAreaId) : null;
-                const count = draftArea?.coords.length || 0;
-                const m2 = count >= 3 ? calculatePolygonArea(draftArea!.coords) : 0;
-                const canFinish = count >= 3;
-
-                return (
-                    <div style={{
-                        position: 'absolute', top: '70px', left: '50%', transform: 'translateX(-50%)',
-                        zIndex: 1100, pointerEvents: 'all',
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        background: 'rgba(10, 18, 14, 0.96)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(16, 185, 129, 0.4)',
-                        borderRadius: '28px', padding: '5px 8px 5px 14px',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.65)',
-                        color: '#fff', fontSize: '12px', whiteSpace: 'nowrap'
-                    }}>
-                        {/* Status dot */}
-                        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
-
-                        {/* Status label */}
-                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)' }}>
-                            {!draftAreaId ? (
-                                <span><b style={{ color: '#10b981' }}>Zone :</b> cliquez sur la carte pour poser le 1er sommet</span>
-                            ) : count < 3 ? (
-                                <span><b style={{ color: '#10b981' }}>{count} sommet{count > 1 ? 's' : ''}</b> — encore {3 - count} pour fermer</span>
-                            ) : (
-                                <span><b style={{ color: '#10b981' }}>{count} sommets</b> — {formatArea(m2)} — cliquez pour en ajouter</span>
-                            )}
-                        </span>
-
-                        <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.12)', margin: '0 2px' }} />
-
-                        {/* BRouter trails */}
-                        {draftArea && count >= 3 && (
-                            <button type="button"
-                                onClick={() => handleToggleRoadFollow(draftArea)}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '4px',
-                                    padding: '3px 9px', borderRadius: '14px', fontSize: '10px', fontWeight: 700, cursor: 'pointer',
-                                    background: draftArea.followRoads ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.07)',
-                                    border: `1px solid ${draftArea.followRoads ? '#10b981' : 'rgba(255,255,255,0.15)'}`,
-                                    color: draftArea.followRoads ? '#6ee7b7' : 'rgba(255,255,255,0.7)'
-                                }}>
-                                <Trees size={12} />
-                                {draftArea.followRoads ? 'Sentiers ON' : 'Sentiers'}
-                            </button>
-                        )}
-
-                        {/* Terminer (Validate) */}
-                        <button type="button"
-                            disabled={!canFinish}
-                            onClick={finishDrawing}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '4px',
-                                padding: '4px 12px', borderRadius: '14px', fontSize: '11px', fontWeight: 700, cursor: canFinish ? 'pointer' : 'not-allowed',
-                                background: canFinish ? '#10b981' : 'rgba(255,255,255,0.07)',
-                                border: `1px solid ${canFinish ? '#10b981' : 'rgba(255,255,255,0.1)'}`,
-                                color: canFinish ? '#fff' : 'rgba(255,255,255,0.3)',
-                                opacity: canFinish ? 1 : 0.6
-                            }}>
-                            ✓ Terminer
-                        </button>
-
-                        {/* Cancel */}
-                        <button type="button"
-                            onClick={cancelDrawing}
-                            style={{
-                                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)',
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px'
-                            }}>
-                            <X size={14} />
-                        </button>
-                    </div>
-                );
-            })()}
         </>
     );
 }
