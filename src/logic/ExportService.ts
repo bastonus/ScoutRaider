@@ -15,6 +15,7 @@ import { ExportHTMLRenderer } from './ExportHTMLRenderer';
 import type { ExportRenderOptions } from './ExportHTMLRenderer';
 import { themeManager } from './ThemeManager';
 import { MODULE_META } from './ModuleRegistry';
+import { calculatePolygonArea, formatArea } from './GeoUtils';
 import type { AppState, ThemeOverrides, ExportFormat, ModuleId } from './types';
 
 // ─── Export Options ───────────────────────────────────────────────────────────
@@ -124,6 +125,9 @@ export class ExportService {
                 includeGeneralMap: options.includeGeneralMap,
                 includeAnnexes: options.includeAnnexes ?? true,
                 vigenereKey: themeManager.getVigenereKey(),
+                pointAnnotations: state.point_annotations,
+                areaAnnotations: state.area_annotations,
+                itineraries: state.itineraries,
             };
 
             console.log(`[ExportService] Generating HTML for ${format} export (version: ${options.version})...`);
@@ -513,6 +517,41 @@ export class ExportService {
             }
         }
         csv += totalRow.join(SEP) + NL;
+
+        // ── 5. Annotations & Calques (Points & Zones délimitées) ─────────────
+        const hasItins = (state.itineraries || []).length > 1;
+        const hasPoints = (state.point_annotations || []).length > 0;
+        const hasAreas = (state.area_annotations || []).length > 0;
+
+        if (hasItins || hasPoints || hasAreas) {
+            csv += NL + NL;
+            csv += `${q('--- CALQUES ET ANNOTATIONS DU RAID ---')}${SEP.repeat(Math.max(0, totalCols - 1))}${NL}`;
+
+            if (hasItins) {
+                csv += `${q('ITINÉRAIRES')}${SEP}${q('Nom')}${SEP}${q('Distance (km)')}${SEP}${q('Nb Étapes')}${SEP}${q('Couleur')}${NL}`;
+                for (const it of state.itineraries) {
+                    const distKm = (it.routes || []).reduce((acc: number, r: any) => acc + (r?.distance_m || 0), 0) / 1000;
+                    csv += `${q('Itinéraire')}${SEP}${q(it.name)}${SEP}${q(distKm.toFixed(2))}${SEP}${it.stages?.length || 0}${SEP}${q(it.color || '')}${NL}`;
+                }
+                csv += NL;
+            }
+
+            if (hasPoints) {
+                csv += `${q('REPÈRES')}${SEP}${q('Titre')}${SEP}${q('Latitude')}${SEP}${q('Longitude')}${SEP}${q('Notes')}${NL}`;
+                for (const pt of state.point_annotations) {
+                    csv += `${q('Point annoté')}${SEP}${q(pt.title)}${SEP}${pt.coords[0].toFixed(5)}${SEP}${pt.coords[1].toFixed(5)}${SEP}${q(pt.text || '')}${NL}`;
+                }
+                csv += NL;
+            }
+
+            if (hasAreas) {
+                csv += `${q('ZONES')}${SEP}${q('Titre')}${SEP}${q('Superficie calculée')}${SEP}${q('Nb Sommets')}${SEP}${q('Consignes')}${NL}`;
+                for (const a of state.area_annotations) {
+                    const surf = a.formatted_area || formatArea(calculatePolygonArea(a.coords));
+                    csv += `${q('Zone délimitée')}${SEP}${q(a.title)}${SEP}${q(surf)}${SEP}${a.coords.length}${SEP}${q(a.text || '')}${NL}`;
+                }
+            }
+        }
 
         return csv;
     }

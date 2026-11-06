@@ -24,6 +24,8 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
         case 'n': onToolChange('node'); break;
         case 'a': onToolChange('azimut'); break;
         case 'e': onToolChange('encodage'); break;
+        case 't': onToolChange('annotate_point'); break;
+        case 'z': onToolChange('annotate_area'); break;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -137,6 +139,22 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
             <rect x="14" y="15" width="8" height="5" rx="1" />
           </svg>
         ), "Encodage d'itinéraire (E)")}
+
+        <Separator />
+
+        {/* GROUPE 4 : ANNOTATIONS & CALQUES */}
+        {renderTool('annotate_point', (
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z" />
+            <circle cx="12" cy="9" r="2.5" />
+          </svg>
+        ), "Point annoté avec texte (T)")}
+
+        {renderTool('annotate_area', (
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
+          </svg>
+        ), "Zone / Périmètre polygonale (Z)")}
       </div>
     </div>
   );

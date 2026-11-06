@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import type {
     AppState, RouteDict, PolySegment, PresetData, CarnetStep,
-    ModuleId, AnnexeId, CarnetView, Stage, PolygonalisationSettings, Notification
+    ModuleId, AnnexeId, CarnetView, Stage, PolygonalisationSettings, Notification,
+    Itinerary, AnnotationLayerDef, PointAnnotation, AreaAnnotation
 } from './logic/types';
 import { StateManager } from './logic/StateManager';
 import { presetsManager } from './logic/PresetsManager';
@@ -12,6 +13,7 @@ import { ConstraintChecker } from './logic/ConstraintChecker';
 import { NavigationText } from './logic/NavigationText';
 import { ModuleLogic } from './logic/ModuleLogic';
 import { backgroundEngine } from './logic/BackgroundEngine';
+import { calculatePolygonArea, formatArea } from './logic/GeoUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ACTION TYPES
@@ -36,6 +38,29 @@ export type AppAction =
     | { type: 'REORDER_STAGES'; stages: Stage[] }
     | { type: 'INVERT_ROUTE' }
     | { type: 'SET_ANCHOR_STAGE'; idx: number }
+
+    // Multi-itinerary management (Layer Manager)
+    | { type: 'ADD_ITINERARY'; name?: string; color?: string; duplicateCurrent?: boolean }
+    | { type: 'SET_ACTIVE_ITINERARY'; id: string }
+    | { type: 'TOGGLE_ITINERARY_VISIBILITY'; id: string }
+    | { type: 'UPDATE_ITINERARY'; id: string; name?: string; color?: string }
+    | { type: 'REMOVE_ITINERARY'; id: string }
+    | { type: 'DUPLICATE_ITINERARY'; id: string }
+
+    // Annotations & distinct annotation layers
+    | { type: 'ADD_POINT_ANNOTATION'; point: Omit<PointAnnotation, 'id' | 'createdAt'> }
+    | { type: 'UPDATE_POINT_ANNOTATION'; id: string; patch: Partial<PointAnnotation> }
+    | { type: 'REMOVE_POINT_ANNOTATION'; id: string }
+    | { type: 'TOGGLE_POINT_VISIBILITY'; id: string }
+    | { type: 'ADD_AREA_ANNOTATION'; area: Omit<AreaAnnotation, 'id' | 'createdAt'> }
+    | { type: 'UPDATE_AREA_ANNOTATION'; id: string; patch: Partial<AreaAnnotation> }
+    | { type: 'REMOVE_AREA_ANNOTATION'; id: string }
+    | { type: 'DELETE_AREA_VERTEX'; areaId: string; vertexIdx: number }
+    | { type: 'SET_AREA_ROUTED_COORDS'; areaId: string; routedCoords: [number, number][]; area_m2: number; formatted_area: string }
+    | { type: 'TOGGLE_AREA_VISIBILITY'; id: string }
+    | { type: 'TOGGLE_ANNOTATION_LAYER_VISIBILITY'; layerId: string }
+    | { type: 'ADD_ANNOTATION_LAYER'; name: string; color?: string; layerType?: 'points' | 'areas' | 'mixed' }
+    | { type: 'REMOVE_ANNOTATION_LAYER'; layerId: string }
 
     // Polygonalisation
     | { type: 'SET_POLYGONAL_LEGS'; legKey: string; segments: PolySegment[] }
@@ -236,6 +261,361 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 label: String.fromCharCode(65 + i)
             }));
             return { ...state, stages: inverted, routes: [] }; // routes need full recalc
+        }
+
+        // ── Multi-itinerary management (Layer Manager) ────────────────────
+        case 'ADD_ITINERARY': {
+            pushHistory(state);
+            const count = (state.itineraries?.length || 1) + 1;
+            const colors = ['#2d8ceb', '#f97316', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308'];
+            const color = action.color || colors[(count - 1) % colors.length];
+            const newId = `itin-${Date.now()}`;
+            const name = action.name || `Itinéraire ${count}${count === 2 ? ' (Bis / Variante)' : ''}`;
+
+            let newItin: Itinerary;
+            if (action.duplicateCurrent) {
+                newItin = {
+                    id: newId,
+                    name: action.name || `${state.itineraries?.find(i => i.id === state.active_itinerary_id)?.name || 'Itinéraire'} (Variante)`,
+                    color,
+                    visible: true,
+                    stages: state.stages.map(s => ({ ...s })),
+                    routes: state.routes.map(r => r ? ({ ...r }) : r),
+                    polygonal_steps: [...state.polygonal_steps],
+                    polygonal_legs: { ...state.polygonal_legs },
+                    carnet_steps: [...state.carnet_steps],
+                    custom_assignments: { ...(state.custom_assignments || {}) },
+                    custom_languages: { ...(state.custom_languages || {}) }
+                };
+            } else {
+                newItin = {
+                    id: newId,
+                    name,
+                    color,
+                    visible: true,
+                    stages: [],
+                    routes: [],
+                    polygonal_steps: [],
+                    polygonal_legs: {},
+                    carnet_steps: [],
+                    custom_assignments: {},
+                    custom_languages: {}
+                };
+            }
+
+            const currentSavedItins = (state.itineraries || []).map(it => it.id === state.active_itinerary_id ? {
+                ...it,
+                stages: state.stages,
+                routes: state.routes,
+                polygonal_steps: state.polygonal_steps,
+                polygonal_legs: state.polygonal_legs,
+                carnet_steps: state.carnet_steps,
+                custom_assignments: state.custom_assignments,
+                custom_languages: state.custom_languages,
+            } : it);
+
+            const allItins = [...currentSavedItins, newItin];
+
+            return {
+                ...state,
+                itineraries: allItins,
+                active_itinerary_id: newId,
+                stages: newItin.stages,
+                routes: newItin.routes,
+                polygonal_steps: newItin.polygonal_steps,
+                polygonal_legs: newItin.polygonal_legs,
+                carnet_steps: newItin.carnet_steps,
+                custom_assignments: newItin.custom_assignments || {},
+                custom_languages: newItin.custom_languages || {},
+                anchor_stage_idx: -1
+            };
+        }
+
+        case 'SET_ACTIVE_ITINERARY': {
+            if (state.active_itinerary_id === action.id) return state;
+            const target = state.itineraries?.find(it => it.id === action.id);
+            if (!target) return state;
+
+            // Save current active state before switching
+            const updatedItins = (state.itineraries || []).map(it => it.id === state.active_itinerary_id ? {
+                ...it,
+                stages: state.stages,
+                routes: state.routes,
+                polygonal_steps: state.polygonal_steps,
+                polygonal_legs: state.polygonal_legs,
+                carnet_steps: state.carnet_steps,
+                custom_assignments: state.custom_assignments,
+                custom_languages: state.custom_languages,
+            } : it);
+
+            return {
+                ...state,
+                itineraries: updatedItins,
+                active_itinerary_id: target.id,
+                stages: target.stages || [],
+                routes: target.routes || [],
+                polygonal_steps: target.polygonal_steps || [],
+                polygonal_legs: target.polygonal_legs || {},
+                carnet_steps: target.carnet_steps || [],
+                custom_assignments: target.custom_assignments || {},
+                custom_languages: target.custom_languages || {},
+                anchor_stage_idx: -1
+            };
+        }
+
+        case 'TOGGLE_ITINERARY_VISIBILITY': {
+            return {
+                ...state,
+                itineraries: (state.itineraries || []).map(it => it.id === action.id ? { ...it, visible: !it.visible } : it)
+            };
+        }
+
+        case 'UPDATE_ITINERARY': {
+            return {
+                ...state,
+                itineraries: (state.itineraries || []).map(it => {
+                    if (it.id === action.id) {
+                        return {
+                            ...it,
+                            ...(action.name ? { name: action.name } : {}),
+                            ...(action.color ? { color: action.color } : {})
+                        };
+                    }
+                    return it;
+                })
+            };
+        }
+
+        case 'REMOVE_ITINERARY': {
+            if ((state.itineraries || []).length <= 1) return state;
+            pushHistory(state);
+            const remaining = state.itineraries.filter(it => it.id !== action.id);
+            if (state.active_itinerary_id === action.id) {
+                const nextActive = remaining[0];
+                return {
+                    ...state,
+                    itineraries: remaining,
+                    active_itinerary_id: nextActive.id,
+                    stages: nextActive.stages || [],
+                    routes: nextActive.routes || [],
+                    polygonal_steps: nextActive.polygonal_steps || [],
+                    polygonal_legs: nextActive.polygonal_legs || {},
+                    carnet_steps: nextActive.carnet_steps || [],
+                    custom_assignments: nextActive.custom_assignments || {},
+                    custom_languages: nextActive.custom_languages || {},
+                    anchor_stage_idx: -1
+                };
+            }
+            return { ...state, itineraries: remaining };
+        }
+
+        case 'DUPLICATE_ITINERARY': {
+            pushHistory(state);
+            const source = (state.itineraries || []).find(it => it.id === action.id);
+            if (!source) return state;
+            const newId = `itin-${Date.now()}`;
+            const colors = ['#2d8ceb', '#f97316', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308'];
+            const color = colors[state.itineraries.length % colors.length];
+            const duplicated: Itinerary = {
+                ...source,
+                id: newId,
+                name: `${source.name} (Variante)`,
+                color,
+                visible: true,
+                stages: source.stages.map(s => ({ ...s })),
+                routes: source.routes.map(r => r ? ({ ...r }) : r),
+                polygonal_steps: [...source.polygonal_steps],
+                polygonal_legs: { ...source.polygonal_legs },
+                carnet_steps: [...source.carnet_steps]
+            };
+            return {
+                ...state,
+                itineraries: [...state.itineraries, duplicated]
+            };
+        }
+
+        // ── Annotations & Annotation Layers ───────────────────────────────
+        case 'ADD_POINT_ANNOTATION': {
+            pushHistory(state);
+            const ptCount = (state.point_annotations?.length || 0) + 1;
+            const newPoint: PointAnnotation = {
+                id: `poi-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                type: 'point',
+                layerId: action.point.layerId || 'layer-points',
+                title: action.point.title || `Repère ${ptCount}`,
+                text: action.point.text || '',
+                coords: action.point.coords,
+                color: action.point.color || '#3b82f6',
+                icon: action.point.icon || 'pin',
+                visible: action.point.visible !== undefined ? action.point.visible : true,
+                createdAt: Date.now()
+            };
+            return {
+                ...state,
+                point_annotations: [...(state.point_annotations || []), newPoint]
+            };
+        }
+
+        case 'UPDATE_POINT_ANNOTATION': {
+            return {
+                ...state,
+                point_annotations: (state.point_annotations || []).map(p =>
+                    p.id === action.id ? { ...p, ...action.patch } : p
+                )
+            };
+        }
+
+        case 'REMOVE_POINT_ANNOTATION': {
+            pushHistory(state);
+            return {
+                ...state,
+                point_annotations: (state.point_annotations || []).filter(p => p.id !== action.id)
+            };
+        }
+
+        case 'TOGGLE_POINT_VISIBILITY': {
+            return {
+                ...state,
+                point_annotations: (state.point_annotations || []).map(p =>
+                    p.id === action.id ? { ...p, visible: !p.visible } : p
+                )
+            };
+        }
+
+        case 'ADD_AREA_ANNOTATION': {
+            pushHistory(state);
+            const areaCount = (state.area_annotations?.length || 0) + 1;
+            const m2 = calculatePolygonArea(action.area.coords);
+            const newArea: AreaAnnotation = {
+                id: `area-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                type: 'area',
+                layerId: action.area.layerId || 'layer-areas',
+                title: action.area.title || `Zone ${areaCount}`,
+                text: action.area.text || '',
+                coords: action.area.coords,
+                color: action.area.color || '#10b981',
+                fillOpacity: action.area.fillOpacity ?? 0.25,
+                visible: action.area.visible !== undefined ? action.area.visible : true,
+                area_m2: m2,
+                formatted_area: formatArea(m2),
+                createdAt: Date.now()
+            };
+            return {
+                ...state,
+                area_annotations: [...(state.area_annotations || []), newArea]
+            };
+        }
+
+        case 'UPDATE_AREA_ANNOTATION': {
+            return {
+                ...state,
+                area_annotations: (state.area_annotations || []).map(a => {
+                    if (a.id !== action.id) return a;
+                    const updated = { ...a, ...action.patch };
+                    if (action.patch.coords) {
+                        const m2 = calculatePolygonArea(action.patch.coords);
+                        updated.area_m2 = m2;
+                        updated.formatted_area = formatArea(m2);
+                    }
+                    return updated;
+                })
+            };
+        }
+
+        case 'REMOVE_AREA_ANNOTATION': {
+            pushHistory(state);
+            return {
+                ...state,
+                area_annotations: (state.area_annotations || []).filter(a => a.id !== action.id)
+            };
+        }
+
+        case 'DELETE_AREA_VERTEX': {
+            pushHistory(state);
+            return {
+                ...state,
+                area_annotations: (state.area_annotations || []).map(a => {
+                    if (a.id !== action.areaId) return a;
+                    if (a.coords.length <= 3) return a; // Keep at least 3 points
+                    const newCoords = a.coords.filter((_, idx) => idx !== action.vertexIdx);
+                    const m2 = calculatePolygonArea(newCoords);
+                    return {
+                        ...a,
+                        coords: newCoords,
+                        routedCoords: undefined,
+                        area_m2: m2,
+                        formatted_area: formatArea(m2)
+                    };
+                })
+            };
+        }
+
+        case 'SET_AREA_ROUTED_COORDS': {
+            return {
+                ...state,
+                area_annotations: (state.area_annotations || []).map(a => {
+                    if (a.id !== action.areaId) return a;
+                    return {
+                        ...a,
+                        routedCoords: action.routedCoords,
+                        area_m2: action.area_m2,
+                        formatted_area: action.formatted_area
+                    };
+                })
+            };
+        }
+
+        case 'TOGGLE_AREA_VISIBILITY': {
+            return {
+                ...state,
+                area_annotations: (state.area_annotations || []).map(a =>
+                    a.id === action.id ? { ...a, visible: !a.visible } : a
+                )
+            };
+        }
+
+        case 'TOGGLE_ANNOTATION_LAYER_VISIBILITY': {
+            const layer = (state.annotation_layers || []).find(l => l.id === action.layerId);
+            if (!layer) return state;
+            const newVis = !layer.visible;
+            return {
+                ...state,
+                annotation_layers: (state.annotation_layers || []).map(l =>
+                    l.id === action.layerId ? { ...l, visible: newVis } : l
+                ),
+                point_annotations: (state.point_annotations || []).map(p =>
+                    p.layerId === action.layerId ? { ...p, visible: newVis } : p
+                ),
+                area_annotations: (state.area_annotations || []).map(a =>
+                    a.layerId === action.layerId ? { ...a, visible: newVis } : a
+                )
+            };
+        }
+
+        case 'ADD_ANNOTATION_LAYER': {
+            pushHistory(state);
+            const newLayer: AnnotationLayerDef = {
+                id: `layer-${Date.now()}`,
+                name: action.name,
+                type: action.layerType || 'mixed',
+                visible: true,
+                color: action.color || '#3b82f6',
+                isDefault: false
+            };
+            return {
+                ...state,
+                annotation_layers: [...(state.annotation_layers || []), newLayer]
+            };
+        }
+
+        case 'REMOVE_ANNOTATION_LAYER': {
+            pushHistory(state);
+            return {
+                ...state,
+                annotation_layers: (state.annotation_layers || []).filter(l => l.id !== action.layerId),
+                point_annotations: (state.point_annotations || []).filter(p => p.layerId !== action.layerId),
+                area_annotations: (state.area_annotations || []).filter(a => a.layerId !== action.layerId)
+            };
         }
 
         // ── Route management ───────────────────────────────────────────────
@@ -1050,13 +1430,63 @@ function regenerateStepTexts(step: CarnetStep, state: AppState): CarnetStep {
     };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTIVE ITINERARY SYNCHRONIZATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+function syncActiveItinerary(nextState: AppState): AppState {
+    if (!nextState.itineraries || nextState.itineraries.length === 0) {
+        const defaultId = 'itin-1';
+        return {
+            ...nextState,
+            itineraries: [{
+                id: defaultId,
+                name: 'Itinéraire 1 (Principal)',
+                color: '#2d8ceb',
+                visible: true,
+                stages: nextState.stages || [],
+                routes: nextState.routes || [],
+                polygonal_steps: nextState.polygonal_steps || [],
+                polygonal_legs: nextState.polygonal_legs || {},
+                carnet_steps: nextState.carnet_steps || [],
+                custom_assignments: nextState.custom_assignments || {},
+                custom_languages: nextState.custom_languages || {},
+            }],
+            active_itinerary_id: defaultId
+        };
+    }
+
+    const activeId = nextState.active_itinerary_id || nextState.itineraries[0].id;
+    const updatedItineraries = nextState.itineraries.map(it => {
+        if (it.id === activeId) {
+            return {
+                ...it,
+                stages: nextState.stages || [],
+                routes: nextState.routes || [],
+                polygonal_steps: nextState.polygonal_steps || [],
+                polygonal_legs: nextState.polygonal_legs || {},
+                carnet_steps: nextState.carnet_steps || [],
+                custom_assignments: nextState.custom_assignments || {},
+                custom_languages: nextState.custom_languages || {},
+            };
+        }
+        return it;
+    });
+
+    return {
+        ...nextState,
+        itineraries: updatedItineraries,
+        active_itinerary_id: activeId
+    };
+}
+
 export const AppContext = createContext<{
     state: AppState;
     dispatch: React.Dispatch<AppAction>;
 }>({ state: initialState, dispatch: () => null });
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [state, dispatch] = useReducer(appReducer, initialState);
+    const [state, dispatch] = useReducer((s: AppState, a: AppAction) => syncActiveItinerary(appReducer(s, a)), initialState);
     const prevRoutesRef = useRef(state.routes);
 
     // ── Initialize async stores ────────────────────────────────────────

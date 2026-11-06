@@ -17,6 +17,9 @@ import { ModuleRegistry } from './ModuleRegistry';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+import { calculatePolygonArea, formatArea } from './GeoUtils';
+import type { PointAnnotation, AreaAnnotation, Itinerary } from './types';
+
 export interface ExportRenderOptions {
     title: string;
     subtitle: string;
@@ -26,6 +29,9 @@ export interface ExportRenderOptions {
     includeGeneralMap: boolean;
     includeAnnexes: boolean;
     vigenereKey: string;
+    pointAnnotations?: PointAnnotation[];
+    areaAnnotations?: AreaAnnotation[];
+    itineraries?: Itinerary[];
 }
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
@@ -421,6 +427,144 @@ function renderStep(step: CarnetStep, stepNum: number, isSolution: boolean, them
   </div>`;
 }
 
+// ─── Annotations & Areas Renderer ──────────────────────────────────────────
+
+function renderAnnotationsSection(
+    points: PointAnnotation[] = [],
+    areas: AreaAnnotation[] = [],
+    itineraries: Itinerary[] = []
+): string {
+    const activePoints = points.filter(p => p.visible !== false);
+    const activeAreas = areas.filter(a => a.visible !== false);
+
+    if (activePoints.length === 0 && activeAreas.length === 0 && itineraries.length <= 1) {
+        return '';
+    }
+
+    let html = `
+  <div class="step" style="page-break-inside: avoid; margin-top: 24px;">
+    <div class="step-header" style="background: #1e3a2b;">
+      <span style="font-size: 13px;">🗺️ Repères & Périmètres Délimités du Raid</span>
+    </div>
+    <div class="step-body" style="padding: 14px 18px; font-size: 11px;">
+`;
+
+    // Multi-itineraries summary
+    if (itineraries.length > 1) {
+        html += `
+      <div style="margin-bottom: 16px;">
+        <div style="font-weight: 700; color: #1e3a2b; margin-bottom: 6px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;">
+          Itinéraires du projet (${itineraries.length}) :
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+`;
+        for (const it of itineraries) {
+            const dist = (it.routes || []).reduce((acc: number, r: any) => acc + (r?.distance_m || 0), 0) / 1000;
+            html += `
+          <div style="padding: 6px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid ${it.color || '#2d8ceb'}; border-radius: 4px;">
+            <b>${it.name}</b> — ${(dist > 0 ? dist.toFixed(1) + ' km · ' : '')}${it.stages?.length || 0} étapes
+          </div>
+`;
+        }
+        html += `
+        </div>
+      </div>
+`;
+    }
+
+    // Points de repère
+    if (activePoints.length > 0) {
+        html += `
+      <div style="margin-bottom: 16px;">
+        <div style="font-weight: 700; color: #1e3a2b; margin-bottom: 6px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;">
+          Points de repère & Balises (${activePoints.length}) :
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background: #f1f5f9; text-align: left; font-size: 10px; color: #64748b;">
+              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Repère</th>
+              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Coordonnées GPS</th>
+              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Notes & Consignes</th>
+            </tr>
+          </thead>
+          <tbody>
+`;
+        for (const pt of activePoints) {
+            html += `
+            <tr>
+              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-weight: 700;">
+                <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${pt.color || '#3b82f6'}; margin-right:6px;"></span>
+                ${pt.title}
+              </td>
+              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-family: monospace; font-size: 10px; color: #475569;">
+                ${pt.coords[0].toFixed(5)}, ${pt.coords[1].toFixed(5)}
+              </td>
+              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; color: #334155;">
+                ${pt.text || '—'}
+              </td>
+            </tr>
+`;
+        }
+        html += `
+          </tbody>
+        </table>
+      </div>
+`;
+    }
+
+    // Zones & Périmètres
+    if (activeAreas.length > 0) {
+        html += `
+      <div>
+        <div style="font-weight: 700; color: #1e3a2b; margin-bottom: 6px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;">
+          Zones & Périmètres délimités (${activeAreas.length}) :
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background: #f1f5f9; text-align: left; font-size: 10px; color: #64748b;">
+              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Zone</th>
+              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Superficie calculée</th>
+              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Sommets</th>
+              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Règles & Consignes</th>
+            </tr>
+          </thead>
+          <tbody>
+`;
+        for (const a of activeAreas) {
+            const surface = a.formatted_area || formatArea(calculatePolygonArea(a.coords));
+            html += `
+            <tr>
+              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-weight: 700;">
+                <span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:${a.color || '#10b981'}; margin-right:6px;"></span>
+                ${a.title}
+              </td>
+              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-weight: 700; color: #15803d;">
+                ${surface}
+              </td>
+              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-size: 10px; color: #64748b;">
+                ${a.coords.length} sommets
+              </td>
+              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; color: #334155;">
+                ${a.text || '—'}
+              </td>
+            </tr>
+`;
+        }
+        html += `
+          </tbody>
+        </table>
+      </div>
+`;
+    }
+
+    html += `
+    </div>
+  </div>
+`;
+
+    return html;
+}
+
 // ─── Main Renderer ────────────────────────────────────────────────────────────
 
 export class ExportHTMLRenderer {
@@ -462,6 +606,13 @@ export class ExportHTMLRenderer {
             html += renderStep(step, stepNum, options.isSolution, themeLabels);
             stepNum++;
         }
+
+        // ── Repères, Zones & Multi-Itinéraires ──
+        html += renderAnnotationsSection(
+            options.pointAnnotations,
+            options.areaAnnotations,
+            options.itineraries
+        );
 
         // ── Annexes ──
         if (options.includeAnnexes) {

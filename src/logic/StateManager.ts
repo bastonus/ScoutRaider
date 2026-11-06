@@ -10,6 +10,7 @@
  */
 
 import type { AppState, RouteDict, PolySegment, ExportJob } from './types';
+import { calculatePolygonArea, formatArea } from './GeoUtils';
 
 const CURRENT_SCHEMA_VERSION = '5.0.0';
 
@@ -47,6 +48,26 @@ export class StateManager {
             }
         }
 
+        const defaultItinId = 'itin-1';
+        const defaultItineraries = [
+            {
+                id: defaultItinId,
+                name: 'Itinéraire 1 (Principal)',
+                color: '#2d8ceb',
+                visible: true,
+                stages: [],
+                routes: [],
+                polygonal_steps: [],
+                polygonal_legs: {},
+                carnet_steps: {},
+            }
+        ];
+
+        const defaultAnnotationLayers = [
+            { id: 'layer-points', name: 'Points & Repères', type: 'points' as const, visible: true, color: '#3b82f6', isDefault: true },
+            { id: 'layer-areas', name: 'Zones & Périmètres', type: 'areas' as const, visible: true, color: '#10b981', isDefault: true }
+        ];
+
         return {
             version: CURRENT_SCHEMA_VERSION,
             active_mode: 'map',
@@ -54,6 +75,13 @@ export class StateManager {
             routes: [],
             active_route_id: null,
             route_chain: [],
+
+            itineraries: defaultItineraries as any,
+            active_itinerary_id: defaultItinId,
+
+            annotation_layers: defaultAnnotationLayers,
+            point_annotations: [],
+            area_annotations: [],
 
             stages: [],
             geojson_data: null,
@@ -181,6 +209,50 @@ export class StateManager {
         // Ensure arrays exist
         if (!Array.isArray(migrated.polygonal_steps)) migrated.polygonal_steps = [];
         if (!Array.isArray(migrated.carnet_steps)) migrated.carnet_steps = [];
+
+        // Ensure multi-itinerary support
+        if (!Array.isArray(migrated.itineraries) || migrated.itineraries.length === 0) {
+            migrated.itineraries = [
+                {
+                    id: 'itin-1',
+                    name: 'Itinéraire 1 (Principal)',
+                    color: '#2d8ceb',
+                    visible: true,
+                    stages: [...migrated.stages],
+                    routes: [...migrated.routes],
+                    polygonal_steps: [...migrated.polygonal_steps],
+                    polygonal_legs: { ...migrated.polygonal_legs },
+                    carnet_steps: [...migrated.carnet_steps],
+                    custom_assignments: { ...(migrated.custom_assignments || {}) },
+                    custom_languages: { ...(migrated.custom_languages || {}) }
+                }
+            ];
+            migrated.active_itinerary_id = 'itin-1';
+        } else {
+            if (!migrated.active_itinerary_id || !migrated.itineraries.some(it => it.id === migrated.active_itinerary_id)) {
+                migrated.active_itinerary_id = migrated.itineraries[0].id;
+            }
+        }
+
+        // Ensure annotations and annotation layers
+        if (!Array.isArray(migrated.annotation_layers) || migrated.annotation_layers.length === 0) {
+            migrated.annotation_layers = [
+                { id: 'layer-points', name: 'Points & Repères', type: 'points', visible: true, color: '#3b82f6', isDefault: true },
+                { id: 'layer-areas', name: 'Zones & Périmètres', type: 'areas', visible: true, color: '#10b981', isDefault: true }
+            ];
+        }
+        if (!Array.isArray(migrated.point_annotations)) migrated.point_annotations = [];
+        if (!Array.isArray(migrated.area_annotations)) {
+            migrated.area_annotations = [];
+        } else {
+            migrated.area_annotations = migrated.area_annotations.map(a => {
+                if (a.coords && (!a.area_m2 || !a.formatted_area)) {
+                    const m2 = calculatePolygonArea(a.coords);
+                    return { ...a, area_m2: m2, formatted_area: formatArea(m2) };
+                }
+                return a;
+            });
+        }
         
         // Migrate legacy top-level nodes if necessary
         const legacyMasked = (loadedState as any).masked_nodes;

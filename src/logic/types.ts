@@ -366,6 +366,69 @@ export interface Notification {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ITINERARIES & MULTI-ROUTE
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface Itinerary {
+    id: string;
+    name: string;
+    color: string;
+    visible: boolean;
+    stages: Stage[];
+    routes: RouteDict[];
+    polygonal_steps: PolySegment[];
+    polygonal_legs: Record<string, PolySegment[]>;
+    carnet_steps: CarnetStep[];
+    custom_assignments?: Record<string, string>;
+    custom_languages?: Record<string, NavLanguage>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANNOTATIONS (POINTS AVEC TEXTE, ZONES/AREAS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AnnotationLayerDef {
+    id: string;
+    name: string;
+    type: 'points' | 'areas' | 'mixed';
+    visible: boolean;
+    color?: string;
+    isDefault?: boolean;
+}
+
+export type AnnotationIcon = 'pin' | 'flag' | 'camp' | 'water' | 'danger' | 'star' | 'info';
+
+export interface PointAnnotation {
+    id: string;
+    type: 'point';
+    layerId: string;
+    title: string;
+    text: string;
+    coords: [number, number]; // [lat, lon]
+    color: string;
+    icon?: AnnotationIcon;
+    visible: boolean;
+    createdAt: number;
+}
+
+export interface AreaAnnotation {
+    id: string;
+    type: 'area';
+    layerId: string;
+    title: string;
+    text?: string;
+    coords: [number, number][]; // [[lat, lon], ...]
+    routedCoords?: [number, number][]; // Detailed boundary following trails
+    followRoads?: boolean; // If true, edges snap to trails/roads via BRouter
+    color: string;
+    fillOpacity: number;
+    visible: boolean;
+    area_m2?: number;
+    formatted_area?: string;
+    createdAt: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // APP-LEVEL STATE
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -380,6 +443,15 @@ export interface AppState {
     routes: RouteDict[];
     active_route_id: string | null;
     route_chain: string[];
+
+    // Multi-itinerary support (Layer manager)
+    itineraries: Itinerary[];
+    active_itinerary_id: string;
+
+    // Annotations & Layers
+    annotation_layers: AnnotationLayerDef[];
+    point_annotations: PointAnnotation[];
+    area_annotations: AreaAnnotation[];
 
     // Stages (user waypoints A, B, C…)
     stages: Stage[];

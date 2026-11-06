@@ -7,6 +7,8 @@ import { backgroundEngine } from '../../logic/BackgroundEngine';
 import ActiveRouteLayer from './ActiveRouteLayer';
 import InteractiveStages from './InteractiveStages';
 import CursorPreviewLine from './CursorPreviewLine';
+import InactiveItinerariesLayer from './InactiveItinerariesLayer';
+import AnnotationsMapLayer from './AnnotationsMapLayer';
 
 // Fix default marker icons (leaflet bundling issue with Vite)
 const DefaultIcon = L.icon({
@@ -324,7 +326,7 @@ export default function MapComponent() {
             <MapContainer
                 center={position}
                 zoom={13}
-                style={{ height: '100%', width: '100%', cursor: ['route', 'route_direct', 'node', 'azimut'].includes(state.active_tool) ? 'crosshair' : 'grab' }}
+                style={{ height: '100%', width: '100%', cursor: ['route', 'route_direct', 'node', 'azimut', 'annotate_point', 'annotate_area'].includes(state.active_tool) ? 'crosshair' : 'grab' }}
                 zoomControl={false}
                 attributionControl={false}
             >
@@ -335,6 +337,8 @@ export default function MapComponent() {
                 <MapTooltipManager />
                 <MapEvents setCursorPos={setCursorPos} />
                 <PoiLayer />
+                <InactiveItinerariesLayer />
+                <AnnotationsMapLayer />
                 <ActiveRouteLayer />
                 <CursorPreviewLine cursorPos={cursorPos} />
                 <InteractiveStages />

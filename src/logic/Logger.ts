@@ -23,7 +23,7 @@ function _send(level: string, msg: string) {
 
     if (IS_ELECTRON) {
         window.electronAPI.writeLog(level, msg);
-    } else if (import.meta.env.DEV) {
+    } else if ((import.meta as any).env?.DEV) {
         // Fire-and-forget to the Vite log server only in local development
         fetch(DEV_LOG_URL, {
             method: 'POST',

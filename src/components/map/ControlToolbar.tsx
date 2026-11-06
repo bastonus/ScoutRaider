@@ -39,6 +39,21 @@ export default function ControlToolbar() {
                 <div style={{ ...pillStyle, flexDirection: 'column', gap: '2px' }}>
                     <button
                         type="button"
+                        onClick={() => (window as any).__openLayerManager?.()}
+                        style={{ ...btnStyle, color: '#3b82f6' }}
+                        title="Ouvrir le Gestionnaire de Calques"
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.15)'; e.currentTarget.style.color = '#60a5fa'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#3b82f6'; }}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                            <polyline points="2 17 12 22 22 17"></polyline>
+                            <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg>
+                    </button>
+                    <div style={{ width: '24px', height: '1px', background: 'rgba(110, 201, 126, 0.12)', margin: '2px 4px' }} />
+                    <button
+                        type="button"
                         onClick={() => dispatch({ type: 'TOGGLE_STAGES_ON_MAP' })}
                         style={{ ...btnStyle, color: state.show_stages_on_map ? '#2d8ceb' : 'var(--text-dim)', background: state.show_stages_on_map ? 'rgba(45,140,235,0.1)' : 'transparent' }}
                         title="Afficher/Masquer les étapes sur la carte"
