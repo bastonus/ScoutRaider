@@ -10,3 +10,5 @@ scoutraider.log
 .env
 .vscode/
 *.af~lock~
+.gemini/
+France IGN 25000 [2021]/
