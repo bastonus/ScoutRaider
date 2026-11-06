@@ -7,6 +7,11 @@ on:
 
 permissions:
   contents: write
+  packages: write  # Required to push Docker images to GHCR
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   # ─────────────────────────────────────────────────────────
@@ -135,10 +140,58 @@ jobs:
           path: dist_electron/*.AppImage
 
   # ─────────────────────────────────────────────────────────
+  # BUILD & PUSH DOCKER IMAGE (Web / Coolify)
+  # Runs in parallel with the Electron builds
+  # Pushes to GitHub Container Registry (ghcr.io)
+  # Coolify can pull from there automatically
+  # ─────────────────────────────────────────────────────────
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Extract version tag and repo info for image labels
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Tag with the git version tag (e.g. v0.3.3-beta)
+            type=semver,pattern={{version}}
+            # Also always update the 'latest' tag
+            type=raw,value=latest
+
+      # Authenticate to GitHub Container Registry
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Enable cross-platform builds (optional, linux/amd64 is sufficient for Coolify)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build and push the image
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Cache between runs for faster builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────
   # RELEASE — Attach all installers to the GitHub Release
+  # Waits for all builds (Electron + Docker)
   # ─────────────────────────────────────────────────────────
   release:
-    needs: [build-windows, build-macos, build-linux]
+    needs: [build-windows, build-macos, build-linux, build-docker]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -153,36 +206,35 @@ jobs:
         with:
           name: "ScoutRaider ${{ github.ref_name }} (Beta)"
           body: |
-            ## 🏕️ ScoutRaider ${{ github.ref_name }} — Version Beta
+            ## 🏕️ ScoutRaider ${{ github.ref_name }}
 
-            ### 🚀 Mise à jour de la Beta 0.3.2
-            - **Nouveau panneau d'exportation** : Une fenêtre d'exportation toute neuve, beaucoup plus propre.
-            - **Support CSV & TSV** : Prise en charge des formats de données tabulaires (CSV et TSV), préparant la future implémentation des formats de documents tels que le DOCX, le PDF et le HTML.
-            - **Nouvel outil "Hors-piste"** : Cet outil permet de tracer des parcours hors-piste (points en vol d'oiseau formant des polygones).
-            - **Corrections des outils** : Réparations et améliorations sur les problèmes rencontrés avec les quatre outils principaux.
-
-            ### ✨ Nouveautés générales de la branche Beta 0.3
-            - **Migration Electron** : Passage à une architecture moderne en **React / Electron**.
-            - **Design System** : Interface glassmorphique sombre et moderne.
-            - **Carte Interactive** : Intégration optimisée de Leaflet avec routage automatique.
-
-            ⚠️ **Avertissement Sécurité** : Les azimuts et métrages sont calculés algorithmiquement. Vérifiez toujours l'itinéraire manuellement sur une carte papier avant d'envoyer vos scouts sur le terrain !
-
-            ---
-
-            ### 💾 Installation
+            ### 💾 Installation — Desktop
             | Plateforme | Fichier | Instructions |
             |---|---|---|
             | 🪟 **Windows** | `ScoutRaider Setup.exe` | Double-cliquez pour installer |
             | 🍎 **macOS** | `ScoutRaider.dmg` | Ouvrez le DMG → Glissez l'app dans Applications |
             | 🐧 **Linux** | `ScoutRaider.AppImage` | `chmod +x *.AppImage` puis lancez |
 
+            ### 🌐 Installation — Web (Docker / Coolify)
+            Image Docker publiée sur GitHub Container Registry :
+            ```
+            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ```
+            Ou utilisez le tag `latest` pour toujours avoir la dernière version :
+            ```
+            docker pull ghcr.io/${{ github.repository }}:latest
+            ```
+
+            ---
+
+            ⚠️ **Avertissement Sécurité** : Les azimuts et métrages sont calculés algorithmiquement. Vérifiez toujours l'itinéraire manuellement sur une carte papier avant d'envoyer vos scouts sur le terrain !
+
             ---
 
             ### 💬 Vos Retours Sont Précieux !
             👉 [Page GitHub Issues](https://github.com/bastonus/ScoutRaider/issues)
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
           files: |
             release-artifacts/**/*.exe
             release-artifacts/**/*.dmg
