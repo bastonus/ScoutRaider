@@ -77,11 +77,36 @@ export default function AnnotationsMapLayer() {
     // Live dragging vertex state (areaId, vertexIdx, live coordinates during drag)
     const [liveDragVertex, setLiveDragVertex] = useState<{ areaId: string; vertexIdx: number; coords: [number, number] } | null>(null);
 
-    // Current area in creation: holds ID of the area currently being drawn in real-time
-    const [currentDrawingAreaId, setCurrentDrawingAreaId] = useState<string | null>(null);
+    // ── DRAWING STATE: accumulate vertices locally (not committed to store until validated)
+    // Vertices are stored in state for real-time preview, but the area is marked "draft" until confirmed.
+    // draft vertices stored locally for preview line
+    const [draftVertices, setDraftVertices] = useState<[number, number][]>([]);
+    const [draftAreaId, setDraftAreaId] = useState<string | null>(null);
 
-    // Routing in progress flag
-    const [isRoutingArea, setIsRoutingArea] = useState(false);
+    // Finish / validate the current drawing (called on double-click or "Terminer" button)
+    const finishDrawing = useCallback(() => {
+        if (!draftAreaId) return;
+        const area = state.area_annotations.find(a => a.id === draftAreaId);
+        if (!area || area.coords.length < 3) {
+            dispatch({ type: 'ADD_NOTIFICATION', message: 'Tracez au moins 3 sommets pour valider la zone.', notifType: 'warning' });
+            return;
+        }
+        // The area is already in state (committed incrementally), just clear the draft state
+        setDraftAreaId(null);
+        setDraftVertices([]);
+        dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
+        dispatch({ type: 'ADD_NOTIFICATION', message: `Zone "${area.title}" validée (${area.formatted_area || formatArea(calculatePolygonArea(area.coords))}).`, notifType: 'info' });
+    }, [draftAreaId, state.area_annotations, dispatch]);
+
+    // Cancel the current drawing
+    const cancelDrawing = useCallback(() => {
+        if (draftAreaId) {
+            dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: draftAreaId });
+        }
+        setDraftAreaId(null);
+        setDraftVertices([]);
+        dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
+    }, [draftAreaId, dispatch]);
 
     // Filter points & areas by layer visibility
     const layersMap = new Map((state.annotation_layers || []).map(l => [l.id, l.visible]));
@@ -132,13 +157,13 @@ export default function AnnotationsMapLayer() {
         }
     }, [dispatch]);
 
-    // Map click events for real-time creation
+    // Map click / dblclick events
     useMapEvents({
         click(e) {
             if ((window as any).__markerDragging) return;
 
             if (activeTool === 'annotate_point') {
-                // AUTOMATIC POINT CREATION: Instant on click!
+                // INSTANT point placement on click
                 const ptCount = (state.point_annotations?.length || 0) + 1;
                 const coords: [number, number] = [e.latlng.lat, e.latlng.lng];
                 dispatch({
@@ -155,20 +180,19 @@ export default function AnnotationsMapLayer() {
                     }
                 });
                 dispatch({ type: 'ADD_NOTIFICATION', message: `Repère ${ptCount} placé. Clic droit pour supprimer, glisser pour déplacer.`, notifType: 'info' });
+
             } else if (activeTool === 'annotate_area') {
                 const clickedPt: [number, number] = [e.latlng.lat, e.latlng.lng];
 
-                // If we don't have an area currently in creation, or the current one is not found:
-                let targetArea = currentDrawingAreaId ? state.area_annotations.find(a => a.id === currentDrawingAreaId) : null;
-
-                if (!targetArea) {
-                    // Create a new area with the first vertex
+                if (!draftAreaId) {
+                    // Start a NEW draft area — create it in state with 1 vertex
                     const areaCount = (state.area_annotations?.length || 0) + 1;
                     const newId = `area-annot-${Date.now()}`;
                     dispatch({
                         type: 'ADD_AREA_ANNOTATION',
                         area: {
                             id: newId,
+                            type: 'area' as const,
                             title: `Zone ${areaCount}`,
                             text: '',
                             layerId: 'layer-areas',
@@ -179,32 +203,41 @@ export default function AnnotationsMapLayer() {
                             followRoads: false
                         } as any
                     });
-                    setCurrentDrawingAreaId(newId);
-                    setSelectedAreaId(newId);
+                    setDraftAreaId(newId);
+                    setDraftVertices([clickedPt]);
                 } else {
-                    // Append vertex to the existing area in REAL TIME
-                    const newCoords: [number, number][] = [...targetArea.coords, clickedPt];
+                    // Append vertex to the existing draft
+                    const area = state.area_annotations.find(a => a.id === draftAreaId);
+                    if (!area) return;
+                    const newCoords: [number, number][] = [...area.coords, clickedPt];
                     const m2 = newCoords.length >= 3 ? calculatePolygonArea(newCoords) : 0;
                     dispatch({
                         type: 'UPDATE_AREA_ANNOTATION',
-                        id: targetArea.id,
-                        patch: {
-                            coords: newCoords,
-                            routedCoords: undefined,
-                            area_m2: m2,
-                            formatted_area: formatArea(m2)
-                        }
+                        id: draftAreaId,
+                        patch: { coords: newCoords, routedCoords: undefined, area_m2: m2, formatted_area: formatArea(m2) }
                     });
-
-                    // If it just reached 3 vertices, it is now an active closed polygon in real time!
-                    if (newCoords.length === 3) {
-                        dispatch({ type: 'ADD_NOTIFICATION', message: `Zone délimitée (${formatArea(m2)}). Continuez à cliquer pour ajouter des sommets.`, notifType: 'info' });
-                    }
+                    setDraftVertices(newCoords);
                 }
+
             } else {
-                // Click on empty map with selection tool deselects
                 setSelectedAreaId(null);
                 setSelectedPointId(null);
+            }
+        },
+
+        dblclick(e) {
+            // Double-click to finish drawing (also fires a click first — we need to prevent double-add)
+            if (activeTool === 'annotate_area' && draftAreaId) {
+                // The last click already added a vertex; remove it and finish
+                const area = state.area_annotations.find(a => a.id === draftAreaId);
+                if (area && area.coords.length > 3) {
+                    // Remove the last duplicate vertex added by the click event
+                    const trimmed = area.coords.slice(0, -1);
+                    const m2 = calculatePolygonArea(trimmed);
+                    dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: draftAreaId, patch: { coords: trimmed, area_m2: m2, formatted_area: formatArea(m2) } });
+                }
+                finishDrawing();
+                L.DomEvent.stopPropagation(e as any);
             }
         }
     });
@@ -388,7 +421,7 @@ export default function AnnotationsMapLayer() {
 
             {/* ── 2. RENDER AREA ANNOTATIONS (REAL-TIME LIVE DRAG + ROUTED EDGES) ── */}
             {visibleAreas.map(area => {
-                const isSelected = selectedAreaId === area.id || currentDrawingAreaId === area.id;
+                const isSelected = selectedAreaId === area.id || draftAreaId === area.id;
                 
                 // Build live display coordinates (if dragging a vertex, update it in 60fps real-time!)
                 let displayCoords = area.followRoads && area.routedCoords && area.routedCoords.length >= 3
@@ -580,97 +613,84 @@ export default function AnnotationsMapLayer() {
                 );
             })}
 
-            {/* ── 3. FLOATING HUD FOR REAL-TIME AREA TOOL ─────────────────── */}
-            {activeTool === 'annotate_area' && (
-                <div style={{
-                    position: 'absolute', top: '74px', left: '50%', transform: 'translateX(-50%)',
-                    zIndex: 1100, pointerEvents: 'all',
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    background: 'rgba(14, 22, 17, 0.94)',
-                    backdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(16, 185, 129, 0.35)',
-                    borderRadius: '24px', padding: '6px 14px',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-                    color: '#fff', fontSize: '12px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
-                        <span style={{ fontWeight: 700, color: '#10b981' }}>Outil Zone en direct :</span>
-                        <span style={{ color: 'rgba(255,255,255,0.85)' }}>
-                            {currentDrawingAreaId ? (
-                                (() => {
-                                    const a = state.area_annotations.find(x => x.id === currentDrawingAreaId);
-                                    if (!a) return 'Cliquez pour commencer une zone';
-                                    const count = a.coords.length;
-                                    const m2 = count >= 3 ? calculatePolygonArea(a.coords) : 0;
-                                    return `${count} sommet${count > 1 ? 's' : ''}${count >= 3 ? ` (${formatArea(m2)})` : ' (posez 3 sommets)'}`;
-                                })()
+            {/* ── 3. FLOATING HUD FOR AREA DRAWING TOOL ─────────────────── */}
+            {activeTool === 'annotate_area' && (() => {
+                const draftArea = draftAreaId ? state.area_annotations.find(x => x.id === draftAreaId) : null;
+                const count = draftArea?.coords.length || 0;
+                const m2 = count >= 3 ? calculatePolygonArea(draftArea!.coords) : 0;
+                const canFinish = count >= 3;
+
+                return (
+                    <div style={{
+                        position: 'absolute', top: '70px', left: '50%', transform: 'translateX(-50%)',
+                        zIndex: 1100, pointerEvents: 'all',
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        background: 'rgba(10, 18, 14, 0.96)',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                        borderRadius: '28px', padding: '5px 8px 5px 14px',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.65)',
+                        color: '#fff', fontSize: '12px', whiteSpace: 'nowrap'
+                    }}>
+                        {/* Status dot */}
+                        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
+
+                        {/* Status label */}
+                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)' }}>
+                            {!draftAreaId ? (
+                                <span><b style={{ color: '#10b981' }}>Zone :</b> cliquez sur la carte pour poser le 1er sommet</span>
+                            ) : count < 3 ? (
+                                <span><b style={{ color: '#10b981' }}>{count} sommet{count > 1 ? 's' : ''}</b> — encore {3 - count} pour fermer</span>
                             ) : (
-                                'Cliquez sur la carte pour tracer une zone'
+                                <span><b style={{ color: '#10b981' }}>{count} sommets</b> — {formatArea(m2)} — cliquez pour en ajouter</span>
                             )}
                         </span>
+
+                        <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.12)', margin: '0 2px' }} />
+
+                        {/* BRouter trails */}
+                        {draftArea && count >= 3 && (
+                            <button type="button"
+                                onClick={() => handleToggleRoadFollow(draftArea)}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '4px',
+                                    padding: '3px 9px', borderRadius: '14px', fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+                                    background: draftArea.followRoads ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.07)',
+                                    border: `1px solid ${draftArea.followRoads ? '#10b981' : 'rgba(255,255,255,0.15)'}`,
+                                    color: draftArea.followRoads ? '#6ee7b7' : 'rgba(255,255,255,0.7)'
+                                }}>
+                                <Trees size={12} />
+                                {draftArea.followRoads ? 'Sentiers ON' : 'Sentiers'}
+                            </button>
+                        )}
+
+                        {/* Terminer (Validate) */}
+                        <button type="button"
+                            disabled={!canFinish}
+                            onClick={finishDrawing}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '4px',
+                                padding: '4px 12px', borderRadius: '14px', fontSize: '11px', fontWeight: 700, cursor: canFinish ? 'pointer' : 'not-allowed',
+                                background: canFinish ? '#10b981' : 'rgba(255,255,255,0.07)',
+                                border: `1px solid ${canFinish ? '#10b981' : 'rgba(255,255,255,0.1)'}`,
+                                color: canFinish ? '#fff' : 'rgba(255,255,255,0.3)',
+                                opacity: canFinish ? 1 : 0.6
+                            }}>
+                            ✓ Terminer
+                        </button>
+
+                        {/* Cancel */}
+                        <button type="button"
+                            onClick={cancelDrawing}
+                            style={{
+                                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px'
+                            }}>
+                            <X size={14} />
+                        </button>
                     </div>
-
-                    <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.15)' }} />
-
-                    {/* Button: Snap edges to trails (BRouter) */}
-                    {currentDrawingAreaId && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const a = state.area_annotations.find(x => x.id === currentDrawingAreaId);
-                                if (a) handleToggleRoadFollow(a);
-                            }}
-                            title="Faire épouser les chemins et sentiers pédestres aux arêtes de la zone"
-                            style={{
-                                background: 'rgba(16, 185, 129, 0.18)', color: '#6ee7b7',
-                                border: '1px solid rgba(16, 185, 129, 0.35)',
-                                padding: '3px 10px', borderRadius: '12px', fontSize: '11px',
-                                fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
-                            }}
-                        >
-                            <Trees size={13} />
-                            <span>Suivre les chemins</span>
-                        </button>
-                    )}
-
-                    {/* Button: Start fresh new area */}
-                    {currentDrawingAreaId && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setCurrentDrawingAreaId(null);
-                                dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouvelle zone prête. Cliquez pour poser le 1er sommet.', notifType: 'info' });
-                            }}
-                            title="Démarrer une nouvelle zone distincte"
-                            style={{
-                                background: 'rgba(255, 255, 255, 0.08)', color: '#fff',
-                                border: '1px solid rgba(255, 255, 255, 0.15)',
-                                padding: '3px 10px', borderRadius: '12px', fontSize: '11px',
-                                fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
-                            }}
-                        >
-                            <Plus size={12} />
-                            <span>+ Autre zone</span>
-                        </button>
-                    )}
-
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setCurrentDrawingAreaId(null);
-                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
-                        }}
-                        title="Quitter l'outil zone"
-                        style={{
-                            background: 'transparent', color: 'rgba(255,255,255,0.5)', border: 'none',
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px'
-                        }}
-                    >
-                        <X size={15} />
-                    </button>
-                </div>
-            )}
+                );
+            })()}
         </>
     );
 }

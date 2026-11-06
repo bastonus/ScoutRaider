@@ -360,8 +360,8 @@ export class ExportService {
 
         let csv = BOM;
         const totalCols = cols.length + (cols.includes('pois_exploded') ? maxPois - 1 : 0);
-        csv += `${q(title)}${SEP.repeat(totalCols)}${NL}`;
-        csv += `Date${SEP}${q(dateStr)}${SEP.repeat(Math.max(0, totalCols - 1))}${NL}`;
+        csv += `${q(title)}${SEP.repeat(Math.max(0, totalCols - 1))}${NL}`;
+        csv += `Date${SEP}${q(dateStr)}${SEP.repeat(Math.max(0, totalCols - 2))}${NL}`;
         csv += NL;
 
         // ── 2. Unified Table Header ──────────────────────────────────────────
@@ -509,7 +509,7 @@ export class ExportService {
         for (const c of cols) {
             if (c === 'step_label' || (c === 'number' && !cols.includes('step_label'))) totalRow.push(q('TOTAL'));
             else if (c === 'distance') totalRow.push(q(fmt(totalDist) + 'm'));
-            else if (c === 'km_total') totalRow.push(fmtKm(totalDist));
+            else if (c === 'km_total') totalRow.push(fmtM(totalDist));
             else if (c === 'pois_exploded') {
                 for (let i = 0; i < maxPois; i++) totalRow.push('');
             } else {

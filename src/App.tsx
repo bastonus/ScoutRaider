@@ -11,12 +11,12 @@ import { List, Library, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export type ViewMode = 'map' | 'text' | 'split';
 
-export type SectionId = 'orchestration' | 'themes' | 'modules' | 'maps' | 'export';
+export type SectionId = 'layers' | 'orchestration' | 'themes' | 'modules' | 'maps' | 'export';
 
 function App() {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
-  const [activeRightSection, setActiveRightSection] = useState<SectionId>('orchestration');
+  const [activeRightSection, setActiveRightSection] = useState<SectionId>('layers');
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);

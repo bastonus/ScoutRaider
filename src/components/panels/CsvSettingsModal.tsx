@@ -164,7 +164,7 @@ export default function CsvSettingsModal({
                             <table style={{ borderCollapse: 'collapse', width: 'max-content', fontSize: '11px', color: '#cdd6f4', fontFamily: 'Consolas, monospace' }}>
                                 <thead style={{ position: 'sticky', top: 0, background: '#181825', zIndex: 10 }}>
                                     <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.15)' }}>
-                                        {previewData[0]?.map((h, i) => (
+                                        {previewData[3]?.map((h, i) => (
                                             <th key={i} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.05)', color: 'var(--accent-default)' }}>
                                                 {h}
                                             </th>
@@ -172,7 +172,8 @@ export default function CsvSettingsModal({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {previewData.slice(1).map((row, rIdx) => (
+                                    {/* Structure CSV: [0]=titre projet, [1]=date, [2]=vide, [3]=headers, [4+]=données */}
+                                    {previewData.slice(4).map((row, rIdx) => (
                                         <tr key={rIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: rIdx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
                                             {row.map((cell, cIdx) => (
                                                 <td key={cIdx} style={{ padding: '8px 14px', borderRight: '1px solid rgba(255,255,255,0.05)', whiteSpace: 'nowrap', maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -181,7 +182,7 @@ export default function CsvSettingsModal({
                                             ))}
                                         </tr>
                                     ))}
-                                    {previewData.length <= 1 && (
+                                    {previewData.length <= 4 && (
                                         <tr>
                                             <td colSpan={10} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontStyle: 'italic' }}>
                                                 {previewData.length === 0 ? 'Chargement ou erreur...' : 'Aucune donnée à afficher'}

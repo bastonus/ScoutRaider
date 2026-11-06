@@ -285,12 +285,12 @@ export default function ExportModal({ onClose }: ExportModalProps) {
 
             <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
               {isCsvLike ? (
-                /* CSV table preview */
-                tableData.length > 1 ? (
+                /* CSV table preview — structure CSV: [0]=titre projet, [1]=date, [2]=vide, [3]=headers colonnes, [4+]=données */
+                tableData.length > 4 ? (
                   <table style={{ borderCollapse: 'collapse', width: 'max-content', fontSize: '11px', fontFamily: 'Consolas, monospace', color: '#cdd6f4' }}>
                     <thead style={{ position: 'sticky', top: 0, background: '#13131f', zIndex: 10 }}>
                       <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.1)' }}>
-                        {tableData[0]?.map((h, i) => (
+                        {tableData[3]?.map((h, i) => (
                           <th key={i} style={{ padding: '9px 13px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.05)', color: FORMATS.find(f => f.id === activeFormat)?.color || 'var(--accent-default)' }}>
                             {h}
                           </th>
@@ -298,7 +298,7 @@ export default function ExportModal({ onClose }: ExportModalProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {tableData.slice(1).map((row, ri) => (
+                      {tableData.slice(4).map((row, ri) => (
                         <tr key={ri} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)' }}>
                           {row.map((cell, ci) => (
                             <td key={ci} style={{ padding: '7px 13px', borderRight: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>

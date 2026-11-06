@@ -4,6 +4,7 @@ import DifficultyLibrary from '../panels/DifficultyLibrary';
 import ThemePanel from '../panels/ThemePanel';
 import LibraryPanel from '../panels/LibraryPanel';
 import MapLibraryPanel from '../panels/MapLibraryPanel';
+import LayerManagerPanel from '../panels/LayerManagerPanel';
 
 interface AccordionSectionProps {
   title: string;
@@ -48,7 +49,7 @@ function AccordionSection({ title, isOpen, onToggle, children }: AccordionSectio
   );
 }
 
-export type SectionId = 'orchestration' | 'themes' | 'modules' | 'maps' | 'export';
+export type SectionId = 'layers' | 'orchestration' | 'themes' | 'modules' | 'maps' | 'export';
 
 interface RightSidebarProps {
   activeSection: SectionId;
@@ -79,6 +80,14 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
         }
       `}</style>
       
+      <AccordionSection 
+        title="Calques" 
+        isOpen={activeSection === 'layers'} 
+        onToggle={() => toggle('layers')}
+      >
+        <LayerManagerPanel />
+      </AccordionSection>
+
       <AccordionSection 
         title="Orchestration Automatique" 
         isOpen={activeSection === 'orchestration'} 
