@@ -1,0 +1,17 @@
+node_modules
+dist
+dist_electron
+build
+build_output.txt
+scoutraider.log
+*.log
+.git
+.github
+.vscode
+.gemini
+legacy
+python-dist
+Mapy.com_files
+Mapy.com.html
+test_overpass.js
+test_poi.ts

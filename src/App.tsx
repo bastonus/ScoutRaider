@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import MenuBar from './components/layout/MenuBar';
 import ProjectWorkspace from './components/layout/ProjectWorkspace';
-import RoutePanel from './components/panels/RoutePanel';
+import LeftSidebarPanel from './components/panels/LeftSidebarPanel';
 import RightSidebar from './components/layout/RightSidebar';
 import NotificationOverlay from './components/map/NotificationOverlay';
 import TextualHeader from './components/textual/TextualHeader';
@@ -47,6 +47,12 @@ function App() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
+  }, []);
+
+  // Keep document title synchronized with package version
+  useEffect(() => {
+    const version = typeof __APP_VERSION__ !== 'undefined' ? `v${__APP_VERSION__}` : 'v0.3.3-beta';
+    document.title = `ScoutRaider — ${version}`;
   }, []);
 
   // Keyboard shortcuts for panel toggling
@@ -150,7 +156,7 @@ function App() {
               height: '100%',
               overflow: 'hidden'
             }}>
-              <RoutePanel />
+              <LeftSidebarPanel />
             </div>
             {/* Left Resizer */}
             <div 

@@ -240,7 +240,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             }},
             { divider: true },
             { label: 'À propos', action: async () => {
-                let version = 'v0.3.3-beta';
+                let version = typeof __APP_VERSION__ !== 'undefined' ? `v${__APP_VERSION__}` : 'v0.3.3-beta';
                 if ((window as any).electronAPI) {
                     try {
                         version = `v${await (window as any).electronAPI.getAppVersion()}`;

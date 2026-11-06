@@ -2,17 +2,25 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import { createServer } from 'http'
 
-const LOG_PATH = path.resolve('./scoutraider.log');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
 
-// Clear log on startup
-fs.writeFileSync(LOG_PATH, `--- ScoutRaider Log Started: ${new Date().toISOString()} ---\n`, 'utf-8');
+const LOG_PATH = path.resolve(__dirname, 'scoutraider.log');
 
 function logServerPlugin() {
   return {
     name: 'scoutraider-log-server',
     configureServer() {
+      try {
+        fs.writeFileSync(LOG_PATH, `--- ScoutRaider Log Started: ${new Date().toISOString()} ---\n`, 'utf-8');
+      } catch (e) {
+        console.warn('Could not write initial log file', e);
+      }
+
       // Tiny HTTP server on port 5174 to receive log messages from the renderer
       const server = createServer((req, res) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,7 +31,9 @@ function logServerPlugin() {
           let body = '';
           req.on('data', chunk => body += chunk);
           req.on('end', () => {
-            fs.appendFileSync(LOG_PATH, body + '\n', 'utf-8');
+            try {
+              fs.appendFileSync(LOG_PATH, body + '\n', 'utf-8');
+            } catch (err) {}
             res.writeHead(200);
             res.end();
           });
@@ -43,6 +53,9 @@ function logServerPlugin() {
 export default defineConfig({
   plugins: [react(), logServerPlugin()],
   base: './',
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

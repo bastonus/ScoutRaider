@@ -68,7 +68,7 @@ export class PolygonalEngine {
         `;
 
         try {
-            const resp = await fetch('http://overpass-api.de/api/interpreter', {
+            const resp = await fetch('https://overpass-api.de/api/interpreter', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({ data: query })
