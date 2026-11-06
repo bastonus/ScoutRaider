@@ -5,6 +5,27 @@ Tous les changements notables apportés à ce projet seront documentés dans ce 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8-beta] - 2026-11-06
+### Ajouté
+- **Transformer vectoriel pour les dessins** : boîte englobante projetée, 8 poignées de redimensionnement, rotation et déplacement, avec aperçu temps réel (60 FPS) et validation en une seule étape (compatible Ctrl+Z / Ctrl+Y).
+- **Hiérarchie calques / traits** : un dessin est désormais un groupe composé de traits (`DrawStroke`) sélectionnables individuellement, chacun avec sa propre couleur, épaisseur et opacité.
+- **Sous-calques dans le gestionnaire de calques** : arborescence dépliable, sélection d'un trait, changement de couleur, badge d'épaisseur et suppression unitaire.
+- **Panneau gauche contextuel** : le panneau affiche les informations du calque sélectionné (itinéraire, zone, repère ou dessin) sous forme de cartes dédiées.
+- **Raccourcis clavier** : `Ctrl+T` (trait ↔ groupe), `Suppr` (supprimer le trait ou le calque), `Échap` (désélectionner), avec rappels affichés dans les menus contextuels (`F2`, `Entrée`, `Espace`, `Suppr`).
+- **Ordre des calques persistant** : l'ordre défini par glisser-déposer est sauvegardé dans l'état du document et restauré à l'ouverture.
+
+### Modifié
+- **Focus d'itinéraire** : seul l'itinéraire sélectionné et actif est affiché en trait plein ; les autres apparaissent en pointillés et restent cliquables pour être sélectionnés.
+- **Création automatique d'itinéraire** : tracer avec l'outil itinéraire alors qu'aucun itinéraire n'est sélectionné crée et active automatiquement un nouvel itinéraire.
+- **Sélection unifiée** : cliquer sur un itinéraire, une zone, un repère ou un trait le sélectionne et synchronise le panneau de gauche, sans interrompre les outils d'annotation en cours.
+- **Nettoyage automatique** : les calques vides (itinéraires sans étapes, dessins sans traits, zones incomplètes, repères invalides) sont supprimés au changement d'outil ou de mode.
+
+### Corrigé
+- **Migration des anciens dessins** : les traits au format historique (`[lat, lng][]`) sont convertis automatiquement en `DrawStroke` à l'ouverture d'un document.
+- **Fluidité du dessin** : conversion native des coordonnées Leaflet et verrouillage du déplacement de la carte pendant le tracé pour éviter les décalages.
+- **Curseur des outils** : curseur en croix ajouté pour `annotate_area_routed` et `annotate_draw`.
+- **Suppression du dernier itinéraire** : un itinéraire par défaut est recréé automatiquement.
+
 ## [0.3.3-beta] - 2026-05-11
 ### Ajouté
 - **Bibliothèque de Cartes (Galerie)** : Refonte complète de la sélection de fonds de carte. Passage d'une simple liste à une galerie visuelle avec aperçus, badges contextuels (Satellite, Bloqué, Favori) et logos de services.

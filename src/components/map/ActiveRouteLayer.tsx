@@ -113,6 +113,12 @@ export default function ActiveRouteLayer() {
     const [encodingPopupVal, setEncodingPopupVal] = useState<{ idx: number, latlng: [number, number] } | null>(null);
     const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
+    // If an itinerary is not the selected layer or tool is not a routing tool,
+    // it is rendered as dashed by InactiveItinerariesLayer instead.
+    const isRouteTool = ['route', 'route_direct', 'node', 'azimut'].includes(activeTool);
+    const isItinActiveAndSelected = state.selected_layer_id === state.active_itinerary_id;
+    const hasFocusedItin = isRouteTool && isItinActiveAndSelected;
+
     React.useEffect(() => {
         const handleDragOver = (e: DragEvent) => {
             const map = (window as any).__leafletMap;
@@ -356,6 +362,8 @@ export default function ActiveRouteLayer() {
             });
         });
     };
+
+    if (!hasFocusedItin) return null;
 
     if (!showPolygons) {
         // Fallback: Just draw raw BRouter routes

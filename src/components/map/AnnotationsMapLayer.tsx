@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Marker, Polygon, Polyline, Tooltip, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
 import { buildAreaDisplayCoords } from '../../AppContext';
-import { AreaAnnotation } from '../../logic/types';
+import { AreaAnnotation, PointAnnotation } from '../../logic/types';
 import { calculatePolygonArea, formatArea } from '../../logic/GeoUtils';
 import { backgroundEngine, invalidateRouteCacheForLeg } from '../../logic/BackgroundEngine';
 import { IGNClient } from '../../logic/IGNClient';
@@ -36,16 +36,6 @@ function createPointIcon(color: string, title: string, isSelected = false) {
             </svg>
         </div>`,
         iconSize: [26, 34], iconAnchor: [13, 33], popupAnchor: [0, -50]
-    });
-}
-
-function createVertexIcon(color: string, isFirst = false, isDrawing = false) {
-    const s = isFirst ? 16 : 14;
-    const border = isDrawing ? `2px dashed ${color}` : `${isFirst ? 3 : 2}px solid ${color}`;
-    return L.divIcon({
-        className: 'area-vertex-handle',
-        html: `<div style="width:${s}px;height:${s}px;border-radius:50%;background:#ffffff;border:${border};box-shadow:0 2px 8px rgba(0,0,0,0.7);cursor:grab;pointer-events:all;"></div>`,
-        iconSize: [s, s], iconAnchor: [s / 2, s / 2]
     });
 }
 
@@ -90,6 +80,202 @@ function AreaPopupContent({ area, formatted, dispatch, onDelete }: {
     );
 }
 
+// ── Memoized Vertex Marker (isolated to avoid unbinding listeners mid-drag) ───
+interface VertexMarkerProps {
+    areaId: string;
+    vIdx: number;
+    position: [number, number];
+    color: string;
+    isFirst: boolean;
+    isDrawing: boolean;
+    totalVertices: number;
+    onDrag: (areaId: string, vIdx: number, lat: number, lng: number) => void;
+    onDragEnd: (areaId: string, vIdx: number, lat: number, lng: number) => void;
+}
+
+const VertexMarker = React.memo(function VertexMarker({
+    areaId, vIdx, position, color, isFirst, isDrawing, totalVertices, onDrag, onDragEnd
+}: VertexMarkerProps) {
+    const markerRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (!markerRef.current) return;
+        const m = markerRef.current._marker || markerRef.current;
+        m.dragging?.enable();
+    }, []);
+
+    const icon = useMemo(() => {
+        const s = isFirst ? 16 : 14;
+        const border = isDrawing ? `2px dashed ${color}` : `${isFirst ? 3 : 2}px solid ${color}`;
+        return L.divIcon({
+            className: 'area-vertex-handle',
+            html: `<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:grab;pointer-events:all;">
+                <div style="width:${s}px;height:${s}px;border-radius:50%;background:#ffffff;border:${border};box-shadow:0 2px 8px rgba(0,0,0,0.7);"></div>
+            </div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
+    }, [color, isFirst, isDrawing]);
+
+    const handleDragStart = useCallback(() => {
+        (window as any).__markerDragging = true;
+        if (markerRef.current?.dragging) markerRef.current.dragging.enable();
+    }, []);
+
+    const handleDrag = useCallback((e: any) => {
+        const ll = e.target.getLatLng();
+        onDrag(areaId, vIdx, ll.lat, ll.lng);
+    }, [areaId, vIdx, onDrag]);
+
+    const handleDragEnd = useCallback((e: any) => {
+        const ll = e.target.getLatLng();
+        onDragEnd(areaId, vIdx, ll.lat, ll.lng);
+        setTimeout(() => { (window as any).__markerDragging = false; }, 100);
+    }, [areaId, vIdx, onDragEnd]);
+
+    const eventHandlers = useMemo(() => ({
+        dragstart: handleDragStart,
+        drag: handleDrag,
+        dragend: handleDragEnd,
+        click: (e: any) => { L.DomEvent.stopPropagation(e); },
+    }), [handleDragStart, handleDrag, handleDragEnd]);
+
+    return (
+        <Marker
+            ref={(ref: any) => { markerRef.current = ref; }}
+            position={position}
+            icon={icon}
+            draggable={true}
+            zIndexOffset={3000}
+            eventHandlers={eventHandlers}
+        >
+            <Tooltip direction="top" offset={[0, -12]}>
+                <span style={{ fontSize: '10px' }}>
+                    <b>S{vIdx + 1}</b>
+                    {isDrawing && vIdx === 0 && totalVertices >= 3 ? ' — clic pour fermer' : ' — glisser pour déplacer'}
+                </span>
+            </Tooltip>
+        </Marker>
+    );
+});
+
+// ── Memoized Point Marker ─────────────────────────────────────────────────────
+interface PointMarkerProps {
+    point: PointAnnotation;
+    isSelected: boolean;
+    onSelect: (id: string) => void;
+    onDragEnd: (id: string, lat: number, lng: number) => void;
+    onDelete: (id: string) => void;
+    dispatch: (a: any) => void;
+}
+
+const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
+    point, isSelected, onSelect, onDragEnd, onDelete, dispatch
+}: PointMarkerProps) {
+    const markerRef = useRef<any>(null);
+    const [hovering, setHovering] = useState(false);
+    const [address, setAddress] = useState<string>('');
+
+    useEffect(() => {
+        if (!markerRef.current) return;
+        const m = markerRef.current._marker || markerRef.current;
+        m.dragging?.enable();
+    }, []);
+
+    const icon = useMemo(() => {
+        return createPointIcon(point.color || '#3b82f6', point.title || '', isSelected);
+    }, [point.color, point.title, isSelected]);
+
+    const handleDragStart = useCallback(() => {
+        (window as any).__markerDragging = true;
+        if (markerRef.current?.dragging) markerRef.current.dragging.enable();
+    }, []);
+
+    const handleDragEnd = useCallback((e: any) => {
+        const p = e.target.getLatLng();
+        onDragEnd(point.id, p.lat, p.lng);
+        setTimeout(() => { (window as any).__markerDragging = false; }, 100);
+    }, [point.id, onDragEnd]);
+
+    const handleClick = useCallback((e: any) => {
+        L.DomEvent.stopPropagation(e);
+        onSelect(point.id);
+    }, [point.id, onSelect]);
+
+    const handleContextMenu = useCallback((e: any) => {
+        L.DomEvent.stopPropagation(e);
+        onDelete(point.id);
+    }, [point.id, onDelete]);
+
+    const eventHandlers = useMemo(() => ({
+        dragstart: handleDragStart,
+        dragend: handleDragEnd,
+        click: handleClick,
+        contextmenu: handleContextMenu,
+        mouseover: async () => {
+            setHovering(true);
+            if (!address) {
+                const addr = await IGNClient.reverseGeocode(point.coords[0], point.coords[1]);
+                setAddress(addr);
+            }
+        },
+        mouseout: () => setHovering(false),
+    }), [handleDragStart, handleDragEnd, handleClick, handleContextMenu, address, point.coords]);
+
+    return (
+        <Marker
+            ref={(ref: any) => { markerRef.current = ref; }}
+            position={point.coords}
+            icon={icon}
+            draggable={true}
+            zIndexOffset={2000}
+            eventHandlers={eventHandlers}
+        >
+            {hovering && (point.text || address) && (
+                <Tooltip permanent direction="top" offset={[0, -50]} className="sr-map-label-point-hover">
+                    {point.text && <div style={{ marginBottom: '4px', fontSize: '11px', color: '#e2e8f0', maxWidth: '200px', whiteSpace: 'normal', lineHeight: 1.4 }}>{point.text}</div>}
+                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
+                        {address || `${point.coords[0].toFixed(5)}, ${point.coords[1].toFixed(5)}`}
+                    </div>
+                </Tooltip>
+            )}
+            <Popup className="sr-annotation-popup" autoPanPadding={[40, 40]}>
+                <div style={{ minWidth: '210px', padding: '10px', background: '#141e17', borderRadius: '10px', border: `1px solid ${point.color || '#3b82f6'}55`, color: '#e8f0eb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: point.color || '#3b82f6' }} />
+                        <span style={{ fontWeight: 800, fontSize: '13px', color: '#fff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{point.title}</span>
+                    </div>
+                    <input type="text" value={point.title}
+                        onChange={e => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { title: e.target.value } })}
+                        placeholder="Nom du repère..."
+                        style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '4px 8px', color: '#fff', fontWeight: 600, fontSize: '11px', outline: 'none', marginBottom: '8px' }}
+                    />
+                    <textarea rows={2} value={point.text || ''}
+                        onChange={e => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { text: e.target.value } })}
+                        placeholder="Notes..."
+                        style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '5px', color: '#cbd5e1', fontSize: '11px', outline: 'none', resize: 'vertical', marginBottom: '8px' }}
+                    />
+                    <div style={{ display: 'flex', gap: '5px', marginBottom: '8px' }}>
+                        {PRESET_COLORS.map(c => (
+                            <div key={c.value} title={c.label}
+                                onClick={() => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { color: c.value } })}
+                                style={{ width: '14px', height: '14px', borderRadius: '50%', background: c.value, cursor: 'pointer', boxShadow: point.color === c.value ? '0 0 0 2px #fff' : 'none' }}
+                            />
+                        ))}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'rgba(255,255,255,0.4)', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px' }}>
+                        <span>Glisser · Clic droit = supprimer</span>
+                        <button type="button" onClick={() => onDelete(point.id)}
+                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }}>
+                            <Trash2 size={11} />
+                        </button>
+                    </div>
+                </div>
+            </Popup>
+        </Marker>
+    );
+});
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function AnnotationsMapLayer() {
     const { state, dispatch } = useApp();
@@ -103,12 +289,8 @@ export default function AnnotationsMapLayer() {
         dispatch({ type: 'SET_SELECTED_LAYER', id });
     }, [dispatch]);
 
-    // ── Point hover / geocode cache ───────────────────────────────────────────
-    const [hoveringPointId, setHoveringPointId] = useState<string | null>(null);
-    const addressCache = useRef<Record<string, string>>({});
-
-    // ── Live vertex drag ──────────────────────────────────────────────────────
-    const [liveDragVertex, setLiveDragVertex] = useState<{ areaId: string; vertexIdx: number; coords: [number, number] } | null>(null);
+    // ── Leaflet Polygon references for imperative 60fps drag updates ──────────
+    const polygonRefs = useRef<Record<string, any>>({});
     const areaAnnotationsRef = useRef(state.area_annotations);
     useEffect(() => { areaAnnotationsRef.current = state.area_annotations; }, [state.area_annotations]);
 
@@ -186,7 +368,7 @@ export default function AnnotationsMapLayer() {
                 const currentId = activeDrawingIdRef.current;
 
                 if (!currentId) {
-                    // Check if an existing completed area is selected: clicking outside deselects it
+                    // If an area is already selected, clicking outside deselects it
                     if (selectedId && visibleAreas.some(a => a.id === selectedId)) {
                         setSelectedId(null);
                         return;
@@ -228,9 +410,6 @@ export default function AnnotationsMapLayer() {
                 }
                 return;
             }
-
-            // Any other tool → deselect
-            setSelectedId(null);
         },
         keydown(e: any) {
             const key = e.originalEvent?.key;
@@ -248,19 +427,28 @@ export default function AnnotationsMapLayer() {
         },
     });
 
-    // ── Vertex drag ───────────────────────────────────────────────────────────
-    const handleVertexDrag = (areaId: string, vIdx: number, e: any) => {
-        const ll = e.target.getLatLng();
-        setLiveDragVertex({ areaId, vertexIdx: vIdx, coords: [ll.lat, ll.lng] });
-    };
-
-    const handleVertexDragEnd = (areaId: string, vIdx: number, e: any) => {
-        const ll = e.target.getLatLng();
+    // ── Imperative 60fps Vertex Drag Handlers (ZERO React re-renders during drag!) ───
+    const handleVertexDrag = useCallback((areaId: string, vIdx: number, lat: number, lng: number) => {
+        const poly = polygonRefs.current[areaId];
         const area = areaAnnotationsRef.current.find(a => a.id === areaId);
-        setLiveDragVertex(null);
+        if (poly && area) {
+            const nc = [...area.coords] as [number, number][];
+            nc[vIdx] = [lat, lng];
+            const n = nc.length;
+            const prevIdx = (vIdx - 1 + n) % n;
+            const tempEdges: ([number, number][] | null)[] = area.edgeRoutes ? [...area.edgeRoutes] : Array(n).fill(null);
+            tempEdges[prevIdx] = null;
+            tempEdges[vIdx] = null;
+            const dp = buildAreaDisplayCoords(nc, tempEdges);
+            poly.setLatLngs(dp);
+        }
+    }, []);
+
+    const handleVertexDragEnd = useCallback((areaId: string, vIdx: number, lat: number, lng: number) => {
+        const area = areaAnnotationsRef.current.find(a => a.id === areaId);
         if (!area) return;
         const nc = [...area.coords] as [number, number][];
-        nc[vIdx] = [ll.lat, ll.lng];
+        nc[vIdx] = [lat, lng];
         const n = nc.length;
         const prevIdx = (vIdx - 1 + n) % n;
         const newEdgeRoutes = area.edgeRoutes ? [...area.edgeRoutes] : Array(n).fill(null) as ([number, number][] | null)[];
@@ -273,125 +461,30 @@ export default function AnnotationsMapLayer() {
         dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: areaId, patch: { coords: nc, edgeRoutes: newEdgeRoutes, area_m2: m2, formatted_area: formatArea(m2) } });
         if (prevWasRouted || area.followRoads) enqueueAreaEdge(areaId, prevIdx, nc[prevIdx], nc[vIdx]);
         if (nextWasRouted || area.followRoads) enqueueAreaEdge(areaId, vIdx, nc[vIdx], nc[(vIdx + 1) % n]);
-        setTimeout(() => { (window as any).__markerDragging = false; }, 150);
-    };
+    }, [dispatch]);
 
-    // Notice: position is the stable vertex coordinate so React-Leaflet doesn't call marker.setLatLng()
-    // during Leaflet's internal drag movement, ensuring 60fps smooth dragging without canceling!
-    const renderVertexMarker = (area: AreaAnnotation, vIdx: number, isDrawing: boolean) => {
-        const vertex = area.coords[vIdx];
-        return (
-            <Marker key={`vertex-${area.id}-${vIdx}`} position={vertex}
-                icon={createVertexIcon(area.color || '#10b981', vIdx === 0, isDrawing)}
-                draggable={true}
-                zIndexOffset={3000}
-                eventHandlers={{
-                    dragstart: (e: any) => {
-                        (window as any).__markerDragging = true;
-                        if (e.target?.dragging) e.target.dragging.enable();
-                        map.dragging.disable();
-                    },
-                    drag: (e: any) => handleVertexDrag(area.id, vIdx, e),
-                    dragend: (e: any) => {
-                        map.dragging.enable();
-                        handleVertexDragEnd(area.id, vIdx, e);
-                    },
-                    click: (e: any) => { L.DomEvent.stopPropagation(e); },
-                }}
-            >
-                <Tooltip direction="top" offset={[0, -10]}>
-                    <span style={{ fontSize: '10px' }}>
-                        <b>S{vIdx + 1}</b>
-                        {isDrawing && vIdx === 0 && area.coords.length >= 3 ? ' — clic pour fermer' : ' — glisser pour déplacer'}
-                    </span>
-                </Tooltip>
-            </Marker>
-        );
-    };
+    const handlePointDragEnd = useCallback((id: string, lat: number, lng: number) => {
+        dispatch({ type: 'UPDATE_POINT_ANNOTATION', id, patch: { coords: [lat, lng] } });
+    }, [dispatch]);
+
+    const handlePointDelete = useCallback((id: string) => {
+        dispatch({ type: 'REMOVE_POINT_ANNOTATION', id });
+    }, [dispatch]);
 
     return (
         <>
             {/* ── 1. POINTS ─────────────────────────────────────────────────── */}
-            {visiblePoints.map(point => {
-                const isSelected = selectedId === point.id;
-                return (
-                    <Marker key={point.id} position={point.coords}
-                        icon={createPointIcon(point.color || '#3b82f6', point.title || '', isSelected)}
-                        draggable={true}
-                        zIndexOffset={2000}
-                        eventHandlers={{
-                            dragstart: (e: any) => {
-                                (window as any).__markerDragging = true;
-                                if (e.target?.dragging) e.target.dragging.enable();
-                                map.dragging.disable();
-                            },
-                            dragend: (e: any) => {
-                                map.dragging.enable();
-                                const p = e.target.getLatLng();
-                                dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { coords: [p.lat, p.lng] } });
-                                delete addressCache.current[point.id];
-                                setTimeout(() => { (window as any).__markerDragging = false; }, 100);
-                            },
-                            click: (e: any) => {
-                                L.DomEvent.stopPropagation(e);
-                                setSelectedId(point.id === selectedId ? null : point.id);
-                            },
-                            mouseover: async () => {
-                                setHoveringPointId(point.id);
-                                if (!addressCache.current[point.id]) {
-                                    const addr = await IGNClient.reverseGeocode(point.coords[0], point.coords[1]);
-                                    addressCache.current[point.id] = addr;
-                                    setHoveringPointId(id => id);
-                                }
-                            },
-                            mouseout: () => setHoveringPointId(null),
-                            contextmenu: (e: any) => { L.DomEvent.stopPropagation(e); dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: point.id }); }
-                        }}
-                    >
-                        {hoveringPointId === point.id && (point.text || addressCache.current[point.id]) && (
-                            <Tooltip permanent direction="top" offset={[0, -60]} className="sr-map-label-point-hover">
-                                {point.text && <div style={{ marginBottom: '4px', fontSize: '11px', color: '#e2e8f0', maxWidth: '200px', whiteSpace: 'normal', lineHeight: 1.4 }}>{point.text}</div>}
-                                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
-                                    {addressCache.current[point.id] || `${point.coords[0].toFixed(5)}, ${point.coords[1].toFixed(5)}`}
-                                </div>
-                            </Tooltip>
-                        )}
-                        <Popup className="sr-annotation-popup" autoPanPadding={[40, 40]}>
-                            <div style={{ minWidth: '210px', padding: '10px', background: '#141e17', borderRadius: '10px', border: `1px solid ${point.color || '#3b82f6'}55`, color: '#e8f0eb' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: point.color || '#3b82f6' }} />
-                                    <span style={{ fontWeight: 800, fontSize: '13px', color: '#fff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{point.title}</span>
-                                </div>
-                                <input type="text" value={point.title}
-                                    onChange={e => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { title: e.target.value } })}
-                                    placeholder="Nom du repère..."
-                                    style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '4px 8px', color: '#fff', fontWeight: 600, fontSize: '11px', outline: 'none', marginBottom: '8px' }}
-                                />
-                                <textarea rows={2} value={point.text || ''}
-                                    onChange={e => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { text: e.target.value } })}
-                                    placeholder="Notes..."
-                                    style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '5px', color: '#cbd5e1', fontSize: '11px', outline: 'none', resize: 'vertical', marginBottom: '8px' }}
-                                />
-                                <div style={{ display: 'flex', gap: '5px', marginBottom: '8px' }}>
-                                    {PRESET_COLORS.map(c => (
-                                        <div key={c.value} title={c.label}
-                                            onClick={() => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: point.id, patch: { color: c.value } })}
-                                            style={{ width: '14px', height: '14px', borderRadius: '50%', background: c.value, cursor: 'pointer', boxShadow: point.color === c.value ? '0 0 0 2px #fff' : 'none' }}
-                                        />
-                                    ))}
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'rgba(255,255,255,0.4)', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px' }}>
-                                    <span>Glisser · Clic droit = supprimer</span>
-                                    <button type="button" onClick={() => dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: point.id })}
-                                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }}>
-                                        <Trash2 size={11} />
-                                    </button>
-                                </div>
-                            </div>
-                        </Popup>
-                    </Marker>
-                );
-            })}
+            {visiblePoints.map(point => (
+                <PointAnnotationMarker
+                    key={point.id}
+                    point={point}
+                    isSelected={selectedId === point.id}
+                    onSelect={setSelectedId}
+                    onDragEnd={handlePointDragEnd}
+                    onDelete={handlePointDelete}
+                    dispatch={dispatch}
+                />
+            ))}
 
             {/* ── 2. RUBBER-BAND while drawing ──────────────────────────────── */}
             {isAreaTool && activeDrawingId && cursorPos && (() => {
@@ -411,31 +504,19 @@ export default function AnnotationsMapLayer() {
                 const isDrawing  = activeDrawingId === area.id;
                 const isSelected = selectedId === area.id;
                 const n = area.coords.length;
-
-                // Build display polygon with live drag preview
-                let displayCoords = buildAreaDisplayCoords(area.coords, area.edgeRoutes);
-                if (liveDragVertex && liveDragVertex.areaId === area.id) {
-                    const nc = [...area.coords] as [number, number][];
-                    nc[liveDragVertex.vertexIdx] = liveDragVertex.coords;
-                    const prevIdx = (liveDragVertex.vertexIdx - 1 + n) % n;
-                    const tempEdges: ([number, number][] | null)[] = area.edgeRoutes ? [...area.edgeRoutes] : Array(n).fill(null);
-                    tempEdges[prevIdx] = null;
-                    tempEdges[liveDragVertex.vertexIdx] = null;
-                    displayCoords = buildAreaDisplayCoords(nc, tempEdges);
-                }
-
+                const displayCoords = buildAreaDisplayCoords(area.coords, area.edgeRoutes);
                 const isComplete = displayCoords.length >= 3;
                 const liveM2    = isComplete ? calculatePolygonArea(displayCoords) : 0;
                 const formatted = isComplete ? (area.formatted_area || formatArea(liveM2)) : '';
                 const hasRouted = area.edgeRoutes?.some(e => e && e.length > 0);
 
                 // ── NON-AREA TOOL: simple read-only display ───────────────────
-                // No interactivity — clicks pass through to map (e.g. to place points)
                 if (!isAreaTool) {
                     return (
                         <React.Fragment key={area.id}>
                             {isComplete ? (
                                 <Polygon
+                                    ref={(ref: any) => { if (ref) polygonRefs.current[area.id] = ref; }}
                                     positions={displayCoords}
                                     pathOptions={{
                                         color: area.color || '#10b981',
@@ -470,6 +551,7 @@ export default function AnnotationsMapLayer() {
                         {/* Fill polygon */}
                         {isComplete ? (
                             <Polygon
+                                ref={(ref: any) => { if (ref) polygonRefs.current[area.id] = ref; }}
                                 positions={displayCoords}
                                 pathOptions={{
                                     color: area.color || '#10b981',
@@ -511,20 +593,7 @@ export default function AnnotationsMapLayer() {
                             const nextIdx  = (eIdx + 1) % n;
                             const edgeRoute = area.edgeRoutes?.[eIdx];
                             const isRouted  = !!(edgeRoute && edgeRoute.length >= 2);
-                            let edgePts: [number, number][];
-                            if (liveDragVertex && liveDragVertex.areaId === area.id) {
-                                const vIdx = liveDragVertex.vertexIdx;
-                                const prevIdx = (vIdx - 1 + n) % n;
-                                if (eIdx === prevIdx || eIdx === vIdx) {
-                                    const nc = [...area.coords] as [number, number][];
-                                    nc[vIdx] = liveDragVertex.coords;
-                                    edgePts = [nc[eIdx], nc[nextIdx]];
-                                } else {
-                                    edgePts = isRouted ? edgeRoute! : [area.coords[eIdx], area.coords[nextIdx]];
-                                }
-                            } else {
-                                edgePts = isRouted ? edgeRoute! : [area.coords[eIdx], area.coords[nextIdx]];
-                            }
+                            const edgePts = isRouted ? edgeRoute! : [area.coords[eIdx], area.coords[nextIdx]];
                             return (
                                 <Polyline key={`edge-${area.id}-${eIdx}`} positions={edgePts}
                                     pathOptions={{ color: isRouted ? '#10b981' : (area.color || '#5b6af0'), weight: 4, dashArray: isRouted ? undefined : '7 5', opacity: 0.95, interactive: true } as any}
@@ -545,10 +614,21 @@ export default function AnnotationsMapLayer() {
                             );
                         })}
 
-                        {/* Vertex handles */}
-                        {showHandles && area.coords.map((_, vIdx) =>
-                            renderVertexMarker(area, vIdx, isDrawing)
-                        )}
+                        {/* Vertex handles — memoized so dragging is 100% stable and smooth */}
+                        {showHandles && area.coords.map((coords, vIdx) => (
+                            <VertexMarker
+                                key={`vertex-${area.id}-${vIdx}`}
+                                areaId={area.id}
+                                vIdx={vIdx}
+                                position={coords}
+                                color={area.color || '#10b981'}
+                                isFirst={vIdx === 0}
+                                isDrawing={isDrawing}
+                                totalVertices={area.coords.length}
+                                onDrag={handleVertexDrag}
+                                onDragEnd={handleVertexDragEnd}
+                            />
+                        ))}
 
                     </React.Fragment>
                 );

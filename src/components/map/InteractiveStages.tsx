@@ -184,6 +184,12 @@ export default function InteractiveStages() {
         dispatch({ type: 'SET_ANCHOR_STAGE', idx: state.stages.length - 1 });
     }, [dispatch, state.stages.length]);
 
+    const isRouteTool = ['route', 'route_direct', 'node', 'azimut'].includes(state.active_tool);
+    const isItinActiveAndSelected = state.selected_layer_id === state.active_itinerary_id;
+    const hasFocusedItin = isRouteTool && isItinActiveAndSelected;
+
+    if (!hasFocusedItin) return null;
+
     const isMovable = state.active_tool === 'route' || state.active_tool === 'route_direct' || state.active_tool === 'node';
 
     return (

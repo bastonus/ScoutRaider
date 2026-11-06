@@ -83,6 +83,7 @@ export class StateManager {
             point_annotations: [],
             area_annotations: [],
             draw_annotations: [],
+            layer_order: [{ kind: 'itin' as const, id: defaultItinId }],
 
             stages: [],
             geojson_data: null,
@@ -131,7 +132,9 @@ export class StateManager {
             // Transient UI state
             is_loading: false,
             loading_text: '',
-            notifications: []
+            notifications: [],
+            selected_layer_id: null,
+            selected_sublayer_id: null
         };
     }
 
@@ -244,6 +247,25 @@ export class StateManager {
         }
         if (!Array.isArray(migrated.point_annotations)) migrated.point_annotations = [];
         if (!Array.isArray(migrated.draw_annotations))  migrated.draw_annotations = [];
+        if (!Array.isArray(migrated.layer_order))       migrated.layer_order = [];
+        // Migrate legacy strokes: [number,number][][] → DrawStroke[]
+        migrated.draw_annotations = migrated.draw_annotations.map((d: any) => {
+            if (!Array.isArray(d.strokes)) return { ...d, strokes: [] };
+            const strokes = d.strokes.map((s: any, idx: number) => {
+                // Already migrated (has id and points)
+                if (s && typeof s === 'object' && s.id && s.points) return s;
+                // Legacy: s is [number, number][]
+                return {
+                    id: `stroke-legacy-${d.id}-${idx}`,
+                    points: s,
+                    color: d.color || '#ef4444',
+                    strokeWidth: d.strokeWidth || 4,
+                    opacity: d.opacity || 0.85,
+                    createdAt: d.createdAt || Date.now(),
+                };
+            });
+            return { ...d, strokes };
+        });
         if (!Array.isArray(migrated.area_annotations)) {
             migrated.area_annotations = [];
         } else {

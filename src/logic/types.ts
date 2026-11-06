@@ -430,16 +430,25 @@ export interface AreaAnnotation {
     createdAt: number;
 }
 
+export interface DrawStroke {
+    id: string;
+    points: [number, number][]; // actual current lat/lng positions (transforms baked in)
+    color: string;
+    strokeWidth: number; // pixels 1–20
+    opacity: number;     // 0–1
+    createdAt: number;
+}
+
 export interface DrawAnnotation {
     id: string;
     type: 'draw';
     layerId: string;
     title: string;
     visible: boolean;
-    color: string;
-    strokeWidth: number;    // pixels (1–20)
-    opacity: number;        // 0–1
-    strokes: [number, number][][]; // array of freehand strokes, each = [[lat,lng],…]
+    color: string;        // default color for new strokes
+    strokeWidth: number;  // default width for new strokes
+    opacity: number;      // default opacity for new strokes
+    strokes: DrawStroke[];
     createdAt: number;
 }
 
@@ -523,4 +532,8 @@ export interface AppState {
 
     // Panel layer selection (shared between LayerManagerPanel and map layers)
     selected_layer_id: string | null;
+    selected_sublayer_id: string | null;
+
+    // Persisted layer display order (array of { kind, id } objects)
+    layer_order: Array<{ kind: 'itin' | 'point' | 'area' | 'draw'; id: string }>;
 }

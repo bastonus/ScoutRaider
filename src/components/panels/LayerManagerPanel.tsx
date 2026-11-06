@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Eye, EyeOff, Trash2, Route, MapPin, Maximize2, Pencil, Check, X, GripVertical, Paintbrush } from 'lucide-react';
+import { Eye, EyeOff, Trash2, Route, MapPin, Maximize2, Pencil, Check, X, GripVertical, Paintbrush, ChevronRight, ChevronDown } from 'lucide-react';
 import { useApp } from '../../AppContext';
 import { mapRef } from '../map/MapComponent';
 import { calculatePolygonArea, formatArea } from '../../logic/GeoUtils';
 import { PRESET_COLORS } from '../map/AnnotationModals';
-import { Itinerary, PointAnnotation, AreaAnnotation, DrawAnnotation } from '../../logic/types';
+import { Itinerary, PointAnnotation, AreaAnnotation, DrawAnnotation, DrawStroke } from '../../logic/types';
 
 // ─── Types ───────────────────────────────────────────────────────────
 type ItemKind = 'itin' | 'point' | 'area' | 'draw';
@@ -20,7 +20,7 @@ function PolygonIcon({ color = 'currentColor', size = 13 }: { color?: string; si
 }
 
 // ─── Context Menu ────────────────────────────────────────────────────
-interface CtxMenuItem { icon?: React.ReactNode; label: string; danger?: boolean; onClick: () => void; }
+interface CtxMenuItem { icon?: React.ReactNode; label: string; shortcut?: string; danger?: boolean; onClick: () => void; }
 interface CtxMenuSeparator { separator: true; }
 
 function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: (CtxMenuItem | CtxMenuSeparator)[]; onClose: () => void; }) {
@@ -43,15 +43,22 @@ function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: (C
 
     return (
         <div ref={ref} onContextMenu={e => e.preventDefault()}
-            style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, background: 'rgba(10,16,12,0.98)', border: '1px solid rgba(110,201,126,0.18)', borderRadius: '10px', padding: '4px', minWidth: '180px', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', backdropFilter: 'blur(20px)' }}>
+            style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, background: 'rgba(10,16,12,0.98)', border: '1px solid rgba(110,201,126,0.18)', borderRadius: '10px', padding: '4px', minWidth: '190px', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', backdropFilter: 'blur(20px)' }}>
             {items.map((item, i) => 'separator' in item
                 ? <div key={i} style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '3px 0' }} />
                 : <button key={i} type="button" onClick={() => { item.onClick(); onClose(); }}
                     onMouseEnter={e => { e.currentTarget.style.background = item.danger ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.07)'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '7px 10px', background: 'transparent', border: 'none', borderRadius: '7px', color: item.danger ? '#ef4444' : 'var(--text-bright)', fontSize: '12px', fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
-                    {item.icon && <span style={{ opacity: 0.7, flexShrink: 0 }}>{item.icon}</span>}
-                    {item.label}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%', padding: '7px 10px', background: 'transparent', border: 'none', borderRadius: '7px', color: item.danger ? '#ef4444' : 'var(--text-bright)', fontSize: '12px', fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {item.icon && <span style={{ opacity: 0.7, flexShrink: 0 }}>{item.icon}</span>}
+                        {item.label}
+                    </span>
+                    {item.shortcut && (
+                        <span style={{ fontSize: '10px', color: 'var(--text-dim)', opacity: 0.65, fontFamily: 'monospace', marginLeft: 'auto', padding: '1px 5px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px' }}>
+                            {item.shortcut}
+                        </span>
+                    )}
                 </button>
             )}
         </div>
@@ -96,14 +103,14 @@ function InlineRename({ value, onConfirm, onCancel }: { value: string; onConfirm
 }
 
 // ─── Layer row ───────────────────────────────────────────────────────
-function LayerRow({ icon, label, sublabel, color, visible, isEditing, isActive, isSelected, onToggleVisible, onContextMenu, renameSlot, dragHandleProps }: {
+function LayerRow({ icon, label, sublabel, color, visible, isEditing, isSelected, onToggleVisible, onContextMenu, renameSlot, dragHandleProps, expandToggle }: {
     icon: React.ReactNode; label: string; sublabel?: string; color: string;
-    visible: boolean; isEditing: boolean; isActive?: boolean; isSelected?: boolean;
+    visible: boolean; isEditing: boolean; isSelected?: boolean;
     onToggleVisible: () => void; onContextMenu: (e: React.MouseEvent) => void;
     renameSlot?: React.ReactNode;
     dragHandleProps?: React.HTMLAttributes<HTMLSpanElement>;
+    expandToggle?: React.ReactNode;
 }) {
-    // Only isSelected gives row highlight. isActive gives an [Actif] badge without highlighing the row.
     const bg = isSelected ? 'rgba(110,201,126,0.12)' : 'transparent';
     const borderL = isSelected ? '#6ec97e' : 'transparent';
     return (
@@ -112,10 +119,12 @@ function LayerRow({ icon, label, sublabel, color, visible, isEditing, isActive, 
             onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
             onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
         >
-            {/* Drag handle */}
-            <span {...dragHandleProps} onClick={e => e.stopPropagation()} style={{ color: 'rgba(255,255,255,0.2)', cursor: 'grab', display: 'flex', flexShrink: 0, touchAction: 'none', ...dragHandleProps?.style }}>
-                <GripVertical size={13} />
-            </span>
+            {/* Expand / collapse chevron (for groups) or drag handle */}
+            {expandToggle || (
+                <span {...dragHandleProps} onClick={e => e.stopPropagation()} style={{ color: 'rgba(255,255,255,0.2)', cursor: 'grab', display: 'flex', flexShrink: 0, touchAction: 'none', ...dragHandleProps?.style }}>
+                    <GripVertical size={13} />
+                </span>
+            )}
 
             {/* Eye */}
             <button type="button" onClick={e => { e.stopPropagation(); onToggleVisible(); }}
@@ -138,11 +147,6 @@ function LayerRow({ icon, label, sublabel, color, visible, isEditing, isActive, 
                             <span style={{ fontSize: '12px', fontWeight: isSelected ? 600 : 500, color: isSelected ? '#fff' : 'var(--text-bright)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {label}
                             </span>
-                            {isActive && (
-                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: 'rgba(45,140,235,0.22)', color: '#60a5fa', border: '1px solid rgba(45,140,235,0.35)', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                    Actif
-                                </span>
-                            )}
                         </div>
                         {sublabel && <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '1px' }}>{sublabel}</div>}
                     </div>
@@ -174,10 +178,20 @@ export default function LayerManagerPanel() {
     const areas        = state.area_annotations  || [];
     const draws        = (state as any).draw_annotations as DrawAnnotation[] || [];
     const selectedId   = state.selected_layer_id;
+    const selectedSublayerId = state.selected_sublayer_id;
 
-    // ── Flat ordered list (local, persists drag order) ────────────────
+    // ── Flat ordered list (local + store synchronized) ───────────────
+    const savedLayerOrder = (state as any).layer_order as OrderItem[] || [];
     const [order, setOrder] = useState<OrderItem[]>([]);
+    const [expandedDrawIds, setExpandedDrawIds] = useState<Set<string>>(new Set());
     const listRef = useRef<HTMLDivElement>(null);
+
+    // Auto-expand draw group when selected
+    useEffect(() => {
+        if (selectedId && draws.some(d => d.id === selectedId)) {
+            setExpandedDrawIds(prev => new Set(prev).add(selectedId));
+        }
+    }, [selectedId, draws]);
 
     useEffect(() => {
         const all: OrderItem[] = [
@@ -187,25 +201,26 @@ export default function LayerManagerPanel() {
             ...draws.map(x       => ({ kind: 'draw'  as const, id: x.id })),
         ];
         const allIds = new Set(all.map(x => x.id));
-        setOrder(prev => {
-            const prevIds = new Set(prev.map(x => x.id));
-            const kept    = prev.filter(x => allIds.has(x.id));
-            const added   = all.filter(x => !prevIds.has(x.id)); // new items
-            if (added.length === 0) {
-                if (kept.length === prev.length) return prev;
-                return kept;
-            }
-            // Insert new items just above the selected layer if any
+        const baseOrder = savedLayerOrder.length > 0 ? savedLayerOrder : order;
+        const prevIds = new Set(baseOrder.map(x => x.id));
+        const kept    = baseOrder.filter(x => allIds.has(x.id));
+        const added   = all.filter(x => !prevIds.has(x.id)); // new items
+        let next: OrderItem[];
+        if (added.length === 0) {
+            next = kept.length === baseOrder.length ? baseOrder : kept;
+        } else {
             const selId = state.selected_layer_id;
             const selIdx = selId ? kept.findIndex(x => x.id === selId) : -1;
             if (selIdx >= 0) {
-                const next = [...kept];
-                next.splice(selIdx, 0, ...added);
-                return next;
+                const copy = [...kept];
+                copy.splice(selIdx, 0, ...added);
+                next = copy;
+            } else {
+                next = [...added, ...kept];
             }
-            return [...added, ...kept];
-        });
-    }, [itineraries, points, areas, draws, state.selected_layer_id]);
+        }
+        setOrder(next);
+    }, [itineraries, points, areas, draws, state.selected_layer_id, savedLayerOrder]);
 
     // ── Selecting a layer row ─────────────────────────────────────────
     const handleSelectRow = (item: OrderItem) => {
@@ -224,6 +239,10 @@ export default function LayerManagerPanel() {
             } else if (item.kind === 'draw') {
                 if (state.active_tool !== 'annotate_draw') {
                     dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_draw' });
+                }
+            } else if (item.kind === 'itin') {
+                if (state.active_tool !== 'route') {
+                    dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
                 }
             }
         }
@@ -248,6 +267,7 @@ export default function LayerManagerPanel() {
         const [moved] = next.splice(dragIdx.current, 1);
         next.splice(idx, 0, moved);
         setOrder(next);
+        dispatch({ type: 'SET_LAYER_ORDER', order: next as any });
         dragIdx.current = null;
         setDropOver(null);
     };
@@ -290,11 +310,9 @@ export default function LayerManagerPanel() {
                 const item = order.find(x => x.id === selectedId);
                 if (!item) break;
                 if (item.kind === 'itin') {
-                    if (itineraries.length > 1) {
-                        const itin = itineraries.find(x => x.id === selectedId);
-                        if (itin && window.confirm(`Supprimer "${itin.name}" ?`))
-                            dispatch({ type: 'REMOVE_ITINERARY', id: selectedId });
-                    }
+                    const itin = itineraries.find(x => x.id === selectedId);
+                    if (itin && window.confirm(`Supprimer "${itin.name}" ?`))
+                        dispatch({ type: 'REMOVE_ITINERARY', id: selectedId });
                 } else if (item.kind === 'point') {
                     dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: selectedId });
                 } else if (item.kind === 'area') {
@@ -329,30 +347,31 @@ export default function LayerManagerPanel() {
         }
     };
 
-    // ── Context menu builders ─────────────────────────────────────────
+    // ── Context menu builders with shortcut hints ─────────────────────
     const openItinCtx = (e: React.MouseEvent, itin: Itinerary) => {
         e.preventDefault(); e.stopPropagation();
-        const isActive = itin.id === activeItinId;
+        const isSelected = itin.id === selectedId;
         setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-            { icon: <Pencil size={13} />, label: 'Renommer', onClick: () => setRenamingId(itin.id) },
+            { icon: <Pencil size={13} />, label: 'Renommer', shortcut: 'F2', onClick: () => setRenamingId(itin.id) },
             { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: itin.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: itin.color, onPick: c => dispatch({ type: 'UPDATE_ITINERARY', id: itin.id, color: c }) }) },
             { separator: true },
-            ...(!isActive ? [{ icon: <Route size={13} />, label: 'Activer pour édition', onClick: () => dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id }) } as CtxMenuItem] : []),
-            { icon: <Eye size={13} />, label: (itin.visible !== false) ? 'Masquer' : 'Afficher', onClick: () => dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: itin.id }) },
-            ...(itineraries.length > 1 ? [{ separator: true } as CtxMenuSeparator, { icon: <Trash2 size={13} />, label: 'Supprimer', danger: true, onClick: () => { if (window.confirm(`Supprimer "${itin.name}" ?`)) dispatch({ type: 'REMOVE_ITINERARY', id: itin.id }); } } as CtxMenuItem] : []),
+            ...(!isSelected ? [{ icon: <Route size={13} />, label: 'Sélectionner', shortcut: 'Entrée', onClick: () => dispatch({ type: 'SET_SELECTED_LAYER', id: itin.id }) } as CtxMenuItem] : []),
+            { icon: <Eye size={13} />, label: (itin.visible !== false) ? 'Masquer' : 'Afficher', shortcut: 'Espace', onClick: () => dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: itin.id }) },
+            { separator: true },
+            { icon: <Trash2 size={13} />, label: 'Supprimer', shortcut: 'Suppr', danger: true, onClick: () => { if (window.confirm(`Supprimer "${itin.name}" ?`)) dispatch({ type: 'REMOVE_ITINERARY', id: itin.id }); } },
         ]});
     };
 
     const openPointCtx = (e: React.MouseEvent, pt: PointAnnotation) => {
         e.preventDefault(); e.stopPropagation();
         setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-            { icon: <Pencil size={13} />, label: 'Renommer', onClick: () => setRenamingId(pt.id) },
+            { icon: <Pencil size={13} />, label: 'Renommer', shortcut: 'F2', onClick: () => setRenamingId(pt.id) },
             { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: pt.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: pt.color, onPick: c => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: pt.id, patch: { color: c } }) }) },
             { separator: true },
-            { icon: <Maximize2 size={13} />, label: 'Centrer la carte', onClick: () => flyTo(pt.coords) },
-            { icon: <Eye size={13} />, label: pt.visible ? 'Masquer' : 'Afficher', onClick: () => dispatch({ type: 'TOGGLE_POINT_VISIBILITY', id: pt.id }) },
+            { icon: <Maximize2 size={13} />, label: 'Centrer la carte', shortcut: 'Entrée', onClick: () => flyTo(pt.coords) },
+            { icon: <Eye size={13} />, label: pt.visible ? 'Masquer' : 'Afficher', shortcut: 'Espace', onClick: () => dispatch({ type: 'TOGGLE_POINT_VISIBILITY', id: pt.id }) },
             { separator: true },
-            { icon: <Trash2 size={13} />, label: 'Supprimer', danger: true, onClick: () => dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: pt.id }) },
+            { icon: <Trash2 size={13} />, label: 'Supprimer', shortcut: 'Suppr', danger: true, onClick: () => dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: pt.id }) },
         ]});
     };
 
@@ -360,25 +379,25 @@ export default function LayerManagerPanel() {
         e.preventDefault(); e.stopPropagation();
         const isComplete = area.coords.length >= 3;
         setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-            { icon: <Pencil size={13} />, label: 'Renommer', onClick: () => setRenamingId(area.id) },
+            { icon: <Pencil size={13} />, label: 'Renommer', shortcut: 'F2', onClick: () => setRenamingId(area.id) },
             { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: area.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: area.color, onPick: c => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { color: c } }) }) },
             { separator: true },
-            ...(isComplete ? [{ icon: <Maximize2 size={13} />, label: 'Cadrer la zone', onClick: () => fitBounds(area.coords) } as CtxMenuItem] : []),
-            { icon: <Eye size={13} />, label: area.visible ? 'Masquer' : 'Afficher', onClick: () => dispatch({ type: 'TOGGLE_AREA_VISIBILITY', id: area.id }) },
+            ...(isComplete ? [{ icon: <Maximize2 size={13} />, label: 'Cadrer la zone', shortcut: 'Entrée', onClick: () => fitBounds(area.coords) } as CtxMenuItem] : []),
+            { icon: <Eye size={13} />, label: area.visible ? 'Masquer' : 'Afficher', shortcut: 'Espace', onClick: () => dispatch({ type: 'TOGGLE_AREA_VISIBILITY', id: area.id }) },
             { separator: true },
-            { icon: <Trash2 size={13} />, label: 'Supprimer', danger: true, onClick: () => dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: area.id }) },
+            { icon: <Trash2 size={13} />, label: 'Supprimer', shortcut: 'Suppr', danger: true, onClick: () => dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: area.id }) },
         ]});
     };
 
     const openDrawCtx = (e: React.MouseEvent, draw: DrawAnnotation) => {
         e.preventDefault(); e.stopPropagation();
         setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-            { icon: <Pencil size={13} />, label: 'Renommer', onClick: () => setRenamingId(draw.id) },
+            { icon: <Pencil size={13} />, label: 'Renommer', shortcut: 'F2', onClick: () => setRenamingId(draw.id) },
             { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: draw.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: draw.color, onPick: c => dispatch({ type: 'UPDATE_DRAW_ANNOTATION', id: draw.id, patch: { color: c } } as any) }) },
             { separator: true },
-            { icon: <Eye size={13} />, label: draw.visible ? 'Masquer' : 'Afficher', onClick: () => dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: draw.id } as any) },
+            { icon: <Eye size={13} />, label: draw.visible ? 'Masquer' : 'Afficher', shortcut: 'Espace', onClick: () => dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: draw.id } as any) },
             { separator: true },
-            { icon: <Trash2 size={13} />, label: 'Supprimer', danger: true, onClick: () => dispatch({ type: 'REMOVE_DRAW_ANNOTATION', id: draw.id } as any) },
+            { icon: <Trash2 size={13} />, label: 'Supprimer', shortcut: 'Suppr', danger: true, onClick: () => dispatch({ type: 'REMOVE_DRAW_ANNOTATION', id: draw.id } as any) },
         ]});
     };
 
@@ -405,15 +424,15 @@ export default function LayerManagerPanel() {
             if (!itin) return null;
             const isActive   = itin.id === activeItinId;
             const km         = getItinKm(itin);
-            const stages     = isActive ? state.stages.length : (itin.stages?.length || 0);
+            const stages     = isSelected ? state.stages.length : (itin.stages?.length || 0);
             const isRenaming = renamingId === itin.id;
             return (
                 <div key={item.id} style={wrapStyle} {...dragProps}
-                    onDoubleClick={() => dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id })}>
+                    onClick={() => handleSelectRow(item)}>
                     <LayerRow icon={<Route size={12} />} label={itin.name}
                         sublabel={`${km.toFixed(1)} km · ${stages} étape${stages !== 1 ? 's' : ''}`}
                         color={itin.color} visible={itin.visible !== false}
-                        isEditing={isRenaming} isActive={isActive} isSelected={isSelected}
+                        isEditing={isRenaming} isSelected={isSelected}
                         onToggleVisible={() => dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: itin.id })}
                         onContextMenu={e => openItinCtx(e, itin)}
                         dragHandleProps={{}}
@@ -467,17 +486,100 @@ export default function LayerManagerPanel() {
             const draw = draws.find(x => x.id === item.id);
             if (!draw) return null;
             const isRenaming = renamingId === draw.id;
+            const strokes = (draw.strokes || []) as unknown as DrawStroke[];
+            const isExpanded = expandedDrawIds.has(draw.id);
+
+            const toggleExpand = (e: React.MouseEvent) => {
+                e.stopPropagation();
+                setExpandedDrawIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(draw.id)) next.delete(draw.id);
+                    else next.add(draw.id);
+                    return next;
+                });
+            };
+
             return (
                 <div key={item.id} style={wrapStyle} {...dragProps}>
                     <LayerRow icon={<Paintbrush size={12} />} label={draw.title}
-                        sublabel={`${draw.strokes.length} trait${draw.strokes.length !== 1 ? 's' : ''}`}
+                        sublabel={`${strokes.length} trait${strokes.length !== 1 ? 's' : ''}`}
                         color={draw.color} visible={draw.visible}
-                        isEditing={isRenaming} isSelected={isSelected}
+                        isEditing={isRenaming} isSelected={isSelected && !selectedSublayerId}
+                        expandToggle={strokes.length > 0 ? (
+                            <button
+                                type="button"
+                                onClick={toggleExpand}
+                                style={{ background: 'transparent', border: 'none', padding: '0 2px', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center' }}
+                            >
+                                {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                            </button>
+                        ) : undefined}
                         onToggleVisible={() => dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: draw.id } as any)}
                         onContextMenu={e => openDrawCtx(e, draw)}
                         dragHandleProps={{}}
                         renameSlot={<InlineRename value={draw.title} onConfirm={v => { dispatch({ type: 'UPDATE_DRAW_ANNOTATION', id: draw.id, patch: { title: v } } as any); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
                     />
+                    {/* ── Sub-stroke list (Group Hierarchy like Figma/tldraw) ── */}
+                    {isExpanded && strokes.length > 0 && (
+                        <div style={{ marginLeft: '22px', borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                            {strokes.map((stroke, sIdx) => {
+                                const isSubSelected = isSelected && selectedSublayerId === stroke.id;
+                                return (
+                                    <div
+                                        key={stroke.id}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            dispatch({ type: 'SET_SELECTED_SUBLAYER', layerId: draw.id, sublayerId: stroke.id });
+                                        }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '7px',
+                                            padding: '4px 8px 4px 10px',
+                                            background: isSubSelected ? 'rgba(45,140,235,0.14)' : 'transparent',
+                                            borderLeft: isSubSelected ? '2px solid #2d8ceb' : '2px solid transparent',
+                                            cursor: 'pointer',
+                                            transition: 'background 0.1s',
+                                        }}
+                                        onMouseEnter={e => { if (!isSubSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                        onMouseLeave={e => { if (!isSubSelected) e.currentTarget.style.background = 'transparent'; }}
+                                    >
+                                        {/* Color dot (click triggers color picker) */}
+                                        <div
+                                            title="Changer la couleur"
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setColorPicker({
+                                                    x: e.clientX, y: e.clientY,
+                                                    currentColor: stroke.color,
+                                                    onPick: (c) => dispatch({ type: 'UPDATE_DRAW_STROKE', drawId: draw.id, strokeId: stroke.id, patch: { color: c } } as any)
+                                                });
+                                            }}
+                                            style={{ width: '8px', height: '8px', borderRadius: '2px', background: stroke.color, flexShrink: 0, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.25)' }}
+                                        />
+                                        <span style={{ fontSize: '11px', color: isSubSelected ? '#fff' : 'var(--text-bright)', flex: 1, fontWeight: isSubSelected ? 600 : 400 }}>
+                                            Trait {sIdx + 1}
+                                        </span>
+                                        {/* Stroke width badge */}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-dim)', padding: '1px 4px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
+                                            {stroke.strokeWidth}px
+                                        </span>
+                                        {/* Delete button */}
+                                        <button
+                                            type="button"
+                                            onClick={e => { e.stopPropagation(); dispatch({ type: 'REMOVE_DRAW_STROKE', drawId: draw.id, strokeId: stroke.id } as any); }}
+                                            title="Supprimer ce trait"
+                                            style={{ background: 'transparent', border: 'none', padding: '1px 3px', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', borderRadius: '3px' }}
+                                            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                                            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+                                        >
+                                            <Trash2 size={11} />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -506,9 +608,13 @@ export default function LayerManagerPanel() {
             {/* ── Bottom toolbar ── */}
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '8px 10px', display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.25)', flexShrink: 0 }}>
                 <button type="button"
-                    onClick={() => { dispatch({ type: 'ADD_ITINERARY' }); dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouvel itinéraire créé.', notifType: 'info' }); }}
+                    onClick={() => {
+                        dispatch({ type: 'ADD_ITINERARY' });
+                        dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
+                        dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouvel itinéraire créé.', notifType: 'info' });
+                    }}
                     title="Créer un nouvel itinéraire"
-                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: 'rgba(45,140,235,0.1)', border: '1px solid rgba(45,140,235,0.22)', color: '#60a5fa', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: (state.active_tool === 'route' && selectedId === state.active_itinerary_id) ? '#2d8ceb' : 'rgba(45,140,235,0.1)', border: `1px solid ${(state.active_tool === 'route' && selectedId === state.active_itinerary_id) ? '#2d8ceb' : 'rgba(45,140,235,0.22)'}`, color: (state.active_tool === 'route' && selectedId === state.active_itinerary_id) ? '#fff' : '#60a5fa', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
                     <Route size={15} />Itinéraire
                 </button>
                 <button type="button"

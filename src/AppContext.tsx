@@ -2,7 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useRef } from 
 import type {
     AppState, RouteDict, PolySegment, PresetData, CarnetStep,
     ModuleId, AnnexeId, CarnetView, Stage, PolygonalisationSettings, Notification,
-    Itinerary, AnnotationLayerDef, PointAnnotation, AreaAnnotation, DrawAnnotation
+    Itinerary, AnnotationLayerDef, PointAnnotation, AreaAnnotation, DrawAnnotation, DrawStroke
 } from './logic/types';
 import { StateManager } from './logic/StateManager';
 import { presetsManager } from './logic/PresetsManager';
@@ -86,12 +86,17 @@ export type AppAction =
     // Draw (brush) annotations
     | { type: 'ADD_DRAW_ANNOTATION'; draw: Omit<DrawAnnotation, 'id' | 'createdAt'> }
     | { type: 'UPDATE_DRAW_ANNOTATION'; id: string; patch: Partial<DrawAnnotation> }
-    | { type: 'APPEND_DRAW_STROKE'; id: string; stroke: [number, number][] }
+    | { type: 'APPEND_DRAW_STROKE'; id: string; stroke: DrawStroke }
+    | { type: 'UPDATE_DRAW_STROKE'; drawId: string; strokeId: string; patch: Partial<DrawStroke> }
+    | { type: 'REMOVE_DRAW_STROKE'; drawId: string; strokeId: string }
     | { type: 'REMOVE_DRAW_ANNOTATION'; id: string }
     | { type: 'TOGGLE_DRAW_VISIBILITY'; id: string }
 
     // Panel layer selection
     | { type: 'SET_SELECTED_LAYER'; id: string | null }
+    | { type: 'SET_SELECTED_SUBLAYER'; layerId: string | null; sublayerId: string | null }
+    // Layer display order (persisted)
+    | { type: 'SET_LAYER_ORDER'; order: Array<{ kind: 'itin' | 'point' | 'area' | 'draw'; id: string }> }
 
     // Polygonalisation
     | { type: 'SET_POLYGONAL_LEGS'; legKey: string; segments: PolySegment[] }
@@ -162,7 +167,8 @@ const initialState: AppState = {
     is_loading: false,
     loading_text: '',
     notifications: [],
-    selected_layer_id: null,
+    selected_layer_id: 'itin-1',
+    selected_sublayer_id: null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,6 +189,145 @@ function pushHistory(state: AppState) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// EMPTY LAYERS AUTO-CLEANUP
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Automatically purges empty layers when leaving their editing tool:
+ * - Empty itineraries (0 stages & 0 manual steps) when leaving route tools
+ * - Empty draw annotations (0 strokes or all strokes < 2 pts) when leaving draw tool
+ * - Incomplete area annotations (< 3 coords) when leaving area tool
+ * - Invalid point annotations (< 2 coords) when leaving point tool
+ * - All empty layers across all kinds when switching mode (e.g. Map -> Textual/Carnet)
+ */
+function cleanupEmptyLayers(state: AppState, incomingTool?: string): AppState {
+    const isIncomingRoute = incomingTool ? ['route', 'route_direct', 'node', 'azimut'].includes(incomingTool) : false;
+    const isIncomingDraw = incomingTool === 'annotate_draw';
+    const isIncomingArea = incomingTool ? ['annotate_area', 'annotate_area_routed'].includes(incomingTool) : false;
+    const isIncomingPoint = incomingTool === 'annotate_point';
+
+    // 1. Sync live active itinerary stages before checking
+    const syncedItins = (state.itineraries || []).map(it => it.id === state.active_itinerary_id ? {
+        ...it,
+        stages: state.stages || [],
+        routes: state.routes || [],
+        polygonal_steps: state.polygonal_steps || [],
+        polygonal_legs: state.polygonal_legs || {},
+        carnet_steps: state.carnet_steps || [],
+        custom_assignments: state.custom_assignments || {},
+        custom_languages: state.custom_languages || {},
+    } : it);
+
+    // If incoming tool is NOT route, empty itineraries must be purged
+    const validItins = isIncomingRoute
+        ? syncedItins
+        : syncedItins.filter(it => (it.stages?.length || 0) > 0 || ((it as any).manual_steps?.length || 0) > 0 || (it.polygonal_steps?.length || 0) > 0);
+    const removedItinIds = new Set(syncedItins.filter(it => !validItins.includes(it)).map(it => it.id));
+
+    // If incoming tool is NOT draw, empty draw annotations must be purged
+    const allDraws = state.draw_annotations || [];
+    const validDraws = isIncomingDraw
+        ? allDraws
+        : allDraws.filter(d => d.strokes && d.strokes.length > 0 && d.strokes.some(s => s.points && s.points.length >= 2));
+    const removedDrawIds = new Set(allDraws.filter(d => !validDraws.includes(d)).map(d => d.id));
+
+    // If incoming tool is NOT area, incomplete area annotations (< 3 coords) must be purged
+    const allAreas = state.area_annotations || [];
+    const validAreas = isIncomingArea
+        ? allAreas
+        : allAreas.filter(a => a.coords && a.coords.length >= 3);
+    const removedAreaIds = new Set(allAreas.filter(a => !validAreas.includes(a)).map(a => a.id));
+
+    // If incoming tool is NOT point, invalid points must be purged
+    const allPoints = state.point_annotations || [];
+    const validPoints = isIncomingPoint
+        ? allPoints
+        : allPoints.filter(p => p.coords && p.coords.length >= 2);
+    const removedPointIds = new Set(allPoints.filter(p => !validPoints.includes(p)).map(p => p.id));
+
+    const totalRemoved = removedItinIds.size + removedDrawIds.size + removedAreaIds.size + removedPointIds.size;
+    if (totalRemoved === 0) {
+        return { ...state, itineraries: syncedItins };
+    }
+
+    // Clean layer_order
+    const nextLayerOrder = (state.layer_order || []).filter(item => {
+        if (item.kind === 'itin' && removedItinIds.has(item.id)) return false;
+        if (item.kind === 'draw' && removedDrawIds.has(item.id)) return false;
+        if (item.kind === 'area' && removedAreaIds.has(item.id)) return false;
+        if (item.kind === 'point' && removedPointIds.has(item.id)) return false;
+        return true;
+    });
+
+    let nextActiveItinId = state.active_itinerary_id;
+    let nextSelectedLayerId = state.selected_layer_id;
+    let nextStages = state.stages;
+    let nextRoutes = state.routes;
+    let nextPolySteps = state.polygonal_steps;
+    let nextPolyLegs = state.polygonal_legs;
+    let nextCarnet = state.carnet_steps;
+    let nextCustomAssignments = state.custom_assignments;
+    let nextCustomLangs = state.custom_languages;
+    let nextAnchor = state.anchor_stage_idx;
+
+    if (removedItinIds.has(state.active_itinerary_id || '')) {
+        if (validItins.length > 0) {
+            const first = validItins[0];
+            nextActiveItinId = first.id;
+            if (nextSelectedLayerId === state.active_itinerary_id) {
+                nextSelectedLayerId = first.id;
+            }
+            nextStages = first.stages || [];
+            nextRoutes = first.routes || [];
+            nextPolySteps = first.polygonal_steps || [];
+            nextPolyLegs = first.polygonal_legs || {};
+            nextCarnet = first.carnet_steps || [];
+            nextCustomAssignments = first.custom_assignments || {};
+            nextCustomLangs = first.custom_languages || {};
+            nextAnchor = (first.stages?.length || 0) - 1;
+        } else {
+            nextActiveItinId = null as any;
+            if (removedItinIds.has(nextSelectedLayerId || '')) {
+                nextSelectedLayerId = null;
+            }
+            nextStages = [];
+            nextRoutes = [];
+            nextPolySteps = [];
+            nextPolyLegs = {};
+            nextCarnet = [];
+            nextCustomAssignments = {};
+            nextCustomLangs = {};
+            nextAnchor = -1;
+        }
+    }
+
+    if (removedDrawIds.has(nextSelectedLayerId || '') ||
+        removedAreaIds.has(nextSelectedLayerId || '') ||
+        removedPointIds.has(nextSelectedLayerId || '')) {
+        nextSelectedLayerId = null;
+    }
+
+    return {
+        ...state,
+        itineraries: validItins,
+        draw_annotations: validDraws,
+        area_annotations: validAreas,
+        point_annotations: validPoints,
+        layer_order: nextLayerOrder,
+        active_itinerary_id: nextActiveItinId,
+        selected_layer_id: nextSelectedLayerId,
+        stages: nextStages,
+        routes: nextRoutes,
+        polygonal_steps: nextPolySteps,
+        polygonal_legs: nextPolyLegs,
+        carnet_steps: nextCarnet,
+        custom_assignments: nextCustomAssignments,
+        custom_languages: nextCustomLangs,
+        anchor_stage_idx: nextAnchor,
+    };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // REDUCER
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -190,38 +335,17 @@ function appReducer(state: AppState, action: AppAction): AppState {
     switch (action.type) {
 
         // ── Mode & Tool ────────────────────────────────────────────────────
-        case 'SET_MODE':
-            return { ...state, active_mode: action.mode };
+        case 'SET_MODE': {
+            const cleaned = cleanupEmptyLayers(state);
+            return { ...cleaned, active_mode: action.mode };
+        }
 
         case 'SET_ACTIVE_TOOL': {
-            // Auto-cleanup: remove empty itineraries on tool switch
-            // (keeps at least one itinerary — the app requires a minimum of 1)
-            let cleanItins = state.itineraries || [];
-            const activeId = state.active_itinerary_id;
-            if (cleanItins.length > 1) {
-                // Remove any non-active itinerary with 0 stages
-                cleanItins = cleanItins.filter(it => it.id === activeId || (it.stages?.length || 0) > 0);
-            }
-            // If the active itinerary itself is empty and there are other non-empty ones, switch + remove
-            const activeItin = cleanItins.find(it => it.id === activeId);
-            let newActiveId = activeId;
-            if (activeItin && (activeItin.stages?.length || 0) === 0 && cleanItins.length > 1) {
-                // Switch active to first non-empty itinerary
-                const nextItin = cleanItins.find(it => it.id !== activeId && (it.stages?.length || 0) > 0);
-                if (nextItin) {
-                    newActiveId = nextItin.id;
-                    cleanItins = cleanItins.filter(it => it.id !== activeId);
-                }
-            }
-            // Auto-cleanup: remove area annotations with < 3 coords (incomplete zones)
-            const cleanAreas = (state.area_annotations || []).filter(a => (a.coords?.length || 0) >= 3);
+            const cleaned = cleanupEmptyLayers(state, action.tool);
             return {
-                ...state,
+                ...cleaned,
                 active_tool: action.tool,
                 anchor_stage_idx: -1,
-                itineraries: cleanItins,
-                active_itinerary_id: newActiveId,
-                area_annotations: cleanAreas,
             };
         }
 
@@ -251,9 +375,24 @@ function appReducer(state: AppState, action: AppAction): AppState {
             }
             // Re-label sequentially A, B, C…
             const labeledStages = newStages.map((s, i) => ({ ...s, label: String.fromCharCode(65 + i) }));
-            // After insertion, move anchor to end of list
             const newAnchor = labeledStages.length - 1;
-            return { ...state, stages: labeledStages, routes: newRoutes, anchor_stage_idx: newAnchor };
+
+            // Sync into active itinerary in itineraries list immediately
+            const activeId = state.active_itinerary_id;
+            const updatedItins = (state.itineraries || []).map(it => it.id === activeId ? {
+                ...it,
+                stages: labeledStages,
+                routes: newRoutes,
+            } : it);
+
+            return {
+                ...state,
+                itineraries: updatedItins,
+                stages: labeledStages,
+                routes: newRoutes,
+                anchor_stage_idx: newAnchor,
+                selected_layer_id: activeId || state.selected_layer_id,
+            };
         }
 
         case 'INSERT_STAGE': {
@@ -268,7 +407,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
             const newRoutes = [...state.routes];
             newRoutes.splice(action.afterIdx + 1, 0, null as any);
             const relabeled = inserted.map((s, i) => ({ ...s, label: String.fromCharCode(65 + i) }));
-            return { ...state, stages: relabeled, routes: newRoutes, anchor_stage_idx: relabeled.length - 1 };
+            const activeId = state.active_itinerary_id;
+            const updatedItins = (state.itineraries || []).map(it => it.id === activeId ? {
+                ...it,
+                stages: relabeled,
+                routes: newRoutes,
+            } : it);
+            return {
+                ...state,
+                itineraries: updatedItins,
+                stages: relabeled,
+                routes: newRoutes,
+                anchor_stage_idx: relabeled.length - 1,
+                selected_layer_id: activeId || state.selected_layer_id,
+            };
         }
 
         case 'REMOVE_STAGE': {
@@ -292,16 +444,36 @@ function appReducer(state: AppState, action: AppAction): AppState {
             } else if (idx > 0 && idx === state.stages.length - 1 && newRoutes.length > 0) {
                 newRoutes.splice(idx - 1, 1); // remove last leg
             }
-            return { ...state, stages: relabeled, routes: newRoutes };
+            const activeId = state.active_itinerary_id;
+            const updatedItins = (state.itineraries || []).map(it => it.id === activeId ? {
+                ...it,
+                stages: relabeled,
+                routes: newRoutes,
+            } : it);
+            return {
+                ...state,
+                itineraries: updatedItins,
+                stages: relabeled,
+                routes: newRoutes,
+                selected_layer_id: activeId || state.selected_layer_id,
+            };
         }
 
         case 'MOVE_STAGE': {
             pushHistory(state);
+            const movedStages = state.stages.map(s =>
+                s.id === action.id ? { ...s, coords: [action.lat, action.lon], address: action.address !== undefined ? action.address : s.address } : s
+            );
+            const activeId = state.active_itinerary_id;
+            const updatedItins = (state.itineraries || []).map(it => it.id === activeId ? {
+                ...it,
+                stages: movedStages,
+            } : it);
             return {
                 ...state,
-                stages: state.stages.map(s =>
-                    s.id === action.id ? { ...s, coords: [action.lat, action.lon], address: action.address !== undefined ? action.address : s.address } : s
-                )
+                itineraries: updatedItins,
+                stages: movedStages,
+                selected_layer_id: activeId || state.selected_layer_id,
             };
         }
 
@@ -364,24 +536,34 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 };
             }
 
-            const currentSavedItins = (state.itineraries || []).map(it => it.id === state.active_itinerary_id ? {
-                ...it,
-                stages: state.stages,
-                routes: state.routes,
-                polygonal_steps: state.polygonal_steps,
-                polygonal_legs: state.polygonal_legs,
-                carnet_steps: state.carnet_steps,
-                custom_assignments: state.custom_assignments,
-                custom_languages: state.custom_languages,
-            } : it);
+            // If current active itinerary was empty, prune it so empty ones don't accumulate
+            const currentSavedItins = (state.itineraries || [])
+                .filter(it => it.id !== state.active_itinerary_id || (state.stages && state.stages.length > 0) || ((it as any).manual_steps?.length || 0) > 0 || (it.polygonal_steps?.length || 0) > 0)
+                .map(it => it.id === state.active_itinerary_id ? {
+                    ...it,
+                    stages: state.stages,
+                    routes: state.routes,
+                    polygonal_steps: state.polygonal_steps,
+                    polygonal_legs: state.polygonal_legs,
+                    carnet_steps: state.carnet_steps,
+                    custom_assignments: state.custom_assignments,
+                    custom_languages: state.custom_languages,
+                } : it);
 
             const allItins = [...currentSavedItins, newItin];
+
+            const nextLayerOrder = [
+                ...(state.layer_order || []).filter(item => item.kind !== 'itin' || currentSavedItins.some(i => i.id === item.id)),
+                { kind: 'itin' as const, id: newId }
+            ];
 
             return {
                 ...state,
                 itineraries: allItins,
+                layer_order: nextLayerOrder,
                 active_itinerary_id: newId,
                 selected_layer_id: newId,
+                active_tool: 'route',
                 stages: newItin.stages,
                 routes: newItin.routes,
                 polygonal_steps: newItin.polygonal_steps,
@@ -394,10 +576,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'SET_ACTIVE_ITINERARY': {
-            if (state.active_itinerary_id === action.id) return state;
-            const target = state.itineraries?.find(it => it.id === action.id);
-            if (!target) return state;
-
             // Save current active state before switching
             const updatedItins = (state.itineraries || []).map(it => it.id === state.active_itinerary_id ? {
                 ...it,
@@ -410,10 +588,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 custom_languages: state.custom_languages,
             } : it);
 
+            const target = updatedItins.find(it => it.id === action.id);
+            if (!target) return { ...state, itineraries: updatedItins };
+
             return {
                 ...state,
                 itineraries: updatedItins,
                 active_itinerary_id: target.id,
+                selected_layer_id: target.id,
+                active_tool: 'route',
                 stages: target.stages || [],
                 routes: target.routes || [],
                 polygonal_steps: target.polygonal_steps || [],
@@ -421,7 +604,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 carnet_steps: target.carnet_steps || [],
                 custom_assignments: target.custom_assignments || {},
                 custom_languages: target.custom_languages || {},
-                anchor_stage_idx: -1
+                anchor_stage_idx: (target.stages?.length || 0) - 1
             };
         }
 
@@ -433,6 +616,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'UPDATE_ITINERARY': {
+            pushHistory(state);
             return {
                 ...state,
                 itineraries: (state.itineraries || []).map(it => {
@@ -449,17 +633,49 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'REMOVE_ITINERARY': {
-            if ((state.itineraries || []).length <= 1) return state;
             pushHistory(state);
             const remaining = state.itineraries.filter(it => it.id !== action.id);
             const nextSelId = state.selected_layer_id === action.id ? null : state.selected_layer_id;
+
+            // If the last itinerary is deleted, create a fresh default one
+            if (remaining.length === 0) {
+                const freshId = `itin-${Date.now()}`;
+                const freshItin = {
+                    id: freshId,
+                    name: 'Itinéraire 1 (Principal)',
+                    color: '#2d8ceb',
+                    visible: true,
+                    stages: [],
+                    routes: [],
+                    polygonal_steps: [],
+                    polygonal_legs: {},
+                    carnet_steps: {},
+                    custom_assignments: {},
+                    custom_languages: {},
+                };
+                return {
+                    ...state,
+                    itineraries: [freshItin],
+                    active_itinerary_id: freshId,
+                    selected_layer_id: freshId,
+                    stages: [],
+                    routes: [],
+                    polygonal_steps: [],
+                    polygonal_legs: {},
+                    carnet_steps: [],
+                    custom_assignments: {},
+                    custom_languages: {},
+                    anchor_stage_idx: -1,
+                };
+            }
+
             if (state.active_itinerary_id === action.id) {
                 const nextActive = remaining[0];
                 return {
                     ...state,
                     itineraries: remaining,
                     active_itinerary_id: nextActive.id,
-                    selected_layer_id: nextSelId,
+                    selected_layer_id: nextSelId ?? nextActive.id,
                     stages: nextActive.stages || [],
                     routes: nextActive.routes || [],
                     polygonal_steps: nextActive.polygonal_steps || [],
@@ -522,6 +738,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'UPDATE_POINT_ANNOTATION': {
+            pushHistory(state);
             return {
                 ...state,
                 point_annotations: (state.point_annotations || []).map(p =>
@@ -575,6 +792,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'UPDATE_AREA_ANNOTATION': {
+            pushHistory(state);
             return {
                 ...state,
                 area_annotations: (state.area_annotations || []).map(a => {
@@ -644,6 +862,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'ADD_DRAW_ANNOTATION': {
+            pushHistory(state);
             const newDraw: DrawAnnotation = {
                 ...action.draw,
                 id: (action.draw as any).id || `draw-annot-${Date.now()}`,
@@ -658,6 +877,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'UPDATE_DRAW_ANNOTATION': {
+            pushHistory(state);
             return {
                 ...state,
                 draw_annotations: (state.draw_annotations || []).map(d =>
@@ -667,19 +887,52 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'APPEND_DRAW_STROKE': {
+            pushHistory(state);
+            // action.stroke is now a DrawStroke object
+            const strokeObj: DrawStroke = action.stroke as unknown as DrawStroke;
             return {
                 ...state,
                 draw_annotations: (state.draw_annotations || []).map(d =>
-                    d.id === action.id ? { ...d, strokes: [...d.strokes, action.stroke] } : d
+                    d.id === action.id ? { ...d, strokes: [...d.strokes, strokeObj] } : d
                 )
             };
         }
 
+        case 'UPDATE_DRAW_STROKE': {
+            pushHistory(state);
+            return {
+                ...state,
+                draw_annotations: (state.draw_annotations || []).map(d => {
+                    if (d.id !== action.drawId) return d;
+                    return {
+                        ...d,
+                        strokes: d.strokes.map((s: DrawStroke) =>
+                            s.id === action.strokeId ? { ...s, ...action.patch } : s
+                        )
+                    };
+                })
+            };
+        }
+
+        case 'REMOVE_DRAW_STROKE': {
+            pushHistory(state);
+            return {
+                ...state,
+                draw_annotations: (state.draw_annotations || []).map(d => {
+                    if (d.id !== action.drawId) return d;
+                    return { ...d, strokes: d.strokes.filter((s: DrawStroke) => s.id !== action.strokeId) };
+                }),
+                selected_sublayer_id: state.selected_sublayer_id === action.strokeId ? null : state.selected_sublayer_id,
+            };
+        }
+
         case 'REMOVE_DRAW_ANNOTATION': {
+            pushHistory(state);
             return {
                 ...state,
                 draw_annotations: (state.draw_annotations || []).filter(d => d.id !== action.id),
                 selected_layer_id: state.selected_layer_id === action.id ? null : state.selected_layer_id,
+                selected_sublayer_id: state.selected_layer_id === action.id ? null : state.selected_sublayer_id,
             };
         }
 
@@ -692,8 +945,65 @@ function appReducer(state: AppState, action: AppAction): AppState {
             };
         }
 
+        case 'SET_LAYER_ORDER': {
+            pushHistory(state);
+            return {
+                ...state,
+                layer_order: action.order
+            };
+        }
+
         case 'SET_SELECTED_LAYER': {
-            return { ...state, selected_layer_id: action.id };
+            // Save current active itinerary state first
+            const updatedItins = (state.itineraries || []).map(it => it.id === state.active_itinerary_id ? {
+                ...it,
+                stages: state.stages,
+                routes: state.routes,
+                polygonal_steps: state.polygonal_steps,
+                polygonal_legs: state.polygonal_legs,
+                carnet_steps: state.carnet_steps,
+                custom_assignments: state.custom_assignments,
+                custom_languages: state.custom_languages,
+            } : it);
+
+            const targetItin = updatedItins.find(it => it.id === action.id);
+            if (targetItin) {
+                // Only switch to route tool if we're not in an annotation/draw mode
+                // (prevents draw tool from being interrupted by clicking a dashed itinerary line)
+                const annotationTools = ['annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw'];
+                const nextTool = annotationTools.includes(state.active_tool) ? state.active_tool : 'route';
+                return {
+                    ...state,
+                    itineraries: updatedItins,
+                    active_itinerary_id: targetItin.id,
+                    selected_layer_id: targetItin.id,
+                    selected_sublayer_id: null,
+                    active_tool: nextTool,
+                    stages: targetItin.stages || [],
+                    routes: targetItin.routes || [],
+                    polygonal_steps: targetItin.polygonal_steps || [],
+                    polygonal_legs: targetItin.polygonal_legs || {},
+                    carnet_steps: targetItin.carnet_steps || [],
+                    custom_assignments: targetItin.custom_assignments || {},
+                    custom_languages: targetItin.custom_languages || {},
+                    anchor_stage_idx: (targetItin.stages?.length || 0) - 1
+                };
+            }
+
+            return {
+                ...state,
+                itineraries: updatedItins,
+                selected_layer_id: action.id,
+                selected_sublayer_id: null,
+            };
+        }
+
+        case 'SET_SELECTED_SUBLAYER': {
+            return {
+                ...state,
+                selected_layer_id: action.layerId,
+                selected_sublayer_id: action.sublayerId,
+            };
         }
 
         case 'TOGGLE_ANNOTATION_LAYER_VISIBILITY': {
@@ -1000,6 +1310,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'REMOVE_MANUAL_STEP':
+            pushHistory(state);
             return {
                 ...state,
                 carnet_steps: state.carnet_steps.filter(s => s.id !== action.stepId).map(s => {

@@ -4,7 +4,7 @@
 
 # 🏕️ ScoutRaider — Générateur de Carnets de Raid
 
-> **Version Beta 0.3.4-beta (Version Web !)** · Application de planification de raids scouts, disponible sur navigateur et en application de bureau.
+> **Version Beta 0.3.8-beta** · Application de planification de raids scouts, disponible sur navigateur et en application de bureau.
 > 
 > 🌐 **[ESSAYER EN LIGNE → scoutraider.silverhorse.fr](https://scoutraider.silverhorse.fr/)**
 > 
@@ -15,6 +15,20 @@
 [![Web](https://img.shields.io/badge/Web-scoutraider.silverhorse.fr-4caf50?logo=nginx&logoColor=white)](https://scoutraider.silverhorse.fr/)
 [![Releases](https://img.shields.io/github/v/release/bastonus/ScoutRaider)](https://github.com/bastonus/ScoutRaider/releases)
 [![Beta](https://img.shields.io/badge/Status-Beta-orange)](#avertissement-de-sécurité)
+
+---
+
+## 🚀 MISE À JOUR : Beta 0.3.8 — Dessin vectoriel & sous-calques
+
+Cette version apporte un éditeur de dessin vectoriel complet et une gestion de calques hiérarchique.
+
+**Quoi de neuf dans cette Beta 0.3.8 :**
+- **🎨 Transformer vectoriel** : redimensionnez, tournez et déplacez un trait ou un groupe entier avec 8 poignées et une rotation, avec aperçu temps réel.
+- **🗂️ Sous-calques** : chaque trait d'un dessin est désormais sélectionnable, colorisable et supprimable individuellement depuis le gestionnaire de calques.
+- **📋 Panneau gauche contextuel** : le panneau affiche les informations du calque sélectionné (itinéraire, zone, repère ou dessin).
+- **🧭 Focus itinéraire** : l'itinéraire actif s'affiche en plein, les autres en pointillés cliquables.
+- **✨ Nettoyage automatique** des calques vides et **ordre des calques sauvegardé** dans le document.
+- **⌨️ Raccourcis** : `Ctrl+T` (trait ↔ groupe), `Suppr`, `Échap`, `F2`, `Espace`.
 
 ---
 

@@ -229,6 +229,15 @@ jobs:
           body: |
             ## 🏕️ ScoutRaider ${{ github.ref_name }}
 
+            ### 🆕 Nouveautés de cette version
+            - 🎨 **Dessin vectoriel** : redimensionnez, tournez et déplacez un trait ou un groupe entier grâce au nouveau Transformer (8 poignées + rotation), avec aperçu temps réel.
+            - 🗂️ **Sous-calques** : chaque trait d'un dessin est sélectionnable, colorisable et supprimable individuellement dans le gestionnaire de calques.
+            - 📋 **Panneau contextuel** : le panneau de gauche affiche les informations du calque sélectionné (itinéraire, zone, repère ou dessin).
+            - 🧭 **Focus itinéraire** : l'itinéraire actif s'affiche en plein ; les autres apparaissent en pointillés et restent cliquables.
+            - ✨ **Nettoyage automatique** des calques vides et **ordre des calques sauvegardé** dans le document.
+            - ⌨️ **Raccourcis** : `Ctrl+T` (trait ↔ groupe), `Suppr`, `Échap`, `F2`, `Espace`.
+            - 📝 Voir le détail complet dans le [CHANGELOG](https://github.com/bastonus/ScoutRaider/blob/main/CHANGELOG.md).
+
             ### 💾 Installation — Desktop
             | Plateforme | Fichier | Instructions |
             |---|---|---|

@@ -199,10 +199,38 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
 
             if (activeTool === 'route' || activeTool === 'route_direct') {
                 const isDirect = activeTool === 'route_direct';
-                // Capture BEFORE dispatch so routing sees pre-add state
-                const currentStages = stagesRef.current;
-                const currentRoutes = routesRef.current;
-                const anchorIdx = anchorRef.current;
+
+                // Check if an itinerary is currently selected and active
+                const selectedId = state.selected_layer_id;
+                const activeItinId = state.active_itinerary_id;
+                const selectedItin = (state.itineraries || []).find(it => it.id === selectedId);
+
+                if (!selectedItin) {
+                    // No itinerary is selected (or another layer type like Draw or Area was selected).
+                    // As requested: "si on dessine sur un itineraire ca doit verifier quil est actif sinon dessiner sur un autre nouvellement créé."
+                    const count = (state.itineraries?.length || 0) + 1;
+                    const colors = ['#2d8ceb', '#f97316', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308'];
+                    const color = colors[(count - 1) % colors.length];
+                    dispatch({
+                        type: 'ADD_ITINERARY',
+                        name: `Itinéraire ${count}`,
+                        color,
+                    });
+                    dispatch({ type: 'ADD_STAGE', lat, lon, label: 'A' });
+                    return;
+                }
+
+                // If an itinerary is selected but wasn't active yet, activate it
+                let currentStages = stagesRef.current;
+                let currentRoutes = routesRef.current;
+                let anchorIdx = anchorRef.current;
+
+                if (selectedId !== activeItinId) {
+                    dispatch({ type: 'SET_ACTIVE_ITINERARY', id: selectedId });
+                    currentStages = selectedItin.stages || [];
+                    currentRoutes = selectedItin.routes || [];
+                    anchorIdx = (selectedItin.stages?.length || 0) - 1;
+                }
 
                 const anchorStage = anchorIdx >= 0 && anchorIdx < currentStages.length
                     ? currentStages[anchorIdx] : null;
@@ -327,7 +355,7 @@ export default function MapComponent() {
             <MapContainer
                 center={position}
                 zoom={13}
-                style={{ height: '100%', width: '100%', cursor: ['route', 'route_direct', 'node', 'azimut', 'annotate_point', 'annotate_area'].includes(state.active_tool) ? 'crosshair' : 'grab' }}
+                style={{ height: '100%', width: '100%', cursor: ['route', 'route_direct', 'node', 'azimut', 'annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw'].includes(state.active_tool) ? 'crosshair' : 'grab' }}
                 zoomControl={false}
                 attributionControl={false}
             >

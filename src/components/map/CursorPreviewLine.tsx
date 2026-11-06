@@ -13,7 +13,8 @@ export default function CursorPreviewLine({ cursorPos }: { cursorPos: [number, n
         ? stages[anchorIdx]
         : stages.length > 0 ? stages[stages.length - 1] : null;
 
-    if ((state.active_tool === 'route' || state.active_tool === 'route_direct') && cursorPos && anchorStage && !(window as any).__isHoveringCompatible) {
+    const isItinSelected = state.selected_layer_id === state.active_itinerary_id;
+    if (isItinSelected && (state.active_tool === 'route' || state.active_tool === 'route_direct') && cursorPos && anchorStage && !(window as any).__isHoveringCompatible) {
         return (
             <Polyline 
                 positions={[anchorStage.coords as [number, number], cursorPos]} 
