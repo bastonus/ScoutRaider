@@ -3,6 +3,7 @@ import { Polyline, Marker, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
 import { Itinerary } from '../../logic/types';
+import { layerPaneName } from '../../logic/LayerOrder';
 
 export default function InactiveItinerariesLayer() {
     const { state, dispatch } = useApp();
@@ -62,6 +63,7 @@ export default function InactiveItinerariesLayer() {
                                 {/* Wider hit-area stroke for clicking */}
                                 <Polyline
                                     positions={positions}
+                                    pane={layerPaneName(itin.id)}
                                     pathOptions={{ color: 'transparent', weight: 26, interactive: true } as any}
                                     eventHandlers={{
                                         click: (e) => {
@@ -81,6 +83,7 @@ export default function InactiveItinerariesLayer() {
                                 {/* Visible dashed route */}
                                 <Polyline
                                     positions={positions}
+                                    pane={layerPaneName(itin.id)}
                                     pathOptions={{
                                         color,
                                         weight: 5,
@@ -97,6 +100,7 @@ export default function InactiveItinerariesLayer() {
                             <React.Fragment key={`itin-${itin.id}-fallback`}>
                                 <Polyline
                                     positions={fallbackLine}
+                                    pane={layerPaneName(itin.id)}
                                     pathOptions={{ color: 'transparent', weight: 26, interactive: true } as any}
                                     eventHandlers={{
                                         click: (e) => {
@@ -114,6 +118,7 @@ export default function InactiveItinerariesLayer() {
                                 </Polyline>
                                 <Polyline
                                     positions={fallbackLine}
+                                    pane={layerPaneName(itin.id)}
                                     pathOptions={{
                                         color,
                                         weight: 4,
@@ -162,6 +167,7 @@ export default function InactiveItinerariesLayer() {
                                     key={`itin-${itin.id}-stage-${stage.id || sIdx}`}
                                     position={stage.coords as [number, number]}
                                     icon={icon}
+                                    pane={layerPaneName(itin.id)}
                                     zIndexOffset={500}
                                     eventHandlers={{
                                         click: (e) => {

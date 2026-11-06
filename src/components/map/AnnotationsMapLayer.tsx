@@ -9,14 +9,19 @@ import { backgroundEngine, invalidateRouteCacheForLeg } from '../../logic/Backgr
 import { IGNClient } from '../../logic/IGNClient';
 import { PRESET_COLORS } from './AnnotationModals';
 import { Trash2 } from 'lucide-react';
+import { layerPaneName } from '../../logic/LayerOrder';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
-function createPointIcon(color: string, title: string, isSelected = false) {
+function createPointIcon(color: string, title: string, isSelected = false, pointId = '', lat = 0, lng = 0) {
     const escaped = (title || '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const idAttr = pointId
+        ? ` data-sr-point-id="${pointId.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`
+        : '';
+    const anchorAttr = ` data-sr-anchor-lat="${lat}" data-sr-anchor-lng="${lng}"`;
     return L.divIcon({
         className: 'annotation-point-marker',
-        html: `<div style="position:relative;display:inline-block;pointer-events:all;">
+        html: `<div${idAttr}${anchorAttr} style="position:relative;display:inline-block;pointer-events:all;">
             <div style="
                 position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);
                 white-space:nowrap;color:#fff;font-size:13px;font-weight:800;
@@ -137,7 +142,9 @@ const VertexMarker = React.memo(function VertexMarker({
         dragstart: handleDragStart,
         drag: handleDrag,
         dragend: handleDragEnd,
-        click: (e: any) => { L.DomEvent.stopPropagation(e); },
+        // Ne pas stopper la propagation : le clic doit remonter à la map
+        // pour permettre la fermeture du polygone (clic sur le premier sommet).
+        click: (e: any) => { /* laisser remonter à la map */ },
     }), [handleDragStart, handleDrag, handleDragEnd]);
 
     return (
@@ -146,6 +153,7 @@ const VertexMarker = React.memo(function VertexMarker({
             position={position}
             icon={icon}
             draggable={true}
+            bubblingMouseEvents={true}
             zIndexOffset={3000}
             eventHandlers={eventHandlers}
         >
@@ -163,6 +171,8 @@ const VertexMarker = React.memo(function VertexMarker({
 interface PointMarkerProps {
     point: PointAnnotation;
     isSelected: boolean;
+    /** True while an area tool (annotate_area / annotate_area_routed) is active. */
+    areaMode: boolean;
     onSelect: (id: string) => void;
     onDragEnd: (id: string, lat: number, lng: number) => void;
     onDelete: (id: string) => void;
@@ -170,7 +180,7 @@ interface PointMarkerProps {
 }
 
 const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
-    point, isSelected, onSelect, onDragEnd, onDelete, dispatch
+    point, isSelected, areaMode, onSelect, onDragEnd, onDelete, dispatch
 }: PointMarkerProps) {
     const markerRef = useRef<any>(null);
     const [hovering, setHovering] = useState(false);
@@ -183,7 +193,7 @@ const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
     }, []);
 
     const icon = useMemo(() => {
-        return createPointIcon(point.color || '#3b82f6', point.title || '', isSelected);
+        return createPointIcon(point.color || '#3b82f6', point.title || '', isSelected, point.id, point.coords[0], point.coords[1]);
     }, [point.color, point.title, isSelected]);
 
     const handleDragStart = useCallback(() => {
@@ -198,9 +208,12 @@ const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
     }, [point.id, onDragEnd]);
 
     const handleClick = useCallback((e: any) => {
+        // With an area tool active, clicking a repère must anchor the area on it:
+        // let the click bubble to the map handler instead of selecting the repère.
+        if (areaMode) return;
         L.DomEvent.stopPropagation(e);
         onSelect(point.id);
-    }, [point.id, onSelect]);
+    }, [point.id, onSelect, areaMode]);
 
     const handleContextMenu = useCallback((e: any) => {
         L.DomEvent.stopPropagation(e);
@@ -220,7 +233,7 @@ const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
             }
         },
         mouseout: () => setHovering(false),
-    }), [handleDragStart, handleDragEnd, handleClick, handleContextMenu, address, point.coords]);
+    }), [handleDragStart, handleDragEnd, handleClick, handleContextMenu, address, point.coords, areaMode]);
 
     return (
         <Marker
@@ -352,9 +365,40 @@ export default function AnnotationsMapLayer() {
         click(e) {
             if ((window as any).__markerDragging) return;
 
+            const targetEl = e.originalEvent?.target as HTMLElement | null;
+
+            // ── Ancrage à un repère existant (outil de zone) ───────────────────
+            // Cliquer sur un repère utilise ses coordonnées exactes comme sommet
+            // de l'aire en cours, sans sélectionner le repère ni ouvrir sa popup.
+            let anchorPt: [number, number] | null = null;
+            if (isAreaTool) {
+                const anchorEl = targetEl?.closest?.('[data-sr-anchor-lat]');
+                if (anchorEl) {
+                    const al = parseFloat(anchorEl.getAttribute('data-sr-anchor-lat') || '');
+                    const ag = parseFloat(anchorEl.getAttribute('data-sr-anchor-lng') || '');
+                    if (!isNaN(al) && !isNaN(ag)) {
+                        anchorPt = [al, ag];
+                    }
+                }
+            }
+
+            // A click landing on an existing marker/overlay must never create
+            // a new annotation underneath it: the marker handles its own click
+            // (selection + popup), and we stop here.
+            // Exception: vertex markers of the area currently being drawn are
+            // allowed to pass through so we can close the polygon by clicking
+            // the first summit.
+            if (!anchorPt && targetEl?.closest?.('.leaflet-marker-icon, .leaflet-popup, .leaflet-control')) {
+                const isVertexOfCurrentArea = isAreaTool && activeDrawingIdRef.current
+                    && targetEl?.closest?.('.area-vertex-handle');
+                if (!isVertexOfCurrentArea) return;
+            }
+
+            const pt: [number, number] = anchorPt ?? [e.latlng.lat, e.latlng.lng];
+
             if (activeTool === 'annotate_point') {
                 const ptCount = (state.point_annotations?.length || 0) + 1;
-                const coords: [number, number] = [e.latlng.lat, e.latlng.lng];
+                const coords: [number, number] = pt;
                 const newId = `poi-annot-${Date.now()}`;
                 dispatch({
                     type: 'ADD_POINT_ANNOTATION',
@@ -364,15 +408,11 @@ export default function AnnotationsMapLayer() {
             }
 
             if (activeTool === 'annotate_area' || activeTool === 'annotate_area_routed') {
-                const pt: [number, number] = [e.latlng.lat, e.latlng.lng];
                 const currentId = activeDrawingIdRef.current;
 
                 if (!currentId) {
-                    // If an area is already selected, clicking outside deselects it
-                    if (selectedId && visibleAreas.some(a => a.id === selectedId)) {
-                        setSelectedId(null);
-                        return;
-                    }
+                    // Pas d'aire en cours de dessin → clic sur la zone de travail
+                    // démarre immédiatement une nouvelle aire.
                     const newId = `area-annot-${Date.now()}`;
                     activeDrawingIdRef.current = newId;
                     setActiveDrawingId(newId);
@@ -380,15 +420,21 @@ export default function AnnotationsMapLayer() {
                     const areaCount = (state.area_annotations?.length || 0) + 1;
                     dispatch({
                         type: 'ADD_AREA_ANNOTATION',
-                        area: { id: newId, type: 'area' as const, title: `Zone ${areaCount}`, text: '', layerId: 'layer-areas', coords: [pt], color: '#10b981', fillOpacity: 0.3, visible: true, followRoads: activeTool === 'annotate_area_routed', edgeRoutes: [] } as any
+                        area: { id: newId, type: 'area' as const, title: `Zone ${areaCount}`, text: '', layerId: 'layer-areas', coords: [pt], fillOpacity: 0.3, visible: true, followRoads: activeTool === 'annotate_area_routed', edgeRoutes: [] } as any
                     });
                 } else {
                     const area = areaAnnotationsRef.current.find(a => a.id === currentId);
                     if (!area) return;
-                    // Snap to first vertex → close
-                    if (area.coords.length >= 3) {
-                        const dist = map.distance(e.latlng, { lat: area.coords[0][0], lng: area.coords[0][1] });
-                        if (dist <= snapMeters()) {
+
+                    // ── Clic sur un sommet existant de l'aire en cours ─────────
+                    // Si on clique sur un sommet déjà placé, soit on ferme (premier
+                    // sommet avec 3+ points), soit on ne fait rien (autres sommets).
+                    const vertexIdx = area.coords.findIndex(c =>
+                        map.distance({ lat: pt[0], lng: pt[1] }, { lat: c[0], lng: c[1] }) <= snapMeters()
+                    );
+                    if (vertexIdx >= 0) {
+                        if (vertexIdx === 0 && area.coords.length >= 3) {
+                            // Fermer le polygone en reliant le dernier point au premier
                             if (activeTool === 'annotate_area_routed') {
                                 const n = area.coords.length;
                                 enqueueAreaEdge(currentId, n - 1, area.coords[n - 1], area.coords[0]);
@@ -399,7 +445,11 @@ export default function AnnotationsMapLayer() {
                             setSelectedId(currentId);
                             return;
                         }
+                        // Clic sur un autre sommet : ne rien faire (éviter le doublon)
+                        return;
                     }
+
+                    // Pas sur un sommet existant : ajouter un nouveau point.
                     const prevCoords = area.coords;
                     const newCoords: [number, number][] = [...prevCoords, pt];
                     const edgeIdx = prevCoords.length - 1;
@@ -479,6 +529,7 @@ export default function AnnotationsMapLayer() {
                     key={point.id}
                     point={point}
                     isSelected={selectedId === point.id}
+                    areaMode={isAreaTool}
                     onSelect={setSelectedId}
                     onDragEnd={handlePointDragEnd}
                     onDelete={handlePointDelete}
@@ -545,27 +596,67 @@ export default function AnnotationsMapLayer() {
                 const showHandles  = isDrawing || isSelected;
                 const showEdges    = isSelected && !isDrawing && isComplete;
 
-                return (
-                    <React.Fragment key={area.id}>
-
-                        {/* Fill polygon */}
-                        {isComplete ? (
+                // Pendant le dessin avec 3+ points : remplissage coloré de la zone
+                // (sans trait de fermeture premier→dernier), traits consécutifs
+                // en trait plein. Le rubber-band vers le curseur est géré ci-dessus.
+                let areaFill: JSX.Element | null = null;
+                let areaOutline: JSX.Element | null = null;
+                if (isComplete) {
+                    if (isDrawing) {
+                        // Remplissage uniquement (pas de stroke, pas de fermeture)
+                        areaFill = (
                             <Polygon
                                 ref={(ref: any) => { if (ref) polygonRefs.current[area.id] = ref; }}
                                 positions={displayCoords}
+                                pane={layerPaneName(area.id)}
+                                pathOptions={{
+                                    stroke: false,
+                                    fillColor: area.color || '#10b981',
+                                    fillOpacity: area.fillOpacity ?? 0.22,
+                                    interactive: false,
+                                } as any}
+                            />
+                        );
+                        // Segments entre sommets consécutifs (dernier→premier NON inclus)
+                        areaOutline = (
+                            <Polyline
+                                positions={displayCoords}
+                                pane={layerPaneName(area.id)}
+                                pathOptions={{
+                                    color: area.color || '#10b981',
+                                    weight: 2,
+                                    opacity: 1,
+                                    interactive: false,
+                                } as any}
+                            />
+                        );
+                    } else {
+                        // Aire terminée : polygon normal (trait plein + remplissage)
+                        areaFill = (
+                            <Polygon
+                                ref={(ref: any) => { if (ref) polygonRefs.current[area.id] = ref; }}
+                                positions={displayCoords}
+                                pane={layerPaneName(area.id)}
                                 pathOptions={{
                                     color: area.color || '#10b981',
                                     fillColor: area.color || '#10b981',
                                     fillOpacity: (isSelected && !isDrawing) ? 0.15 : (area.fillOpacity ?? 0.22),
                                     weight: (isSelected && !isDrawing) ? 2 : 2,
                                     opacity: 1,
-                                    dashArray: isDrawing ? '6 4' : undefined,
+                                    dashArray: undefined,
                                     interactive: true,
                                 } as any}
                                 eventHandlers={{
                                     click: (e: any) => {
                                         L.DomEvent.stopPropagation(e);
-                                        if (!isDrawing) setSelectedId(area.id);
+                                        if (!isDrawing) {
+                                            // Clic sur une aire existante en mode outil :
+                                            // bascule en mode édition sur cette aire
+                                            // pour pouvoir lui ajouter des sommets.
+                                            setSelectedId(area.id);
+                                            activeDrawingIdRef.current = area.id;
+                                            setActiveDrawingId(area.id);
+                                        }
                                     }
                                 }}
                             >
@@ -582,11 +673,22 @@ export default function AnnotationsMapLayer() {
                                     </Popup>
                                 )}
                             </Polygon>
-                        ) : (
-                            <Polyline positions={area.coords.length >= 2 ? area.coords : []}
-                                pathOptions={{ color: area.color || '#10b981', weight: 2, dashArray: '6 4', interactive: false } as any}
-                            />
-                        )}
+                        );
+                    }
+                } else if (area.coords.length >= 2) {
+                    // 1 ou 2 points : juste le trait entre les sommets placés
+                    areaOutline = (
+                        <Polyline positions={area.coords}
+                            pane={layerPaneName(area.id)}
+                            pathOptions={{ color: area.color || '#10b981', weight: 2, dashArray: undefined, interactive: false } as any}
+                        />
+                    );
+                }
+
+                return (
+                    <React.Fragment key={area.id}>
+                        {areaFill}
+                        {areaOutline}
 
                         {/* Per-edge polylines (selected + finalized only) */}
                         {showEdges && area.coords.map((_, eIdx) => {
@@ -596,6 +698,7 @@ export default function AnnotationsMapLayer() {
                             const edgePts = isRouted ? edgeRoute! : [area.coords[eIdx], area.coords[nextIdx]];
                             return (
                                 <Polyline key={`edge-${area.id}-${eIdx}`} positions={edgePts}
+                                    pane={layerPaneName(area.id)}
                                     pathOptions={{ color: isRouted ? '#10b981' : (area.color || '#5b6af0'), weight: 4, dashArray: isRouted ? undefined : '7 5', opacity: 0.95, interactive: true } as any}
                                     eventHandlers={{
                                         click:     (e: any) => { L.DomEvent.stopPropagation(e); handleToggleEdge(area, eIdx); },

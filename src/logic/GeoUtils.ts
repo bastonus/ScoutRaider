@@ -58,6 +58,45 @@ export function calculatePolygonArea(coords: [number, number][]): number {
 }
 
 /**
+ * Haversine distance between two [lat, lon] points, in meters.
+ */
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371000;
+    const p1 = (lat1 * Math.PI) / 180;
+    const p2 = (lat2 * Math.PI) / 180;
+    const dp = ((lat2 - lat1) * Math.PI) / 180;
+    const dl = ((lon2 - lon1) * Math.PI) / 180;
+    const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Total geodesic length of a polyline in meters.
+ * @param coords Array of [lat, lon] points
+ */
+export function calculatePathLength(coords: [number, number][]): number {
+    if (!coords || coords.length < 2) return 0;
+    let total = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+        total += haversineMeters(coords[i][0], coords[i][1], coords[i + 1][0], coords[i + 1][1]);
+    }
+    return Math.round(total);
+}
+
+/**
+ * Total geodesic length of a GeoJSON-style polyline in meters.
+ * @param coords Array of [lon, lat] points
+ */
+export function calculatePathLengthLonLat(coords: [number, number][]): number {
+    if (!coords || coords.length < 2) return 0;
+    let total = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+        total += haversineMeters(coords[i][1], coords[i][0], coords[i + 1][1], coords[i + 1][0]);
+    }
+    return Math.round(total);
+}
+
+/**
  * Format an area in m² into human readable m², ha, or km².
  */
 export function formatArea(areaM2: number): string {

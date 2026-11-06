@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -10,6 +10,7 @@ import CursorPreviewLine from './CursorPreviewLine';
 import InactiveItinerariesLayer from './InactiveItinerariesLayer';
 import AnnotationsMapLayer from './AnnotationsMapLayer';
 import DrawAnnotationsLayer from './DrawAnnotationsLayer';
+import { computeLayerOrder, layerPaneName, layerPaneZIndex } from '../../logic/LayerOrder';
 
 // Fix default marker icons (leaflet bundling issue with Vite)
 const DefaultIcon = L.icon({
@@ -46,6 +47,33 @@ function MapResizer() {
         resizeObserver.observe(container);
         return () => resizeObserver.disconnect();
     }, [map]);
+    return null;
+}
+
+// ── Layer panes: panel order drives map z-index ──────────────────────────────
+function LayerPaneManager() {
+    const map = useMap();
+    const { state } = useApp();
+
+    const order = useMemo(() => computeLayerOrder({
+        itineraries: state.itineraries || [],
+        points: state.point_annotations || [],
+        areas: state.area_annotations || [],
+        draws: state.draw_annotations || [],
+        savedOrder: state.layer_order,
+        selectedId: state.selected_layer_id,
+    }), [state.itineraries, state.point_annotations, state.area_annotations, state.draw_annotations, state.layer_order, state.selected_layer_id]);
+
+    // useLayoutEffect runs before react-leaflet's passive effects create the
+    // layers, so every child can safely target its pane on first mount.
+    useLayoutEffect(() => {
+        order.forEach((item, index) => {
+            const name = layerPaneName(item.id);
+            const pane = map.getPane(name) ?? map.createPane(name);
+            pane.style.zIndex = String(layerPaneZIndex(index, order.length));
+        });
+    }, [map, order]);
+
     return null;
 }
 
@@ -194,8 +222,28 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
             // Leaflet can fire a residual map click at the drop position after dragend.
             if ((window as any).__markerDragging) return;
 
-            const lat = e.latlng.lat;
-            const lon = e.latlng.lng;
+            // Clicking an existing marker (repère, étape, nœud…) must never
+            // create a new stage at its exact coordinates. The marker's own
+            // click handler takes care of selection/editing.
+            const targetEl = e.originalEvent?.target as HTMLElement | null;
+
+            // Exception: with a stage-placement tool, clicking a repère must
+            // place the stage exactly on it. The repère lets the click bubble
+            // and exposes its id, so we snap to its coordinates.
+            let forcedCoords: [number, number] | null = null;
+            const pointEl = targetEl?.closest?.('[data-sr-point-id]') as HTMLElement | null;
+            if (pointEl) {
+                if (activeTool !== 'route' && activeTool !== 'route_direct') return;
+                const pointId = pointEl.getAttribute('data-sr-point-id');
+                const point = (state.point_annotations || []).find(p => p.id === pointId);
+                if (!point) return;
+                forcedCoords = [point.coords[0], point.coords[1]];
+            } else if (targetEl?.closest?.('.leaflet-marker-icon, .leaflet-popup, .leaflet-control')) {
+                return;
+            }
+
+            const lat = forcedCoords ? forcedCoords[0] : e.latlng.lat;
+            const lon = forcedCoords ? forcedCoords[1] : e.latlng.lng;
 
             if (activeTool === 'route' || activeTool === 'route_direct') {
                 const isDirect = activeTool === 'route_direct';
@@ -208,14 +256,9 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
                 if (!selectedItin) {
                     // No itinerary is selected (or another layer type like Draw or Area was selected).
                     // As requested: "si on dessine sur un itineraire ca doit verifier quil est actif sinon dessiner sur un autre nouvellement créé."
-                    const count = (state.itineraries?.length || 0) + 1;
-                    const colors = ['#2d8ceb', '#f97316', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308'];
-                    const color = colors[(count - 1) % colors.length];
-                    dispatch({
-                        type: 'ADD_ITINERARY',
-                        name: `Itinéraire ${count}`,
-                        color,
-                    });
+                    // Let the reducer pick a free name/color so we never duplicate
+                    // an existing itinerary's name or color.
+                    dispatch({ type: 'ADD_ITINERARY' });
                     dispatch({ type: 'ADD_STAGE', lat, lon, label: 'A' });
                     return;
                 }
@@ -364,6 +407,7 @@ export default function MapComponent() {
                 <MapRefCapture />
                 <MapResizer />
                 <MapTooltipManager />
+                <LayerPaneManager />
                 <MapEvents setCursorPos={setCursorPos} />
                 <PoiLayer />
                 <InactiveItinerariesLayer />

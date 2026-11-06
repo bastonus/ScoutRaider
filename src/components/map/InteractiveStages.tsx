@@ -4,6 +4,7 @@ import L from 'leaflet';
 import { useApp } from '../../AppContext';
 import { backgroundEngine } from '../../logic/BackgroundEngine';
 import { Stage } from '../../logic/types';
+import { layerPaneName } from '../../logic/LayerOrder';
 
 // ── Per-stage marker — isolated in React.memo so parent re-renders
 // (e.g. setCursorPos on mousemove) don't unbind/rebind Leaflet event
@@ -14,6 +15,7 @@ interface StageMarkerProps {
     total: number;
     isMovable: boolean;
     isAnchored: boolean;
+    pane?: string;
     onDragEnd: (idx: number, lat: number, lon: number) => void;
     onRemove: (idx: number) => void;
     onAnchor: (idx: number) => void;
@@ -21,7 +23,7 @@ interface StageMarkerProps {
 }
 
 const StageMarker = React.memo(function StageMarker({
-    stage, idx, total, isMovable, isAnchored,
+    stage, idx, total, isMovable, isAnchored, pane,
     onDragEnd, onRemove, onAnchor, onUnAnchor,
 }: StageMarkerProps) {
     const markerRef = useRef<any>(null);
@@ -98,6 +100,7 @@ const StageMarker = React.memo(function StageMarker({
             ref={(ref: any) => { markerRef.current = ref; }}
             position={stage.coords as [number, number]}
             icon={icon}
+            pane={pane}
             zIndexOffset={1000}
             draggable={isMovable}
             eventHandlers={eventHandlers}
@@ -191,6 +194,7 @@ export default function InteractiveStages() {
     if (!hasFocusedItin) return null;
 
     const isMovable = state.active_tool === 'route' || state.active_tool === 'route_direct' || state.active_tool === 'node';
+    const activeItinPane = state.active_itinerary_id ? layerPaneName(state.active_itinerary_id) : undefined;
 
     return (
         <>
@@ -202,6 +206,7 @@ export default function InteractiveStages() {
                     total={state.stages.length}
                     isMovable={isMovable}
                     isAnchored={anchorIdx === idx}
+                    pane={activeItinPane}
                     onDragEnd={handleDragEnd}
                     onRemove={handleRemove}
                     onAnchor={handleAnchor}

@@ -12,7 +12,7 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Sous-calques dans le gestionnaire de calques** : arborescence dépliable, sélection d'un trait, changement de couleur, badge d'épaisseur et suppression unitaire.
 - **Panneau gauche contextuel** : le panneau affiche les informations du calque sélectionné (itinéraire, zone, repère ou dessin) sous forme de cartes dédiées.
 - **Raccourcis clavier** : `Ctrl+T` (trait ↔ groupe), `Suppr` (supprimer le trait ou le calque), `Échap` (désélectionner), avec rappels affichés dans les menus contextuels (`F2`, `Entrée`, `Espace`, `Suppr`).
-- **Ordre des calques persistant** : l'ordre défini par glisser-déposer est sauvegardé dans l'état du document et restauré à l'ouverture.
+- **Ordre des calques persistant** : l'ordre défini par glisser-déposer est sauvegardé dans l'état du document et restauré à l'ouverture ; il pilote désormais l'empilement (z-index) réel des calques sur la carte, le premier de la liste étant affiché au premier plan.
 
 ### Modifié
 - **Focus d'itinéraire** : seul l'itinéraire sélectionné et actif est affiché en trait plein ; les autres apparaissent en pointillés et restent cliquables pour être sélectionnés.
@@ -21,6 +21,7 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Nettoyage automatique** : les calques vides (itinéraires sans étapes, dessins sans traits, zones incomplètes, repères invalides) sont supprimés au changement d'outil ou de mode.
 
 ### Corrigé
+- **Clic sur un repère avec un autre outil** : le nom et l'épingle d'un repère sont désormais entièrement cliquables ; hors outils de tracé d'itinéraire, ils sélectionnent et ouvrent le repère au lieu de créer un point, une zone ou un dessin superposé. Avec le tracé pédestre ou hors piste, le clic place une étape exactement sur les coordonnées du repère, sans ouvrir sa popup d'édition.
 - **Migration des anciens dessins** : les traits au format historique (`[lat, lng][]`) sont convertis automatiquement en `DrawStroke` à l'ouverture d'un document.
 - **Fluidité du dessin** : conversion native des coordonnées Leaflet et verrouillage du déplacement de la carte pendant le tracé pour éviter les décalages.
 - **Curseur des outils** : curseur en croix ajouté pour `annotate_area_routed` et `annotate_draw`.

@@ -13,6 +13,7 @@ import { Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
 import type { DrawAnnotation, DrawStroke } from '../../logic/types';
+import { layerPaneName } from '../../logic/LayerOrder';
 import Transformer, { TransformerTarget } from './Transformer';
 
 const MIN_SAMPLE_PX = 4;
@@ -125,9 +126,15 @@ export default function DrawAnnotationsLayer() {
 
         const onDown = (e: PointerEvent) => {
             if (e.button !== 0 && e.pointerType !== 'touch') return;
-            // Ignore if pointer is down on a transformer handle or rotation knob
+            // Ignore if pointer is down on a transformer handle, rotation knob,
+            // a map marker (repère, étape, nœud…) or a Leaflet popup/control.
+            // Let the marker receive its own click so it can be selected/edited
+            // instead of starting a stray brush stroke on top of it.
             const targetEl = e.target as HTMLElement | null;
-            if (targetEl?.closest?.('[data-transformer-handle]') || (window as any).__markerDragging) {
+            if (
+                targetEl?.closest?.('[data-transformer-handle], .leaflet-marker-icon, .leaflet-popup, .leaflet-control') ||
+                (window as any).__markerDragging
+            ) {
                 return;
             }
 
@@ -313,6 +320,7 @@ export default function DrawAnnotationsLayer() {
                             {/* Hit-area polyline for easy selection */}
                             <Polyline
                                 positions={pts}
+                                pane={layerPaneName(draw.id)}
                                 pathOptions={{
                                     color: 'transparent',
                                     weight: Math.max(stroke.strokeWidth + 12, 18),
@@ -329,6 +337,7 @@ export default function DrawAnnotationsLayer() {
                             {/* Visual stroke */}
                             <Polyline
                                 positions={pts}
+                                pane={layerPaneName(draw.id)}
                                 pathOptions={{
                                     color: stroke.color,
                                     weight: stroke.strokeWidth,
@@ -342,6 +351,7 @@ export default function DrawAnnotationsLayer() {
                             {(isStrokeSelected || isGroupSelected) && (
                                 <Polyline
                                     positions={pts}
+                                    pane={layerPaneName(draw.id)}
                                     pathOptions={{
                                         color: '#2d8ceb',
                                         weight: stroke.strokeWidth + 3,
@@ -361,6 +371,7 @@ export default function DrawAnnotationsLayer() {
             {isDrawTool && liveStroke.length >= 2 && (
                 <Polyline
                     positions={liveStroke}
+                    pane={activeDrawId ? layerPaneName(activeDrawId) : undefined}
                     pathOptions={{
                         color: activeDrawRef.current?.color || activeDraw?.color || '#ef4444',
                         weight: activeDrawRef.current?.strokeWidth || activeDraw?.strokeWidth || 4,

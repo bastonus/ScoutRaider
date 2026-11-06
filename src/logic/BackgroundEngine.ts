@@ -20,6 +20,7 @@ import { IGNClient } from './IGNClient';
 import { PolygonalEngine } from './PolygonalEngine';
 import { POIService } from './POIService';
 import { Logger } from './Logger';
+import { calculatePathLengthLonLat } from './GeoUtils';
 import type { BackgroundJob, JobType, JobPriority, PolySegment } from './types';
 
 // ─── Concurrency limits per job type ──────────────────────────────────────────
@@ -32,7 +33,7 @@ const MAX_CONCURRENT: Record<JobType, number> = {
 };
 
 // ─── BRouter result cache ─────────────────────────────────────────────────────
-const _routeCache = new Map<string, { coordinates: [number, number][]; alts: any[] | null }>();
+const _routeCache = new Map<string, { coordinates: [number, number][]; alts: any[] | null; distance: number }>();
 
 function routeCacheKey(p1: [number, number], p2: [number, number], profile: string): string {
     return `${p1[0].toFixed(6)},${p1[1].toFixed(6)}-${p2[0].toFixed(6)},${p2[1].toFixed(6)}-${profile}`;
@@ -209,8 +210,13 @@ export class BackgroundEngine {
             ? { coordinates: alts[0].geometry.coordinates as [number,number][], alts }
             : { coordinates: [[data.p1[1], data.p1[0]], [data.p2[1], data.p2[0]]] as [number,number][], alts: null };
 
-        _routeCache.set(cacheKey, entry);
-        return { ...entry, insertIdx: data.insertIdx, legKey: data.legKey, fromCache: false, p1: data.p1, p2: data.p2, profile: data.profile };
+        // The route providers don't expose a usable distance for every profile
+        // (and the itinerary panel needs it), so derive it from the geometry.
+        const distance = calculatePathLengthLonLat(entry.coordinates);
+        const cachedEntry = { ...entry, distance };
+
+        _routeCache.set(cacheKey, cachedEntry);
+        return { ...cachedEntry, insertIdx: data.insertIdx, legKey: data.legKey, fromCache: false, p1: data.p1, p2: data.p2, profile: data.profile };
     }
 
     private async handleAzimutLeg(data: {

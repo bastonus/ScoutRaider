@@ -8,6 +8,7 @@ import { themeManager } from '../../logic/ThemeManager';
 import { ModuleLogic } from '../../logic/ModuleLogic';
 import { NavigationText } from '../../logic/NavigationText';
 import { PolygonalEngine } from '../../logic/PolygonalEngine';
+import { layerPaneName } from '../../logic/LayerOrder';
 
 /** Helper: Haversine distance in meters */
 const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -118,6 +119,7 @@ export default function ActiveRouteLayer() {
     const isRouteTool = ['route', 'route_direct', 'node', 'azimut'].includes(activeTool);
     const isItinActiveAndSelected = state.selected_layer_id === state.active_itinerary_id;
     const hasFocusedItin = isRouteTool && isItinActiveAndSelected;
+    const itinPane = state.active_itinerary_id ? layerPaneName(state.active_itinerary_id) : undefined;
 
     React.useEffect(() => {
         const handleDragOver = (e: DragEvent) => {
@@ -339,6 +341,7 @@ export default function ActiveRouteLayer() {
                         {/* Invisible thick line for easier clicking */}
                         <Polyline
                             positions={coords}
+                            pane={itinPane}
                             color="transparent"
                             weight={20}
                             eventHandlers={{
@@ -351,6 +354,7 @@ export default function ActiveRouteLayer() {
                         {/* Visible thin grey line */}
                         <Polyline
                             positions={coords}
+                            pane={itinPane}
                             color="#9ca3af"
                             weight={6}
                             opacity={0.5}
@@ -378,6 +382,7 @@ export default function ActiveRouteLayer() {
                             {/* Invisible wide line for clicking */}
                             <Polyline
                                 positions={positions}
+                                pane={itinPane}
                                 color="transparent"
                                 weight={30}
                                 interactive={true}
@@ -413,6 +418,7 @@ export default function ActiveRouteLayer() {
                             {/* Visible route line */}
                             <Polyline 
                                 positions={positions} 
+                                pane={itinPane}
                                 color={itinColor}
                                 weight={6}
                                 opacity={0.85}
@@ -465,6 +471,7 @@ export default function ActiveRouteLayer() {
                         {/* ── Invisible Thicker Line for easier interaction ── */}
                         <Polyline 
                             positions={latLngs} 
+                            pane={itinPane}
                             pathOptions={{ color: 'transparent', weight: 20 }}
                             eventHandlers={{
                                 click: (e: any) => {
@@ -516,6 +523,7 @@ export default function ActiveRouteLayer() {
                         {/* Visible Segment Line */}
                         <Polyline 
                             positions={latLngs} 
+                            pane={itinPane}
                             pathOptions={{ color, weight, opacity: isDragOver ? 1 : 0.85 }}
                             interactive={false}
                         />
@@ -529,6 +537,7 @@ export default function ActiveRouteLayer() {
                                     <>
                                         <Polyline 
                                             positions={[startPt, destPt]} 
+                                            pane={itinPane}
                                             color="#2d8ceb" 
                                             weight={3} 
                                             dashArray="5, 8"
@@ -549,6 +558,7 @@ export default function ActiveRouteLayer() {
                                     <>
                                         <Polyline 
                                             positions={[startPt, destPt]} 
+                                            pane={itinPane}
                                             color="#2d8ceb" 
                                             weight={2} 
                                             dashArray="5, 8" 

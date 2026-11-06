@@ -5,10 +5,10 @@ import { mapRef } from '../map/MapComponent';
 import { calculatePolygonArea, formatArea } from '../../logic/GeoUtils';
 import { PRESET_COLORS } from '../map/AnnotationModals';
 import { Itinerary, PointAnnotation, AreaAnnotation, DrawAnnotation, DrawStroke } from '../../logic/types';
+import { computeLayerOrder, layerOrdersEqual, type LayerOrderItem } from '../../logic/LayerOrder';
 
 // ─── Types ───────────────────────────────────────────────────────────
-type ItemKind = 'itin' | 'point' | 'area' | 'draw';
-interface OrderItem { kind: ItemKind; id: string; }
+type OrderItem = LayerOrderItem;
 
 // ─── Icons ───────────────────────────────────────────────────────────
 function PolygonIcon({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
@@ -194,33 +194,22 @@ export default function LayerManagerPanel() {
     }, [selectedId, draws]);
 
     useEffect(() => {
-        const all: OrderItem[] = [
-            ...itineraries.map(x => ({ kind: 'itin'  as const, id: x.id })),
-            ...points.map(x      => ({ kind: 'point' as const, id: x.id })),
-            ...areas.map(x       => ({ kind: 'area'  as const, id: x.id })),
-            ...draws.map(x       => ({ kind: 'draw'  as const, id: x.id })),
-        ];
-        const allIds = new Set(all.map(x => x.id));
-        const baseOrder = savedLayerOrder.length > 0 ? savedLayerOrder : order;
-        const prevIds = new Set(baseOrder.map(x => x.id));
-        const kept    = baseOrder.filter(x => allIds.has(x.id));
-        const added   = all.filter(x => !prevIds.has(x.id)); // new items
-        let next: OrderItem[];
-        if (added.length === 0) {
-            next = kept.length === baseOrder.length ? baseOrder : kept;
-        } else {
-            const selId = state.selected_layer_id;
-            const selIdx = selId ? kept.findIndex(x => x.id === selId) : -1;
-            if (selIdx >= 0) {
-                const copy = [...kept];
-                copy.splice(selIdx, 0, ...added);
-                next = copy;
-            } else {
-                next = [...added, ...kept];
-            }
+        const next = computeLayerOrder({
+            itineraries,
+            points,
+            areas,
+            draws,
+            savedOrder: savedLayerOrder,
+            currentOrder: order,
+            selectedId: state.selected_layer_id,
+        });
+        setOrder(prev => layerOrdersEqual(prev, next) ? prev : next);
+        // Keep the persisted order in sync (without an undo entry) so the map
+        // applies the exact same z-order as the panel, including new layers.
+        if (!layerOrdersEqual(savedLayerOrder, next)) {
+            dispatch({ type: 'SET_LAYER_ORDER', order: next, recordHistory: false });
         }
-        setOrder(next);
-    }, [itineraries, points, areas, draws, state.selected_layer_id, savedLayerOrder]);
+    }, [itineraries, points, areas, draws, state.selected_layer_id, savedLayerOrder, order, dispatch]);
 
     // ── Selecting a layer row ─────────────────────────────────────────
     const handleSelectRow = (item: OrderItem) => {
@@ -593,7 +582,9 @@ export default function LayerManagerPanel() {
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-panel)', userSelect: 'none', fontSize: '12px', color: 'var(--text-primary)' }}>
 
             {/* ── Flat layer list ── */}
-            <div ref={listRef} tabIndex={0} style={{ flex: 1, overflowY: 'auto', outline: 'none' }}
+            <div ref={listRef} tabIndex={0}
+                title="Le premier calque de la liste est affiché au premier plan sur la carte."
+                style={{ flex: 1, overflowY: 'auto', outline: 'none' }}
                 onKeyDown={handleKeyDown}>
                 {isEmpty ? (
                     <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '11px' }}>

@@ -13,7 +13,7 @@ import { ConstraintChecker } from './logic/ConstraintChecker';
 import { NavigationText } from './logic/NavigationText';
 import { ModuleLogic } from './logic/ModuleLogic';
 import { backgroundEngine } from './logic/BackgroundEngine';
-import { calculatePolygonArea, formatArea } from './logic/GeoUtils';
+import { calculatePolygonArea, formatArea, calculatePathLengthLonLat } from './logic/GeoUtils';
 
 // ── Helper: build display polygon from control vertices + per-edge BRouter paths ──
 // edgeRoutes[i] = detailed path from coords[i] → coords[(i+1)%n], or null for straight
@@ -96,7 +96,7 @@ export type AppAction =
     | { type: 'SET_SELECTED_LAYER'; id: string | null }
     | { type: 'SET_SELECTED_SUBLAYER'; layerId: string | null; sublayerId: string | null }
     // Layer display order (persisted)
-    | { type: 'SET_LAYER_ORDER'; order: Array<{ kind: 'itin' | 'point' | 'area' | 'draw'; id: string }> }
+    | { type: 'SET_LAYER_ORDER'; order: Array<{ kind: 'itin' | 'point' | 'area' | 'draw'; id: string }>; recordHistory?: boolean }
 
     // Polygonalisation
     | { type: 'SET_POLYGONAL_LEGS'; legKey: string; segments: PolySegment[] }
@@ -327,6 +327,23 @@ function cleanupEmptyLayers(state: AppState, incomingTool?: string): AppState {
     };
 }
 
+/**
+ * Keep the routes persisted on the active itinerary in sync with the live
+ * `state.routes`. Route legs are added/updated asynchronously after the stage,
+ * so without this the stored itinerary keeps `null` legs and the layer panel
+ * displays a wrong (0 km) distance for it once it is no longer active.
+ */
+function syncActiveItineraryRoutes(state: AppState): AppState {
+    const activeId = state.active_itinerary_id;
+    if (!activeId) return state;
+    return {
+        ...state,
+        itineraries: (state.itineraries || []).map(it =>
+            it.id === activeId ? { ...it, routes: state.routes } : it
+        ),
+    };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // REDUCER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -499,11 +516,23 @@ function appReducer(state: AppState, action: AppAction): AppState {
         // ── Multi-itinerary management (Layer Manager) ────────────────────
         case 'ADD_ITINERARY': {
             pushHistory(state);
-            const count = (state.itineraries?.length || 1) + 1;
+            const existing = state.itineraries || [];
             const colors = ['#2d8ceb', '#f97316', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308'];
-            const color = action.color || colors[(count - 1) % colors.length];
+
+            // Numbering must not be derived from the array length alone: empty
+            // itineraries are pruned, so the length can stay the same and two
+            // consecutive creations would both be named "Itinéraire 2" with the
+            // same color. Pick the first free number/color instead.
+            const usedNames = new Set(existing.map(i => i.name));
+            let n = existing.length + 1;
+            while (usedNames.has(`Itinéraire ${n}`)) n++;
+
+            const usedColors = new Set(existing.map(i => i.color));
+            const name = action.name || `Itinéraire ${n}`;
+            const color = action.color
+                || colors.find(c => !usedColors.has(c))
+                || colors[(n - 1) % colors.length];
             const newId = `itin-${Date.now()}`;
-            const name = action.name || `Itinéraire ${count}${count === 2 ? ' (Bis / Variante)' : ''}`;
 
             let newItin: Itinerary;
             if (action.duplicateCurrent) {
@@ -769,6 +798,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
             pushHistory(state);
             const areaCount = (state.area_annotations?.length || 0) + 1;
             const m2 = calculatePolygonArea(action.area.coords);
+            const areaColors = new Set((state.area_annotations || []).map(a => a.color));
+            const colors = ['#10b981', '#f97316', '#2d8ceb', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308'];
+            const areaColor = action.area.color
+                || colors.find(c => !areaColors.has(c))
+                || colors[(areaCount - 1) % colors.length];
             const newArea: AreaAnnotation = {
                 // Use provided id if any (allows caller to track it for updates)
                 id: (action.area as any).id || `area-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -777,7 +811,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 title: action.area.title || `Zone ${areaCount}`,
                 text: action.area.text || '',
                 coords: action.area.coords,
-                color: action.area.color || '#10b981',
+                color: areaColor,
                 fillOpacity: action.area.fillOpacity ?? 0.25,
                 visible: action.area.visible !== undefined ? action.area.visible : true,
                 area_m2: m2,
@@ -946,7 +980,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'SET_LAYER_ORDER': {
-            pushHistory(state);
+            // Auto-synchronisation of newly created layers must not pollute undo history.
+            if (action.recordHistory !== false) pushHistory(state);
             return {
                 ...state,
                 layer_order: action.order
@@ -1059,7 +1094,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 // Fallback (should not happen if mapped properly)
                 newRoutes.push(action.route);
             }
-            return { ...state, routes: newRoutes };
+            return syncActiveItineraryRoutes({ ...state, routes: newRoutes });
         }
 
         case 'UPDATE_ROUTE':
