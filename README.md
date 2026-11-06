@@ -4,14 +4,29 @@
 
 # 🏕️ ScoutRaider — Générateur de Carnets de Raid
 
-> **Version Beta 0.3.3-beta (Galerie de Cartes & UX !)** · Application de bureau pour planifier, concevoir et générer automatiquement des carnets de raid scout.
+> **Version Beta 0.3.4-beta (Version Web !)** · Application de planification de raids scouts, disponible sur navigateur et en application de bureau.
+> 
+> 🌐 **[ESSAYER EN LIGNE → scoutraider.silverhorse.fr](https://scoutraider.silverhorse.fr/)**
 > 
 > 👉 **[📥 TÉLÉCHARGER LA DERNIÈRE VERSION (Windows, macOS, Linux)](https://github.com/bastonus/ScoutRaider/releases/latest)**
 
 [![React/Vite](https://img.shields.io/badge/UI-React_Vite-61dafb?logo=react&logoColor=black)](#)
 [![Electron](https://img.shields.io/badge/App-Electron-47848f?logo=electron&logoColor=white)](#)
+[![Web](https://img.shields.io/badge/Web-scoutraider.silverhorse.fr-4caf50?logo=nginx&logoColor=white)](https://scoutraider.silverhorse.fr/)
 [![Releases](https://img.shields.io/github/v/release/bastonus/ScoutRaider)](https://github.com/bastonus/ScoutRaider/releases)
 [![Beta](https://img.shields.io/badge/Status-Beta-orange)](#avertissement-de-sécurité)
+
+---
+
+## 🚀 MISE À JOUR : Beta 0.3.4 — Version Web
+
+ScoutRaider est maintenant **disponible sur navigateur** ! Plus besoin d'installer quoi que ce soit pour commencer à planifier vos raids.
+
+**Quoi de neuf dans cette Beta 0.3.4 :**
+- **🌐 Version Web** : ScoutRaider tourne désormais dans votre navigateur à [scoutraider.silverhorse.fr](https://scoutraider.silverhorse.fr/). Compatible Chrome, Firefox, Safari.
+- **🐳 Déploiement Docker** : Infrastructure Docker + Nginx mise en place pour le déploiement en production via Coolify.
+- **🔒 HTTPS partout** : Migration des appels Overpass API vers HTTPS pour une utilisation web sécurisée.
+- **📌 Version synchronisée** : La version affichée dans l'app (desktop & web) est toujours synchronisée avec `package.json`.
 
 ---
 
@@ -86,7 +101,13 @@ ScoutRaider est un outil conçu pour les **chefs et cheftaines scouts** (Guides 
 
 ---
 
-## 📦 Installation
+## 📦 Installation & Accès
+
+### Version Web (sans installation)
+
+👉 **[scoutraider.silverhorse.fr](https://scoutraider.silverhorse.fr/)** — Ouvrez directement dans votre navigateur.
+
+### Version Desktop
 
 | Plateforme | Fichier | Instructions |
 |---|---|---|
