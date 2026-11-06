@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, Trash2, Route, MapPin, Maximize2, Trees, ChevronDown, ChevronRight, Edit2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Eye, EyeOff, Trash2, Route, MapPin, Maximize2, Pencil, Check, X, GripVertical, Paintbrush } from 'lucide-react';
 import { useApp } from '../../AppContext';
 import { mapRef } from '../map/MapComponent';
-import { calculatePolygonArea, formatArea, computeRoutedAreaBoundary } from '../../logic/GeoUtils';
+import { calculatePolygonArea, formatArea } from '../../logic/GeoUtils';
 import { PRESET_COLORS } from '../map/AnnotationModals';
-import { Itinerary, PointAnnotation, AreaAnnotation } from '../../logic/types';
+import { Itinerary, PointAnnotation, AreaAnnotation, DrawAnnotation } from '../../logic/types';
 
-// ─── Polygon icon ───────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────
+type ItemKind = 'itin' | 'point' | 'area' | 'draw';
+interface OrderItem { kind: ItemKind; id: string; }
+
+// ─── Icons ───────────────────────────────────────────────────────────
 function PolygonIcon({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
     return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -15,436 +19,521 @@ function PolygonIcon({ color = 'currentColor', size = 13 }: { color?: string; si
     );
 }
 
-// ─── Layer row ───────────────────────────────────────────────────────
-function LayerRow({
-    icon, label, sublabel, color, visible, selected,
-    onToggleVisible, onSelect, onDelete, children
-}: {
-    icon: React.ReactNode;
-    label: string;
-    sublabel?: string;
-    color: string;
-    visible: boolean;
-    selected: boolean;
-    onToggleVisible: () => void;
-    onSelect: () => void;
-    onDelete?: () => void;
-    children?: React.ReactNode;
-}) {
+// ─── Context Menu ────────────────────────────────────────────────────
+interface CtxMenuItem { icon?: React.ReactNode; label: string; danger?: boolean; onClick: () => void; }
+interface CtxMenuSeparator { separator: true; }
+
+function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: (CtxMenuItem | CtxMenuSeparator)[]; onClose: () => void; }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState({ x, y });
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+        const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('mousedown', handler, true);
+        document.addEventListener('keydown', esc);
+        return () => { document.removeEventListener('mousedown', handler, true); document.removeEventListener('keydown', esc); };
+    }, [onClose]);
+
+    useEffect(() => {
+        if (!ref.current) return;
+        const r = ref.current.getBoundingClientRect();
+        setPos({ x: r.right > window.innerWidth ? Math.max(0, x - r.width) : x, y: r.bottom > window.innerHeight ? Math.max(0, y - r.height) : y });
+    }, [x, y]);
+
     return (
-        <div>
-            <div
-                onClick={onSelect}
-                style={{
-                    display: 'flex', alignItems: 'center', gap: '7px',
-                    padding: '5px 8px 5px 10px',
-                    background: selected ? 'rgba(45,140,235,0.14)' : 'transparent',
-                    borderLeft: `2px solid ${selected ? '#2d8ceb' : 'transparent'}`,
-                    cursor: 'pointer',
-                    transition: 'background 0.12s',
-                }}
-                onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-                onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
-            >
-                {/* Eye toggle */}
-                <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); onToggleVisible(); }}
-                    style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: visible ? color : 'rgba(255,255,255,0.2)', display: 'flex', flexShrink: 0 }}
-                >
-                    {visible ? <Eye size={13} /> : <EyeOff size={13} />}
+        <div ref={ref} onContextMenu={e => e.preventDefault()}
+            style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, background: 'rgba(10,16,12,0.98)', border: '1px solid rgba(110,201,126,0.18)', borderRadius: '10px', padding: '4px', minWidth: '180px', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', backdropFilter: 'blur(20px)' }}>
+            {items.map((item, i) => 'separator' in item
+                ? <div key={i} style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '3px 0' }} />
+                : <button key={i} type="button" onClick={() => { item.onClick(); onClose(); }}
+                    onMouseEnter={e => { e.currentTarget.style.background = item.danger ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.07)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '7px 10px', background: 'transparent', border: 'none', borderRadius: '7px', color: item.danger ? '#ef4444' : 'var(--text-bright)', fontSize: '12px', fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+                    {item.icon && <span style={{ opacity: 0.7, flexShrink: 0 }}>{item.icon}</span>}
+                    {item.label}
                 </button>
-
-                {/* Color dot */}
-                <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: color, flexShrink: 0 }} />
-
-                {/* Icon */}
-                <span style={{ color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{icon}</span>
-
-                {/* Label */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: 500, color: selected ? '#fff' : 'var(--text-bright)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {label}
-                    </div>
-                    {sublabel && (
-                        <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '1px' }}>{sublabel}</div>
-                    )}
-                </div>
-
-                {/* Delete */}
-                {onDelete && (
-                    <button
-                        type="button"
-                        onClick={e => { e.stopPropagation(); onDelete(); }}
-                        style={{ background: 'transparent', border: 'none', padding: '2px', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', display: 'flex', flexShrink: 0 }}
-                        onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                        onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
-                    >
-                        <Trash2 size={12} />
-                    </button>
-                )}
-            </div>
-
-            {/* Expanded detail panel */}
-            {selected && children && (
-                <div style={{ padding: '8px 12px 10px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.2)' }}>
-                    {children}
-                </div>
             )}
         </div>
     );
 }
 
-// ─── Section header ──────────────────────────────────────────────────
-function SectionHeader({ label, count }: { label: string; count: number }) {
+// ─── Color picker ────────────────────────────────────────────────────
+function ColorPickerPopup({ x, y, currentColor, onPick, onClose }: { x: number; y: number; currentColor: string; onPick: (c: string) => void; onClose: () => void; }) {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+        document.addEventListener('mousedown', h, true);
+        return () => document.removeEventListener('mousedown', h, true);
+    }, [onClose]);
     return (
-        <div style={{
-            padding: '5px 10px 3px 10px',
-            fontSize: '9px', fontWeight: 800, letterSpacing: '0.1em',
-            textTransform: 'uppercase', color: 'var(--text-dim)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-        }}>
-            <span>{label}</span>
-            <span style={{ background: 'rgba(255,255,255,0.08)', padding: '0 4px', borderRadius: '3px' }}>{count}</span>
+        <div ref={ref} onContextMenu={e => e.preventDefault()}
+            style={{ position: 'fixed', left: x, top: y, zIndex: 10000, background: 'rgba(10,16,12,0.98)', border: '1px solid rgba(110,201,126,0.18)', borderRadius: '10px', padding: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', backdropFilter: 'blur(20px)', display: 'flex', flexWrap: 'wrap', gap: '6px', maxWidth: '170px' }}>
+            {PRESET_COLORS.map(c => (
+                <div key={c.value} title={c.label} onClick={() => { onPick(c.value); onClose(); }}
+                    style={{ width: '20px', height: '20px', borderRadius: '5px', background: c.value, cursor: 'pointer', boxShadow: currentColor === c.value ? '0 0 0 2.5px #fff, 0 0 0 4px rgba(255,255,255,0.15)' : '0 1px 3px rgba(0,0,0,0.4)', transform: currentColor === c.value ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.1s' }}
+                />
+            ))}
         </div>
     );
 }
 
-// ─── Main component ──────────────────────────────────────────────────
+// ─── Inline rename ───────────────────────────────────────────────────
+function InlineRename({ value, onConfirm, onCancel }: { value: string; onConfirm: (v: string) => void; onCancel: () => void; }) {
+    const [v, setV] = useState(value);
+    const ref = useRef<HTMLInputElement>(null);
+    useEffect(() => { ref.current?.select(); }, []);
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }} onClick={e => e.stopPropagation()}>
+            <input ref={ref} value={v} onChange={e => setV(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') onConfirm(v); if (e.key === 'Escape') onCancel(); }}
+                style={{ flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(110,201,126,0.4)', borderRadius: '5px', padding: '2px 6px', color: '#fff', fontSize: '11px', fontWeight: 600, outline: 'none' }}
+                autoFocus />
+            <button type="button" onClick={() => onConfirm(v)} style={{ background: 'transparent', border: 'none', color: '#6ec97e', cursor: 'pointer', padding: '1px', display: 'flex' }}><Check size={12} /></button>
+            <button type="button" onClick={onCancel} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '1px', display: 'flex' }}><X size={12} /></button>
+        </div>
+    );
+}
+
+// ─── Layer row ───────────────────────────────────────────────────────
+function LayerRow({ icon, label, sublabel, color, visible, isEditing, isActive, isSelected, onToggleVisible, onContextMenu, renameSlot, dragHandleProps }: {
+    icon: React.ReactNode; label: string; sublabel?: string; color: string;
+    visible: boolean; isEditing: boolean; isActive?: boolean; isSelected?: boolean;
+    onToggleVisible: () => void; onContextMenu: (e: React.MouseEvent) => void;
+    renameSlot?: React.ReactNode;
+    dragHandleProps?: React.HTMLAttributes<HTMLSpanElement>;
+}) {
+    // Only isSelected gives row highlight. isActive gives an [Actif] badge without highlighing the row.
+    const bg = isSelected ? 'rgba(110,201,126,0.12)' : 'transparent';
+    const borderL = isSelected ? '#6ec97e' : 'transparent';
+    return (
+        <div onContextMenu={onContextMenu}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px 6px 6px', background: bg, borderLeft: `2px solid ${borderL}`, cursor: 'pointer', transition: 'background 0.12s', outline: isSelected ? '1px solid rgba(110,201,126,0.22)' : 'none', outlineOffset: '-1px' }}
+            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+            onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+        >
+            {/* Drag handle */}
+            <span {...dragHandleProps} onClick={e => e.stopPropagation()} style={{ color: 'rgba(255,255,255,0.2)', cursor: 'grab', display: 'flex', flexShrink: 0, touchAction: 'none', ...dragHandleProps?.style }}>
+                <GripVertical size={13} />
+            </span>
+
+            {/* Eye */}
+            <button type="button" onClick={e => { e.stopPropagation(); onToggleVisible(); }}
+                style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: visible ? color : 'rgba(255,255,255,0.2)', display: 'flex', flexShrink: 0 }}>
+                {visible ? <Eye size={13} /> : <EyeOff size={13} />}
+            </button>
+
+            {/* Color dot */}
+            <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: color, flexShrink: 0 }} />
+
+            {/* Type icon */}
+            <span style={{ color: isSelected ? '#6ec97e' : 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{icon}</span>
+
+            {/* Label or rename */}
+            {isEditing && renameSlot
+                ? renameSlot
+                : (
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: isSelected ? 600 : 500, color: isSelected ? '#fff' : 'var(--text-bright)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {label}
+                            </span>
+                            {isActive && (
+                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: 'rgba(45,140,235,0.22)', color: '#60a5fa', border: '1px solid rgba(45,140,235,0.35)', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    Actif
+                                </span>
+                            )}
+                        </div>
+                        {sublabel && <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '1px' }}>{sublabel}</div>}
+                    </div>
+                )}
+
+            {/* ⋮ menu button */}
+            {!isEditing && (
+                <button type="button" onClick={e => { e.stopPropagation(); onContextMenu(e); }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
+                    style={{ background: 'transparent', border: 'none', padding: '2px 4px', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', display: 'flex', flexShrink: 0, borderRadius: '4px' }}
+                    title="Options (clic droit)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+                    </svg>
+                </button>
+            )}
+        </div>
+    );
+}
+
+// ─── Main ────────────────────────────────────────────────────────────
 export default function LayerManagerPanel() {
     const { state, dispatch } = useApp();
 
-    const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [routingId, setRoutingId] = useState<string | null>(null);
-
-    const itineraries = state.itineraries || [];
+    const itineraries  = state.itineraries || [];
     const activeItinId = state.active_itinerary_id;
-    const points = state.point_annotations || [];
-    const areas = state.area_annotations || [];
+    const points       = state.point_annotations || [];
+    const areas        = state.area_annotations  || [];
+    const draws        = (state as any).draw_annotations as DrawAnnotation[] || [];
+    const selectedId   = state.selected_layer_id;
 
-    const flyTo = (coords: [number, number]) => {
-        mapRef.current?.flyTo(coords, Math.max(mapRef.current.getZoom(), 15), { duration: 0.8 });
-    };
+    // ── Flat ordered list (local, persists drag order) ────────────────
+    const [order, setOrder] = useState<OrderItem[]>([]);
+    const listRef = useRef<HTMLDivElement>(null);
 
-    const fitBounds = (coords: [number, number][]) => {
-        if (coords.length > 0) mapRef.current?.fitBounds(coords, { padding: [40, 40], maxZoom: 16 });
-    };
+    useEffect(() => {
+        const all: OrderItem[] = [
+            ...itineraries.map(x => ({ kind: 'itin'  as const, id: x.id })),
+            ...points.map(x      => ({ kind: 'point' as const, id: x.id })),
+            ...areas.map(x       => ({ kind: 'area'  as const, id: x.id })),
+            ...draws.map(x       => ({ kind: 'draw'  as const, id: x.id })),
+        ];
+        const allIds = new Set(all.map(x => x.id));
+        setOrder(prev => {
+            const prevIds = new Set(prev.map(x => x.id));
+            const kept    = prev.filter(x => allIds.has(x.id));
+            const added   = all.filter(x => !prevIds.has(x.id)); // new items
+            if (added.length === 0) {
+                if (kept.length === prev.length) return prev;
+                return kept;
+            }
+            // Insert new items just above the selected layer if any
+            const selId = state.selected_layer_id;
+            const selIdx = selId ? kept.findIndex(x => x.id === selId) : -1;
+            if (selIdx >= 0) {
+                const next = [...kept];
+                next.splice(selIdx, 0, ...added);
+                return next;
+            }
+            return [...added, ...kept];
+        });
+    }, [itineraries, points, areas, draws, state.selected_layer_id]);
 
-    const handleFollowRoads = async (area: AreaAnnotation) => {
-        const newFollow = !area.followRoads;
-        if (!newFollow) {
-            dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { followRoads: false, routedCoords: undefined } });
-            return;
+    // ── Selecting a layer row ─────────────────────────────────────────
+    const handleSelectRow = (item: OrderItem) => {
+        const isAlreadySelected = selectedId === item.id;
+        const nextId = isAlreadySelected ? null : item.id;
+        dispatch({ type: 'SET_SELECTED_LAYER', id: nextId });
+
+        if (nextId) {
+            if (item.kind === 'area') {
+                const area = areas.find(a => a.id === item.id);
+                // When an area is selected, ALWAYS activate area tool so sommets are visible and draggable!
+                const targetTool = area?.followRoads ? 'annotate_area_routed' : 'annotate_area';
+                if (state.active_tool !== targetTool) {
+                    dispatch({ type: 'SET_ACTIVE_TOOL', tool: targetTool });
+                }
+            } else if (item.kind === 'draw') {
+                if (state.active_tool !== 'annotate_draw') {
+                    dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_draw' });
+                }
+            }
         }
-        setRoutingId(area.id);
-        dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Calcul du contour sur les sentiers...' });
-        try {
-            const routed = await computeRoutedAreaBoundary(area.coords, 'pedestrian');
-            const m2 = calculatePolygonArea(routed);
-            dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { followRoads: true, routedCoords: routed, area_m2: m2, formatted_area: formatArea(m2) } });
-            dispatch({ type: 'ADD_NOTIFICATION', message: `Contour sur les sentiers (${formatArea(m2)})`, notifType: 'info' });
-        } catch {
-            dispatch({ type: 'ADD_NOTIFICATION', message: 'Impossible de router les arêtes.', notifType: 'warning' });
-        } finally {
-            setRoutingId(null);
-            dispatch({ type: 'SET_LOADING', isLoading: false });
-        }
     };
 
+    // ── Context menu + color picker + rename ──────────────────────────
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: (CtxMenuItem | CtxMenuSeparator)[] } | null>(null);
+    const [colorPicker, setColorPicker] = useState<{ x: number; y: number; currentColor: string; onPick: (c: string) => void } | null>(null);
+    const [renamingId, setRenamingId] = useState<string | null>(null);
+    const closeCtx   = useCallback(() => setCtxMenu(null), []);
+    const closeColor = useCallback(() => setColorPicker(null), []);
+
+    // ── Drag & drop ───────────────────────────────────────────────────
+    const dragIdx    = useRef<number | null>(null);
+    const [dropOver, setDropOver] = useState<number | null>(null);
+
+    const handleDragStart = (idx: number) => { dragIdx.current = idx; };
+    const handleDragOver  = (e: React.DragEvent, idx: number) => { e.preventDefault(); setDropOver(idx); };
+    const handleDrop      = (idx: number) => {
+        if (dragIdx.current === null || dragIdx.current === idx) { dragIdx.current = null; setDropOver(null); return; }
+        const next = [...order];
+        const [moved] = next.splice(dragIdx.current, 1);
+        next.splice(idx, 0, moved);
+        setOrder(next);
+        dragIdx.current = null;
+        setDropOver(null);
+    };
+    const handleDragEnd = () => { dragIdx.current = null; setDropOver(null); };
+
+    // ── Helpers ───────────────────────────────────────────────────────
+    const flyTo    = (coords: [number, number]) => mapRef.current?.flyTo(coords, Math.max(mapRef.current.getZoom(), 15), { duration: 0.8 });
+    const fitBounds = (coords: [number, number][]) => { if (coords.length > 0) mapRef.current?.fitBounds(coords, { padding: [40, 40], maxZoom: 16 }); };
     const getItinKm = (itin: Itinerary) => {
         const routes = itin.id === activeItinId ? state.routes : (itin.routes || []);
         return routes.reduce((acc, r) => acc + (r?.distance_m || 0), 0) / 1000;
     };
 
-    const toggleSelect = (id: string) => setSelectedId(prev => prev === id ? null : id);
+    // ── Keyboard shortcuts ────────────────────────────────────────────
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (renamingId) return; // Let InlineRename handle keys
+        const idx = order.findIndex(x => x.id === selectedId);
+
+        switch (e.key) {
+            case 'ArrowUp': {
+                e.preventDefault();
+                const nextItem = idx > 0 ? order[idx - 1] : order[order.length - 1];
+                if (nextItem) handleSelectRow(nextItem);
+                break;
+            }
+            case 'ArrowDown': {
+                e.preventDefault();
+                const nextItem = idx < order.length - 1 ? order[idx + 1] : order[0];
+                if (nextItem) handleSelectRow(nextItem);
+                break;
+            }
+            case 'F2':
+                e.preventDefault();
+                if (selectedId) setRenamingId(selectedId);
+                break;
+            case 'Delete':
+            case 'Backspace': {
+                e.preventDefault();
+                if (!selectedId) break;
+                const item = order.find(x => x.id === selectedId);
+                if (!item) break;
+                if (item.kind === 'itin') {
+                    if (itineraries.length > 1) {
+                        const itin = itineraries.find(x => x.id === selectedId);
+                        if (itin && window.confirm(`Supprimer "${itin.name}" ?`))
+                            dispatch({ type: 'REMOVE_ITINERARY', id: selectedId });
+                    }
+                } else if (item.kind === 'point') {
+                    dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: selectedId });
+                } else if (item.kind === 'area') {
+                    dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: selectedId });
+                } else if (item.kind === 'draw') {
+                    dispatch({ type: 'REMOVE_DRAW_ANNOTATION', id: selectedId } as any);
+                }
+                dispatch({ type: 'SET_SELECTED_LAYER', id: null });
+                break;
+            }
+            case ' ': {
+                e.preventDefault();
+                if (!selectedId) break;
+                const item2 = order.find(x => x.id === selectedId);
+                if (!item2) break;
+                if (item2.kind === 'itin')  dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: selectedId });
+                if (item2.kind === 'point') dispatch({ type: 'TOGGLE_POINT_VISIBILITY',    id: selectedId });
+                if (item2.kind === 'area')  dispatch({ type: 'TOGGLE_AREA_VISIBILITY',     id: selectedId });
+                if (item2.kind === 'draw')  dispatch({ type: 'TOGGLE_DRAW_VISIBILITY',     id: selectedId } as any);
+                break;
+            }
+            case 'Enter': {
+                if (selectedId) {
+                    const item3 = order.find(x => x.id === selectedId);
+                    if (item3?.kind === 'itin') dispatch({ type: 'SET_ACTIVE_ITINERARY', id: selectedId });
+                }
+                break;
+            }
+            case 'Escape':
+                dispatch({ type: 'SET_SELECTED_LAYER', id: null });
+                break;
+        }
+    };
+
+    // ── Context menu builders ─────────────────────────────────────────
+    const openItinCtx = (e: React.MouseEvent, itin: Itinerary) => {
+        e.preventDefault(); e.stopPropagation();
+        const isActive = itin.id === activeItinId;
+        setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+            { icon: <Pencil size={13} />, label: 'Renommer', onClick: () => setRenamingId(itin.id) },
+            { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: itin.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: itin.color, onPick: c => dispatch({ type: 'UPDATE_ITINERARY', id: itin.id, color: c }) }) },
+            { separator: true },
+            ...(!isActive ? [{ icon: <Route size={13} />, label: 'Activer pour édition', onClick: () => dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id }) } as CtxMenuItem] : []),
+            { icon: <Eye size={13} />, label: (itin.visible !== false) ? 'Masquer' : 'Afficher', onClick: () => dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: itin.id }) },
+            ...(itineraries.length > 1 ? [{ separator: true } as CtxMenuSeparator, { icon: <Trash2 size={13} />, label: 'Supprimer', danger: true, onClick: () => { if (window.confirm(`Supprimer "${itin.name}" ?`)) dispatch({ type: 'REMOVE_ITINERARY', id: itin.id }); } } as CtxMenuItem] : []),
+        ]});
+    };
+
+    const openPointCtx = (e: React.MouseEvent, pt: PointAnnotation) => {
+        e.preventDefault(); e.stopPropagation();
+        setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+            { icon: <Pencil size={13} />, label: 'Renommer', onClick: () => setRenamingId(pt.id) },
+            { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: pt.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: pt.color, onPick: c => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: pt.id, patch: { color: c } }) }) },
+            { separator: true },
+            { icon: <Maximize2 size={13} />, label: 'Centrer la carte', onClick: () => flyTo(pt.coords) },
+            { icon: <Eye size={13} />, label: pt.visible ? 'Masquer' : 'Afficher', onClick: () => dispatch({ type: 'TOGGLE_POINT_VISIBILITY', id: pt.id }) },
+            { separator: true },
+            { icon: <Trash2 size={13} />, label: 'Supprimer', danger: true, onClick: () => dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: pt.id }) },
+        ]});
+    };
+
+    const openAreaCtx = (e: React.MouseEvent, area: AreaAnnotation) => {
+        e.preventDefault(); e.stopPropagation();
+        const isComplete = area.coords.length >= 3;
+        setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+            { icon: <Pencil size={13} />, label: 'Renommer', onClick: () => setRenamingId(area.id) },
+            { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: area.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: area.color, onPick: c => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { color: c } }) }) },
+            { separator: true },
+            ...(isComplete ? [{ icon: <Maximize2 size={13} />, label: 'Cadrer la zone', onClick: () => fitBounds(area.coords) } as CtxMenuItem] : []),
+            { icon: <Eye size={13} />, label: area.visible ? 'Masquer' : 'Afficher', onClick: () => dispatch({ type: 'TOGGLE_AREA_VISIBILITY', id: area.id }) },
+            { separator: true },
+            { icon: <Trash2 size={13} />, label: 'Supprimer', danger: true, onClick: () => dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: area.id }) },
+        ]});
+    };
+
+    const openDrawCtx = (e: React.MouseEvent, draw: DrawAnnotation) => {
+        e.preventDefault(); e.stopPropagation();
+        setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+            { icon: <Pencil size={13} />, label: 'Renommer', onClick: () => setRenamingId(draw.id) },
+            { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: draw.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: draw.color, onPick: c => dispatch({ type: 'UPDATE_DRAW_ANNOTATION', id: draw.id, patch: { color: c } } as any) }) },
+            { separator: true },
+            { icon: <Eye size={13} />, label: draw.visible ? 'Masquer' : 'Afficher', onClick: () => dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: draw.id } as any) },
+            { separator: true },
+            { icon: <Trash2 size={13} />, label: 'Supprimer', danger: true, onClick: () => dispatch({ type: 'REMOVE_DRAW_ANNOTATION', id: draw.id } as any) },
+        ]});
+    };
+
+    // ── Render one item ───────────────────────────────────────────────
+    const renderItem = (item: OrderItem, idx: number) => {
+        const isDraggingOver = dropOver === idx;
+        const isSelected = selectedId === item.id;
+        const wrapStyle: React.CSSProperties = {
+            borderTop: isDraggingOver ? '2px solid #6ec97e' : '2px solid transparent',
+            transition: 'border-color 0.1s',
+        };
+
+        const dragProps = {
+            draggable: true,
+            onDragStart: () => handleDragStart(idx),
+            onDragOver: (e: React.DragEvent) => handleDragOver(e, idx),
+            onDrop: () => handleDrop(idx),
+            onDragEnd: handleDragEnd,
+            onClick: () => handleSelectRow(item),
+        };
+
+        if (item.kind === 'itin') {
+            const itin = itineraries.find(x => x.id === item.id);
+            if (!itin) return null;
+            const isActive   = itin.id === activeItinId;
+            const km         = getItinKm(itin);
+            const stages     = isActive ? state.stages.length : (itin.stages?.length || 0);
+            const isRenaming = renamingId === itin.id;
+            return (
+                <div key={item.id} style={wrapStyle} {...dragProps}
+                    onDoubleClick={() => dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id })}>
+                    <LayerRow icon={<Route size={12} />} label={itin.name}
+                        sublabel={`${km.toFixed(1)} km · ${stages} étape${stages !== 1 ? 's' : ''}`}
+                        color={itin.color} visible={itin.visible !== false}
+                        isEditing={isRenaming} isActive={isActive} isSelected={isSelected}
+                        onToggleVisible={() => dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: itin.id })}
+                        onContextMenu={e => openItinCtx(e, itin)}
+                        dragHandleProps={{}}
+                        renameSlot={<InlineRename value={itin.name} onConfirm={v => { dispatch({ type: 'UPDATE_ITINERARY', id: itin.id, name: v }); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
+                    />
+                </div>
+            );
+        }
+
+        if (item.kind === 'point') {
+            const pt = points.find(x => x.id === item.id);
+            if (!pt) return null;
+            const isRenaming = renamingId === pt.id;
+            return (
+                <div key={item.id} style={wrapStyle} {...dragProps}>
+                    <LayerRow icon={<MapPin size={12} />} label={pt.title}
+                        sublabel={`${pt.coords[0].toFixed(4)}, ${pt.coords[1].toFixed(4)}`}
+                        color={pt.color} visible={pt.visible}
+                        isEditing={isRenaming} isSelected={isSelected}
+                        onToggleVisible={() => dispatch({ type: 'TOGGLE_POINT_VISIBILITY', id: pt.id })}
+                        onContextMenu={e => openPointCtx(e, pt)}
+                        dragHandleProps={{}}
+                        renameSlot={<InlineRename value={pt.title} onConfirm={v => { dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: pt.id, patch: { title: v } }); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
+                    />
+                </div>
+            );
+        }
+
+        if (item.kind === 'area') {
+            const area = areas.find(x => x.id === item.id);
+            if (!area) return null;
+            const isComplete = area.coords.length >= 3;
+            const surface    = area.formatted_area || (isComplete ? formatArea(calculatePolygonArea(area.coords)) : '—');
+            const isRenaming = renamingId === area.id;
+            return (
+                <div key={item.id} style={wrapStyle} {...dragProps}>
+                    <LayerRow icon={<PolygonIcon size={12} />} label={area.title}
+                        sublabel={isComplete ? surface : `${area.coords.length} sommet${area.coords.length > 1 ? 's' : ''} (en cours)`}
+                        color={area.color} visible={area.visible}
+                        isEditing={isRenaming} isSelected={isSelected}
+                        onToggleVisible={() => dispatch({ type: 'TOGGLE_AREA_VISIBILITY', id: area.id })}
+                        onContextMenu={e => openAreaCtx(e, area)}
+                        dragHandleProps={{}}
+                        renameSlot={<InlineRename value={area.title} onConfirm={v => { dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { title: v } }); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
+                    />
+                </div>
+            );
+        }
+
+        if (item.kind === 'draw') {
+            const draw = draws.find(x => x.id === item.id);
+            if (!draw) return null;
+            const isRenaming = renamingId === draw.id;
+            return (
+                <div key={item.id} style={wrapStyle} {...dragProps}>
+                    <LayerRow icon={<Paintbrush size={12} />} label={draw.title}
+                        sublabel={`${draw.strokes.length} trait${draw.strokes.length !== 1 ? 's' : ''}`}
+                        color={draw.color} visible={draw.visible}
+                        isEditing={isRenaming} isSelected={isSelected}
+                        onToggleVisible={() => dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: draw.id } as any)}
+                        onContextMenu={e => openDrawCtx(e, draw)}
+                        dragHandleProps={{}}
+                        renameSlot={<InlineRename value={draw.title} onConfirm={v => { dispatch({ type: 'UPDATE_DRAW_ANNOTATION', id: draw.id, patch: { title: v } } as any); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
+                    />
+                </div>
+            );
+        }
+
+        return null;
+    };
+
+    const isEmpty = itineraries.length === 0 && points.length === 0 && areas.length === 0 && draws.length === 0;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-panel)', userSelect: 'none', fontSize: '12px', color: 'var(--text-primary)' }}>
 
-            {/* ── LAYER LIST (scrollable) ── */}
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-
-                {/* SECTION: Itinéraires */}
-                {itineraries.length > 0 && (
-                    <>
-                        <SectionHeader label="Itinéraires" count={itineraries.length} />
-                        {[...itineraries].reverse().map(itin => {
-                            const isActive = itin.id === activeItinId;
-                            const km = getItinKm(itin);
-                            const stages = isActive ? state.stages.length : (itin.stages?.length || 0);
-                            const isSelected = selectedId === itin.id;
-
-                            return (
-                                <LayerRow
-                                    key={itin.id}
-                                    icon={<Route size={12} />}
-                                    label={itin.name}
-                                    sublabel={`${km.toFixed(1)} km · ${stages} étape${stages !== 1 ? 's' : ''}`}
-                                    color={itin.color}
-                                    visible={itin.visible !== false}
-                                    selected={isSelected}
-                                    onToggleVisible={() => dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: itin.id })}
-                                    onSelect={() => toggleSelect(itin.id)}
-                                    onDelete={itineraries.length > 1 ? () => {
-                                        if (window.confirm(`Supprimer "${itin.name}" ?`)) dispatch({ type: 'REMOVE_ITINERARY', id: itin.id });
-                                    } : undefined}
-                                >
-                                    {/* Detail */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                                        {/* Rename */}
-                                        <input type="text" value={itin.name}
-                                            onChange={e => dispatch({ type: 'UPDATE_ITINERARY', id: itin.id, name: e.target.value })}
-                                            placeholder="Nom de l'itinéraire..."
-                                            style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '5px', padding: '4px 7px', color: '#fff', fontSize: '11px', outline: 'none' }}
-                                        />
-                                        {/* Color */}
-                                        <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-                                            {PRESET_COLORS.map(c => (
-                                                <div key={c.value} title={c.label}
-                                                    onClick={() => dispatch({ type: 'UPDATE_ITINERARY', id: itin.id, color: c.value })}
-                                                    style={{ width: '14px', height: '14px', borderRadius: '3px', background: c.value, cursor: 'pointer', boxShadow: itin.color === c.value ? '0 0 0 2px #fff' : 'none' }}
-                                                />
-                                            ))}
-                                        </div>
-                                        {/* Activate */}
-                                        {!isActive && (
-                                            <button type="button"
-                                                onClick={() => dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id })}
-                                                style={{ padding: '4px 10px', borderRadius: '5px', background: 'rgba(45,140,235,0.15)', border: '1px solid rgba(45,140,235,0.3)', color: '#60a5fa', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>
-                                                Activer pour édition
-                                            </button>
-                                        )}
-                                        {isActive && (
-                                            <span style={{ fontSize: '10px', color: '#60a5fa', fontWeight: 600 }}>✓ Itinéraire en cours d'édition</span>
-                                        )}
-                                    </div>
-                                </LayerRow>
-                            );
-                        })}
-                        <div style={{ height: '8px' }} />
-                    </>
-                )}
-
-                {/* SECTION: Points */}
-                {points.length > 0 && (
-                    <>
-                        <SectionHeader label="Points & Repères" count={points.length} />
-                        {[...points].reverse().map(pt => {
-                            const isSelected = selectedId === pt.id;
-                            return (
-                                <LayerRow
-                                    key={pt.id}
-                                    icon={<MapPin size={12} />}
-                                    label={pt.title}
-                                    sublabel={`${pt.coords[0].toFixed(4)}, ${pt.coords[1].toFixed(4)}`}
-                                    color={pt.color}
-                                    visible={pt.visible}
-                                    selected={isSelected}
-                                    onToggleVisible={() => dispatch({ type: 'TOGGLE_POINT_VISIBILITY', id: pt.id })}
-                                    onSelect={() => toggleSelect(pt.id)}
-                                    onDelete={() => dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: pt.id })}
-                                >
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                                        <input type="text" value={pt.title}
-                                            onChange={e => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: pt.id, patch: { title: e.target.value } })}
-                                            placeholder="Nom du repère..."
-                                            style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '5px', padding: '4px 7px', color: '#fff', fontSize: '11px', outline: 'none' }}
-                                        />
-                                        <textarea rows={2} value={pt.text || ''}
-                                            onChange={e => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: pt.id, patch: { text: e.target.value } })}
-                                            placeholder="Notes..."
-                                            style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', padding: '4px 7px', color: '#cbd5e1', fontSize: '10px', outline: 'none', resize: 'vertical' }}
-                                        />
-                                        <div style={{ display: 'flex', gap: '5px' }}>
-                                            {PRESET_COLORS.map(c => (
-                                                <div key={c.value} title={c.label}
-                                                    onClick={() => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: pt.id, patch: { color: c.value } })}
-                                                    style={{ width: '14px', height: '14px', borderRadius: '3px', background: c.value, cursor: 'pointer', boxShadow: pt.color === c.value ? '0 0 0 2px #fff' : 'none' }}
-                                                />
-                                            ))}
-                                            <button type="button" onClick={() => flyTo(pt.coords)}
-                                                style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}>
-                                                <Maximize2 size={11} /> Centrer
-                                            </button>
-                                        </div>
-                                    </div>
-                                </LayerRow>
-                            );
-                        })}
-                        <div style={{ height: '8px' }} />
-                    </>
-                )}
-
-                {/* SECTION: Zones */}
-                {areas.length > 0 && (
-                    <>
-                        <SectionHeader label="Zones & Périmètres" count={areas.length} />
-                        {[...areas].reverse().map(area => {
-                            const isSelected = selectedId === area.id;
-                            const isComplete = area.coords.length >= 3;
-                            const surface = area.formatted_area || (isComplete ? formatArea(calculatePolygonArea(area.coords)) : '—');
-                            const isRouting = routingId === area.id;
-
-                            return (
-                                <LayerRow
-                                    key={area.id}
-                                    icon={<PolygonIcon size={12} />}
-                                    label={area.title}
-                                    sublabel={isComplete ? surface : `${area.coords.length} sommet${area.coords.length > 1 ? 's' : ''} (en cours)`}
-                                    color={area.color}
-                                    visible={area.visible}
-                                    selected={isSelected}
-                                    onToggleVisible={() => dispatch({ type: 'TOGGLE_AREA_VISIBILITY', id: area.id })}
-                                    onSelect={() => toggleSelect(area.id)}
-                                    onDelete={() => dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: area.id })}
-                                >
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                                        {/* Name */}
-                                        <input type="text" value={area.title}
-                                            onChange={e => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { title: e.target.value } })}
-                                            placeholder="Nom de la zone..."
-                                            style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '5px', padding: '4px 7px', color: '#fff', fontSize: '11px', outline: 'none' }}
-                                        />
-                                        {/* Notes */}
-                                        <textarea rows={2} value={area.text || ''}
-                                            onChange={e => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { text: e.target.value } })}
-                                            placeholder="Consignes, règles de zone..."
-                                            style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', padding: '4px 7px', color: '#cbd5e1', fontSize: '10px', outline: 'none', resize: 'vertical' }}
-                                        />
-                                        {/* Area stat + fit */}
-                                        {isComplete && (
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#6ee7b7' }}>{surface}</span>
-                                                <button type="button" onClick={() => fitBounds(area.coords)}
-                                                    style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}>
-                                                    <Maximize2 size={11} /> Cadrer
-                                                </button>
-                                            </div>
-                                        )}
-                                        {/* BRouter follow roads */}
-                                        {isComplete && (
-                                            <button type="button" disabled={isRouting}
-                                                onClick={() => handleFollowRoads(area)}
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
-                                                    padding: '5px', borderRadius: '5px',
-                                                    background: area.followRoads ? 'rgba(16,185,129,0.18)' : 'rgba(255,255,255,0.05)',
-                                                    border: `1px solid ${area.followRoads ? '#10b981' : 'rgba(255,255,255,0.1)'}`,
-                                                    color: area.followRoads ? '#6ee7b7' : 'var(--text-dim)',
-                                                    fontSize: '10px', fontWeight: 600, cursor: isRouting ? 'wait' : 'pointer'
-                                                }}>
-                                                <Trees size={12} />
-                                                {isRouting ? 'Calcul…' : (area.followRoads ? 'Sentiers actifs — cliquer pour désactiver' : 'Suivre les sentiers (BRouter)')}
-                                            </button>
-                                        )}
-                                        {/* Colors */}
-                                        <div style={{ display: 'flex', gap: '5px' }}>
-                                            {PRESET_COLORS.map(c => (
-                                                <div key={c.value} title={c.label}
-                                                    onClick={() => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { color: c.value } })}
-                                                    style={{ width: '14px', height: '14px', borderRadius: '3px', background: c.value, cursor: 'pointer', boxShadow: area.color === c.value ? '0 0 0 2px #fff' : 'none' }}
-                                                />
-                                            ))}
-                                        </div>
-                                        {/* Vertex list */}
-                                        {area.coords.length > 0 && (
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
-                                                {area.coords.map((_, vIdx) => (
-                                                    <span key={vIdx}
-                                                        style={{ fontSize: '9px', background: 'rgba(255,255,255,0.07)', padding: '1px 5px', borderRadius: '3px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                        S{vIdx + 1}
-                                                        {area.coords.length > 3 && (
-                                                            <button type="button"
-                                                                onClick={() => dispatch({ type: 'DELETE_AREA_VERTEX', areaId: area.id, vertexIdx: vIdx })}
-                                                                style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, fontSize: '10px', lineHeight: 1 }}
-                                                                onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                                                                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
-                                                            >×</button>
-                                                        )}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </LayerRow>
-                            );
-                        })}
-                        <div style={{ height: '8px' }} />
-                    </>
-                )}
-
-                {/* Empty state */}
-                {itineraries.length === 0 && points.length === 0 && areas.length === 0 && (
+            {/* ── Flat layer list ── */}
+            <div ref={listRef} tabIndex={0} style={{ flex: 1, overflowY: 'auto', outline: 'none' }}
+                onKeyDown={handleKeyDown}>
+                {isEmpty ? (
                     <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '11px' }}>
                         Aucun calque.<br />
                         <span style={{ opacity: 0.6 }}>Utilisez les boutons ci-dessous pour créer.</span>
                     </div>
+                ) : (
+                    order.map((item, idx) => renderItem(item, idx))
                 )}
             </div>
 
-            {/* ── BOTTOM TOOLBAR: Create new layer ── */}
-            <div style={{
-                borderTop: '1px solid rgba(255,255,255,0.08)',
-                padding: '8px 10px',
-                display: 'flex', gap: '6px',
-                background: 'rgba(0,0,0,0.25)',
-                flexShrink: 0
-            }}>
-                {/* + Itinéraire */}
+            {/* ── Bottom toolbar ── */}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '8px 10px', display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.25)', flexShrink: 0 }}>
                 <button type="button"
-                    onClick={() => {
-                        dispatch({ type: 'ADD_ITINERARY' });
-                        dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouvel itinéraire créé.', notifType: 'info' });
-                    }}
+                    onClick={() => { dispatch({ type: 'ADD_ITINERARY' }); dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouvel itinéraire créé.', notifType: 'info' }); }}
                     title="Créer un nouvel itinéraire"
-                    style={{
-                        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                        padding: '7px 4px', borderRadius: '6px',
-                        background: 'rgba(45,140,235,0.1)', border: '1px solid rgba(45,140,235,0.22)',
-                        color: '#60a5fa', cursor: 'pointer', fontSize: '9px', fontWeight: 700
-                    }}>
-                    <Route size={15} />
-                    Itinéraire
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: 'rgba(45,140,235,0.1)', border: '1px solid rgba(45,140,235,0.22)', color: '#60a5fa', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
+                    <Route size={15} />Itinéraire
                 </button>
-
-                {/* + Point */}
                 <button type="button"
-                    onClick={() => {
-                        dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_point' });
-                        dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour placer un repère. Clic droit pour supprimer.', notifType: 'info' });
-                    }}
-                    title="Activer l'outil Point (cliquer sur la carte)"
-                    style={{
-                        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                        padding: '7px 4px', borderRadius: '6px',
-                        background: state.active_tool === 'annotate_point' ? '#3b82f6' : 'rgba(59,130,246,0.1)',
-                        border: `1px solid ${state.active_tool === 'annotate_point' ? '#3b82f6' : 'rgba(59,130,246,0.22)'}`,
-                        color: state.active_tool === 'annotate_point' ? '#fff' : '#60a5fa',
-                        cursor: 'pointer', fontSize: '9px', fontWeight: 700
-                    }}>
-                    <MapPin size={15} />
-                    Repère
+                    onClick={() => { dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_point' }); dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour placer un repère.', notifType: 'info' }); }}
+                    title="Activer l'outil Point"
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: state.active_tool === 'annotate_point' ? '#3b82f6' : 'rgba(59,130,246,0.1)', border: `1px solid ${state.active_tool === 'annotate_point' ? '#3b82f6' : 'rgba(59,130,246,0.22)'}`, color: state.active_tool === 'annotate_point' ? '#fff' : '#60a5fa', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
+                    <MapPin size={15} />Repère
                 </button>
-
-                {/* + Zone */}
                 <button type="button"
-                    onClick={() => {
-                        dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_area' });
-                        dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour tracer les sommets. Double-cliquez ou cliquez "Terminer" pour valider.', notifType: 'info' });
-                    }}
-                    title="Activer l'outil Zone (tracer les sommets sur la carte)"
-                    style={{
-                        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                        padding: '7px 4px', borderRadius: '6px',
-                        background: state.active_tool === 'annotate_area' ? '#10b981' : 'rgba(16,185,129,0.1)',
-                        border: `1px solid ${state.active_tool === 'annotate_area' ? '#10b981' : 'rgba(16,185,129,0.22)'}`,
-                        color: state.active_tool === 'annotate_area' ? '#fff' : '#6ee7b7',
-                        cursor: 'pointer', fontSize: '9px', fontWeight: 700
-                    }}>
-                    <PolygonIcon size={15} color={state.active_tool === 'annotate_area' ? '#fff' : '#6ee7b7'} />
-                    Zone
+                    onClick={() => { dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_area' }); dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour tracer les sommets.', notifType: 'info' }); }}
+                    title="Activer l'outil Zone"
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: (state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#10b981' : 'rgba(16,185,129,0.1)', border: `1px solid ${(state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#10b981' : 'rgba(16,185,129,0.22)'}`, color: (state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#fff' : '#6ee7b7', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
+                    <PolygonIcon size={15} color={(state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#fff' : '#6ee7b7'} />Zone
+                </button>
+                <button type="button"
+                    onClick={() => { dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_draw' }); dispatch({ type: 'ADD_NOTIFICATION', message: 'Dessinez librement sur la carte.', notifType: 'info' }); }}
+                    title="Activer l'outil Dessin (B)"
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: state.active_tool === 'annotate_draw' ? '#f59e0b' : 'rgba(245,158,11,0.1)', border: `1px solid ${state.active_tool === 'annotate_draw' ? '#f59e0b' : 'rgba(245,158,11,0.22)'}`, color: state.active_tool === 'annotate_draw' ? '#fff' : '#fcd34d', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
+                    <Paintbrush size={15} />Dessin
                 </button>
             </div>
+
+            {/* Portals */}
+            {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={closeCtx} />}
+            {colorPicker && <ColorPickerPopup x={colorPicker.x} y={colorPicker.y} currentColor={colorPicker.currentColor} onPick={colorPicker.onPick} onClose={closeColor} />}
         </div>
     );
 }

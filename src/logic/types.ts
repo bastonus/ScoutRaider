@@ -430,6 +430,19 @@ export interface AreaAnnotation {
     createdAt: number;
 }
 
+export interface DrawAnnotation {
+    id: string;
+    type: 'draw';
+    layerId: string;
+    title: string;
+    visible: boolean;
+    color: string;
+    strokeWidth: number;    // pixels (1–20)
+    opacity: number;        // 0–1
+    strokes: [number, number][][]; // array of freehand strokes, each = [[lat,lng],…]
+    createdAt: number;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // APP-LEVEL STATE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -454,6 +467,7 @@ export interface AppState {
     annotation_layers: AnnotationLayerDef[];
     point_annotations: PointAnnotation[];
     area_annotations: AreaAnnotation[];
+    draw_annotations: DrawAnnotation[];
 
     // Stages (user waypoints A, B, C…)
     stages: Stage[];
@@ -506,4 +520,7 @@ export interface AppState {
     is_loading: boolean;
     loading_text: string;
     notifications: Notification[];
+
+    // Panel layer selection (shared between LayerManagerPanel and map layers)
+    selected_layer_id: string | null;
 }

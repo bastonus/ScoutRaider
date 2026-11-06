@@ -40,6 +40,7 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
         case 't': onToolChange('annotate_point'); break;
         case 'z': onToolChange('annotate_area'); break;
         case 'x': onToolChange('annotate_area_routed'); break;
+        case 'b': onToolChange('annotate_draw'); break;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -84,6 +85,7 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
         alignItems: 'center',
         gap: '8px',
         pointerEvents: 'none',
+        background: 'transparent',
       }}
     >
 
@@ -178,6 +180,15 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
             <path d="M6 13 Q9 10 12 13 Q15 16 18 13" strokeWidth="1.5" strokeDasharray="2 1.5" opacity="0.85"/>
           </svg>
         ), 'Zone sur sentiers BRouter (X)')}
+
+        {/* Pinceau libre (B) */}
+        {btn('annotate_draw', (
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 22a1 1 0 0 1-1-1v-4l14-14 5 5L7 22z"/>
+            <path d="M6 17 3 20"/>
+            <path d="m16 7 1-1"/>
+          </svg>
+        ), 'Dessin libre (B)')}
       </div>
 
       {/* ── Cellule 5 : Encodage ────────────────────────────────────────────── */}

@@ -82,6 +82,7 @@ export class StateManager {
             annotation_layers: defaultAnnotationLayers,
             point_annotations: [],
             area_annotations: [],
+            draw_annotations: [],
 
             stages: [],
             geojson_data: null,
@@ -242,6 +243,7 @@ export class StateManager {
             ];
         }
         if (!Array.isArray(migrated.point_annotations)) migrated.point_annotations = [];
+        if (!Array.isArray(migrated.draw_annotations))  migrated.draw_annotations = [];
         if (!Array.isArray(migrated.area_annotations)) {
             migrated.area_annotations = [];
         } else {

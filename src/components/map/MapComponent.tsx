@@ -9,6 +9,7 @@ import InteractiveStages from './InteractiveStages';
 import CursorPreviewLine from './CursorPreviewLine';
 import InactiveItinerariesLayer from './InactiveItinerariesLayer';
 import AnnotationsMapLayer from './AnnotationsMapLayer';
+import DrawAnnotationsLayer from './DrawAnnotationsLayer';
 
 // Fix default marker icons (leaflet bundling issue with Vite)
 const DefaultIcon = L.icon({
@@ -339,6 +340,7 @@ export default function MapComponent() {
                 <PoiLayer />
                 <InactiveItinerariesLayer />
                 <AnnotationsMapLayer />
+                <DrawAnnotationsLayer />
                 <ActiveRouteLayer />
                 <CursorPreviewLine cursorPos={cursorPos} />
                 <InteractiveStages />

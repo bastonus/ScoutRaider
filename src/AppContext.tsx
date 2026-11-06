@@ -2,7 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useRef } from 
 import type {
     AppState, RouteDict, PolySegment, PresetData, CarnetStep,
     ModuleId, AnnexeId, CarnetView, Stage, PolygonalisationSettings, Notification,
-    Itinerary, AnnotationLayerDef, PointAnnotation, AreaAnnotation
+    Itinerary, AnnotationLayerDef, PointAnnotation, AreaAnnotation, DrawAnnotation
 } from './logic/types';
 import { StateManager } from './logic/StateManager';
 import { presetsManager } from './logic/PresetsManager';
@@ -83,6 +83,15 @@ export type AppAction =
     | { type: 'TOGGLE_ANNOTATION_LAYER_VISIBILITY'; layerId: string }
     | { type: 'ADD_ANNOTATION_LAYER'; name: string; color?: string; layerType?: 'points' | 'areas' | 'mixed' }
     | { type: 'REMOVE_ANNOTATION_LAYER'; layerId: string }
+    // Draw (brush) annotations
+    | { type: 'ADD_DRAW_ANNOTATION'; draw: Omit<DrawAnnotation, 'id' | 'createdAt'> }
+    | { type: 'UPDATE_DRAW_ANNOTATION'; id: string; patch: Partial<DrawAnnotation> }
+    | { type: 'APPEND_DRAW_STROKE'; id: string; stroke: [number, number][] }
+    | { type: 'REMOVE_DRAW_ANNOTATION'; id: string }
+    | { type: 'TOGGLE_DRAW_VISIBILITY'; id: string }
+
+    // Panel layer selection
+    | { type: 'SET_SELECTED_LAYER'; id: string | null }
 
     // Polygonalisation
     | { type: 'SET_POLYGONAL_LEGS'; legKey: string; segments: PolySegment[] }
@@ -152,7 +161,8 @@ const initialState: AppState = {
     ...StateManager.getInitialState(),
     is_loading: false,
     loading_text: '',
-    notifications: []
+    notifications: [],
+    selected_layer_id: null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -371,6 +381,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 ...state,
                 itineraries: allItins,
                 active_itinerary_id: newId,
+                selected_layer_id: newId,
                 stages: newItin.stages,
                 routes: newItin.routes,
                 polygonal_steps: newItin.polygonal_steps,
@@ -441,12 +452,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
             if ((state.itineraries || []).length <= 1) return state;
             pushHistory(state);
             const remaining = state.itineraries.filter(it => it.id !== action.id);
+            const nextSelId = state.selected_layer_id === action.id ? null : state.selected_layer_id;
             if (state.active_itinerary_id === action.id) {
                 const nextActive = remaining[0];
                 return {
                     ...state,
                     itineraries: remaining,
                     active_itinerary_id: nextActive.id,
+                    selected_layer_id: nextSelId,
                     stages: nextActive.stages || [],
                     routes: nextActive.routes || [],
                     polygonal_steps: nextActive.polygonal_steps || [],
@@ -457,7 +470,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
                     anchor_stage_idx: -1
                 };
             }
-            return { ...state, itineraries: remaining };
+            return { ...state, itineraries: remaining, selected_layer_id: nextSelId };
         }
 
         case 'DUPLICATE_ITINERARY': {
@@ -490,7 +503,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
             pushHistory(state);
             const ptCount = (state.point_annotations?.length || 0) + 1;
             const newPoint: PointAnnotation = {
-                id: `poi-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                id: (action.point as any).id || `poi-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 type: 'point',
                 layerId: action.point.layerId || 'layer-points',
                 title: action.point.title || `Repère ${ptCount}`,
@@ -503,7 +516,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             };
             return {
                 ...state,
-                point_annotations: [...(state.point_annotations || []), newPoint]
+                point_annotations: [...(state.point_annotations || []), newPoint],
+                selected_layer_id: newPoint.id,
             };
         }
 
@@ -520,7 +534,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             pushHistory(state);
             return {
                 ...state,
-                point_annotations: (state.point_annotations || []).filter(p => p.id !== action.id)
+                point_annotations: (state.point_annotations || []).filter(p => p.id !== action.id),
+                selected_layer_id: state.selected_layer_id === action.id ? null : state.selected_layer_id,
             };
         }
 
@@ -554,7 +569,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             };
             return {
                 ...state,
-                area_annotations: [...(state.area_annotations || []), newArea]
+                area_annotations: [...(state.area_annotations || []), newArea],
+                selected_layer_id: newArea.id,
             };
         }
 
@@ -578,7 +594,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             pushHistory(state);
             return {
                 ...state,
-                area_annotations: (state.area_annotations || []).filter(a => a.id !== action.id)
+                area_annotations: (state.area_annotations || []).filter(a => a.id !== action.id),
+                selected_layer_id: state.selected_layer_id === action.id ? null : state.selected_layer_id,
             };
         }
 
@@ -624,6 +641,59 @@ function appReducer(state: AppState, action: AppAction): AppState {
                     a.id === action.id ? { ...a, visible: !a.visible } : a
                 )
             };
+        }
+
+        case 'ADD_DRAW_ANNOTATION': {
+            const newDraw: DrawAnnotation = {
+                ...action.draw,
+                id: (action.draw as any).id || `draw-annot-${Date.now()}`,
+                createdAt: Date.now(),
+                strokes: action.draw.strokes ?? [],
+            };
+            return {
+                ...state,
+                draw_annotations: [...(state.draw_annotations || []), newDraw],
+                selected_layer_id: newDraw.id,
+            };
+        }
+
+        case 'UPDATE_DRAW_ANNOTATION': {
+            return {
+                ...state,
+                draw_annotations: (state.draw_annotations || []).map(d =>
+                    d.id === action.id ? { ...d, ...action.patch } : d
+                )
+            };
+        }
+
+        case 'APPEND_DRAW_STROKE': {
+            return {
+                ...state,
+                draw_annotations: (state.draw_annotations || []).map(d =>
+                    d.id === action.id ? { ...d, strokes: [...d.strokes, action.stroke] } : d
+                )
+            };
+        }
+
+        case 'REMOVE_DRAW_ANNOTATION': {
+            return {
+                ...state,
+                draw_annotations: (state.draw_annotations || []).filter(d => d.id !== action.id),
+                selected_layer_id: state.selected_layer_id === action.id ? null : state.selected_layer_id,
+            };
+        }
+
+        case 'TOGGLE_DRAW_VISIBILITY': {
+            return {
+                ...state,
+                draw_annotations: (state.draw_annotations || []).map(d =>
+                    d.id === action.id ? { ...d, visible: !d.visible } : d
+                )
+            };
+        }
+
+        case 'SET_SELECTED_LAYER': {
+            return { ...state, selected_layer_id: action.id };
         }
 
         case 'TOGGLE_ANNOTATION_LAYER_VISIBILITY': {
