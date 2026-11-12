@@ -53,7 +53,7 @@ export default function ExportPanel() {
 
     // ── Config ──
     const [version, setVersion] = useState<ExportVersion>('both');
-    const [pdfEngine, setPdfEngine] = useState<PdfEngine>('auto');
+    const [pdfEngine, setPdfEngine] = useState<PdfEngine>('weasyprint');
     const [includeAnnexes, setIncludeAnnexes] = useState(true);
     const [csvColumns, setCsvColumns] = useState<CsvColumnKey[]>(CSV_COLUMNS.map(c => c.key));
     const [csvSeparator, setCsvSeparator] = useState(';');
@@ -104,7 +104,7 @@ export default function ExportPanel() {
             const startTime = Date.now();
             try {
                 const opts: ExportPipelineOptions = {
-                    title: 'Carnet de Scout',
+                    title: state.document_title || 'Carnet de Scout',
                     subtitle: new Date().toLocaleDateString('fr-FR'),
                     includeGeneralMap: state.carnet_include_general_map,
                     includeAnnexes,

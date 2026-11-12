@@ -2,7 +2,8 @@ import React, { createContext, useContext, useReducer, useEffect, useRef } from 
 import type {
     AppState, RouteDict, PolySegment, PresetData, CarnetStep,
     ModuleId, AnnexeId, CarnetView, Stage, PolygonalisationSettings, Notification,
-    Itinerary, AnnotationLayerDef, PointAnnotation, AreaAnnotation, DrawAnnotation, DrawStroke
+    Itinerary, AnnotationLayerDef, PointAnnotation, AreaAnnotation, DrawAnnotation, DrawStroke,
+    TextAnnotation, TextItem
 } from './logic/types';
 import { StateManager } from './logic/StateManager';
 import { presetsManager } from './logic/PresetsManager';
@@ -91,12 +92,20 @@ export type AppAction =
     | { type: 'REMOVE_DRAW_STROKE'; drawId: string; strokeId: string }
     | { type: 'REMOVE_DRAW_ANNOTATION'; id: string }
     | { type: 'TOGGLE_DRAW_VISIBILITY'; id: string }
+    // Text annotations
+    | { type: 'ADD_TEXT_ANNOTATION'; text: Omit<TextAnnotation, 'id' | 'createdAt'> }
+    | { type: 'UPDATE_TEXT_ANNOTATION'; id: string; patch: Partial<TextAnnotation> }
+    | { type: 'APPEND_TEXT_ITEM'; id: string; textItem: TextItem }
+    | { type: 'UPDATE_TEXT_ITEM'; textId: string; itemId: string; patch: Partial<TextItem> }
+    | { type: 'REMOVE_TEXT_ITEM'; textId: string; itemId: string }
+    | { type: 'REMOVE_TEXT_ANNOTATION'; id: string }
+    | { type: 'TOGGLE_TEXT_VISIBILITY'; id: string }
 
     // Panel layer selection
     | { type: 'SET_SELECTED_LAYER'; id: string | null }
     | { type: 'SET_SELECTED_SUBLAYER'; layerId: string | null; sublayerId: string | null }
     // Layer display order (persisted)
-    | { type: 'SET_LAYER_ORDER'; order: Array<{ kind: 'itin' | 'point' | 'area' | 'draw'; id: string }>; recordHistory?: boolean }
+    | { type: 'SET_LAYER_ORDER'; order: Array<{ kind: 'itin' | 'point' | 'area' | 'draw' | 'text'; id: string }>; recordHistory?: boolean }
 
     // Polygonalisation
     | { type: 'SET_POLYGONAL_LEGS'; legKey: string; segments: PolySegment[] }
@@ -116,6 +125,7 @@ export type AppAction =
     | { type: 'TOGGLE_ANNEXE'; annexeId: AnnexeId }
     | { type: 'SET_CARNET_VIEW'; view: CarnetView }
     | { type: 'TOGGLE_GENERAL_MAP' }
+    | { type: 'TOGGLE_ELEVATION_PROFILE' }
     | { type: 'MANUAL_MODULE_ASSIGNMENT'; stepId: string; moduleId: string }
     | { type: 'UPDATE_MANUAL_TEXT'; stepId: string; text: string }
     | { type: 'INSERT_MANUAL_STEP'; afterStepId: string; content: string }
@@ -134,7 +144,23 @@ export type AppAction =
      */
     | { type: 'EDIT_COMPUTED_TEXT'; stepId: string; lineIdx?: number; newSolutionText: string }
     /** Persist the zoom/center/bounds of a carte_ign or drapeaux mini-map */
-    | { type: 'PERSIST_MAP_STATE'; stepId: string; zoom: number; center: [number, number]; bounds?: [[number, number], [number, number]] }
+    | {
+        type: 'PERSIST_MAP_STATE';
+        stepId: string;
+        zoom?: number;
+        center?: [number, number];
+        bounds?: [[number, number], [number, number]];
+        height?: number;
+        width?: number;
+        widthPercent?: number;
+        alignment?: 'left' | 'center' | 'right';
+        scaleName?: string;
+        layerId?: string;
+        isLocked?: boolean;
+        showRoute?: boolean;
+        showEndpoints?: boolean;
+        showAnnotations?: boolean;
+    }
 
     // POI persistence
     | { type: 'SET_SEGMENT_POIS'; segment_pois: Record<string, import('./logic/types').POIResult[]> }
@@ -150,6 +176,8 @@ export type AppAction =
     // Persistence
     | { type: 'UNDO' }
     | { type: 'REDO' }
+    | { type: 'SET_DOCUMENT_TITLE'; title: string }
+    | { type: 'SET_CURRENT_FILEPATH'; filepath: string | null }
     | { type: 'LOAD_PROJECT'; state: AppState }
     | { type: 'NEW_PROJECT' }
 
@@ -203,6 +231,7 @@ function pushHistory(state: AppState) {
 function cleanupEmptyLayers(state: AppState, incomingTool?: string): AppState {
     const isIncomingRoute = incomingTool ? ['route', 'route_direct', 'node', 'azimut'].includes(incomingTool) : false;
     const isIncomingDraw = incomingTool === 'annotate_draw';
+    const isIncomingText = incomingTool === 'annotate_text';
     const isIncomingArea = incomingTool ? ['annotate_area', 'annotate_area_routed'].includes(incomingTool) : false;
     const isIncomingPoint = incomingTool === 'annotate_point';
 
@@ -231,6 +260,13 @@ function cleanupEmptyLayers(state: AppState, incomingTool?: string): AppState {
         : allDraws.filter(d => d.strokes && d.strokes.length > 0 && d.strokes.some(s => s.points && s.points.length >= 2));
     const removedDrawIds = new Set(allDraws.filter(d => !validDraws.includes(d)).map(d => d.id));
 
+    // If incoming tool is NOT text, empty text annotations must be purged
+    const allTexts = state.text_annotations || [];
+    const validTexts = isIncomingText
+        ? allTexts
+        : allTexts.filter(t => t.texts && t.texts.length > 0 && t.texts.some(item => item.text && item.text.trim().length > 0));
+    const removedTextIds = new Set(allTexts.filter(t => !validTexts.includes(t)).map(t => t.id));
+
     // If incoming tool is NOT area, incomplete area annotations (< 3 coords) must be purged
     const allAreas = state.area_annotations || [];
     const validAreas = isIncomingArea
@@ -245,7 +281,7 @@ function cleanupEmptyLayers(state: AppState, incomingTool?: string): AppState {
         : allPoints.filter(p => p.coords && p.coords.length >= 2);
     const removedPointIds = new Set(allPoints.filter(p => !validPoints.includes(p)).map(p => p.id));
 
-    const totalRemoved = removedItinIds.size + removedDrawIds.size + removedAreaIds.size + removedPointIds.size;
+    const totalRemoved = removedItinIds.size + removedDrawIds.size + removedTextIds.size + removedAreaIds.size + removedPointIds.size;
     if (totalRemoved === 0) {
         return { ...state, itineraries: syncedItins };
     }
@@ -254,6 +290,7 @@ function cleanupEmptyLayers(state: AppState, incomingTool?: string): AppState {
     const nextLayerOrder = (state.layer_order || []).filter(item => {
         if (item.kind === 'itin' && removedItinIds.has(item.id)) return false;
         if (item.kind === 'draw' && removedDrawIds.has(item.id)) return false;
+        if (item.kind === 'text' && removedTextIds.has(item.id)) return false;
         if (item.kind === 'area' && removedAreaIds.has(item.id)) return false;
         if (item.kind === 'point' && removedPointIds.has(item.id)) return false;
         return true;
@@ -302,6 +339,7 @@ function cleanupEmptyLayers(state: AppState, incomingTool?: string): AppState {
     }
 
     if (removedDrawIds.has(nextSelectedLayerId || '') ||
+        removedTextIds.has(nextSelectedLayerId || '') ||
         removedAreaIds.has(nextSelectedLayerId || '') ||
         removedPointIds.has(nextSelectedLayerId || '')) {
         nextSelectedLayerId = null;
@@ -311,6 +349,7 @@ function cleanupEmptyLayers(state: AppState, incomingTool?: string): AppState {
         ...state,
         itineraries: validItins,
         draw_annotations: validDraws,
+        text_annotations: validTexts,
         area_annotations: validAreas,
         point_annotations: validPoints,
         layer_order: nextLayerOrder,
@@ -979,6 +1018,89 @@ function appReducer(state: AppState, action: AppAction): AppState {
             };
         }
 
+        // ── Text Annotations ──────────────────────────────────────────────
+        case 'ADD_TEXT_ANNOTATION': {
+            pushHistory(state);
+            const newText: TextAnnotation = {
+                ...action.text,
+                id: (action.text as any).id || `text-annot-${Date.now()}`,
+                createdAt: Date.now(),
+                texts: action.text.texts ?? [],
+            };
+            return {
+                ...state,
+                text_annotations: [...(state.text_annotations || []), newText],
+                selected_layer_id: newText.id,
+            };
+        }
+
+        case 'UPDATE_TEXT_ANNOTATION': {
+            pushHistory(state);
+            return {
+                ...state,
+                text_annotations: (state.text_annotations || []).map(t =>
+                    t.id === action.id ? { ...t, ...action.patch } : t
+                )
+            };
+        }
+
+        case 'APPEND_TEXT_ITEM': {
+            pushHistory(state);
+            return {
+                ...state,
+                text_annotations: (state.text_annotations || []).map(t =>
+                    t.id === action.id ? { ...t, texts: [...t.texts, action.textItem] } : t
+                )
+            };
+        }
+
+        case 'UPDATE_TEXT_ITEM': {
+            pushHistory(state);
+            return {
+                ...state,
+                text_annotations: (state.text_annotations || []).map(t => {
+                    if (t.id !== action.textId) return t;
+                    return {
+                        ...t,
+                        texts: t.texts.map((item: TextItem) =>
+                            item.id === action.itemId ? { ...item, ...action.patch } : item
+                        )
+                    };
+                })
+            };
+        }
+
+        case 'REMOVE_TEXT_ITEM': {
+            pushHistory(state);
+            return {
+                ...state,
+                text_annotations: (state.text_annotations || []).map(t => {
+                    if (t.id !== action.textId) return t;
+                    return { ...t, texts: t.texts.filter((item: TextItem) => item.id !== action.itemId) };
+                }),
+                selected_sublayer_id: state.selected_sublayer_id === action.itemId ? null : state.selected_sublayer_id,
+            };
+        }
+
+        case 'REMOVE_TEXT_ANNOTATION': {
+            pushHistory(state);
+            return {
+                ...state,
+                text_annotations: (state.text_annotations || []).filter(t => t.id !== action.id),
+                selected_layer_id: state.selected_layer_id === action.id ? null : state.selected_layer_id,
+                selected_sublayer_id: state.selected_layer_id === action.id ? null : state.selected_sublayer_id,
+            };
+        }
+
+        case 'TOGGLE_TEXT_VISIBILITY': {
+            return {
+                ...state,
+                text_annotations: (state.text_annotations || []).map(t =>
+                    t.id === action.id ? { ...t, visible: !t.visible } : t
+                )
+            };
+        }
+
         case 'SET_LAYER_ORDER': {
             // Auto-synchronisation of newly created layers must not pollute undo history.
             if (action.recordHistory !== false) pushHistory(state);
@@ -1005,7 +1127,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
             if (targetItin) {
                 // Only switch to route tool if we're not in an annotation/draw mode
                 // (prevents draw tool from being interrupted by clicking a dashed itinerary line)
-                const annotationTools = ['annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw'];
+                const annotationTools = ['annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw', 'annotate_text'];
                 const nextTool = annotationTools.includes(state.active_tool) ? state.active_tool : 'route';
                 return {
                     ...state,
@@ -1253,6 +1375,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'TOGGLE_GENERAL_MAP':
             return { ...state, carnet_include_general_map: !state.carnet_include_general_map };
 
+        case 'TOGGLE_ELEVATION_PROFILE':
+            return { ...state, carnet_include_elevation_profile: !(state.carnet_include_elevation_profile ?? true) };
+
         case 'MANUAL_MODULE_ASSIGNMENT': {
             pushHistory(state);
             const stepToChange = state.carnet_steps.find(s => s.id === action.stepId);
@@ -1456,9 +1581,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
                     return {
                         ...s,
                         mapPersist: {
-                            zoom: action.zoom,
-                            center: action.center,
-                            bounds: action.bounds,
+                            ...s.mapPersist,
+                            zoom: action.zoom !== undefined ? action.zoom : (s.mapPersist?.zoom ?? 15),
+                            center: action.center !== undefined ? action.center : (s.mapPersist?.center ?? [0, 0]),
+                            bounds: action.bounds !== undefined ? action.bounds : s.mapPersist?.bounds,
+                            height: action.height !== undefined ? action.height : s.mapPersist?.height,
+                            width: action.width !== undefined ? action.width : s.mapPersist?.width,
+                            widthPercent: action.widthPercent !== undefined ? action.widthPercent : s.mapPersist?.widthPercent,
+                            alignment: action.alignment !== undefined ? action.alignment : s.mapPersist?.alignment,
+                            scaleName: action.scaleName !== undefined ? action.scaleName : s.mapPersist?.scaleName,
+                            layerId: action.layerId !== undefined ? action.layerId : s.mapPersist?.layerId,
+                            isLocked: action.isLocked !== undefined ? action.isLocked : s.mapPersist?.isLocked,
+                            showRoute: action.showRoute !== undefined ? action.showRoute : s.mapPersist?.showRoute,
+                            showEndpoints: action.showEndpoints !== undefined ? action.showEndpoints : s.mapPersist?.showEndpoints,
+                            showAnnotations: action.showAnnotations !== undefined ? action.showAnnotations : s.mapPersist?.showAnnotations,
                         }
                     };
                 })
@@ -1584,6 +1720,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
             return { ...next, notifications: state.notifications, is_loading: state.is_loading, loading_text: state.loading_text };
         }
 
+        case 'SET_DOCUMENT_TITLE':
+            return { ...state, document_title: action.title.trim() || 'Document sans titre' };
+
+        case 'SET_CURRENT_FILEPATH':
+            return { ...state, current_filepath: action.filepath };
+
         case 'LOAD_PROJECT':
             historyStack = [];
             redoStack = [];
@@ -1631,21 +1773,39 @@ function appReducer(state: AppState, action: AppAction): AppState {
 function autoMergeSteps(steps: CarnetStep[]): CarnetStep[] {
     if (steps.length <= 1) return steps;
 
+    const isMapModule = (mod: string) => ['carte_ign', 'carte_simple', 'drapeaux'].includes(mod);
+
     const merged: CarnetStep[] = [steps[0]];
     for (let i = 1; i < steps.length; i++) {
         const prev = merged[merged.length - 1];
         const curr = steps[i];
 
-        // Only merge if both are non-manual and have the same module
-        if (!prev.isManual && !curr.isManual && prev.moduleId === curr.moduleId) {
+        const bothMaps = !prev.isManual && !curr.isManual && isMapModule(prev.moduleId) && isMapModule(curr.moduleId);
+        const sameNonMapModule = !prev.isManual && !curr.isManual && !isMapModule(prev.moduleId) && prev.moduleId === curr.moduleId;
+
+        if (bothMaps || sameNonMapModule) {
+            let combinedCoords = prev.coords || [];
+            if (curr.coords && curr.coords.length > 0) {
+                if (combinedCoords.length > 0 &&
+                    Math.abs(combinedCoords[combinedCoords.length - 1][0] - curr.coords[0][0]) < 0.00001 &&
+                    Math.abs(combinedCoords[combinedCoords.length - 1][1] - curr.coords[0][1]) < 0.00001) {
+                    combinedCoords = [...combinedCoords, ...curr.coords.slice(1)];
+                } else {
+                    combinedCoords = [...combinedCoords, ...curr.coords];
+                }
+            }
+
             merged[merged.length - 1] = {
                 ...prev,
-                toLabel: curr.toLabel,
+                moduleId: bothMaps ? 'carte_ign' : prev.moduleId,
+                toLabel: curr.toLabel || prev.toLabel,
                 distanceM: prev.distanceM + curr.distanceM,
-                coords: [...prev.coords, ...curr.coords],
-                solutionText: prev.solutionText + '\n' + curr.solutionText,
-                encodedText: prev.encodedText + '\n' + curr.encodedText,
-                warnings: [...prev.warnings, ...curr.warnings],
+                coords: combinedCoords,
+                segmentIndices: [...(prev.segmentIndices || []), ...(curr.segmentIndices || [])],
+                solutionText: (prev.solutionText && curr.solutionText) ? (prev.solutionText + '\n' + curr.solutionText) : (prev.solutionText || curr.solutionText),
+                encodedText: (prev.encodedText && curr.encodedText) ? (prev.encodedText + '\n' + curr.encodedText) : (prev.encodedText || curr.encodedText),
+                warnings: [...(prev.warnings || []), ...(curr.warnings || [])],
+                mapPersist: prev.mapPersist || curr.mapPersist,
             };
         } else {
             merged.push(curr);
@@ -1844,6 +2004,9 @@ function autoRebuildCarnet(state: AppState): AppState {
         const annexe = MODULE_TO_ANNEXE[mod];
         if (annexe) newAnnexes.add(annexe as any);
     });
+
+    // Always merge consecutive map steps so they are never split in the editor
+    finalSteps = autoMergeSteps(finalSteps);
 
     return { 
         ...state, 

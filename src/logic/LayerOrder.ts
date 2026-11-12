@@ -1,4 +1,4 @@
-import type { Itinerary, PointAnnotation, AreaAnnotation, DrawAnnotation } from './types';
+import type { Itinerary, PointAnnotation, AreaAnnotation, DrawAnnotation, TextAnnotation } from './types';
 
 /**
  * Layer list order = map z-order.
@@ -6,7 +6,7 @@ import type { Itinerary, PointAnnotation, AreaAnnotation, DrawAnnotation } from 
  * The first item of the list is drawn on top of the map (highest z-index),
  * the last item is drawn underneath the others.
  */
-export type LayerKind = 'itin' | 'point' | 'area' | 'draw';
+export type LayerKind = 'itin' | 'point' | 'area' | 'draw' | 'text';
 
 export interface LayerOrderItem {
     kind: LayerKind;
@@ -18,6 +18,7 @@ export interface ComputeLayerOrderInput {
     points: PointAnnotation[];
     areas: AreaAnnotation[];
     draws: DrawAnnotation[];
+    texts?: TextAnnotation[];
     savedOrder?: LayerOrderItem[] | null;
     /** In-memory order fallback used before the order has been persisted. */
     currentOrder?: LayerOrderItem[] | null;
@@ -34,6 +35,7 @@ export function computeLayerOrder({
     points,
     areas,
     draws,
+    texts,
     savedOrder,
     currentOrder,
     selectedId,
@@ -43,6 +45,7 @@ export function computeLayerOrder({
         ...(points || []).map(x => ({ kind: 'point' as const, id: x.id })),
         ...(areas || []).map(x => ({ kind: 'area' as const, id: x.id })),
         ...(draws || []).map(x => ({ kind: 'draw' as const, id: x.id })),
+        ...(texts || []).map(x => ({ kind: 'text' as const, id: x.id })),
     ];
 
     const allIds = new Set(all.map(x => x.id));

@@ -70,6 +70,8 @@ export class StateManager {
 
         return {
             version: CURRENT_SCHEMA_VERSION,
+            document_title: 'Document sans titre',
+            current_filepath: null,
             active_mode: 'map',
 
             routes: [],
@@ -83,6 +85,7 @@ export class StateManager {
             point_annotations: [],
             area_annotations: [],
             draw_annotations: [],
+            text_annotations: [],
             layer_order: [{ kind: 'itin' as const, id: defaultItinId }],
 
             stages: [],
@@ -125,6 +128,7 @@ export class StateManager {
             carnet_steps: [],
             carnet_view: 'participant',
             carnet_include_general_map: true,
+            carnet_include_elevation_profile: true,
             enabled_annexes: [],
 
             export_queue: [],
@@ -152,6 +156,7 @@ export class StateManager {
         delete persistable.notifications;
         delete persistable.mapy_api_key;
         delete persistable.ign_api_key;
+        delete persistable.current_filepath;
 
         const envelope = {
             _scoutproj: true,
@@ -202,6 +207,9 @@ export class StateManager {
         const defaults = StateManager.getInitialState();
         const migrated: AppState = { ...defaults, ...loadedState };
 
+        migrated.document_title = loadedState.document_title || (loadedState as any).project_name || 'Document sans titre';
+        migrated.current_filepath = loadedState.current_filepath || null;
+
         // Ensure transient fields are reset
         migrated.is_loading = false;
         migrated.loading_text = '';
@@ -247,6 +255,7 @@ export class StateManager {
         }
         if (!Array.isArray(migrated.point_annotations)) migrated.point_annotations = [];
         if (!Array.isArray(migrated.draw_annotations))  migrated.draw_annotations = [];
+        if (!Array.isArray(migrated.text_annotations))  migrated.text_annotations = [];
         if (!Array.isArray(migrated.layer_order))       migrated.layer_order = [];
         // Migrate legacy strokes: [number,number][][] → DrawStroke[]
         migrated.draw_annotations = migrated.draw_annotations.map((d: any) => {
@@ -331,13 +340,16 @@ export class StateManager {
     /**
      * Save project via Electron IPC or browser fallback.
      */
-    static async saveProject(state: AppState, filepath?: string): Promise<boolean> {
+    static async saveProject(state: AppState, filepath?: string): Promise<{ success: boolean; filepath?: string } | boolean> {
         const json = StateManager.serializeForSave(state);
+        const safeTitle = (state.document_title || 'Document sans titre').trim().replace(/[/\\?%*:|"<>]/g, '_') || 'Document';
+        const defaultFilename = `${safeTitle}.srdoc`;
 
         if (typeof window !== 'undefined' && (window as any).electronAPI?.saveScoutproj) {
             try {
-                await (window as any).electronAPI.saveScoutproj(json, filepath);
-                return true;
+                const savedPath = await (window as any).electronAPI.saveScoutproj(json, filepath, defaultFilename);
+                if (!savedPath) return false;
+                return { success: true, filepath: typeof savedPath === 'string' ? savedPath : filepath };
             } catch (e) {
                 console.error('Failed to save via IPC:', e);
                 return false;
@@ -349,10 +361,10 @@ export class StateManager {
             const blob = new Blob([json], { type: 'application/json' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = filepath || 'projet.srdoc';
+            a.download = filepath || defaultFilename;
             a.click();
             URL.revokeObjectURL(a.href);
-            return true;
+            return { success: true, filepath: defaultFilename };
         }
 
         return false;
@@ -366,7 +378,15 @@ export class StateManager {
             try {
                 const result = await (window as any).electronAPI.openScoutproj();
                 if (!result) return null; // user cancelled
-                return StateManager.deserializeFromLoad(result.state);
+                const loaded = StateManager.deserializeFromLoad(result.state);
+                if (result.filepath) {
+                    loaded.current_filepath = result.filepath;
+                    const baseName = result.filepath.split(/[\\/]/).pop()?.replace(/\.(srdoc|scoutproj)$/i, '');
+                    if (baseName && (!loaded.document_title || loaded.document_title === 'Document sans titre')) {
+                        loaded.document_title = baseName;
+                    }
+                }
+                return loaded;
             } catch (e) {
                 console.error('Failed to load via IPC:', e);
                 return null;

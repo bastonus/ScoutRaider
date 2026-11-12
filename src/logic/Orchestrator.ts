@@ -161,7 +161,7 @@ export class Orchestrator {
                 
                 // Smart splitting limitations
                 if (mod === 'gilwell' && count >= 7) break; // Max 7 azimuts per Gilwell diagram
-                if ((mod === 'carte_ign' || mod === 'maritime') && count >= 5) break; 
+                if (mod === 'maritime' && count >= 5) break; 
             }
 
             plan.push([mod, i, count]);

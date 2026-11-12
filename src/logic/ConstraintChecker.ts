@@ -53,7 +53,7 @@ export class ConstraintChecker {
                     });
                 }
             } else {
-                if (lastType === 'visual' && mod !== 'carte_ign') {
+                if (lastType === 'visual' && mod !== 'carte_ign' && mod !== 'carte_simple') {
                     violations.push({
                         level: 'warning',
                         seg_idx: i,

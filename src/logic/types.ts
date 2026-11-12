@@ -251,6 +251,16 @@ export interface CarnetStep {
         zoom: number;
         center: [number, number];
         bounds?: [[number, number], [number, number]];
+        height?: number;
+        width?: number; // Largeur canonique en pixels
+        widthPercent?: number; // e.g. 50, 75, 100
+        alignment?: 'left' | 'center' | 'right';
+        scaleName?: string; // '1:10000' | '1:25000' | '1:50000' | '1:100000' | 'auto' | 'custom'
+        layerId?: string;
+        isLocked?: boolean;
+        showRoute?: boolean; // Afficher ou masquer l'itinéraire
+        showEndpoints?: boolean; // Afficher ou masquer les points de début et fin
+        showAnnotations?: boolean; // Afficher ou masquer les repères, aires et dessins
     };
     /** Indices of polygonal segments that this step encompasses */
     segmentIndices?: number[];
@@ -285,7 +295,8 @@ export type ModuleId =
     | 'cassis'
     | 'templier'
     | 'texte_clair'
-    | 'carte_ign';
+    | 'carte_ign'
+    | 'carte_simple';
 
 /** Known annexe identifiers */
 export type AnnexeId =
@@ -452,6 +463,33 @@ export interface DrawAnnotation {
     createdAt: number;
 }
 
+export interface TextItem {
+    id: string;
+    text: string;
+    points: [number, number][]; // 4 corners [TL, TR, BR, BL] in [lat, lng] for native Transformer compatibility
+    color: string;
+    fontSize: number;           // base font size in pixels (e.g. 16)
+    fontFamily?: string;
+    bold?: boolean;
+    italic?: boolean;
+    backgroundColor?: string;   // optional badge background color
+    opacity: number;            // 0–1
+    createdAt: number;
+}
+
+export interface TextAnnotation {
+    id: string;
+    type: 'text';
+    layerId: string;
+    title: string;
+    visible: boolean;
+    color: string;
+    fontSize: number;
+    opacity: number;
+    texts: TextItem[];
+    createdAt: number;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // APP-LEVEL STATE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -461,6 +499,8 @@ export type CarnetView = 'participant' | 'solution';
 
 export interface AppState {
     version: string;
+    document_title: string;
+    current_filepath?: string | null;
     active_mode: AppMode;
 
     // Multi-route model
@@ -477,6 +517,7 @@ export interface AppState {
     point_annotations: PointAnnotation[];
     area_annotations: AreaAnnotation[];
     draw_annotations: DrawAnnotation[];
+    text_annotations: TextAnnotation[];
 
     // Stages (user waypoints A, B, C…)
     stages: Stage[];
@@ -520,6 +561,7 @@ export interface AppState {
     carnet_steps: CarnetStep[];
     carnet_view: CarnetView;
     carnet_include_general_map: boolean;
+    carnet_include_elevation_profile?: boolean;
     enabled_annexes: AnnexeId[];
 
     // Export

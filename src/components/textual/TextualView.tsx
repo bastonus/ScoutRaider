@@ -22,6 +22,7 @@ import TextualHeader from './TextualHeader';
 import CarnetStepBlock from './CarnetStepBlock';
 import StepSeparator from './StepSeparator';
 import CodeBlockPicker from './CodeBlockPicker';
+import CarnetElevationBlock from './CarnetElevationBlock';
 import { mapRef } from '../map/MapComponent';
 import L from 'leaflet';
 
@@ -166,6 +167,7 @@ export default function TextualView({ onExport, viewMode }: { onExport?: () => v
                 ) : (
                     /* ── Steps list ──────────────────────────────────────── */
                     <>
+                        <CarnetElevationBlock />
                         <StepSeparator index={0} afterStepId="" onAddHtml={handleAddHtmlStep} onAddCode={handleAddCodeStep} />
                         {pickingCodeFor?.stepId === "" && <CodeBlockPicker afterStepId="" anchorSegmentIdx={pickingCodeFor.anchorSegmentIdx} onClose={() => setPickingCodeFor(null)} />}
                         

@@ -194,10 +194,22 @@ export class IGNClient {
 
         const results: LegRoute[] = [];
 
-        if (smallRoadsOnly) {
+        // 1. Try IGN Géoplateforme Valhalla BD TOPO first for pedestrian routing in France
+        if (profile === "pedestrian") {
+            try {
+                const ignResults = await this._ignValhallaRoute(startLon, startLat, endLon, endLat);
+                if (ignResults.length > 0) {
+                    results.push(...ignResults);
+                }
+            } catch (e) {
+                console.debug("[IGNClient] IGN BD TOPO Valhalla routing fallback:", e);
+            }
+        }
+
+        if (smallRoadsOnly && results.length < maxAlts) {
             // brouter hiking
             try {
-                const brResults = await this._brouterRoute(startLon, startLat, endLon, endLat, "hiking", maxAlts);
+                const brResults = await this._brouterRoute(startLon, startLat, endLon, endLat, "hiking", maxAlts - results.length);
                 for (const r of brResults) {
                     r.name += " (BRouter Strict)";
                     results.push(r);
@@ -230,7 +242,7 @@ export class IGNClient {
                     }
                 } catch (e) {}
             }
-        } else {
+        } else if (results.length < maxAlts) {
             // Normal mode
             try {
                 const profilesToTry = profile === "pedestrian" ? ["trekking"] : ["car-fast"];
@@ -255,6 +267,62 @@ export class IGNClient {
         }
 
         return results;
+    }
+
+    private static async _ignValhallaRoute(
+        slon: number, slat: number, elon: number, elat: number,
+        optimization = "fastest"
+    ): Promise<LegRoute[]> {
+        const constraints = encodeURIComponent(JSON.stringify({
+            constraintType: "banned",
+            key: "wayType",
+            operator: "=",
+            value: "autoroute"
+        }));
+        const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-valhalla&profile=pedestrian&optimization=${optimization}&start=${slon.toFixed(6)},${slat.toFixed(6)}&end=${elon.toFixed(6)},${elat.toFixed(6)}&constraints=${constraints}&geometryFormat=geojson&getSteps=true&getBbox=false&crs=EPSG:4326&timeUnit=second&distanceUnit=meter&waysAttributes=name`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 9000);
+        const resp = await fetch(url, {
+            signal: controller.signal,
+            headers: { "Accept": "application/json" }
+        });
+        clearTimeout(timeout);
+
+        if (!resp.ok) throw new Error(`IGN Navigation HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data.geometry || !data.geometry.coordinates || data.geometry.coordinates.length < 2) {
+            return [];
+        }
+
+        // Detect dangers / heavy traffic roads from steps
+        let dangerLevel: DangerLevel | undefined;
+        const steps = data.portions?.[0]?.steps || [];
+        for (const s of steps) {
+            const attr = s.attributes || {};
+            const nat = (attr.nature || '').toLowerCase();
+            const imp = parseInt(attr.importance || '5', 10);
+            if (imp <= 2 || nat.includes('autoroute') || nat.includes('voie rapide')) {
+                dangerLevel = 'extreme';
+                break;
+            } else if (imp === 3 || nat.includes('chaussées séparées')) {
+                dangerLevel = 'high';
+            } else if (!dangerLevel && imp === 4) {
+                dangerLevel = 'minor';
+            }
+        }
+
+        const geom = data.geometry;
+        if (!geom.properties) geom.properties = {};
+        geom.properties.danger_level = dangerLevel;
+        geom.properties.is_fallback = false;
+        geom.properties.source = 'IGN BD TOPO (Valhalla)';
+
+        return [{
+            name: 'Itinéraire BD TOPO Pédestre',
+            leg_key: Math.random().toString(),
+            geometry: geom
+        }];
     }
 
     private static async _brouterRoute(slon: number, slat: number, elon: number, elat: number, profileName: string, maxAlts: number): Promise<LegRoute[]> {

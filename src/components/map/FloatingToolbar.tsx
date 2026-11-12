@@ -37,7 +37,8 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
         case 'n': onToolChange('node'); break;
         case 'a': onToolChange('azimut'); break;
         case 'e': onToolChange('encodage'); break;
-        case 't': onToolChange('annotate_point'); break;
+        case 'r': onToolChange('annotate_point'); break;
+        case 't': onToolChange('annotate_text'); break;
         case 'z': onToolChange('annotate_area'); break;
         case 'x': onToolChange('annotate_area_routed'); break;
         case 'b': onToolChange('annotate_draw'); break;
@@ -145,7 +146,7 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
             <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z" />
             <circle cx="12" cy="9" r="2.5" />
           </svg>
-        ), 'Repère (T)')}
+        ), 'Repère (R)')}
       </div>
 
       {/* ── Cellule 4 : Zones ───────────────────────────────────────────────── */}
@@ -189,6 +190,15 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
             <path d="m16 7 1-1"/>
           </svg>
         ), 'Dessin libre (B)')}
+
+        {/* Texte libre (T) */}
+        {btn('annotate_text', (
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="4 7 4 4 20 4 20 7" />
+            <line x1="9" y1="20" x2="15" y2="20" />
+            <line x1="12" y1="4" x2="12" y2="20" />
+          </svg>
+        ), 'Texte libre (T)')}
       </div>
 
       {/* ── Cellule 5 : Encodage ────────────────────────────────────────────── */}
