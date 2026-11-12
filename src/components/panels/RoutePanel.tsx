@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, FolderOpen, MoreHorizontal, GripVertical, MapPin } from 'lucide-react';
+import { X, Plus, FolderOpen, MoreHorizontal, GripVertical, MapPin, ArrowLeftRight } from 'lucide-react';
 import { useApp } from '../../AppContext';
 import { backgroundEngine } from '../../logic/BackgroundEngine';
 import { StateManager } from '../../logic/StateManager';
@@ -502,6 +502,46 @@ export default function RoutePanel() {
             background: 'var(--bg-panel)',
             borderRight: '1px solid var(--bg-border)'
         }}>
+            {/* Route toolbar */}
+            {stages.length >= 2 && (
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 14px',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                    background: 'rgba(0, 0, 0, 0.15)',
+                    flexShrink: 0,
+                }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600 }}>
+                        {stages.length} étapes ({state.routes.length} tronçon{state.routes.length > 1 ? 's' : ''})
+                    </span>
+                    <button
+                        onClick={() => dispatch({ type: 'INVERT_ROUTE' })}
+                        title="Inverser le sens du parcours (Ctrl+I)"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            background: 'rgba(255, 255, 255, 0.04)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            color: 'var(--text-primary)',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(110, 201, 126, 0.3)'}
+                        onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'}
+                    >
+                        <ArrowLeftRight size={12} color="var(--accent-default)" />
+                        <span>Inverser</span>
+                        <span style={{ fontSize: '9px', opacity: 0.5, padding: '0 3px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>Ctrl+I</span>
+                    </button>
+                </div>
+            )}
+
             {/* Steps */}
             <div ref={scrollRef} style={{ 
                 flex: 1, 

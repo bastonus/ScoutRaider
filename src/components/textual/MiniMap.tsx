@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { MapContainer, TileLayer, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, CircleMarker, Polygon, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { useApp } from '../../AppContext';
@@ -52,6 +52,9 @@ interface MiniMapProps {
         scaleName?: string;
         layerId?: string;
         isLocked?: boolean;
+        showRoute?: boolean;
+        showEndpoints?: boolean;
+        showAnnotations?: boolean;
     };
 }
 
@@ -304,6 +307,9 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
     const alignment = initialPersist?.alignment || 'center';
     const isLocked = initialPersist?.isLocked || false;
     const layerId = initialPersist?.layerId || '';
+    const showRoute = initialPersist?.showRoute !== false;
+    const showEndpoints = initialPersist?.showEndpoints !== false;
+    const showAnnotations = initialPersist?.showAnnotations !== false;
 
     // ── Facteur d'échelle d'affichage homothétique sur petits écrans ──
     // Si la carte est plus large que l'espace disponible (ex: mobile, petit écran, split-view),
@@ -538,21 +544,76 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
                             <MiniDynamicTileLayer overrideLayerId={layerId} />
                             
                             {/* Tracé de l'étape */}
-                            <Polyline positions={latLngs} pathOptions={{ color: routeColor, weight: 4.5, opacity: 0.95 }} />
+                            {showRoute && (
+                                <Polyline positions={latLngs} pathOptions={{ color: routeColor, weight: 4.5, opacity: 0.95 }} />
+                            )}
                             
                             {/* Point de départ (vert) */}
-                            <CircleMarker
-                                center={latLngs[0]}
-                                radius={5}
-                                pathOptions={{ fillColor: '#22c55e', fillOpacity: 1, color: '#ffffff', weight: 2 }}
-                            />
+                            {showEndpoints && latLngs.length > 0 && (
+                                <CircleMarker
+                                    center={latLngs[0]}
+                                    radius={5}
+                                    pathOptions={{ fillColor: '#22c55e', fillOpacity: 1, color: '#ffffff', weight: 2 }}
+                                />
+                            )}
 
                             {/* Point d'arrivée (rouge) */}
-                            <CircleMarker
-                                center={latLngs[latLngs.length - 1]}
-                                radius={5}
-                                pathOptions={{ fillColor: '#ef4444', fillOpacity: 1, color: '#ffffff', weight: 2 }}
-                            />
+                            {showEndpoints && latLngs.length > 0 && (
+                                <CircleMarker
+                                    center={latLngs[latLngs.length - 1]}
+                                    radius={5}
+                                    pathOptions={{ fillColor: '#ef4444', fillOpacity: 1, color: '#ffffff', weight: 2 }}
+                                />
+                            )}
+
+                            {/* Repères, Aires et Dessins (Annotations) */}
+                            {showAnnotations && (
+                                <>
+                                    {/* Repères ponctuels */}
+                                    {(state.point_annotations || []).filter((pt: any) => pt.visible !== false).map((pt: any) => (
+                                        <CircleMarker
+                                            key={pt.id}
+                                            center={[pt.coords[0], pt.coords[1]]}
+                                            radius={5.5}
+                                            pathOptions={{ fillColor: pt.color || '#f59e0b', fillOpacity: 0.9, color: '#ffffff', weight: 1.5 }}
+                                        >
+                                            {pt.title && <Tooltip permanent={false} direction="top">{pt.title}</Tooltip>}
+                                        </CircleMarker>
+                                    ))}
+
+                                    {/* Aires surfaciques */}
+                                    {(state.area_annotations || []).filter((area: any) => area.visible !== false && area.coords && area.coords.length >= 3).map((area: any) => (
+                                        <Polygon
+                                            key={area.id}
+                                            positions={area.coords.map((c: any) => [c[0], c[1]])}
+                                            pathOptions={{
+                                                color: area.color || '#3b82f6',
+                                                fillColor: area.color || '#3b82f6',
+                                                fillOpacity: area.fillOpacity ?? 0.25,
+                                                weight: 2
+                                            }}
+                                        />
+                                    ))}
+
+                                    {/* Dessins libres */}
+                                    {(state.draw_annotations || []).filter((draw: any) => draw.visible !== false).map((draw: any) =>
+                                        (draw.strokes || []).map((stroke: any, sIdx: number) => {
+                                            if (!stroke.points || stroke.points.length < 2) return null;
+                                            return (
+                                                <Polyline
+                                                    key={`${draw.id}-${sIdx}`}
+                                                    positions={stroke.points.map((p: any) => [p[0], p[1]])}
+                                                    pathOptions={{
+                                                        color: stroke.color || draw.color || '#ef4444',
+                                                        weight: stroke.strokeWidth || draw.strokeWidth || 3,
+                                                        opacity: stroke.opacity ?? 0.85
+                                                    }}
+                                                />
+                                            );
+                                        })
+                                    )}
+                                </>
+                            )}
 
                             <MapViewController center={center} zoom={zoom} />
                             <MapPersister stepId={stepId} onStateChange={handleMapMoved} />

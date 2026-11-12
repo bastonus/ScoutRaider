@@ -64,7 +64,7 @@ function App() {
     };
   }, []);
 
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
 
   // Keep document title synchronized with package version
   useEffect(() => {
@@ -137,6 +137,75 @@ function App() {
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, []);
+
+  // Global Quick Shortcuts for views, route inversion, and tools
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+      // View switching: Ctrl+1 (or Digit1), Ctrl+2 (or Digit2), Ctrl+3 (or Digit3)
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        if (e.key === '1' || e.code === 'Digit1') {
+          e.preventDefault();
+          setViewMode('map');
+          return;
+        }
+        if (e.key === '2' || e.code === 'Digit2') {
+          e.preventDefault();
+          setViewMode('text');
+          return;
+        }
+        if (e.key === '3' || e.code === 'Digit3') {
+          e.preventDefault();
+          setViewMode('split');
+          return;
+        }
+      }
+
+      // Quick actions (only when not typing in text fields)
+      if (!isInput) {
+        // Ctrl+I: Invert route
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'i') {
+          e.preventDefault();
+          dispatch({ type: 'INVERT_ROUTE' });
+          return;
+        }
+        // Ctrl+Shift+A: Toggle Elevation profile
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          dispatch({ type: 'TOGGLE_ELEVATION_PROFILE' });
+          return;
+        }
+        // Ctrl+Shift+M: Toggle General Map in carnet
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'm') {
+          e.preventDefault();
+          dispatch({ type: 'TOGGLE_GENERAL_MAP' });
+          return;
+        }
+        // Ctrl+Shift+P: Toggle POIs
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
+          e.preventDefault();
+          dispatch({ type: 'TOGGLE_SHOW_POIS_ON_MAP' });
+          return;
+        }
+        // Ctrl+Shift+D: Toggle Dangers
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          dispatch({ type: 'TOGGLE_SHOW_DANGERS_ON_MAP' });
+          return;
+        }
+        // Alt+S: Toggle Carnet Participant / Solution view
+        if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          dispatch({ type: 'SET_CARNET_VIEW', view: state.carnet_view === 'participant' ? 'solution' : 'participant' });
+          return;
+        }
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [dispatch, state.carnet_view]);
 
   const panelToggleStyle: React.CSSProperties = {
     position: 'absolute', top: '16px', zIndex: 900,

@@ -283,15 +283,28 @@ export class IGNClient {
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 9000);
-        const resp = await fetch(url, {
-            signal: controller.signal,
-            headers: { "Accept": "application/json" }
-        });
-        clearTimeout(timeout);
+        let resp: Response;
+        try {
+            resp = await fetch(url, {
+                signal: controller.signal,
+                headers: { "Accept": "application/json" }
+            });
+        } catch (e: any) {
+            clearTimeout(timeout);
+            console.debug("[IGNClient] IGN Valhalla fetch aborted or timed out:", e?.message);
+            return [];
+        } finally {
+            clearTimeout(timeout);
+        }
 
-        if (!resp.ok) throw new Error(`IGN Navigation HTTP ${resp.status}`);
-        const data = await resp.json();
-        if (!data.geometry || !data.geometry.coordinates || data.geometry.coordinates.length < 2) {
+        if (!resp || !resp.ok) return [];
+        let data: any;
+        try {
+            data = await resp.json();
+        } catch {
+            return [];
+        }
+        if (!data || !data.geometry || !data.geometry.coordinates || data.geometry.coordinates.length < 2) {
             return [];
         }
 

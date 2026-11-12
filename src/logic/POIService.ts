@@ -245,16 +245,36 @@ export class POIService {
             out center;
         `;
 
+        const OVERPASS_ENDPOINTS = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
+        ];
+
         try {
-            const response = await fetch('https://overpass-api.de/api/interpreter', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: new URLSearchParams({ data: query }).toString(),
-            });
+            let response: Response | null = null;
+            for (const endpoint of OVERPASS_ENDPOINTS) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 12000);
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: new URLSearchParams({ data: query }).toString(),
+                        signal: controller.signal,
+                    });
+                    clearTimeout(timeoutId);
+                    if (res.ok) {
+                        response = res;
+                        break;
+                    }
+                } catch (err: any) {
+                    console.debug(`[POIService] Overpass endpoint ${endpoint} failed:`, err?.message);
+                }
+            }
             
-            if (response.ok) {
+            if (response && response.ok) {
                 const data = await response.json();
                 const rawPOIs: RawOSMPOI[] = (data.elements || []).map((e: any) => ({
                     id: e.id,

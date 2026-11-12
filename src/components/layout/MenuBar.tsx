@@ -595,18 +595,20 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     <button
                         onClick={() => onViewModeChange?.('map')}
                         style={getViewBtnStyle(viewMode === 'map')}
-                        title="Vue Carte"
+                        title="Vue Carte Topographique (Ctrl+1)"
                     >
                         <MapIcon size={13} />
-                        Carte
+                        <span>Carte</span>
+                        <span style={{ fontSize: '9px', opacity: 0.5, marginLeft: '2px', padding: '0 3px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>Ctrl+1</span>
                     </button>
                     <button
                         onClick={() => onViewModeChange?.('text')}
                         style={getViewBtnStyle(viewMode === 'text')}
-                        title="Vue Texte"
+                        title="Vue Carnet Textuel (Ctrl+2)"
                     >
                         <Type size={13} />
-                        Texte
+                        <span>Texte</span>
+                        <span style={{ fontSize: '9px', opacity: 0.5, marginLeft: '2px', padding: '0 3px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>Ctrl+2</span>
                     </button>
                     <button
                         onClick={() => onViewModeChange?.(viewMode === 'split' ? 'map' : 'split')}
@@ -614,10 +616,11 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                             ...getViewBtnStyle(viewMode === 'split'),
                             borderRadius: '18px',
                         }}
-                        title="Vue côte à côte"
+                        title="Vue scindée Carte + Texte (Ctrl+3)"
                     >
                         <Columns size={13} />
-                        Side-by-side
+                        <span>Side-by-side</span>
+                        <span style={{ fontSize: '9px', opacity: 0.5, marginLeft: '2px', padding: '0 3px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>Ctrl+3</span>
                     </button>
                 </div>
 
