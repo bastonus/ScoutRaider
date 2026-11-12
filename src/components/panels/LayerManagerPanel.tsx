@@ -195,12 +195,20 @@ export default function LayerManagerPanel() {
         }
     }, [selectedId, draws]);
 
+    // Auto-expand text group when selected
+    useEffect(() => {
+        if (selectedId && texts.some(t => t.id === selectedId)) {
+            setExpandedTextIds(prev => new Set(prev).add(selectedId));
+        }
+    }, [selectedId, texts]);
+
     useEffect(() => {
         const next = computeLayerOrder({
             itineraries,
             points,
             areas,
             draws,
+            texts,
             savedOrder: savedLayerOrder,
             currentOrder: order,
             selectedId: state.selected_layer_id,
@@ -211,7 +219,7 @@ export default function LayerManagerPanel() {
         if (!layerOrdersEqual(savedLayerOrder, next)) {
             dispatch({ type: 'SET_LAYER_ORDER', order: next, recordHistory: false });
         }
-    }, [itineraries, points, areas, draws, state.selected_layer_id, savedLayerOrder, order, dispatch]);
+    }, [itineraries, points, areas, draws, texts, state.selected_layer_id, savedLayerOrder, order, dispatch]);
 
     // ── Selecting a layer row ─────────────────────────────────────────
     const handleSelectRow = (item: OrderItem) => {
@@ -230,6 +238,10 @@ export default function LayerManagerPanel() {
             } else if (item.kind === 'draw') {
                 if (state.active_tool !== 'annotate_draw') {
                     dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_draw' });
+                }
+            } else if (item.kind === 'text') {
+                if (state.active_tool !== 'annotate_text') {
+                    dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_text' });
                 }
             } else if (item.kind === 'itin') {
                 if (state.active_tool !== 'route') {
