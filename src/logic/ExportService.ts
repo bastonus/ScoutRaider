@@ -351,29 +351,40 @@ export class ExportService {
         const api = getElectronAPI();
 
         if (!api) {
-            console.log('[ExportService] Navigateur Web détecté : rendu PDF WeasyPrint via serveur backend...');
-            try {
-                const res = await fetch('/api/render/html-to-pdf', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ html, title: defaultFilename.replace('.pdf', '') })
-                });
+            console.log('[ExportService] Navigateur Web détecté : rendu PDF WeasyPrint...');
+            const endpoints = [
+                '/api/render/html-to-pdf',
+                '/render/html-to-pdf',
+                'http://127.0.0.1:8000/render/html-to-pdf',
+                'http://127.0.0.1:8000/api/render/html-to-pdf'
+            ];
 
-                if (res.ok) {
-                    const blob = await res.blob();
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = defaultFilename;
-                    a.click();
-                    URL.revokeObjectURL(a.href);
-                    return true;
+            let lastErr = '';
+            for (const ep of endpoints) {
+                try {
+                    const res = await fetch(ep, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ html, title: defaultFilename.replace('.pdf', '') })
+                    });
+
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = defaultFilename;
+                        a.click();
+                        URL.revokeObjectURL(a.href);
+                        return true;
+                    }
+                    lastErr = `${res.status} ${res.statusText}`;
+                } catch (e: any) {
+                    lastErr = e?.message || 'Erreur réseau';
                 }
-                const errText = await res.text();
-                throw new Error(`Erreur serveur WeasyPrint (${res.status}): ${errText}`);
-            } catch (e: any) {
-                console.error('[ExportService] Échec du rendu WeasyPrint distant:', e);
-                throw new Error(`Génération PDF impossible sans WeasyPrint : ${e.message}`);
             }
+
+            console.error('[ExportService] Échec du rendu WeasyPrint distant:', lastErr);
+            throw new Error(`Génération PDF impossible sans WeasyPrint (${lastErr})`);
         }
 
         const outputPath = await api.showSaveDialog(defaultFilename, 'pdf');

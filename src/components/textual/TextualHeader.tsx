@@ -268,30 +268,86 @@ export default function TextualHeader({
                 </div>
             )}
 
+            {/* ── PARTICIPANT / SOLUTION VIEW TOGGLE ────────────────────── */}
+            <div style={{
+                display: 'flex',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                padding: '2px',
+                alignItems: 'center',
+                gap: '2px',
+                flexShrink: 0,
+            }}>
+                <button
+                    onClick={() => dispatch({ type: 'SET_CARNET_VIEW', view: 'participant' })}
+                    style={{
+                        padding: '3px 8px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        background: (state.carnet_view || 'participant') === 'participant' ? 'rgba(45, 90, 142, 0.55)' : 'transparent',
+                        color: (state.carnet_view || 'participant') === 'participant' ? '#fff' : 'rgba(255,255,255,0.45)',
+                        fontSize: '10.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.15s ease'
+                    }}
+                    title="Vue Participant (sans solutions) — Raccourci : Alt+S"
+                >
+                    <span>Participant</span>
+                </button>
+                <button
+                    onClick={() => dispatch({ type: 'SET_CARNET_VIEW', view: 'solution' })}
+                    style={{
+                        padding: '3px 8px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        background: state.carnet_view === 'solution' ? 'rgba(180, 74, 43, 0.55)' : 'transparent',
+                        color: state.carnet_view === 'solution' ? '#fff' : 'rgba(255,255,255,0.45)',
+                        fontSize: '10.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.15s ease'
+                    }}
+                    title="Vue Solution (avec corrigés et coordonnées réelles) — Raccourci : Alt+S"
+                >
+                    <span>Solution</span>
+                </button>
+                <span style={{ fontSize: '9px', opacity: 0.45, padding: '0 4px', color: '#fff' }} title="Raccourci pour basculer : Alt+S">Alt+S</span>
+            </div>
+
             <Separator />
 
             {/* ── CARTE GÉNÉRALE ────────────────────────────────────────── */}
             <button
                 onClick={() => dispatch({ type: 'TOGGLE_GENERAL_MAP' })}
                 style={pillBtn(includeGeneralMap, 'var(--accent-default)')}
-                title="Inclure la carte générale dans l'export"
+                title="Inclure la carte générale dans le carnet (Ctrl+Shift+M)"
                 onMouseEnter={e => { if (!includeGeneralMap) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.7)'; }}
                 onMouseLeave={e => { if (!includeGeneralMap) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)'; }}
             >
                 <MapIcon size={12} />
-                Carte générale
+                <span>Carte générale</span>
+                <span style={{ fontSize: '9px', opacity: 0.5, marginLeft: '3px', padding: '0 3px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>Ctrl+Shift+M</span>
             </button>
 
             {/* ── PROFIL ALTIMÉTRIQUE ─────────────────────────────────────── */}
             <button
                 onClick={() => dispatch({ type: 'TOGGLE_ELEVATION_PROFILE' })}
                 style={pillBtn(includeElevationProfile, '#06b6d4')}
-                title="Afficher le profil altimétrique (dénivelé D+/D-) dans le carnet et l'export"
+                title="Afficher le profil altimétrique (dénivelé D+/D-) dans le carnet (Ctrl+Shift+A)"
                 onMouseEnter={e => { if (!includeElevationProfile) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.7)'; }}
                 onMouseLeave={e => { if (!includeElevationProfile) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)'; }}
             >
                 <TrendingUp size={12} />
-                Profil Alti
+                <span>Profil Alti</span>
+                <span style={{ fontSize: '9px', opacity: 0.5, marginLeft: '3px', padding: '0 3px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>Ctrl+Shift+A</span>
             </button>
 
             {/* ── ANNEXES ──────────────────────────────────────────────── */}
@@ -374,6 +430,7 @@ export default function TextualHeader({
             {/* ── EXPORT BUTTON ──────────────────────────────────────────── */}
             <button
                 onClick={onExport}
+                title="Exporter le carnet (Ctrl+E)"
                 style={{
                     display: 'flex', alignItems: 'center', gap: '6px',
                     padding: '6px 14px', borderRadius: '20px', border: 'none',
@@ -393,7 +450,8 @@ export default function TextualHeader({
                 }}
             >
                 <Download size={13} strokeWidth={2.5} />
-                Exporter
+                <span>Exporter</span>
+                <span style={{ fontSize: '9px', opacity: 0.7, marginLeft: '2px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0,0,0,0.25)', fontWeight: 600 }}>Ctrl+E</span>
             </button>
         </div>
     );

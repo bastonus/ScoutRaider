@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Eye, EyeOff, Trash2, Route, MapPin, Maximize2, Pencil, Check, X, GripVertical, Paintbrush, ChevronRight, ChevronDown } from 'lucide-react';
+import { Eye, EyeOff, Trash2, Route, MapPin, Maximize2, Pencil, Check, X, GripVertical, Paintbrush, ChevronRight, ChevronDown, Type } from 'lucide-react';
 import { useApp } from '../../AppContext';
 import { mapRef } from '../map/MapComponent';
 import { calculatePolygonArea, formatArea } from '../../logic/GeoUtils';
 import { PRESET_COLORS } from '../map/AnnotationModals';
-import { Itinerary, PointAnnotation, AreaAnnotation, DrawAnnotation, DrawStroke } from '../../logic/types';
+import { Itinerary, PointAnnotation, AreaAnnotation, DrawAnnotation, DrawStroke, TextAnnotation, TextItem } from '../../logic/types';
 import { computeLayerOrder, layerOrdersEqual, type LayerOrderItem } from '../../logic/LayerOrder';
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -177,6 +177,7 @@ export default function LayerManagerPanel() {
     const points       = state.point_annotations || [];
     const areas        = state.area_annotations  || [];
     const draws        = (state as any).draw_annotations as DrawAnnotation[] || [];
+    const texts        = (state as any).text_annotations as TextAnnotation[] || [];
     const selectedId   = state.selected_layer_id;
     const selectedSublayerId = state.selected_sublayer_id;
 
@@ -184,6 +185,7 @@ export default function LayerManagerPanel() {
     const savedLayerOrder = (state as any).layer_order as OrderItem[] || [];
     const [order, setOrder] = useState<OrderItem[]>([]);
     const [expandedDrawIds, setExpandedDrawIds] = useState<Set<string>>(new Set());
+    const [expandedTextIds, setExpandedTextIds] = useState<Set<string>>(new Set());
     const listRef = useRef<HTMLDivElement>(null);
 
     // Auto-expand draw group when selected

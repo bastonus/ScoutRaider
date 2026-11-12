@@ -549,7 +549,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 ...s,
                 label: String.fromCharCode(65 + i)
             }));
-            return { ...state, stages: inverted, routes: [] }; // routes need full recalc
+            for (let i = 0; i < inverted.length - 1; i++) {
+                backgroundEngine.enqueue('route_leg', 0, `job-invert-${Date.now()}-${i}`, {
+                    p1: [inverted[i].coords[0], inverted[i].coords[1]],
+                    p2: [inverted[i + 1].coords[0], inverted[i + 1].coords[1]],
+                    profile: 'pedestrian', small_roads: state.small_roads_only, insertIdx: i
+                });
+            }
+            return {
+                ...state,
+                stages: inverted,
+                routes: [],
+                is_loading: inverted.length > 1,
+                loading_text: "Inversion de l'itinéraire..."
+            };
         }
 
         // ── Multi-itinerary management (Layer Manager) ────────────────────

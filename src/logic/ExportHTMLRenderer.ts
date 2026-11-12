@@ -39,11 +39,12 @@ export interface ExportRenderOptions {
     pointAnnotations?: PointAnnotation[];
     areaAnnotations?: AreaAnnotation[];
     itineraries?: Itinerary[];
+    paperSize?: 'A4' | 'A5' | 'A3' | 'Letter';
 }
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 
-function buildCSS(accent: string, isSolution: boolean, fontsBase64: Record<string, string>): string {
+function buildCSS(accent: string, isSolution: boolean, fontsBase64: Record<string, string>, paperSize: string = 'A4'): string {
     const accentDark = isSolution ? '#8b2500' : '#1a3a5c';
 
     let fontFaces = '';
@@ -78,7 +79,7 @@ body {
 }
 
 @page {
-    size: A4 portrait;
+    size: ${paperSize} portrait;
     margin: 18mm 14mm 20mm 14mm;
 
     @top-left {
@@ -572,8 +573,8 @@ function renderStep(step: CarnetStep, stepNum: number, isSolution: boolean, them
                 <strong>Suivre le cap ${step.azimuth || 0}° sur ${step.distanceM || 0} mètres.</strong><br>
                 <span style="font-size: 8pt; color: #15803d; font-style: italic;">Se repérer directement sur la carte topographique sans chiffrement.</span>
             </div>
-            <div class="map-placeholder" data-center="${center}" data-zoom="${zoom}" style="height:${h}; width:${w}; margin: 6px auto 0 auto;">
-                [Extrait ${mapTitle} — zone ${fromTo || 'N/A'}]
+            <div class="map-placeholder" data-center="${center}" data-zoom="${zoom}" data-scale="${step.mapPersist?.scaleName || '1:25000'}" data-show-route="${step.mapPersist?.showRoute !== false}" data-show-endpoints="${step.mapPersist?.showEndpoints !== false}" data-show-annotations="${step.mapPersist?.showAnnotations !== false}" style="height:${h}; width:${w}; margin: 6px auto 0 auto; border-radius: 0; border: 1.5px solid #1e293b;">
+                [Extrait ${mapTitle} (${step.mapPersist?.scaleName || '1:25 000'}) — zone ${fromTo || 'N/A'}]
             </div>
         </div>`;
     }
@@ -758,7 +759,7 @@ export class ExportHTMLRenderer {
         fontsBase64: Record<string, string> = {}
     ): string {
         const accent = options.isSolution ? '#b44a2b' : '#2d5a8e';
-        const css = buildCSS(accent, options.isSolution, fontsBase64);
+        const css = buildCSS(accent, options.isSolution, fontsBase64, options.paperSize || 'A4');
         const themeLabels = theme.labels || {};
         const roleLabel = options.isSolution ? 'SOLUTION' : 'PARTICIPANT';
 

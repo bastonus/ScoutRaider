@@ -70,6 +70,7 @@ export default function CommandPalette({
             label: 'Afficher la Vue Carte Topographique',
             category: 'Vues',
             icon: <Map size={16} color="#3b82f6" />,
+            shortcut: 'Ctrl+1',
             keywords: 'carte map carto plein ecran ign',
             perform: () => onViewModeChange('map'),
         });
@@ -78,6 +79,7 @@ export default function CommandPalette({
             label: 'Afficher la Vue Carnet Textuel',
             category: 'Vues',
             icon: <FileText size={16} color="#10b981" />,
+            shortcut: 'Ctrl+2',
             keywords: 'carnet texte enigmes solution participant',
             perform: () => onViewModeChange('text'),
         });
@@ -86,6 +88,7 @@ export default function CommandPalette({
             label: 'Afficher la Vue Scindée (Carte + Carnet côte à côte)',
             category: 'Vues',
             icon: <Columns size={16} color="#8b5cf6" />,
+            shortcut: 'Ctrl+3',
             keywords: 'scindee split dual side by side deux',
             perform: () => onViewModeChange('split'),
         });
@@ -110,26 +113,47 @@ export default function CommandPalette({
             perform: onPreferencesOpen,
         });
         items.push({
-            id: 'action_toggle_elevation',
-            label: `Profil Altimétrique dans le Carnet : ${state.carnet_include_elevation_profile ? 'Désactiver' : 'Activer'}`,
+            id: 'action_toggle_carnet_view',
+            label: (state.carnet_view || 'participant') === 'participant' ? 'Passer en Vue Solution (avec corrigés)' : 'Passer en Vue Participant (sans solutions)',
             category: 'Actions Rapides',
-            icon: <Mountain size={16} color="#06b6d4" />,
-            keywords: 'alti denivele d+ d- courbe elevation',
-            perform: () => dispatch({ type: 'TOGGLE_ELEVATION_PROFILE' }),
+            icon: <Sparkles size={16} color="#eab308" />,
+            shortcut: 'Alt+S',
+            keywords: 'solution participant reponses enigmes carnet',
+            perform: () => dispatch({ type: 'SET_CARNET_VIEW', view: (state.carnet_view || 'participant') === 'participant' ? 'solution' : 'participant' }),
         });
         items.push({
             id: 'action_reverse_route',
             label: 'Inverser le sens du parcours (Départ ⇄ Arrivée)',
             category: 'Actions Rapides',
             icon: <ArrowLeftRight size={16} color="#f59e0b" />,
+            shortcut: 'Ctrl+I',
             keywords: 'inverser sens retour swap demi tour',
-            perform: () => dispatch({ type: 'REVERSE_ACTIVE_ROUTE' }),
+            perform: () => dispatch({ type: 'INVERT_ROUTE' }),
+        });
+        items.push({
+            id: 'action_toggle_elevation',
+            label: `Profil Altimétrique dans le Carnet : ${state.carnet_include_elevation_profile ? 'Désactiver' : 'Activer'}`,
+            category: 'Actions Rapides',
+            icon: <Mountain size={16} color="#06b6d4" />,
+            shortcut: 'Ctrl+Shift+A',
+            keywords: 'alti denivele d+ d- courbe elevation',
+            perform: () => dispatch({ type: 'TOGGLE_ELEVATION_PROFILE' }),
+        });
+        items.push({
+            id: 'action_toggle_general_map',
+            label: `Carte générale dans le Carnet : ${state.carnet_include_general_map ? 'Masquer' : 'Inclure'}`,
+            category: 'Actions Rapides',
+            icon: <Map size={16} color="#10b981" />,
+            shortcut: 'Ctrl+Shift+M',
+            keywords: 'carte generale vue ensemble carnet export',
+            perform: () => dispatch({ type: 'TOGGLE_GENERAL_MAP' }),
         });
         items.push({
             id: 'action_toggle_pois',
             label: `${state.show_pois_on_map ? 'Masquer' : 'Afficher'} les points remarquables (POI IGN)`,
             category: 'Actions Rapides',
             icon: state.show_pois_on_map ? <EyeOff size={16} color="#a855f7" /> : <Eye size={16} color="#a855f7" />,
+            shortcut: 'Ctrl+Shift+P',
             keywords: 'pois monuments calvaires fontaines',
             perform: () => dispatch({ type: 'TOGGLE_SHOW_POIS_ON_MAP' }),
         });
@@ -138,6 +162,7 @@ export default function CommandPalette({
             label: `${state.show_dangers_on_map ? 'Masquer' : 'Afficher'} les zones de danger et grands axes`,
             category: 'Actions Rapides',
             icon: <AlertTriangle size={16} color="#f97316" />,
+            shortcut: 'Ctrl+Shift+D',
             keywords: 'danger autoroute route nationale securite',
             perform: () => dispatch({ type: 'TOGGLE_SHOW_DANGERS_ON_MAP' }),
         });
