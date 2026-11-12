@@ -23,6 +23,38 @@ export default function MetroTimeline() {
     const [expandedLegs, setExpandedLegs] = useState<Set<string>>(new Set());
     const [dragOver, setDragOver] = useState<number | null>(null);
 
+    // ── Module Diversity & Streak warning ──────────────────────────────────────
+    const { moduleStats, streakWarning } = React.useMemo(() => {
+        const counts: Record<string, number> = {};
+        let maxStreak = 0;
+        let currentStreak = 1;
+        let streakMod = '';
+
+        for (let i = 0; i < steps.length; i++) {
+            const m = steps[i].assigned_module || 'texte_clair';
+            counts[m] = (counts[m] || 0) + 1;
+
+            if (i > 0) {
+                const prev = steps[i - 1].assigned_module || 'texte_clair';
+                if (m === prev && m !== 'texte_clair') {
+                    currentStreak++;
+                    if (currentStreak > maxStreak) {
+                        maxStreak = currentStreak;
+                        streakMod = m;
+                    }
+                } else {
+                    currentStreak = 1;
+                }
+            }
+        }
+
+        const warning = maxStreak >= 4
+            ? `⚠️ ${maxStreak} étapes consécutives en ${MODULE_META[streakMod as ModuleId]?.label || streakMod} — variez les épreuves !`
+            : null;
+
+        return { moduleStats: counts, streakWarning: warning };
+    }, [steps]);
+
     // ── Group segments by leg ──────────────────────────────────────────────────
     const groupedLegs: { legKey: string; startLabel: string; endLabel: string; segments: { globalIdx: number; seg: PolySegment }[] }[] = [];
     
@@ -207,6 +239,34 @@ export default function MetroTimeline() {
                     </button>
                 </div>
 
+                {/* ── DIVERSITY PROGRESS BAR ────────────────────────────── */}
+                {steps.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', margin: '1px 0 3px 0' }}>
+                        <div style={{
+                            display: 'flex', width: '100%', height: '4px', borderRadius: '2px',
+                            overflow: 'hidden', background: 'rgba(255,255,255,0.06)'
+                        }} title="Répartition des épreuves et modules sur le parcours">
+                            {Object.entries(moduleStats).map(([modId, count]) => {
+                                const meta = MODULE_META[modId as ModuleId];
+                                const color = meta?.color || '#64748b';
+                                const pct = (count / steps.length) * 100;
+                                return (
+                                    <div
+                                        key={modId}
+                                        style={{ width: `${pct}%`, height: '100%', background: color }}
+                                        title={`${meta?.label || modId} : ${count} (${Math.round(pct)}%)`}
+                                    />
+                                );
+                            })}
+                        </div>
+                        {streakWarning && (
+                            <span style={{ fontSize: '9px', color: '#f59e0b', fontWeight: 600 }}>
+                                {streakWarning}
+                            </span>
+                        )}
+                    </div>
+                )}
+
                 {/* ── LEG ROWS ───────────────────────────────────────────── */}
                 {groupedLegs.length === 0 ? (
                     <span style={{ fontSize: '11px', color: 'var(--text-dim)', padding: '2px 0' }}>Tracer d'abord un itinéraire</span>
@@ -339,29 +399,29 @@ export default function MetroTimeline() {
                 )}
             </div>
 
-            {/* ── MODULE PALETTE — visible si sélection ─────────────────── */}
-            {selection.length > 0 && (
+            {/* ── MODULE PALETTE — accessible et glissable en permanence ── */}
+            {steps.length > 0 && (
                 <div style={{
                     background: 'rgba(14, 22, 17, 0.97)', border: '1px solid var(--glass-border)',
-                    padding: '7px 12px', borderRadius: '10px',
+                    padding: '6px 12px', borderRadius: '10px',
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                     pointerEvents: 'all', animation: 'slideInY 0.15s ease-out',
                     display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap',
                     backdropFilter: 'blur(14px)', width: '100%'
                 }}>
-                    <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.4px', flexShrink: 0 }}>
-                        {selection.length} tronçon{selection.length > 1 ? 's' : ''} →
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: selection.length > 0 ? '#f59e0b' : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.4px', flexShrink: 0 }}>
+                        {selection.length > 0 ? `${selection.length} sélectionné${selection.length > 1 ? 's' : ''} →` : 'Glisser un module :'}
                     </span>
                     {ALL_MODULE_IDS.map(modId => {
                         const meta = MODULE_META[modId];
-                        const allHave = selection.every(i => steps[i]?.assigned_module === modId);
+                        const allHave = selection.length > 0 && selection.every(i => steps[i]?.assigned_module === modId);
                         return (
                             <button
                                 key={modId}
                                 draggable
                                 onDragStart={e => onDragStartModule(e, modId)}
                                 onClick={() => handleAssign(modId)}
-                                title={meta.label}
+                                title={`${meta.label} (glisser sur un tronçon ou cliquer pour assigner)`}
                                 style={{
                                     display: 'flex', alignItems: 'center', gap: '4px',
                                     padding: '3px 8px', borderRadius: '20px', cursor: 'grab',
@@ -387,8 +447,12 @@ export default function MetroTimeline() {
                             </button>
                         );
                     })}
-                    <button onClick={() => handleAssign('unassigned')} style={{ padding: '3px 8px', borderRadius: '20px', cursor: 'pointer', background: 'transparent', border: '1.5px dashed rgba(255,255,255,0.15)', color: 'var(--text-dim)', fontSize: '11px', fontWeight: 700 }}>× Effacer</button>
-                    <button onClick={() => setSelection([])} style={{ marginLeft: 'auto', padding: '3px 7px', borderRadius: '5px', cursor: 'pointer', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-dim)', fontSize: '10px' }}>✕</button>
+                    {selection.length > 0 && (
+                        <>
+                            <button onClick={() => handleAssign('unassigned')} style={{ padding: '3px 8px', borderRadius: '20px', cursor: 'pointer', background: 'transparent', border: '1.5px dashed rgba(255,255,255,0.15)', color: 'var(--text-dim)', fontSize: '11px', fontWeight: 700 }}>× Effacer</button>
+                            <button onClick={() => setSelection([])} style={{ marginLeft: 'auto', padding: '3px 7px', borderRadius: '5px', cursor: 'pointer', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-dim)', fontSize: '10px' }}>✕</button>
+                        </>
+                    )}
                 </div>
             )}
         </div>

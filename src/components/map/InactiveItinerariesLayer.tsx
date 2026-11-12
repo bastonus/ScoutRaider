@@ -30,7 +30,7 @@ export default function InactiveItinerariesLayer() {
 
     const handleSelectItin = (itinId: string, itinName: string) => {
         // Don't steal focus from annotation tools (draw, area, point)
-        const annotationTools = ['annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw'];
+        const annotationTools = ['annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw', 'annotate_text'];
         if (annotationTools.includes(state.active_tool)) return;
         dispatch({ type: 'SET_SELECTED_LAYER', id: itinId });
         dispatch({ type: 'ADD_NOTIFICATION', message: `Itinéraire actif : ${itinName}`, notifType: 'info' });

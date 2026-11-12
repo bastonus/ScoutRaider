@@ -19,6 +19,7 @@ import { ModuleRegistry } from './ModuleRegistry';
 
 import { calculatePolygonArea, formatArea } from './GeoUtils';
 import type { PointAnnotation, AreaAnnotation, Itinerary } from './types';
+import type { PaginationPlan } from './MapPagination';
 
 export interface ExportRenderOptions {
     title: string;
@@ -27,6 +28,12 @@ export interface ExportRenderOptions {
     themeTitle: string;
     isSolution: boolean;
     includeGeneralMap: boolean;
+    includeElevationProfile?: boolean;
+    elevationSvg?: string;
+    elevationStats?: { ascend_m: number; descend_m: number; min_alt_m: number; max_alt_m: number; duration_min: number };
+    includeMapPagination?: boolean;
+    mapPaginationPlan?: PaginationPlan;
+    mapPaginationSvg?: string;
     includeAnnexes: boolean;
     vigenereKey: string;
     pointAnnotations?: PointAnnotation[];
@@ -71,14 +78,71 @@ body {
 }
 
 @page {
-    size: A4;
-    margin: 18mm 15mm 22mm 15mm;
+    size: A4 portrait;
+    margin: 18mm 14mm 20mm 14mm;
+
+    @top-left {
+        content: "SCOUTRAIDER SUITE";
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        font-size: 7.5pt;
+        letter-spacing: 1px;
+        color: #64748b;
+        vertical-align: bottom;
+        padding-bottom: 4mm;
+        border-bottom: 0.5pt solid #cbd5e1;
+    }
+
+    @top-right {
+        content: string(raidtitle);
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        font-size: 8pt;
+        font-weight: bold;
+        color: #1e293b;
+        vertical-align: bottom;
+        padding-bottom: 4mm;
+        border-bottom: 0.5pt solid #cbd5e1;
+    }
+
+    @bottom-left {
+        content: string(versiontitle);
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        font-size: 7.5pt;
+        color: #94a3b8;
+        vertical-align: top;
+        padding-top: 3mm;
+        border-top: 0.5pt solid #e2e8f0;
+    }
+
     @bottom-center {
         content: counter(page) " / " counter(pages);
-        font-family: 'Segoe UI', sans-serif;
-        font-size: 9pt;
-        color: #94a3b8;
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        font-size: 8pt;
+        font-weight: 600;
+        color: #64748b;
+        vertical-align: top;
+        padding-top: 3mm;
+        border-top: 0.5pt solid #e2e8f0;
     }
+
+    @bottom-right {
+        content: "Toujours Prêt";
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        font-size: 7.5pt;
+        font-style: italic;
+        color: #94a3b8;
+        vertical-align: top;
+        padding-top: 3mm;
+        border-top: 0.5pt solid #e2e8f0;
+    }
+}
+
+@page:first {
+    margin: 0;
+    @top-left { content: none; border: none; }
+    @top-right { content: none; border: none; }
+    @bottom-left { content: none; border: none; }
+    @bottom-center { content: none; border: none; }
+    @bottom-right { content: none; border: none; }
 }
 
 .page-header {
@@ -104,10 +168,16 @@ h1 {
 .step {
     background: #fff;
     border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.08);
-    margin-bottom: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    margin-bottom: 16px;
     overflow: hidden;
+    break-inside: avoid;
     page-break-inside: avoid;
+}
+
+.step-body p, .step-body div, .msg, .visual-msg, .encoded {
+    orphans: 3;
+    widows: 3;
 }
 
 .step-header {
@@ -187,9 +257,37 @@ h1 {
     margin: 12px 0;
 }
 
+.step-map-card {
+    margin: 8px 0;
+    border: 1pt solid #cbd5e1;
+    border-radius: 4px;
+    background: #f8fafc;
+    overflow: hidden;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.step-map-header {
+    background: #f1f5f9;
+    border-bottom: 0.5pt solid #cbd5e1;
+    padding: 6px 10px;
+    font-size: 8.5pt;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+}
+
+.step-map-visual {
+    padding: 10px 12px;
+    border-left: 3pt solid #16a34a;
+    background: #f0fdf4;
+    font-size: 9pt;
+    color: #1e293b;
+}
+
 .map-placeholder {
     width: 100%;
-    min-height: 200px;
+    min-height: 180px;
     background: #e2e8f0;
     border-radius: 4px;
     border: 1px solid #cbd5e1;
@@ -198,7 +296,7 @@ h1 {
     justify-content: center;
     color: #64748b;
     font-size: 10pt;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 }
 
 /* ── Typography per module ── */
@@ -232,12 +330,15 @@ h1 {
 }
 
 /* ── Annexes ── */
-.annexe {
+.annexe, .annexe-section {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 6px;
     padding: 14px;
     margin-top: 16px;
+    break-before: page;
+    page-break-before: always;
+    break-inside: avoid;
     page-break-inside: avoid;
 }
 .annexe h3 {
@@ -362,6 +463,70 @@ function renderMaritimeAnnexe(): string {
     return html;
 }
 
+function renderGilwellAnnexe(): string {
+    return `
+    <div class="annexe-section">
+        <h2 class="annexe-title">GUIDE DU RELEVÉ GILWELL</h2>
+        <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px 16px; font-size: 9pt; color: #334155; line-height: 1.5;">
+            <p style="margin-bottom: 8px;"><strong>Interprétation des azimuts vectoriels :</strong></p>
+            <ul style="margin-left: 20px;">
+                <li>Le point <strong style="color: #16a34a;">VERT</strong> indique votre position de départ de l'étape.</li>
+                <li>Chaque flèche vectorielle indique le cap magnétique en degrés et la distance métrique du segment.</li>
+                <li>Le point <strong style="color: #dc2626;">ROUGE</strong> marque l'arrivée du tronçon Gilwell.</li>
+            </ul>
+        </div>
+    </div>`;
+}
+
+function renderMapPaginationAnnexe(plan: PaginationPlan, svg?: string): string {
+    const scaleLabel = plan.scale >= 1000 ? `1 : ${plan.scale / 1000} 000` : `1 : ${plan.scale}`;
+    let html = `
+    <div class="annexe-section" style="page-break-before: always; margin-top: 24px;">
+        <h2 class="annexe-title">DÉCOUPAGE TOPOGRAPHIQUE DES PLANCHES (${scaleLabel})</h2>
+        <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+                <span style="font-size: 10pt; font-weight: bold; color: #0284c7;">
+                    🗺️ Plan d'assemblage (${plan.pages.length} feuille${plan.pages.length > 1 ? 's' : ''} A4)
+                </span>
+                <span style="font-size: 8.5pt; color: #475569;">
+                    ${plan.nLandscape > 0 ? `${plan.nLandscape} Paysage` : ''}${plan.mixed ? ' · ' : ''}${plan.nPortrait > 0 ? `${plan.nPortrait} Portrait` : ''} · Recouvrement 10mm
+                </span>
+            </div>
+            ${svg ? `<div style="margin-bottom: 14px; text-align: center;">${svg}</div>` : ''}
+            <table style="width: 100%; border-collapse: collapse; font-size: 8pt; color: #334155;">
+                <thead>
+                    <tr style="background: #f1f5f9; border-bottom: 1px solid #cbd5e1; text-align: left;">
+                        <th style="padding: 6px 8px;">Feuille</th>
+                        <th style="padding: 6px 8px;">Format & Orient.</th>
+                        <th style="padding: 6px 8px;">Centre (Lat, Lon)</th>
+                        <th style="padding: 6px 8px;">Emprise (SW / NE)</th>
+                        <th style="padding: 6px 8px;">Raccords voisins</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+    for (const p of plan.pages) {
+        const nbStrs = Object.entries(p.nb).map(([dir, nums]) => `${dir} → F${nums.join(', ')}`).join(' · ') || '—';
+        html += `
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 6px 8px; font-weight: bold; color: #0284c7;">Feuille ${p.n}</td>
+                        <td style="padding: 6px 8px;">A4 ${p.orient === 'landscape' ? 'Paysage' : 'Portrait'}</td>
+                        <td style="padding: 6px 8px; font-family: monospace;">${p.center[0].toFixed(5)}, ${p.center[1].toFixed(5)}</td>
+                        <td style="padding: 6px 8px; font-family: monospace; font-size: 7.5pt; color: #64748b;">
+                            [${p.sw[0].toFixed(4)}, ${p.sw[1].toFixed(4)}] à [${p.ne[0].toFixed(4)}, ${p.ne[1].toFixed(4)}]
+                        </td>
+                        <td style="padding: 6px 8px; font-weight: 500; color: #d97706;">${nbStrs}</td>
+                    </tr>`;
+    }
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    </div>`;
+    return html;
+}
+
 // ─── Step Renderer ────────────────────────────────────────────────────────────
 
 function getModuleFontClass(moduleId: string): string {
@@ -386,13 +551,30 @@ function renderStep(step: CarnetStep, stepNum: number, isSolution: boolean, them
         ? `${step.fromLabel} → ${step.toLabel}`
         : step.fromLabel || '';
 
-    // Visual content (Gilwell SVG, map placeholder)
+    // Visual content (Gilwell SVG, map placeholder, Carte Simple)
     let visualContent = '';
     if (step.moduleId === 'gilwell' && step.gilwellSvg) {
         visualContent = `<div class="gilwell-svg">${step.gilwellSvg}</div>`;
-    } else if (['carte_ign', 'drapeaux'].includes(step.moduleId)) {
-        visualContent = `<div class="map-placeholder" data-center="${step.mapCenter || ''}" data-zoom="${step.mapZoom || 15}">
-            [Carte IGN — zone ${fromTo || 'N/A'}]
+    } else if (['carte_ign', 'carte_simple', 'drapeaux'].includes(step.moduleId)) {
+        const center = step.mapPersist?.center ? step.mapPersist.center.join(',') : (step.mapCenter ? step.mapCenter.join(',') : '');
+        const zoom = step.mapPersist?.zoom || step.mapZoom || 15;
+        const h = step.mapPersist?.height ? `${step.mapPersist.height}px` : '240px';
+        const w = step.mapPersist?.width ? `${step.mapPersist.width}px` : (step.mapPersist?.widthPercent ? `${step.mapPersist.widthPercent}%` : '100%');
+        const isCarteSimple = step.moduleId === 'carte_simple';
+        const mapTitle = isCarteSimple ? 'CARTE SIMPLE' : 'CARTE IGN';
+        visualContent = `
+        <div class="step-map-card">
+            <div class="step-map-header">
+                <span>🗺️ ${mapTitle} — ${fromTo || 'TRONÇON DIRECT'}</span>
+                <span style="color:#64748b; font-weight:normal;">Azimut ${step.azimuth || 0}° &bull; ${step.distanceM || 0}m</span>
+            </div>
+            <div class="step-map-visual">
+                <strong>Suivre le cap ${step.azimuth || 0}° sur ${step.distanceM || 0} mètres.</strong><br>
+                <span style="font-size: 8pt; color: #15803d; font-style: italic;">Se repérer directement sur la carte topographique sans chiffrement.</span>
+            </div>
+            <div class="map-placeholder" data-center="${center}" data-zoom="${zoom}" style="height:${h}; width:${w}; margin: 6px auto 0 auto;">
+                [Extrait ${mapTitle} — zone ${fromTo || 'N/A'}]
+            </div>
         </div>`;
     }
 
@@ -402,7 +584,7 @@ function renderStep(step: CarnetStep, stepNum: number, isSolution: boolean, them
     const isEncoded = !isSolution && step.moduleId !== 'texte_clair' && displayText !== step.solutionText;
 
     let textContent = '';
-    if (!['carte_ign', 'gilwell'].includes(step.moduleId) && displayText) {
+    if (!['carte_ign', 'carte_simple', 'gilwell'].includes(step.moduleId) && displayText) {
         textContent += '<div class="msg">';
         textContent += `<div class="msg-num">1</div>`;
         if (isEncoded) {
@@ -590,15 +772,41 @@ export class ExportHTMLRenderer {
     <style>${css}</style>
 </head>
 <body>
+  <span class="raid-title-target">${options.title || options.themeTitle || 'CARNET DE ROUTE'}</span>
+  <span class="version-title-target">${roleLabel}</span>
 `;
 
         // ── Header ──
         html += `
   <div class="page-header">
-    <h1>${options.themeTitle}</h1>
-    <div class="subtitle">${steps.length} étapes · ${roleLabel} · ScoutRaider Suite</div>
+    <h1>${options.title || options.themeTitle}</h1>
+    <div class="subtitle">${options.title && options.themeTitle && options.themeTitle !== options.title ? `${options.themeTitle} · ` : ''}${steps.length} étapes · ${roleLabel} · ScoutRaider Suite</div>
   </div>
 `;
+
+        // ── Profil Altimétrique ──
+        if (options.includeElevationProfile && options.elevationSvg) {
+            const stats = options.elevationStats;
+            html += `
+  <div style="margin: 0 0 24px 0; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); page-break-inside: avoid;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+      <div style="font-weight: 700; color: #0e7490; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;">
+        ⛰️ Profil Altimétrique & Topographie du Parcours
+      </div>
+      ${stats ? `
+      <div style="display: flex; gap: 12px; font-size: 10px; color: #475569;">
+        <span><b>D+ :</b> +${stats.ascend_m}m</span>
+        <span><b>D- :</b> -${stats.descend_m}m</span>
+        <span><b>Alt :</b> ${stats.min_alt_m}m / ${stats.max_alt_m}m</span>
+        <span><b>Durée marche estimée :</b> ${Math.floor(stats.duration_min / 60)}h${String(stats.duration_min % 60).padStart(2, '0')}</span>
+      </div>` : ''}
+    </div>
+    <div style="width: 100%; overflow: hidden; padding: 4px 0;">
+      ${options.elevationSvg}
+    </div>
+  </div>
+`;
+        }
 
         // ── Steps ──
         let stepNum = 1;
@@ -629,6 +837,12 @@ export class ExportHTMLRenderer {
             }
             if (usedModules.has('maritime')) {
                 html += renderMaritimeAnnexe();
+            }
+            if (usedModules.has('gilwell')) {
+                html += renderGilwellAnnexe();
+            }
+            if (options.includeMapPagination && options.mapPaginationPlan) {
+                html += renderMapPaginationAnnexe(options.mapPaginationPlan, options.mapPaginationSvg);
             }
         }
 

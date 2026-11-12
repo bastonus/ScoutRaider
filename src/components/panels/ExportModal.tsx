@@ -129,9 +129,18 @@ export default function ExportModal({ onClose }: ExportModalProps) {
 
   // ── State ──
   const [activeFormat, setActiveFormat] = useState<ExportFormatId>('pdf');
+  const [docTitle, setDocTitle] = useState(state.document_title || 'Carnet de Route');
+
+  useEffect(() => {
+    if (state.document_title) {
+      setDocTitle(state.document_title);
+    }
+  }, [state.document_title]);
   const [version, setVersion] = useState<ExportVersion>('both');
-  const [pdfEngine, setPdfEngine] = useState<PdfEngine>('auto');
+  const [pdfEngine, setPdfEngine] = useState<PdfEngine>('weasyprint');
   const [includeAnnexes, setIncludeAnnexes] = useState(true);
+  const [includeElevation, setIncludeElevation] = useState(state.carnet_include_elevation_profile ?? true);
+  const [includeMapPagination, setIncludeMapPagination] = useState(false);
   const [csvColumns, setCsvColumns] = useState<CsvColumnKey[]>(CSV_COLUMNS.map(c => c.key));
   const [csvSeparator, setCsvSeparator] = useState(';');
   const [csvMaxPois, setCsvMaxPois] = useState(5);
@@ -169,8 +178,9 @@ export default function ExportModal({ onClose }: ExportModalProps) {
 
   // ── CSV preview ──
   const csvSep = activeFormat === 'tsv' ? '\t' : (csvSeparator === 'tab' ? '\t' : csvSeparator);
+  const currentTitle = docTitle || state.document_title || 'Carnet de Route';
   const previewOpts: ExportPipelineOptions = useMemo(() => ({
-    title: 'Carnet de Route',
+    title: currentTitle,
     subtitle: new Date().toLocaleDateString('fr-FR'),
     includeGeneralMap: false,
     includeAnnexes,
@@ -180,7 +190,7 @@ export default function ExportModal({ onClose }: ExportModalProps) {
     csvSeparator: csvSep,
     csvMaxPois,
     enrichedAddresses,
-  }), [state, csvColumns, csvSep, csvMaxPois, enrichedAddresses, includeAnnexes, version, pdfEngine]);
+  }), [state, docTitle, currentTitle, csvColumns, csvSep, csvMaxPois, enrichedAddresses, includeAnnexes, version, pdfEngine]);
 
   const tableData = useMemo(() => {
     if (activeFormat !== 'csv' && activeFormat !== 'tsv') return [];
@@ -195,7 +205,7 @@ export default function ExportModal({ onClose }: ExportModalProps) {
     try {
       const isSolution = version === 'solution' || version === 'both';
       const baseOpts = {
-          title: 'Carnet de Route',
+          title: currentTitle,
           subtitle: new Date().toLocaleDateString('fr-FR'),
           date: new Date().toLocaleDateString('fr-FR'),
           themeTitle: themeManager.getLabel('main_title', 'CARNET DE ROUTE'),
@@ -208,16 +218,18 @@ export default function ExportModal({ onClose }: ExportModalProps) {
     } catch {
       return '';
     }
-  }, [activeFormat, state.carnet_steps, version, includeAnnexes]);
+  }, [activeFormat, state.carnet_steps, currentTitle, version, includeAnnexes]);
 
   // ── Export handler ──
   const handleExport = async () => {
     setExporting(true);
     try {
       const opts: ExportPipelineOptions = {
-        title: 'Carnet de Route',
+        title: currentTitle,
         subtitle: new Date().toLocaleDateString('fr-FR'),
         includeGeneralMap: state.carnet_include_general_map,
+        includeElevationProfile: includeElevation,
+        includeMapPagination,
         includeAnnexes,
         version,
         pdfEngine,
@@ -332,6 +344,30 @@ export default function ExportModal({ onClose }: ExportModalProps) {
 
             <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: '18px', flex: 1, overflowY: 'auto' }}>
 
+              {/* Titre du document */}
+              <div>
+                <ParamLabel>Nom du document</ParamLabel>
+                <input
+                  type="text"
+                  value={docTitle}
+                  onChange={e => setDocTitle(e.target.value)}
+                  placeholder="Carnet de Route"
+                  style={{
+                    width: '100%',
+                    padding: '7px 10px',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={e => e.currentTarget.style.borderColor = 'var(--accent-default)'}
+                  onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'}
+                />
+              </div>
+
               {/* Version — for PDF, DOCX & HTML */}
               {(activeFormat === 'pdf' || activeFormat === 'docx' || activeFormat === 'html') && (
                 <div>
@@ -380,9 +416,17 @@ export default function ExportModal({ onClose }: ExportModalProps) {
               {(activeFormat === 'pdf' || activeFormat === 'docx' || activeFormat === 'html') && (
                 <div>
                   <ParamLabel>Options</ParamLabel>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', marginBottom: '6px' }}>
                     <input type="checkbox" checked={includeAnnexes} onChange={e => setIncludeAnnexes(e.target.checked)} style={{ accentColor: 'var(--accent-default)', width: '14px', height: '14px' }} />
                     Inclure les annexes
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', marginBottom: '6px' }}>
+                    <input type="checkbox" checked={includeElevation} onChange={e => setIncludeElevation(e.target.checked)} style={{ accentColor: 'var(--accent-default)', width: '14px', height: '14px' }} />
+                    Inclure le profil altimétrique (D+ / D-)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={includeMapPagination} onChange={e => setIncludeMapPagination(e.target.checked)} style={{ accentColor: 'var(--accent-default)', width: '14px', height: '14px' }} />
+                    Découpage multi-planches 1:25 000 (A4)
                   </label>
                 </div>
               )}

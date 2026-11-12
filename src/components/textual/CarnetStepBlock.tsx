@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Eye, EyeOff, ChevronDown, Check, Trash2, Globe, Edit2, MessageSquarePlus, Code2 } from 'lucide-react';
+import { Eye, EyeOff, ChevronDown, Check, Trash2, Globe, Edit2, MessageSquarePlus, Code2, Ruler, Layers, Lock, Unlock, Compass, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 
@@ -8,7 +8,7 @@ import { MODULE_META } from '../../logic/ModuleRegistry';
 import { useApp } from '../../AppContext';
 import { PolygonalEngine } from '../../logic/PolygonalEngine';
 import InlineEditor from './InlineEditor';
-import MiniMap from './MiniMap';
+import MiniMap, { calculateZoomForScale, calculateScaleForZoom } from './MiniMap';
 
 const MODULE_FONT: Record<string, string> = {
     morse:    '"Morse", "Courier New", monospace',
@@ -56,17 +56,6 @@ export default function CarnetStepBlock({
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {isVisual && (
-                <div style={{ display: 'flex' }}>
-                    <div style={{ width: '80px', flexShrink: 0, position: 'relative', display: 'flex', justifyContent: 'center' }}>
-                        <div style={{ position: 'absolute', top: 0, bottom: 0, width: '2px', background: 'var(--bg-border)', zIndex: 1 }} />
-                    </div>
-                    <div style={{ flex: 1, padding: '12px 16px' }}>
-                        {hasGilwell && <div dangerouslySetInnerHTML={{ __html: step.gilwellSvg! }} style={{ marginBottom: '12px', textAlign: 'left' }} />}
-                        {hasMap && <MiniMap stepId={step.id} moduleId={step.moduleId} coords={step.coords} initialPersist={step.mapPersist} />}
-                    </div>
-                </div>
-            )}
 
             {(() => {
                 const seenLabels = new Set<string>();
@@ -151,10 +140,12 @@ export default function CarnetStepBlock({
                     return null;
                 };
 
-                return encodedLines.map((line: string, idx: number) => {
-                    const segIdx = step.segmentIndices?.[idx];
+                const linesToRender = isVisual ? [encodedLines[0] || ''] : encodedLines;
+
+                return linesToRender.map((line: string, idx: number) => {
+                    const segIdx = isVisual ? step.segmentIndices?.[0] : step.segmentIndices?.[idx];
                     const originalSeg = segIdx !== undefined ? state.polygonal_steps[segIdx] : null;
-                    const distance = step.isManual ? 0 : (originalSeg?.distance ?? 0);
+                    const distance = step.isManual ? 0 : (isVisual ? (step.distanceM ?? 0) : (originalSeg?.distance ?? 0));
                     const azimuth = step.isManual ? 0 : (originalSeg?.azimut ?? 0);
                     
                     let lineLabel = '';
@@ -425,12 +416,20 @@ function ComputedStepLine({
     step, lineIdx, segIdx, encodedLine, solutionLine, distance, azimuth, isFirst, isSolutionView, isVisual,
     lineLabel, navLanguage, pois, dangerLevel, onModuleChange, onNavLanguageChange, onLineClick, onPoiToggle, onRemoveStep
 }: any) {
+    const { state, dispatch } = useApp();
     const [hovered, setHovered] = useState(false);
     const [modulePickerOpen, setModulePickerOpen] = useState(false);
     const [langPickerOpen, setLangPickerOpen] = useState(false);
     const [poiPickerOpen, setPoiPickerOpen] = useState(false);
+    const [scaleMenuOpen, setScaleMenuOpen] = useState(false);
+    const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
+    const [layerMenuOpen, setLayerMenuOpen] = useState(false);
+    const [displayMenuOpen, setDisplayMenuOpen] = useState(false);
     const [solutionVisible, setSolutionVisible] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+
+    const hasMap = ['carte_ign', 'drapeaux'].includes(step.moduleId) && step.coords && step.coords.length > 0;
+    const hasGilwell = step.moduleId === 'gilwell' && step.gilwellSvg;
 
     const meta = MODULE_META[step.moduleId as keyof typeof MODULE_META];
     const accentColor = meta?.color || '#6b7280';
@@ -450,7 +449,6 @@ function ComputedStepLine({
     else if (dangerLevel === 'high') { dangerColor = '#ea580c'; dangerText = "Prudence : Ce tronçon emprunte une route très passante (Nationale)."; }
     else if (dangerLevel === 'minor') { dangerColor = '#eab308'; dangerText = "Prudence : Passage prolongé sur route départementale."; }
 
-    const { state } = useApp();
     let dotColor = 'var(--accent-default)';
     if (lineLabel) {
         const stageIdx = state.stages.findIndex((st: any) => st.label === lineLabel);
@@ -464,10 +462,19 @@ function ComputedStepLine({
                 display: 'flex', 
                 position: 'relative', 
                 minHeight: lineLabel ? '84px' : '60px',
-                zIndex: hovered ? 50 : 1
+                zIndex: hovered ? 2500 : 1
             }} 
             onMouseEnter={() => setHovered(true)} 
-            onMouseLeave={() => { setHovered(false); setModulePickerOpen(false); setLangPickerOpen(false); setPoiPickerOpen(false); }}
+            onMouseLeave={() => {
+                setHovered(false);
+                setModulePickerOpen(false);
+                setLangPickerOpen(false);
+                setPoiPickerOpen(false);
+                setScaleMenuOpen(false);
+                setSizeMenuOpen(false);
+                setLayerMenuOpen(false);
+                setDisplayMenuOpen(false);
+            }}
         >
             <div style={{ width: '80px', flexShrink: 0, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ position: 'absolute', top: 0, bottom: 0, width: '2px', background: 'var(--bg-border)', zIndex: 1 }} />
@@ -519,7 +526,7 @@ function ComputedStepLine({
                 )}
 
                 {hovered && !isEditing && (
-                    <div style={{ position: 'absolute', top: '-28px', right: '12px', zIndex: 500, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '4px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}>
+                    <div style={{ position: 'absolute', top: '-28px', right: '12px', zIndex: 3000, display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '4px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}>
                         {/* Spatial bridge: maintains hover while moving mouse from line up to this menu */}
                         <div style={{ position: 'absolute', top: '100%', left: -20, right: 0, height: '40px', zIndex: -1 }} />
                         
@@ -533,13 +540,237 @@ function ComputedStepLine({
                                 <Trash2 size={12} />
                             </button>
                         )}
+
+                        {/* ── Paramètres de carte dans le menu d'encodage au hover ── */}
+                        {hasMap && (
+                            <>
+                                {/* Échelle cartographique (1:25k par défaut) */}
+                                <div style={{ position: 'relative' }}>
+                                    <button
+                                        onClick={() => { setScaleMenuOpen(!scaleMenuOpen); setSizeMenuOpen(false); setLayerMenuOpen(false); setLangPickerOpen(false); setModulePickerOpen(false); setPoiPickerOpen(false); }}
+                                        title="Échelle cartographique de l'étape"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#60a5fa', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}
+                                    >
+                                        <Ruler size={12} />
+                                        <span>{step.mapPersist?.scaleName || '1:25000'}</span>
+                                        <ChevronDown size={11} />
+                                    </button>
+                                    {scaleMenuOpen && (
+                                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '4px', minWidth: '175px', zIndex: 3500, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                                            <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8', padding: '4px 8px', fontWeight: 700 }}>Échelle cartographique</div>
+                                            {[
+                                                { id: '1:25000', label: '1:25 000 (TOP 25)', desc: '1 cm = 250 m • IGN (Défaut)' },
+                                                { id: '1:10000', label: '1:10 000 (Détail)', desc: '1 cm = 100 m' },
+                                                { id: '1:50000', label: '1:50 000 (Moyen)', desc: '1 cm = 500 m' },
+                                                { id: '1:100000', label: '1:100 000 (Région)', desc: '1 cm = 1 km' },
+                                                { id: 'auto', label: 'Ajuster au tracé', desc: 'Vue d’ensemble' },
+                                            ].map(item => (
+                                                <div
+                                                    key={item.id}
+                                                    onClick={() => {
+                                                        const denomMap: Record<string, number> = { '1:10000': 10000, '1:25000': 25000, '1:50000': 50000, '1:100000': 100000 };
+                                                        const denom = denomMap[item.id];
+                                                        const mid = step.coords[Math.floor(step.coords.length / 2)] || step.coords[0];
+                                                        const z = denom ? calculateZoomForScale(denom, mid[1]) : 15;
+                                                        dispatch({
+                                                            type: 'PERSIST_MAP_STATE',
+                                                            stepId: step.id,
+                                                            scaleName: item.id,
+                                                            zoom: z,
+                                                            center: [mid[1], mid[0]]
+                                                        });
+                                                        setScaleMenuOpen(false);
+                                                    }}
+                                                    style={{ padding: '6px 8px', display: 'flex', flexDirection: 'column', cursor: 'pointer', borderRadius: '4px', background: (step.mapPersist?.scaleName || '1:25000') === item.id ? 'var(--accent-default)' : 'transparent', color: '#ffffff' }}
+                                                >
+                                                    <span style={{ fontSize: '11px', fontWeight: 600 }}>{item.label}</span>
+                                                    <span style={{ fontSize: '9px', opacity: 0.7 }}>{item.desc}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Format / Dimensions image */}
+                                <div style={{ position: 'relative' }}>
+                                    <button
+                                        onClick={() => { setSizeMenuOpen(!sizeMenuOpen); setScaleMenuOpen(false); setLayerMenuOpen(false); setLangPickerOpen(false); setModulePickerOpen(false); setPoiPickerOpen(false); }}
+                                        title="Dimensions et mise en page"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}
+                                    >
+                                        <span>{step.mapPersist?.widthPercent || 100}%</span>
+                                        <ChevronDown size={11} />
+                                    </button>
+                                    {sizeMenuOpen && (
+                                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '6px', minWidth: '160px', zIndex: 3500, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700 }}>Largeur</div>
+                                            <div style={{ display: 'flex', gap: '3px' }}>
+                                                {[100, 75, 50].map(pct => (
+                                                    <button
+                                                        key={pct}
+                                                        onClick={() => {
+                                                            dispatch({ type: 'PERSIST_MAP_STATE', stepId: step.id, widthPercent: pct, width: undefined });
+                                                            setSizeMenuOpen(false);
+                                                        }}
+                                                        style={{ flex: 1, background: (step.mapPersist?.widthPercent || 100) === pct ? 'var(--accent-default)' : 'rgba(255,255,255,0.08)', color: '#fff', border: 'none', padding: '4px 0', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}
+                                                    >
+                                                        {pct}%
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, marginTop: '2px' }}>Hauteur</div>
+                                            <div style={{ display: 'flex', gap: '3px' }}>
+                                                {[{ h: 220, label: '220p' }, { h: 340, label: '340p' }, { h: 480, label: '480p' }].map(item => (
+                                                    <button
+                                                        key={item.h}
+                                                        onClick={() => {
+                                                            dispatch({ type: 'PERSIST_MAP_STATE', stepId: step.id, height: item.h });
+                                                            setSizeMenuOpen(false);
+                                                        }}
+                                                        style={{ flex: 1, background: (step.mapPersist?.height || 340) === item.h ? 'var(--accent-default)' : 'rgba(255,255,255,0.08)', color: '#fff', border: 'none', padding: '4px 0', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}
+                                                    >
+                                                        {item.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Fond de carte */}
+                                <div style={{ position: 'relative' }}>
+                                    <button
+                                        onClick={() => { setLayerMenuOpen(!layerMenuOpen); setScaleMenuOpen(false); setSizeMenuOpen(false); setLangPickerOpen(false); setModulePickerOpen(false); setPoiPickerOpen(false); }}
+                                        title="Fond cartographique"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: step.mapPersist?.layerId ? '#60a5fa' : 'var(--text-dim)', cursor: 'pointer', padding: '4px 6px', borderRadius: '4px' }}
+                                    >
+                                        <Layers size={12} />
+                                    </button>
+                                    {layerMenuOpen && (
+                                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '4px', minWidth: '160px', zIndex: 3500, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                            <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8', padding: '4px 8px', fontWeight: 700 }}>Fond de carte</div>
+                                            {[
+                                                { id: '', label: 'Défaut global' },
+                                                { id: 'PLAN.IGN', label: 'Plan IGN v2' },
+                                                { id: 'SCAN25', label: 'Scan 25 IGN' },
+                                                { id: 'SAT.IGN', label: 'Satellite Ortho' },
+                                                { id: 'CYCLOSM', label: 'CyclOSM Randonnée' },
+                                                { id: 'OSM', label: 'OpenStreetMap' },
+                                            ].map(lyr => (
+                                                <div
+                                                    key={lyr.id}
+                                                    onClick={() => {
+                                                        dispatch({ type: 'PERSIST_MAP_STATE', stepId: step.id, layerId: lyr.id });
+                                                        setLayerMenuOpen(false);
+                                                    }}
+                                                    style={{ padding: '5px 8px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: (step.mapPersist?.layerId || '') === lyr.id ? 'var(--accent-default)' : 'transparent', color: '#fff' }}
+                                                >
+                                                    {lyr.label}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Recentrer sur le tracé */}
+                                <button
+                                    onClick={() => {
+                                        const mid = step.coords[Math.floor(step.coords.length / 2)] || step.coords[0];
+                                        const denomMap: Record<string, number> = { '1:10000': 10000, '1:25000': 25000, '1:50000': 50000, '1:100000': 100000 };
+                                        const curScale = step.mapPersist?.scaleName || '1:25000';
+                                        const denom = denomMap[curScale];
+                                        const z = denom ? calculateZoomForScale(denom, mid[1]) : (step.mapPersist?.zoom || 15);
+                                        dispatch({ type: 'PERSIST_MAP_STATE', stepId: step.id, center: [mid[1], mid[0]], zoom: z });
+                                    }}
+                                    title="Recentrer sur le tracé"
+                                    style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center' }}
+                                >
+                                    <Compass size={12} />
+                                </button>
+
+                                {/* Verrouillage cadenas */}
+                                <button
+                                    onClick={() => {
+                                        const nextLocked = !step.mapPersist?.isLocked;
+                                        dispatch({ type: 'PERSIST_MAP_STATE', stepId: step.id, isLocked: nextLocked });
+                                    }}
+                                    title={step.mapPersist?.isLocked ? "Carte verrouillée (cliquez pour déplacer)" : "Verrouiller le déplacement"}
+                                    style={{ background: 'transparent', border: 'none', color: step.mapPersist?.isLocked ? '#ef4444' : 'var(--text-dim)', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center' }}
+                                >
+                                    {step.mapPersist?.isLocked ? <Lock size={12} /> : <Unlock size={12} />}
+                                </button>
+
+                                <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.15)', margin: '0 2px' }} />
+                            </>
+                        )}
                         
-                        <div style={{ position: 'relative' }}>
-                            <button onClick={() => { setLangPickerOpen(!langPickerOpen); setModulePickerOpen(false); setPoiPickerOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: `transparent`, border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                        {/* Menu d'affichage des éléments IGN (Tracé, Points, Repères & Aires) */}
+                                <div style={{ position: 'relative' }}>
+                                    <button
+                                        onClick={() => { setDisplayMenuOpen(!displayMenuOpen); setScaleMenuOpen(false); setSizeMenuOpen(false); setLayerMenuOpen(false); setLangPickerOpen(false); setModulePickerOpen(false); setPoiPickerOpen(false); }}
+                                        title="Éléments affichés sur la carte"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}
+                                    >
+                                        <Eye size={12} />
+                                        <span>Affichage</span>
+                                        <ChevronDown size={11} />
+                                    </button>
+                                    {displayMenuOpen && (
+                                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '6px', minWidth: '195px', zIndex: 3500, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8', padding: '2px 6px', fontWeight: 700 }}>Éléments sur la carte</div>
+                                            
+                                            {/* Tracé de l'itinéraire */}
+                                            <div
+                                                onClick={() => {
+                                                    const cur = step.mapPersist?.showRoute !== false;
+                                                    dispatch({ type: 'PERSIST_MAP_STATE', stepId: step.id, showRoute: !cur });
+                                                }}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', cursor: 'pointer', borderRadius: '4px', background: 'rgba(255,255,255,0.03)' }}
+                                            >
+                                                <div style={{ width: '14px', height: '14px', borderRadius: '3px', border: '1.5px solid #60a5fa', background: step.mapPersist?.showRoute !== false ? '#60a5fa' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    {step.mapPersist?.showRoute !== false && <Check size={10} color="#000" strokeWidth={3} />}
+                                                </div>
+                                                <span style={{ fontSize: '11px', color: '#fff' }}>Tracé itinéraire</span>
+                                            </div>
+
+                                            {/* Points début & fin */}
+                                            <div
+                                                onClick={() => {
+                                                    const cur = step.mapPersist?.showEndpoints !== false;
+                                                    dispatch({ type: 'PERSIST_MAP_STATE', stepId: step.id, showEndpoints: !cur });
+                                                }}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', cursor: 'pointer', borderRadius: '4px', background: 'rgba(255,255,255,0.03)' }}
+                                            >
+                                                <div style={{ width: '14px', height: '14px', borderRadius: '3px', border: '1.5px solid #34d399', background: step.mapPersist?.showEndpoints !== false ? '#34d399' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    {step.mapPersist?.showEndpoints !== false && <Check size={10} color="#000" strokeWidth={3} />}
+                                                </div>
+                                                <span style={{ fontSize: '11px', color: '#fff' }}>Points départ & arrivée</span>
+                                            </div>
+
+                                            {/* Repères, aires & dessins */}
+                                            <div
+                                                onClick={() => {
+                                                    const cur = step.mapPersist?.showAnnotations !== false;
+                                                    dispatch({ type: 'PERSIST_MAP_STATE', stepId: step.id, showAnnotations: !cur });
+                                                }}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', cursor: 'pointer', borderRadius: '4px', background: 'rgba(255,255,255,0.03)' }}
+                                            >
+                                                <div style={{ width: '14px', height: '14px', borderRadius: '3px', border: '1.5px solid #fbbf24', background: step.mapPersist?.showAnnotations !== false ? '#fbbf24' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    {step.mapPersist?.showAnnotations !== false && <Check size={10} color="#000" strokeWidth={3} />}
+                                                </div>
+                                                <span style={{ fontSize: '11px', color: '#fff' }}>Repères, aires & dessins</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.15)', margin: '0 2px' }} />
+<div style={{ position: 'relative' }}>
+                            <button onClick={() => { setLangPickerOpen(!langPickerOpen); setModulePickerOpen(false); setPoiPickerOpen(false); setScaleMenuOpen(false); setSizeMenuOpen(false); setLayerMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: `transparent`, border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
                                 <Globe size={12} /> Langage : {navLanguage || 'Aléatoire'} <ChevronDown size={12} />
                             </button>
                             {langPickerOpen && (
-                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '4px', minWidth: '120px', zIndex: 600 }}>
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '4px', minWidth: '120px', zIndex: 3500 }}>
                                     {NAV_LANGUAGES.map(lang => (
                                         <div key={lang} onClick={() => { onNavLanguageChange(lang); setLangPickerOpen(false); }} style={{ padding: '6px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', borderRadius: '4px', color: lang === navLanguage ? '#fff' : 'var(--text-default)' }}>
                                             {lang}
@@ -556,14 +787,14 @@ function ComputedStepLine({
                         {pois && pois.length > 0 && (
                             <div style={{ position: 'relative' }}>
                                 <button
-                                    onClick={() => { setPoiPickerOpen(!poiPickerOpen); setLangPickerOpen(false); setModulePickerOpen(false); }}
+                                    onClick={() => { setPoiPickerOpen(!poiPickerOpen); setLangPickerOpen(false); setModulePickerOpen(false); setScaleMenuOpen(false); setSizeMenuOpen(false); setLayerMenuOpen(false); }}
                                     title="Sélectionner un point d'intérêt"
                                     style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: pois.some((p: any) => p.selected) ? '#fbbf24' : 'var(--text-dim)', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}
                                 >
                                     📍 POI <ChevronDown size={12} />
                                 </button>
                                 {poiPickerOpen && (
-                                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '6px', minWidth: '220px', zIndex: 600, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+                                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '6px', minWidth: '220px', zIndex: 3500, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
                                         <div style={{ fontSize: '10px', color: 'var(--text-dim)', fontWeight: 700, padding: '2px 6px 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Points d'intérêt proches</div>
                                         {pois.map((poi: any) => (
                                             <div
@@ -586,11 +817,11 @@ function ComputedStepLine({
                         )}
 
                         <div style={{ position: 'relative' }}>
-                            <button onClick={() => { setModulePickerOpen(!modulePickerOpen); setLangPickerOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: `${accentColor}15`, border: 'none', color: accentColor, cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                            <button onClick={() => { setModulePickerOpen(!modulePickerOpen); setLangPickerOpen(false); setScaleMenuOpen(false); setSizeMenuOpen(false); setLayerMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: `${accentColor}15`, border: 'none', color: accentColor, cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
                                 {meta?.label || step.moduleId} <ChevronDown size={12} />
                             </button>
                             {modulePickerOpen && (
-                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '4px', minWidth: '180px', zIndex: 600 }}>
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '8px', padding: '4px', minWidth: '180px', zIndex: 3500 }}>
                                     {ALL_MODULES.map(modId => (
                                         <div key={modId} onClick={() => { onModuleChange(modId); setModulePickerOpen(false); }} style={{ padding: '6px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', borderRadius: '4px' }}>
                                             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: MODULE_META[modId].color }} />
@@ -606,7 +837,7 @@ function ComputedStepLine({
                 <div style={{ marginTop: (isFirst && hasWarnings) ? '40px' : '0', paddingTop: dangerText ? ((isFirst && hasWarnings) ? '32px' : '36px') : '0' }}>
                     {isEditing ? (
                         <InlineEditor stepId={step.id} solutionText={solutionLine} moduleId={step.moduleId} lineIdx={lineIdx} onClose={() => setIsEditing(false)} />
-                    ) : !isVisual && (
+                    ) : !isVisual ? (
                         <div style={{ marginBottom: '8px', cursor: 'pointer' }} onClick={onLineClick}>
                             {isSolutionView ? (
                                 <div style={{ fontSize: '13px', color: dangerColor || 'var(--semantic-green)', fontWeight: dangerColor ? 700 : 600, lineHeight: 1.5 }}>
@@ -626,6 +857,24 @@ function ComputedStepLine({
                             ) : (
                                 <div style={{ fontSize: '13px', color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', lineHeight: 1.5 }}>
                                     <HighlightedText text={encodedLine} pois={pois} isEncoded={false} />
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        /* Contenu visuel rendu directement dans l'encart de l'étape */
+                        <div style={{ marginBottom: '8px' }}>
+                            {hasGilwell && <div dangerouslySetInnerHTML={{ __html: step.gilwellSvg! }} style={{ marginBottom: '12px', textAlign: 'left' }} />}
+                            {hasMap && isFirst && (
+                                <MiniMap
+                                    stepId={step.id}
+                                    moduleId={step.moduleId}
+                                    coords={step.coords}
+                                    initialPersist={step.mapPersist}
+                                />
+                            )}
+                            {isSolutionView && (
+                                <div style={{ fontSize: '12px', color: 'var(--semantic-green)', marginTop: '8px', fontWeight: 600 }}>
+                                    <HighlightedText text={solutionLine} pois={pois} isEncoded={false} />
                                 </div>
                             )}
                         </div>

@@ -261,8 +261,12 @@ export class CarnetEngine {
             let visualContent = '';
             if (step.moduleId === 'gilwell' && step.gilwellSvg) {
                 visualContent = `<div class="svg-container">${step.gilwellSvg}</div>`;
-            } else if (['carte_ign', 'drapeaux'].includes(step.moduleId)) {
-                visualContent = `<div class="leaflet-map-snapshot" data-center="${step.mapCenter}" data-zoom="${step.mapZoom}">[Ceci sera remplacé par une image de la carte avant l'impression]</div>`;
+            } else if (['carte_ign', 'carte_simple', 'drapeaux'].includes(step.moduleId)) {
+                const center = step.mapPersist?.center ? step.mapPersist.center.join(',') : (step.mapCenter ? step.mapCenter.join(',') : '');
+                const zoom = step.mapPersist?.zoom || step.mapZoom || 15;
+                const h = step.mapPersist?.height ? `${step.mapPersist.height}px` : '280px';
+                const w = step.mapPersist?.width ? `${step.mapPersist.width}px` : (step.mapPersist?.widthPercent ? `${step.mapPersist.widthPercent}%` : '100%');
+                visualContent = `<div class="leaflet-map-snapshot" data-center="${center}" data-zoom="${zoom}" style="height:${h}; width:${w}; margin: 0 auto;">[Ceci sera remplacé par une image de la carte avant l'impression]</div>`;
             }
 
             // Typography assignment
@@ -280,7 +284,7 @@ export class CarnetEngine {
     <div class="step-content ${textColorClass}">
         ${step.solutionText ? `<div style="display:none;" class="solution-hint">${step.solutionText}</div>` : ''}
         ${visualContent}
-        ${!['carte_ign', 'gilwell'].includes(step.moduleId) ? `<div>${step.encodedText.replace(/\\n/g, '<br>')}</div>` : ''}
+        ${!['carte_ign', 'carte_simple', 'gilwell'].includes(step.moduleId) ? `<div>${step.encodedText.replace(/\\n/g, '<br>')}</div>` : ''}
     </div>
 </div>
 `;

@@ -1,0 +1,8 @@
+{
+  "id": "carte_simple",
+  "name": "Carte Simple",
+  "category": "ign_map",
+  "render_type": "map",
+  "description": "Extrait de carte simple avec point de départ et repère d'arrivée pour une navigation cartographique directe.",
+  "rules_explanation": "Carte Simple : Permet une progression visuelle directe sur carte IGN/OSM. Idéale pour les sections de transition et la lecture de carte de base."
+}

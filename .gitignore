@@ -10,3 +10,12 @@ scoutraider.log
 .env
 .vscode/
 *.af~lock~
+__pycache__/
+*.pyc
+*.pyo
+*.pdf
+backend/app/storage/temp/
+backend/app/storage/*.pdf
+backend/app/storage/*.db
+backend/app/storage/*.sqlite
+.pytest_cache/

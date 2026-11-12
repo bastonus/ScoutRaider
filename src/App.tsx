@@ -7,7 +7,13 @@ import NotificationOverlay from './components/map/NotificationOverlay';
 import TextualHeader from './components/textual/TextualHeader';
 import ExportModal from './components/panels/ExportModal';
 import PreferencesModal from './components/panels/PreferencesModal';
+import AuthModal from './components/panels/AuthModal';
+import ProjectsDashboardModal from './components/panels/ProjectsDashboardModal';
+import ShareModal from './components/panels/ShareModal';
+import CommandPalette from './components/layout/CommandPalette';
 import { List, Library, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useApp } from './AppContext';
+import { useAuth } from './AuthContext';
 
 export type ViewMode = 'map' | 'text' | 'split';
 
@@ -20,6 +26,15 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const { 
+    authModalOpen, 
+    setAuthModalOpen, 
+    projectsModalOpen, 
+    setProjectsModalOpen,
+    shareModalOpen,
+    setShareModalOpen
+  } = useAuth();
 
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
@@ -49,11 +64,14 @@ function App() {
     };
   }, []);
 
+  const { state } = useApp();
+
   // Keep document title synchronized with package version
   useEffect(() => {
     const version = typeof __APP_VERSION__ !== 'undefined' ? `v${__APP_VERSION__}` : 'v0.3.3-beta';
-    document.title = `ScoutRaider — ${version}`;
-  }, []);
+    const title = state.document_title || 'Document sans titre';
+    document.title = `${title} — ScoutRaider ${version}`;
+  }, [state.document_title]);
 
   // Keyboard shortcuts for panel toggling
   useEffect(() => {
@@ -108,6 +126,18 @@ function App() {
     return () => window.removeEventListener('keydown', h);
   }, []);
 
+  // Global Ctrl+K (Command Palette)
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+
   const panelToggleStyle: React.CSSProperties = {
     position: 'absolute', top: '16px', zIndex: 900,
     height: '38px', padding: '0 10px',
@@ -139,6 +169,7 @@ function App() {
         onExport={handleExportRequest} 
         onPreferencesOpen={() => setPreferencesModalOpen(true)}
         onSetRightSection={setActiveRightSection}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
       />
       
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
@@ -252,6 +283,20 @@ function App() {
 
       {/* Preferences Modal */}
       {preferencesModalOpen && <PreferencesModal onClose={() => setPreferencesModalOpen(false)} />}
+
+      {/* Command Palette (Ctrl+K) */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onViewModeChange={setViewMode}
+        onExport={handleExportRequest}
+        onPreferencesOpen={() => setPreferencesModalOpen(true)}
+      />
+
+      {/* Cloud Auth, Workspace & Share Modals */}
+      {authModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} />}
+      {projectsModalOpen && <ProjectsDashboardModal onClose={() => setProjectsModalOpen(false)} />}
+      {shareModalOpen && <ShareModal onClose={() => setShareModalOpen(false)} />}
     </div>
   );
 }

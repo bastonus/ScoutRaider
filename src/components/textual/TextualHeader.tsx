@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
     Download, Map as MapIcon, Paperclip, Check,
-    ChevronDown, Key,
+    ChevronDown, Key, TrendingUp,
 } from 'lucide-react';
 import type { AnnexeId } from '../../logic/types';
 import { useApp } from '../../AppContext';
@@ -73,6 +73,7 @@ export default function TextualHeader({
     const enabledAnnexesSet = new Set(state.enabled_annexes || []);
     const activeCount = availableAnnexes.filter(a => enabledAnnexesSet.has(a)).length;
     const includeGeneralMap: boolean = state.carnet_include_general_map;
+    const includeElevationProfile: boolean = state.carnet_include_elevation_profile ?? true;
 
     const currentAccent = getAccent(state.theme_id);
     const currentTheme = themeManager.getTheme(state.theme_id);
@@ -279,6 +280,18 @@ export default function TextualHeader({
             >
                 <MapIcon size={12} />
                 Carte générale
+            </button>
+
+            {/* ── PROFIL ALTIMÉTRIQUE ─────────────────────────────────────── */}
+            <button
+                onClick={() => dispatch({ type: 'TOGGLE_ELEVATION_PROFILE' })}
+                style={pillBtn(includeElevationProfile, '#06b6d4')}
+                title="Afficher le profil altimétrique (dénivelé D+/D-) dans le carnet et l'export"
+                onMouseEnter={e => { if (!includeElevationProfile) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.7)'; }}
+                onMouseLeave={e => { if (!includeElevationProfile) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)'; }}
+            >
+                <TrendingUp size={12} />
+                Profil Alti
             </button>
 
             {/* ── ANNEXES ──────────────────────────────────────────────── */}

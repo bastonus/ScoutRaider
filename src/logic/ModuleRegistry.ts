@@ -18,6 +18,7 @@ const MODULE_MANIFESTS: Record<ModuleId, ModuleManifest> = {
     templier:    { category: 'crypted_message', type: 'written', description: 'Croix des Templiers — chiffrement pigpen avec police personnalisée.' },
     texte_clair: { category: 'explicit_message',type: 'written', description: 'Message en clair — texte de navigation sans encodage.' },
     carte_ign:   { category: 'ign_map',         type: 'visual',  description: 'Carte IGN — extrait de carte avec points de départ/arrivée.' },
+    carte_simple:{ category: 'ign_map',         type: 'visual',  description: 'Carte Simple — extrait de carte direct sans chiffrement pour repérage sur le terrain.' },
 };
 
 // ─── Category constraints (from legacy/config/constraints_categories.json) ────
@@ -66,12 +67,13 @@ export const MODULE_META: Record<ModuleId, { label: string; color: string; defau
     templier:    { label: 'Templier',            color: '#b45309', defaultAnnexes: [] },
     texte_clair: { label: 'Texte clair',         color: '#6b7280', defaultAnnexes: [] },
     carte_ign:   { label: 'Carte IGN',           color: '#16a34a', defaultAnnexes: [] },
+    carte_simple:{ label: 'Carte Simple',        color: '#10b981', defaultAnnexes: [] },
 };
 
 // ─── All module IDs ───────────────────────────────────────────────────────────
 
 export const ALL_MODULE_IDS: ModuleId[] = [
-    'texte_clair', 'carte_ign', 'gilwell', 'drapeaux', 'morse',
+    'texte_clair', 'carte_simple', 'carte_ign', 'gilwell', 'drapeaux', 'morse',
     'templier', 'polybe', 'maritime', 'avocat', 'cassis', 'vigenere',
 ];
 

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ options.title }}</title>
+    <style>
+        {{ css_content | safe }}
+    </style>
+</head>
+<body>
+
+    <!-- Target elements for running headers/footers in CSS Paged Media -->
+    <span class="raid-title-target" style="display:none;">{{ options.title }}</span>
+    <span class="version-title-target" style="display:none;">
+        {% if options.is_solution %}ÉDITION SOLUTIONS (CHEFS){% else %}ÉDITION PARTICIPANTS{% endif %}
+    </span>
+
+    <!-- 1. COVER PAGE -->
+    <div class="cover-page">
+        <div class="cover-inner">
+            <div class="cover-badge">
+                {% if options.is_solution %}
+                    DOCUMENT OFFICIEL &bull; CHEFS
+                {% else %}
+                    CARNET DE ROUTE &bull; PATROUILLE
+                {% endif %}
+            </div>
+            <h1 class="cover-title">{{ options.title }}</h1>
+            <div class="cover-subtitle">{{ options.subtitle }}</div>
+            <div class="cover-divider"></div>
+            <table class="cover-meta-table">
+                <tr>
+                    <td class="label">Date :</td>
+                    <td>{{ options.date_str }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Patrouille :</td>
+                    <td>{{ options.patrol_name }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Distance Totale :</td>
+                    <td>{{ total_distance_km }} km ({{ steps|length }} étapes)</td>
+                </tr>
+                {% if options.is_solution %}
+                <tr>
+                    <td class="label">Clé Vigenère :</td>
+                    <td><strong>{{ options.vigenere_key }}</strong></td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+
+    <!-- 2. SUMMARY & ROUTE OVERVIEW PAGE -->
+    {% if options.include_general_map %}
+    <div class="page-break">
+        <div class="section-header">
+            <h2 class="section-title">Vue d'Ensemble du Parcours</h2>
+            <div class="section-subtitle">Aperçu topographique et données d'orientation</div>
+        </div>
+
+        <div style="margin: 12px 0; border: 1pt solid #cbd5e1; border-radius: 6px; padding: 14px; background: #f8fafc;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 33%; text-align: center; border-right: 1pt solid #e2e8f0;">
+                        <div style="font-size: 8pt; color: #64748b; text-transform: uppercase;">Distance Totale</div>
+                        <div style="font-size: 16pt; font-weight: 800; color: #0f172a;">{{ total_distance_km }} km</div>
+                    </td>
+                    <td style="width: 33%; text-align: center; border-right: 1pt solid #e2e8f0;">
+                        <div style="font-size: 8pt; color: #64748b; text-transform: uppercase;">Nombre d'Étapes</div>
+                        <div style="font-size: 16pt; font-weight: 800; color: #0f172a;">{{ steps|length }}</div>
+                    </td>
+                    <td style="width: 33%; text-align: center;">
+                        <div style="font-size: 8pt; color: #64748b; text-transform: uppercase;">Type d'Édition</div>
+                        <div style="font-size: 14pt; font-weight: 800; color: {% if options.is_solution %}#b91c1c{% else %}#0369a1{% endif %};">
+                            {% if options.is_solution %}SOLUTIONS{% else %}SCOUTS{% endif %}
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div style="margin-top: 14px; border: 1pt solid #cbd5e1; border-radius: 6px; height: 170mm; background: #f1f5f9; display: table; width: 100%;">
+            <div style="display: table-cell; vertical-align: middle; text-align: center; color: #475569;">
+                <div style="font-weight: 700; font-size: 12pt; margin-bottom: 6px;">[CARTE GÉNÉRALE DU PARCOURS]</div>
+                <div style="font-size: 9pt; color: #64748b;">Fond cartographique IGN haute résolution (Échelle 1:25 000)</div>
+                <div style="margin-top: 10px; font-size: 8pt; color: #94a3b8;">Tracé topographique complet avec balises d'étapes</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 3. STEPS SECTION -->
+    <div class="page-break">
+        <div class="section-header">
+            <h2 class="section-title">Carnet de Progression</h2>
+            <div class="section-subtitle">Instructions de navigation et messages codés</div>
+        </div>
+
+        {% for step in steps %}
+        <div class="step-block">
+            <div class="step-header">
+                <div class="step-header-left">
+                    <span class="step-pill">ÉTAPE {{ step.step_number }}</span>
+                    <span class="step-module-tag">{{ step.module_name }}</span>
+                </div>
+                <div class="step-header-right">
+                    <span class="step-metrics">Azimut {{ step.azimut }}° &bull; {{ step.distance_m }} m</span>
+                </div>
+            </div>
+
+            <div class="step-body">
+                <!-- SVG Content (Gilwell) -->
+                {% if step.svg_content %}
+                <div class="step-svg-box">
+                    {{ step.svg_content | safe }}
+                </div>
+                {% endif %}
+
+                <!-- Map block (Carte Simple / Carte IGN) -->
+                {% if step.render_type == 'map' %}
+                <div class="step-map-card">
+                    <div class="step-map-header">
+                        <span style="font-weight: bold; color: #0f172a;">EXTRAIT CARTOGRAPHIQUE &bull; {{ step.module_name|upper }}</span>
+                        <span style="color: #64748b; font-size: 8pt; float: right;">Tracé direct terrain</span>
+                    </div>
+                    <div class="step-map-visual">
+                        <div style="font-weight: 600; font-size: 9pt; color: #1e293b; margin-bottom: 3px;">
+                            Prendre le cap {{ step.azimut }}° et progresser sur {{ step.distance_m }} m jusqu'au prochain repère.
+                        </div>
+                        <div style="font-size: 8pt; color: #15803d; font-style: italic;">
+                            Suivre le tracé sur la carte topographique (repères de départ et d'arrivée matérialisés).
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Cipher / Encoded message -->
+                {% if step.encoded_text and not step.svg_content and step.render_type != 'map' %}
+                <div class="step-cipher-box">{{ step.encoded_text }}</div>
+                {% endif %}
+
+                <!-- POI Information -->
+                {% if step.poi_name %}
+                <div>
+                    <span class="step-poi-badge">&map-pin; Repère : {{ step.poi_name }}</span>
+                </div>
+                {% endif %}
+
+                <!-- Solution block (if Solution Edition) -->
+                {% if options.is_solution %}
+                <div class="step-solution-box">
+                    <div class="step-solution-title">&check; Solution Décodée :</div>
+                    <div style="font-weight: 600;">{{ step.solution_text }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- 4. ANNEXES SECTION -->
+    {% if options.include_annexes and used_annexes %}
+        {% if 'tableau_vigenere' in used_annexes %}
+        <div class="annexe-page">
+            <div class="section-header">
+                <h2 class="section-title">Annexe : Tableau de Vigenère</h2>
+                <div class="section-subtitle">Tableau de déchiffrement poly-alphabétique (Clé : {{ options.vigenere_key }})</div>
+            </div>
+            <p style="font-size: 8.5pt; color: #475569; margin-bottom: 8px;">
+                Pour déchiffrer une lettre : repérez la ligne correspondant à la lettre de la clé, avancez jusqu'à la lettre chiffrée, puis remontez verticalement vers la colonne pour lire le caractère en clair.
+            </p>
+            <table class="vigenere-table">
+                <tr>
+                    <th>&bull;</th>
+                    {% for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}
+                    <th>{{ c }}</th>
+                    {% endfor %}
+                </tr>
+                {% set alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}
+                {% for i in range(26) %}
+                <tr>
+                    <td class="header-col">{{ alphabet[i] }}</td>
+                    {% for j in range(26) %}
+                    <td>{{ alphabet[(i + j) % 26] }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+
+        {% if 'alphabet_morse' in used_annexes %}
+        <div class="annexe-page">
+            <div class="section-header">
+                <h2 class="section-title">Annexe : Code Morse International</h2>
+                <div class="section-subtitle">Tableau des signaux sonores et visuels (point = son court, trait = son long)</div>
+            </div>
+            <div class="morse-grid">
+                {% set morse_pairs = [
+                    ('A', '.-'), ('B', '-...'), ('C', '-.-.'), ('D', '-..'), ('E', '.'), ('F', '..-.'), ('G', '--.'),
+                    ('H', '....'), ('I', '..'), ('J', '.---'), ('K', '-.-'), ('L', '.-..'), ('M', '--'), ('N', '-.'),
+                    ('O', '---'), ('P', '.--.'), ('Q', '--.-'), ('R', '.-.'), ('S', '...'), ('T', '-'), ('U', '..-'),
+                    ('V', '...-'), ('W', '.--'), ('X', '-..-'), ('Y', '-.--'), ('Z', '--..'),
+                    ('1', '.----'), ('2', '..---'), ('3', '...--'), ('4', '....-'), ('5', '.....'),
+                    ('6', '-....'), ('7', '--...'), ('8', '---..'), ('9', '----.'), ('0', '-----')
+                ] %}
+                <div class="morse-col">
+                    {% for pair in morse_pairs[0:9] %}
+                    <div class="morse-item"><span class="morse-letter">{{ pair[0] }}</span><span class="morse-code">{{ pair[1] }}</span></div>
+                    {% endfor %}
+                </div>
+                <div class="morse-col">
+                    {% for pair in morse_pairs[9:18] %}
+                    <div class="morse-item"><span class="morse-letter">{{ pair[0] }}</span><span class="morse-code">{{ pair[1] }}</span></div>
+                    {% endfor %}
+                </div>
+                <div class="morse-col">
+                    {% for pair in morse_pairs[18:27] %}
+                    <div class="morse-item"><span class="morse-letter">{{ pair[0] }}</span><span class="morse-code">{{ pair[1] }}</span></div>
+                    {% endfor %}
+                </div>
+                <div class="morse-col">
+                    {% for pair in morse_pairs[27:] %}
+                    <div class="morse-item"><span class="morse-letter">{{ pair[0] }}</span><span class="morse-code">{{ pair[1] }}</span></div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if 'grille_polybe' in used_annexes %}
+        <div class="annexe-page">
+            <div class="section-header">
+                <h2 class="section-title">Annexe : Grille de Polybe (6 &times; 6)</h2>
+                <div class="section-subtitle">Chiffrement par substitution matricielle (Ligne puis Colonne)</div>
+            </div>
+            <p style="font-size: 8.5pt; color: #475569; margin-bottom: 8px;">
+                Chaque caractère est représenté par deux chiffres : le numéro de sa ligne suivi du numéro de sa colonne.
+            </p>
+            <table class="polybe-table">
+                <tr>
+                    <th>L / C</th>
+                    <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th>
+                </tr>
+                {% set polybe_rows = [
+                    ['1', 'A', 'B', 'C', 'D', 'E', 'F'],
+                    ['2', 'G', 'H', 'I', 'J', 'K', 'L'],
+                    ['3', 'M', 'N', 'O', 'P', 'Q', 'R'],
+                    ['4', 'S', 'T', 'U', 'V', 'W', 'X'],
+                    ['5', 'Y', 'Z', '0', '1', '2', '3'],
+                    ['6', '4', '5', '6', '7', '8', '9']
+                ] %}
+                {% for row in polybe_rows %}
+                <tr>
+                    <td class="header-col">{{ row[0] }}</td>
+                    {% for cell in row[1:] %}
+                    <td><strong>{{ cell }}</strong></td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+
+        {% if 'alphabet_gilwell' in used_annexes %}
+        <div class="annexe-page">
+            <div class="section-header">
+                <h2 class="section-title">Annexe : Guide du Relevé Gilwell</h2>
+                <div class="section-subtitle">Interprétation des azimuts et des flèches vectorielles</div>
+            </div>
+            <div style="padding: 14px; background: #f8fafc; border: 1pt solid #cbd5e1; border-radius: 6px; font-size: 9pt;">
+                <p style="margin-bottom: 8px;"><strong>Principe :</strong> Le diagramme Gilwell trace vectoriellement les changements de cap sans afficher le fond de carte.</p>
+                <ul style="margin-left: 20px; line-height: 1.6;">
+                    <li>Le point <span style="color: #16a34a; font-weight: bold;">VERT</span> indique votre position de départ de l'étape.</li>
+                    <li>Chaque segment porte l'azimut en degrés (0° = Nord, 90° = Est, 180° = Sud, 270° = Ouest).</li>
+                    <li>La distance entre parenthèses donne la longueur réelle du segment sur le terrain en mètres.</li>
+                    <li>Le point <span style="color: #dc2626; font-weight: bold;">ROUGE</span> marque l'arrivée du tronçon Gilwell.</li>
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
+
+</body>
+</html>

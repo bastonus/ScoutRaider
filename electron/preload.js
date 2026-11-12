@@ -5,8 +5,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
 
     // ─── Project persistence (.scoutproj) ─────────────────────────────
-    saveScoutproj: (stateJSON, filepath) =>
-        ipcRenderer.invoke('save-scoutproj', stateJSON, filepath),
+    saveScoutproj: (stateJSON, filepath, defaultName) =>
+        ipcRenderer.invoke('save-scoutproj', stateJSON, filepath, defaultName),
 
     openScoutproj: () =>
         ipcRenderer.invoke('open-scoutproj'),

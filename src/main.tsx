@@ -5,11 +5,14 @@ import './index.css'
 import 'leaflet/dist/leaflet.css'
 
 import { AppProvider } from './AppContext'
+import { AuthProvider } from './AuthContext'
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <AppProvider>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </AppProvider>
   </React.StrictMode>,
 )

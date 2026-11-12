@@ -16,6 +16,8 @@ import type { ExportRenderOptions } from './ExportHTMLRenderer';
 import { themeManager } from './ThemeManager';
 import { MODULE_META } from './ModuleRegistry';
 import { calculatePolygonArea, formatArea } from './GeoUtils';
+import { ElevationService } from './ElevationService';
+import { MapPagination, PaginationPlan } from './MapPagination';
 import type { AppState, ThemeOverrides, ExportFormat, ModuleId } from './types';
 
 // ─── Export Options ───────────────────────────────────────────────────────────
@@ -43,6 +45,8 @@ export interface ExportPipelineOptions {
     title: string;
     subtitle: string;
     includeGeneralMap: boolean;
+    includeElevationProfile?: boolean;
+    includeMapPagination?: boolean;
     includeAnnexes: boolean;
     /** 'participant' | 'solution' | 'both' */
     version: 'participant' | 'solution' | 'both';
@@ -117,12 +121,94 @@ export class ExportService {
             const mergedTheme = { ...theme, ...overrides };
 
             // 2. Build render options
+            const includeElevation = options.includeElevationProfile ?? state.carnet_include_elevation_profile ?? true;
+            let elevationSvg: string | undefined;
+            let elevationStats: any = undefined;
+
+            if (includeElevation) {
+                const allCoords: [number, number][] = [];
+                for (const r of (state.routes || [])) {
+                    if (!r) continue;
+                    const geom = r.geojson?.geometry || r.geojson;
+                    const pts = geom?.coordinates || [];
+                    for (const pt of pts) {
+                        if (Array.isArray(pt) && pt.length >= 2) allCoords.push([pt[0], pt[1]]);
+                    }
+                }
+                if (allCoords.length >= 2) {
+                    try {
+                        const stages = (state.stages || []).map(s => ({ label: s.label, coords: s.coords }));
+                        const prof = await ElevationService.computeProfile(allCoords, 'lonlat', stages);
+                        if (prof) {
+                            elevationSvg = ElevationService.generateSvg(prof, { width: 720, height: 160, accentColor: '#0e7490', isDarkTheme: false });
+                            elevationStats = {
+                                ascend_m: prof.ascend_m,
+                                descend_m: prof.descend_m,
+                                min_alt_m: prof.min_alt_m,
+                                max_alt_m: prof.max_alt_m,
+                                duration_min: prof.estimated_duration_min
+                            };
+                        }
+                    } catch (e) {
+                        console.warn('[ExportService] Could not compute elevation profile for export', e);
+                    }
+                }
+            }
+
+            // 2b. Map Pagination (1:25 000 multi-sheet tiling)
+            const includeMapPagination = options.includeMapPagination ?? false;
+            let mapPaginationPlan: PaginationPlan | undefined;
+            let mapPaginationSvg: string | undefined;
+
+            if (includeMapPagination) {
+                const trackLines: [number, number][][] = [];
+                for (const r of (state.routes || [])) {
+                    if (!r) continue;
+                    const geom = r.geojson?.geometry || r.geojson;
+                    const pts = geom?.coordinates || [];
+                    const line: [number, number][] = [];
+                    for (const pt of pts) {
+                        if (Array.isArray(pt) && pt.length >= 2) {
+                            line.push([pt[1], pt[0]]); // [lat, lon]
+                        }
+                    }
+                    if (line.length >= 2) trackLines.push(line);
+                }
+
+                if (trackLines.length > 0) {
+                    try {
+                        const plan = MapPagination.plan({
+                            lines: trackLines,
+                            scale: 25000,
+                            paper: [210, 297], // A4
+                            orient: 'auto',
+                            mix: true,
+                            margin: 8,
+                            overlap: 10,
+                            corridor: 6
+                        });
+                        if (plan && plan.pages.length > 0) {
+                            mapPaginationPlan = plan;
+                            mapPaginationSvg = MapPagination.generateAssemblySvg(plan, trackLines);
+                        }
+                    } catch (e) {
+                        console.warn('[ExportService] Could not compute map pagination for export', e);
+                    }
+                }
+            }
+
             const baseOpts: Omit<ExportRenderOptions, 'isSolution'> = {
                 title: options.title || 'Carnet de Route',
                 subtitle: options.subtitle || '',
                 date: options.subtitle || new Date().toLocaleDateString('fr-FR'),
                 themeTitle: themeManager.getLabel('main_title', 'CARNET DE ROUTE'),
                 includeGeneralMap: options.includeGeneralMap,
+                includeElevationProfile: includeElevation && !!elevationSvg,
+                elevationSvg,
+                elevationStats,
+                includeMapPagination: includeMapPagination && !!mapPaginationPlan,
+                mapPaginationPlan,
+                mapPaginationSvg,
                 includeAnnexes: options.includeAnnexes ?? true,
                 vigenereKey: themeManager.getVigenereKey(),
                 pointAnnotations: state.point_annotations,
@@ -208,7 +294,8 @@ export class ExportService {
                 );
 
                 const suffix = ver.isSolution ? '_SOLUCE' : '';
-                const safeName = (options.title || 'Carnet').replace(/\s+/g, '_');
+                const docTitle = (options.title || state.document_title || 'Carnet').trim();
+                const safeName = docTitle.replace(/[/\\?%*:|"<>]/g, '_').replace(/\s+/g, '_') || 'Carnet';
 
                 if (format === 'html') {
                     const ok = await this.saveHTML(htmlPayload, `${safeName}${suffix}.html`);
@@ -262,39 +349,48 @@ export class ExportService {
         engine: 'weasyprint' | 'electron' | 'auto'
     ): Promise<boolean> {
         const api = getElectronAPI();
+
         if (!api) {
-            console.warn('[ExportService] No Electron API. Cannot generate PDF.');
-            // Browser fallback: save as HTML instead
-            return this.saveHTML(html, defaultFilename.replace('.pdf', '.html'));
-        }
+            console.log('[ExportService] Navigateur Web détecté : rendu PDF WeasyPrint via serveur backend...');
+            try {
+                const res = await fetch('/api/render/html-to-pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ html, title: defaultFilename.replace('.pdf', '') })
+                });
 
-        const outputPath = await api.showSaveDialog(defaultFilename, 'pdf');
-        if (!outputPath) return false; // User cancelled
-
-        // Try WeasyPrint first if requested
-        if (engine === 'weasyprint' || engine === 'auto') {
-            if (api.convertHtmlToPdf) {
-                console.log('[ExportService] Attempting WeasyPrint conversion...');
-                try {
-                    const result = await api.convertHtmlToPdf(html, outputPath);
-                    if (result.success) {
-                        console.log(`[ExportService] WeasyPrint PDF saved to ${outputPath}`);
-                        return true;
-                    }
-                    console.warn('[ExportService] WeasyPrint failed:', result.error);
-                    if (engine === 'weasyprint') {
-                        throw new Error(`WeasyPrint conversion failed: ${result.error}`);
-                    }
-                    // Fall through to Electron if engine is 'auto'
-                } catch (err) {
-                    if (engine === 'weasyprint') throw err;
-                    console.warn('[ExportService] WeasyPrint unavailable, falling back to Electron printToPDF...');
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = defaultFilename;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                    return true;
                 }
+                const errText = await res.text();
+                throw new Error(`Erreur serveur WeasyPrint (${res.status}): ${errText}`);
+            } catch (e: any) {
+                console.error('[ExportService] Échec du rendu WeasyPrint distant:', e);
+                throw new Error(`Génération PDF impossible sans WeasyPrint : ${e.message}`);
             }
         }
 
-        // Electron printToPDF fallback
-        console.log('[ExportService] Using Electron printToPDF...');
+        const outputPath = await api.showSaveDialog(defaultFilename, 'pdf');
+        if (!outputPath) return false; // Annulation utilisateur
+
+        // Compilation WeasyPrint native côté Electron
+        if (api.convertHtmlToPdf) {
+            console.log('[ExportService] Compilation du PDF via le moteur natif WeasyPrint...');
+            const result = await api.convertHtmlToPdf(html, outputPath);
+            if (result.success) {
+                console.log(`[ExportService] PDF WeasyPrint enregistré avec succès : ${outputPath}`);
+                return true;
+            }
+            throw new Error(`Échec de la compilation WeasyPrint : ${result.error || 'Erreur inconnue'}`);
+        }
+
+        // Relevé d'export direct (qui invoque également WeasyPrint dans main.js)
         return await api.exportFile(html, 'pdf', outputPath);
     }
 
@@ -564,10 +660,11 @@ export class ExportService {
         options: ExportPipelineOptions
     ): Promise<boolean> {
         const csv = this.generateCSVString(state, options);
-        const title = options.title || 'Carnet de Route';
+        const title = (options.title || state.document_title || 'Carnet de Route').trim();
+        const safeName = title.replace(/[/\\?%*:|"<>]/g, '_').replace(/\s+/g, '_') || 'Carnet';
 
         // ── Sauvegarde ───────────────────────────────────────────────────────
-        const defaultFilename = `Carnet_${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+        const defaultFilename = `Carnet_${safeName}_${new Date().toISOString().slice(0, 10)}.csv`;
         const api = getElectronAPI();
 
         if (api) {

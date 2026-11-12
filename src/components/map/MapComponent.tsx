@@ -10,6 +10,7 @@ import CursorPreviewLine from './CursorPreviewLine';
 import InactiveItinerariesLayer from './InactiveItinerariesLayer';
 import AnnotationsMapLayer from './AnnotationsMapLayer';
 import DrawAnnotationsLayer from './DrawAnnotationsLayer';
+import TextAnnotationsLayer from './TextAnnotationsLayer';
 import { computeLayerOrder, layerPaneName, layerPaneZIndex } from '../../logic/LayerOrder';
 
 // Fix default marker icons (leaflet bundling issue with Vite)
@@ -60,9 +61,10 @@ function LayerPaneManager() {
         points: state.point_annotations || [],
         areas: state.area_annotations || [],
         draws: state.draw_annotations || [],
+        texts: state.text_annotations || [],
         savedOrder: state.layer_order,
         selectedId: state.selected_layer_id,
-    }), [state.itineraries, state.point_annotations, state.area_annotations, state.draw_annotations, state.layer_order, state.selected_layer_id]);
+    }), [state.itineraries, state.point_annotations, state.area_annotations, state.draw_annotations, state.text_annotations, state.layer_order, state.selected_layer_id]);
 
     // useLayoutEffect runs before react-leaflet's passive effects create the
     // layers, so every child can safely target its pane on first mount.
@@ -398,7 +400,7 @@ export default function MapComponent() {
             <MapContainer
                 center={position}
                 zoom={13}
-                style={{ height: '100%', width: '100%', cursor: ['route', 'route_direct', 'node', 'azimut', 'annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw'].includes(state.active_tool) ? 'crosshair' : 'grab' }}
+                style={{ height: '100%', width: '100%', cursor: ['route', 'route_direct', 'node', 'azimut', 'annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw', 'annotate_text'].includes(state.active_tool) ? 'crosshair' : 'grab' }}
                 zoomControl={false}
                 attributionControl={false}
             >
@@ -413,6 +415,7 @@ export default function MapComponent() {
                 <InactiveItinerariesLayer />
                 <AnnotationsMapLayer />
                 <DrawAnnotationsLayer />
+                <TextAnnotationsLayer />
                 <ActiveRouteLayer />
                 <CursorPreviewLine cursorPos={cursorPos} />
                 <InteractiveStages />

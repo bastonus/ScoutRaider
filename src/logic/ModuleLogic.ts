@@ -299,6 +299,7 @@ export class ModuleLogic {
             case 'maritime':    return this.maritime(text);
             case 'drapeaux':    return text; // Flag narrative handled separately
             case 'texte_clair': return this.texteClair(text);
+            case 'carte_simple':
             case 'carte_ign':   return text; // Map module, no encoding
             default:            return text;
         }

@@ -80,6 +80,11 @@ function createMenu() {
           accelerator: 'CmdOrCtrl+S',
           click: () => mainWindow?.webContents.send('menu-action', 'save') // Frontend will call window.electronAPI.saveScoutproj()
         },
+        {
+          label: 'Enregistrer sous...',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: () => mainWindow?.webContents.send('menu-action', 'save-as')
+        },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' }
       ]
@@ -351,13 +356,14 @@ ipcMain.handle('show-open-dialog', async (event, filters) => {
 });
 
 // Save .srdoc
-ipcMain.handle('save-scoutproj', async (event, stateJSON, filepath) => {
+ipcMain.handle('save-scoutproj', async (event, stateJSON, filepath, defaultName) => {
   try {
     let targetPath = filepath;
     if (!targetPath) {
+      const defName = defaultName ? (defaultName.endsWith('.srdoc') ? defaultName : `${defaultName}.srdoc`) : 'projet.srdoc';
       const { canceled, filePath: dialogPath } = await dialog.showSaveDialog(mainWindow, {
         title: 'Enregistrer le projet',
-        defaultPath: 'projet.srdoc',
+        defaultPath: defName,
         filters: [{ name: 'Document ScoutRaider', extensions: ['srdoc', 'scoutproj'] }]
       });
       if (canceled) return false;
@@ -410,6 +416,69 @@ ipcMain.handle('write-file', async (event, filePath, data) => {
   return true;
 });
 
+// ─── WeasyPrint Integration ───────────────────────────────────────────────
+
+function getWeasyPrintCandidates() {
+  const localAppData = process.env.LOCALAPPDATA || '';
+  const python312 = path.join(localAppData, 'Programs', 'Python', 'Python312');
+  const python312Exe = path.join(python312, 'python.exe');
+  const weasyprint312Exe = path.join(python312, 'Scripts', 'weasyprint.exe');
+
+  return [
+    { cmd: 'weasyprint', args: [] },
+    { cmd: 'python', args: ['-m', 'weasyprint'] },
+    { cmd: weasyprint312Exe, args: [] },
+    { cmd: python312Exe, args: ['-m', 'weasyprint'] },
+    { cmd: 'py', args: ['-3.12', '-m', 'weasyprint'] },
+    { cmd: 'python3', args: ['-m', 'weasyprint'] },
+  ];
+}
+
+async function renderHtmlToPdfWithWeasyPrint(html, outputPath) {
+  const tmpDir = os.tmpdir();
+  const tmpHtml = path.join(tmpDir, `scoutraider_export_${Date.now()}_${Math.random().toString(36).substring(7)}.html`);
+
+  try {
+    await fs.writeFile(tmpHtml, html, 'utf-8');
+    const candidates = getWeasyPrintCandidates();
+    let lastError = null;
+
+    for (const c of candidates) {
+      try {
+        const ok = await new Promise((resolve, reject) => {
+          const runArgs = [...c.args, tmpHtml, outputPath];
+          execFile(c.cmd, runArgs, {
+            timeout: 120000,
+            maxBuffer: 1024 * 1024 * 20,
+            windowsHide: true,
+          }, (err, stdout, stderr) => {
+            if (err) {
+              return reject(new Error(stderr || err.message));
+            }
+            resolve(true);
+          });
+        });
+
+        if (ok) {
+          try { await fs.unlink(tmpHtml); } catch { /* ignore */ }
+          return { success: true };
+        }
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    try { await fs.unlink(tmpHtml); } catch { /* ignore */ }
+    return {
+      success: false,
+      error: lastError ? lastError.message : 'Aucun binaire WeasyPrint valide trouvé sur le système.'
+    };
+  } catch (err) {
+    try { await fs.unlink(tmpHtml); } catch { /* ignore */ }
+    return { success: false, error: err.message };
+  }
+}
+
 // Export File (PDF / HTML)
 ipcMain.handle('export-file', async (event, html, format, outputPath) => {
   try {
@@ -419,32 +488,11 @@ ipcMain.handle('export-file', async (event, html, format, outputPath) => {
     } 
     
     if (format === 'pdf') {
-      // Create a hidden window to render the HTML and printToPDF
-      const printWin = new BrowserWindow({
-        show: false,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true
-        }
-      });
-
-      // Load the raw HTML into the hidden browser window
-      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
-      await printWin.loadURL(dataUrl);
-
-      // Wait a bit for any map tiles/images/fonts to finish rendering
-      // In a robust implementation, we'd wait for a signal from the renderer, but 2s is a reasonable fallback
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const pdfData = await printWin.webContents.printToPDF({
-        printBackground: true,
-        pageSize: 'A4',
-        margin: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 }
-      });
-
-      await fs.writeFile(outputPath, pdfData);
-      printWin.destroy();
-      return true;
+      const res = await renderHtmlToPdfWithWeasyPrint(html, outputPath);
+      if (res.success) {
+        return true;
+      }
+      throw new Error(`WeasyPrint export failed: ${res.error}`);
     }
     
     return false;
@@ -454,68 +502,30 @@ ipcMain.handle('export-file', async (event, html, format, outputPath) => {
   }
 });
 
-// ─── WeasyPrint Integration ───────────────────────────────────────────────
-
 // Check if WeasyPrint is available
 ipcMain.handle('check-weasyprint', async () => {
-  return new Promise((resolve) => {
-    execFile('python', ['-m', 'weasyprint', '--version'], { timeout: 5000 }, (error, stdout) => {
-      if (error) {
-        // Try python3 on Unix-like systems
-        execFile('python3', ['-m', 'weasyprint', '--version'], { timeout: 5000 }, (err2, stdout2) => {
-          if (err2) {
-            resolve({ available: false });
-          } else {
-            resolve({ available: true, version: stdout2.trim() });
-          }
+  const candidates = getWeasyPrintCandidates();
+  for (const c of candidates) {
+    try {
+      const ver = await new Promise((resolve, reject) => {
+        execFile(c.cmd, [...c.args, '--version'], { timeout: 5000, windowsHide: true }, (err, stdout) => {
+          if (err) return reject(err);
+          resolve(stdout.trim());
         });
-      } else {
-        resolve({ available: true, version: stdout.trim() });
+      });
+      if (ver) {
+        return { available: true, version: ver };
       }
-    });
-  });
+    } catch {
+      // Try next candidate
+    }
+  }
+  return { available: false };
 });
 
 // Convert HTML to PDF via WeasyPrint
 ipcMain.handle('convert-html-to-pdf', async (event, html, outputPath) => {
-  const tmpDir = os.tmpdir();
-  const tmpHtml = path.join(tmpDir, `scoutraider_export_${Date.now()}.html`);
-
-  try {
-    // Write HTML to temp file
-    await fs.writeFile(tmpHtml, html, 'utf-8');
-
-    // Run WeasyPrint
-    return await new Promise((resolve) => {
-      const tryPython = (cmd) => {
-        execFile(cmd, ['-m', 'weasyprint', tmpHtml, outputPath], {
-          timeout: 120000, // 2 minutes max
-          maxBuffer: 1024 * 1024 * 10,
-        }, async (error, stdout, stderr) => {
-          // Clean up temp file
-          try { await fs.unlink(tmpHtml); } catch { /* ignore */ }
-
-          if (error) {
-            if (cmd === 'python') {
-              // Retry with python3
-              tryPython('python3');
-            } else {
-              resolve({
-                success: false,
-                error: stderr || error.message || 'WeasyPrint conversion failed'
-              });
-            }
-          } else {
-            resolve({ success: true });
-          }
-        });
-      };
-      tryPython('python');
-    });
-  } catch (err) {
-    try { await fs.unlink(tmpHtml); } catch { /* ignore */ }
-    return { success: false, error: err.message };
-  }
+  return await renderHtmlToPdfWithWeasyPrint(html, outputPath);
 });
 
 // ─── Custom Logger ────────────────────────────────────────────────────────
