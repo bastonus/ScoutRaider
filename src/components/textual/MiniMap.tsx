@@ -464,12 +464,28 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
     }, [stepId, initialPersist?.scaleName, initialPersist?.zoom, zoom25k, midPoint, dispatch]);
 
     const handleMapMoved = useCallback((newZoom: number, newCenter: [number, number], newBounds: [[number, number], [number, number]]) => {
+        // Recalcul du scaleName d'après le zoom réel (pour affichage live dans la barre d'outils)
+        const realScaleDenom = calculateScaleForZoom(newZoom, newCenter[0]);
+        // Snap vers l'échelle nommée la plus proche
+        const named: Array<{ id: string; denom: number }> = [
+            { id: '1:10000', denom: 10000 },
+            { id: '1:25000', denom: 25000 },
+            { id: '1:50000', denom: 50000 },
+            { id: '1:100000', denom: 100000 },
+        ];
+        const closest = named.reduce((best, item) =>
+            Math.abs(item.denom - realScaleDenom) < Math.abs(best.denom - realScaleDenom) ? item : best
+        );
+        // On ne snap le nom que si on est à moins d'un facteur 1.5 de l'échelle nommée — sinon on garde 'auto'
+        const snapName = Math.abs(closest.denom - realScaleDenom) / closest.denom < 0.5 ? closest.id : 'auto';
+
         dispatch({
             type: 'PERSIST_MAP_STATE',
             stepId,
             zoom: newZoom,
             center: newCenter,
-            bounds: newBounds
+            bounds: newBounds,
+            scaleName: snapName,
         });
     }, [dispatch, stepId]);
 
@@ -741,6 +757,37 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
                             <MapControllerBridge bridgeRef={mapBridgeRef} />
                         </MapContainer>
 
+                        {/* Indicateur d'échelle réelle calculée dynamiquement */}
+                        {(() => {
+                            const currentZoom = initialPersist?.zoom ?? zoom25k;
+                            const lat = initialPersist?.center?.[0] ?? midPoint[0];
+                            const realDenom = calculateScaleForZoom(currentZoom, lat);
+                            const roundedDenom = Math.round(realDenom / 500) * 500;
+                            const label = roundedDenom >= 1000
+                                ? '1:' + (roundedDenom / 1000).toFixed(0) + '\u202f000'
+                                : '1:' + roundedDenom;
+                            return (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '6px',
+                                    right: '6px',
+                                    zIndex: 450,
+                                    background: 'rgba(15,23,42,0.88)',
+                                    color: 'rgba(255,255,255,0.80)',
+                                    fontSize: '9px',
+                                    fontFamily: 'monospace',
+                                    fontWeight: 600,
+                                    padding: '2px 7px',
+                                    border: '1px solid rgba(255,255,255,0.12)',
+                                    pointerEvents: 'none',
+                                    whiteSpace: 'nowrap',
+                                    letterSpacing: '0.04em',
+                                }}>
+                                    {label}
+                                </div>
+                            );
+                        })()}
+
                         {/* Discrets boutons Zoom + / - locaux en bas à droite */}
                         <div style={{
                             position: 'absolute',
@@ -789,9 +836,9 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
                                 <ZoomOut size={12} />
                             </button>
                         </div>
-                    </div>
+                    </div>{/* ── fin CONTENEUR TUILES LEAFLET ── */}
 
-                    {/* ── LES 4 POINTS DE MANIPULATION AUX COINS ── */}
+{/* ── LES 4 POINTS DE MANIPULATION AUX COINS ── */}
                     
                     {/* 1. Coin Haut-Gauche */}
                     <div
