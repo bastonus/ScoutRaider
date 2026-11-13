@@ -178,7 +178,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const login = async (username: string, password: string) => {
-        setIsLoading(true);
         try {
             const data = await CloudAuthService.login(username, password);
             setUser(data.user);
@@ -187,14 +186,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setAuthModalOpen(false);
             dispatch({ type: 'ADD_NOTIFICATION', message: `Connecté en tant que ${data.user.username}`, notifType: 'info' });
         } catch (err: any) {
-            setIsLoading(false);
             throw err;
         }
-        setIsLoading(false);
     };
 
     const register = async (username: string, password: string, email?: string) => {
-        setIsLoading(true);
         try {
             const data = await CloudAuthService.register(username, password, email);
             setUser(data.user);
@@ -203,10 +199,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setAuthModalOpen(false);
             dispatch({ type: 'ADD_NOTIFICATION', message: `Bienvenue, ${data.user.username} ! Votre compte est créé.`, notifType: 'info' });
         } catch (err: any) {
-            setIsLoading(false);
             throw err;
         }
-        setIsLoading(false);
     };
 
     const continueAsGuest = () => {
