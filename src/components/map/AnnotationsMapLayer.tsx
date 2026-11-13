@@ -173,6 +173,7 @@ interface PointMarkerProps {
     isSelected: boolean;
     /** True while an area tool (annotate_area / annotate_area_routed) is active. */
     areaMode: boolean;
+    activeTool: string;
     onSelect: (id: string) => void;
     onDragEnd: (id: string, lat: number, lng: number) => void;
     onDelete: (id: string) => void;
@@ -180,7 +181,7 @@ interface PointMarkerProps {
 }
 
 const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
-    point, isSelected, areaMode, onSelect, onDragEnd, onDelete, dispatch
+    point, isSelected, areaMode, activeTool, onSelect, onDragEnd, onDelete, dispatch
 }: PointMarkerProps) {
     const markerRef = useRef<any>(null);
     const [hovering, setHovering] = useState(false);
@@ -208,12 +209,12 @@ const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
     }, [point.id, onDragEnd]);
 
     const handleClick = useCallback((e: any) => {
-        // With an area tool active, clicking a repère must anchor the area on it:
-        // let the click bubble to the map handler instead of selecting the repère.
-        if (areaMode) return;
+        // If route or area tool is active, clicking a repère must let the click bubble
+        // so the map handler snaps the new stage or polygon vertex to the repère's exact coordinates.
+        if (activeTool === 'route' || activeTool === 'route_direct' || areaMode) return;
         L.DomEvent.stopPropagation(e);
         onSelect(point.id);
-    }, [point.id, onSelect, areaMode]);
+    }, [point.id, onSelect, areaMode, activeTool]);
 
     const handleContextMenu = useCallback((e: any) => {
         L.DomEvent.stopPropagation(e);
@@ -233,7 +234,7 @@ const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
             }
         },
         mouseout: () => setHovering(false),
-    }), [handleDragStart, handleDragEnd, handleClick, handleContextMenu, address, point.coords, areaMode]);
+    }), [handleDragStart, handleDragEnd, handleClick, handleContextMenu, address, point.coords, areaMode, activeTool]);
 
     return (
         <Marker
@@ -244,14 +245,24 @@ const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
             zIndexOffset={2000}
             eventHandlers={eventHandlers}
         >
-            {hovering && (point.text || address) && (
-                <Tooltip permanent direction="top" offset={[0, -50]} className="sr-map-label-point-hover">
-                    {point.text && <div style={{ marginBottom: '4px', fontSize: '11px', color: '#e2e8f0', maxWidth: '200px', whiteSpace: 'normal', lineHeight: 1.4 }}>{point.text}</div>}
-                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
+            <Tooltip direction="top" offset={[0, -42]} className="sr-map-label-point-hover">
+                <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
+                    <div style={{ fontWeight: 800, color: point.color || '#3b82f6', marginBottom: '2px' }}>{point.title}</div>
+                    {point.text && <div style={{ fontSize: '10px', color: '#e2e8f0', maxWidth: '200px', whiteSpace: 'normal', lineHeight: 1.3, marginBottom: '2px' }}>{point.text}</div>}
+                    <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic', marginBottom: '4px' }}>
                         {address || `${point.coords[0].toFixed(5)}, ${point.coords[1].toFixed(5)}`}
                     </div>
-                </Tooltip>
-            )}
+                    <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '3px' }}>
+                        {activeTool === 'route' || activeTool === 'route_direct' ? (
+                            <span style={{ color: '#6ee7b7' }}>Clic : relier l'itinéraire à ce repère</span>
+                        ) : areaMode ? (
+                            <span style={{ color: '#6ee7b7' }}>Clic : ancrer le sommet de la zone</span>
+                        ) : (
+                            <span>Clic : éditer · Glisser : déplacer · Clic droit : supprimer</span>
+                        )}
+                    </div>
+                </div>
+            </Tooltip>
             <Popup className="sr-annotation-popup" autoPanPadding={[40, 40]}>
                 <div style={{ minWidth: '210px', padding: '10px', background: '#141e17', borderRadius: '10px', border: `1px solid ${point.color || '#3b82f6'}55`, color: '#e8f0eb' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -530,6 +541,7 @@ export default function AnnotationsMapLayer() {
                     point={point}
                     isSelected={selectedId === point.id}
                     areaMode={isAreaTool}
+                    activeTool={activeTool}
                     onSelect={setSelectedId}
                     onDragEnd={handlePointDragEnd}
                     onDelete={handlePointDelete}

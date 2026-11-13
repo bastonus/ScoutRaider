@@ -9,7 +9,7 @@
  *   - Ctrl+T shortcut support
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Polyline, useMap } from 'react-leaflet';
+import { Polyline, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
 import type { DrawAnnotation, DrawStroke } from '../../logic/types';
@@ -314,6 +314,11 @@ export default function DrawAnnotationsLayer() {
 
                     const isStrokeSelected = selectedLayerId === draw.id && selectedSublayerId === stroke.id;
                     const isGroupSelected = selectedLayerId === draw.id && !selectedSublayerId;
+                    const isOtherCreationTool = [
+                        'route', 'route_direct', 'annotate_point', 'annotate_area', 
+                        'annotate_area_routed', 'annotate_text', 'node', 'azimut'
+                    ].includes(activeTool);
+                    const canInteractWithStroke = isDrawTool || !isOtherCreationTool;
 
                     return (
                         <React.Fragment key={`stroke-${draw.id}-${stroke.id}`}>
@@ -324,16 +329,25 @@ export default function DrawAnnotationsLayer() {
                                 pathOptions={{
                                     color: 'transparent',
                                     weight: Math.max(stroke.strokeWidth + 12, 18),
-                                    interactive: true,
+                                    interactive: canInteractWithStroke,
                                 } as any}
-                                eventHandlers={{
+                                eventHandlers={canInteractWithStroke ? {
                                     click: (e) => {
                                         L.DomEvent.stopPropagation(e);
                                         // Clicking a stroke selects this specific sublayer
                                         dispatch({ type: 'SET_SELECTED_SUBLAYER', layerId: draw.id, sublayerId: stroke.id });
                                     }
-                                }}
-                            />
+                                } : undefined}
+                            >
+                                {canInteractWithStroke && (
+                                    <Tooltip sticky direction="top">
+                                        <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
+                                            <b style={{ color: stroke.color }}>{draw.title}</b>
+                                            <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>Clic : sélectionner ce trait</div>
+                                        </div>
+                                    </Tooltip>
+                                )}
+                            </Polyline>
                             {/* Visual stroke */}
                             <Polyline
                                 positions={pts}

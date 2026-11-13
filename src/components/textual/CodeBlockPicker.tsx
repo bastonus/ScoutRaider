@@ -35,12 +35,12 @@ export default function CodeBlockPicker({ afterStepId, anchorSegmentIdx, onClose
 
     return (
         <div style={{
-            background: 'var(--bg-panel)',
-            border: '1px solid var(--bg-border)',
-            borderRadius: '10px',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)',
             padding: '16px',
             margin: '8px 0 8px 88px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            boxShadow: 'var(--shadow-md)',
         }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -60,9 +60,9 @@ export default function CodeBlockPicker({ afterStepId, anchorSegmentIdx, onClose
                 autoFocus
                 style={{
                     width: '100%', minHeight: '72px',
-                    background: 'var(--bg-base)', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px',
-                    fontFamily: '"Inter", sans-serif', lineHeight: 1.6,
+                    background: 'var(--bg-base)', border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-xs)', color: 'var(--text-primary)', fontSize: '13px',
+                    fontFamily: 'var(--font-ui)', lineHeight: 1.6,
                     padding: '8px', resize: 'vertical', outline: 'none', boxSizing: 'border-box',
                 }}
                 onKeyDown={e => {
@@ -72,7 +72,7 @@ export default function CodeBlockPicker({ afterStepId, anchorSegmentIdx, onClose
             />
 
             {/* Module selector below */}
-            <div style={{ margin: '10px 0 5px', fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <div style={{ margin: '10px 0 5px', fontSize: '10px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Encodage
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '12px' }}>
@@ -85,8 +85,8 @@ export default function CodeBlockPicker({ afterStepId, anchorSegmentIdx, onClose
                             onClick={() => setSelectedModule(modId)}
                             style={{
                                 display: 'flex', alignItems: 'center', gap: '5px',
-                                padding: '3px 9px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: 600,
-                                border: `1px solid ${active ? meta.color : 'rgba(255,255,255,0.1)'}`,
+                                padding: '3px 9px', borderRadius: 'var(--radius-pill)', cursor: 'pointer', fontSize: '11px', fontWeight: 600,
+                                border: `1px solid ${active ? meta.color : 'var(--border-subtle)'}`,
                                 background: active ? `${meta.color}20` : 'transparent',
                                 color: active ? meta.color : 'var(--text-dim)',
                                 transition: 'all 0.12s',
@@ -101,15 +101,15 @@ export default function CodeBlockPicker({ afterStepId, anchorSegmentIdx, onClose
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                <button onClick={onClose} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', color: 'var(--text-dim)', cursor: 'pointer', padding: '5px 12px', fontSize: '11px' }}>
+                <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xs)', color: 'var(--text-dim)', cursor: 'pointer', padding: '5px 12px', fontSize: '11px' }}>
                     Annuler
                 </button>
                 <button
                     onClick={handleInsert}
                     disabled={!content.trim()}
                     style={{
-                        background: content.trim() ? 'var(--accent-default)' : 'rgba(255,255,255,0.05)',
-                        border: 'none', borderRadius: '4px',
+                        background: content.trim() ? 'var(--accent-default)' : 'var(--bg-surface)',
+                        border: 'none', borderRadius: 'var(--radius-xs)',
                         color: content.trim() ? '#fff' : 'var(--text-dim)',
                         cursor: content.trim() ? 'pointer' : 'default',
                         padding: '5px 14px', fontSize: '11px', fontWeight: 700,

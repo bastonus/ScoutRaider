@@ -15,21 +15,21 @@ function PolygonIcon({ color = 'currentColor', size = 13 }: { color?: string; si
 function InfoCard({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
     return (
         <div style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: '8px',
-            padding: '10px 12px',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '8px 10px',
             display: 'flex',
             flexDirection: 'column',
             gap: '3px'
         }}>
-            <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+            <div style={{ fontSize: '10.5px', color: 'var(--text-dim)', fontWeight: 500 }}>
                 {label}
             </div>
-            <div style={{ fontSize: '13px', color: '#fff', fontWeight: 600 }}>
+            <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: 500, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
                 {value}
             </div>
-            {sub && <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{sub}</div>}
+            {sub && <div style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>{sub}</div>}
         </div>
     );
 }

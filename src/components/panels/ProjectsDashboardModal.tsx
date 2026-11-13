@@ -20,6 +20,14 @@ export default function ProjectsDashboardModal({ onClose }: ProjectsDashboardMod
     const { user, loadFromCloud, cloudProjectId } = useAuth();
     const { dispatch } = useApp();
 
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 640);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     const [projects, setProjects] = useState<CloudProjectSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -131,120 +139,134 @@ export default function ProjectsDashboardModal({ onClose }: ProjectsDashboardMod
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '24px'
+            padding: isMobile ? 0 : '24px'
         }}>
             <div style={{
-                background: '#131D17',
-                border: '1px solid #283D30',
-                borderRadius: '16px',
+                background: 'var(--bg-elevated)',
+                border: isMobile ? 'none' : '1px solid var(--border-subtle)',
+                borderRadius: isMobile ? 0 : 'var(--radius-md)',
                 width: '100%',
-                maxWidth: '960px',
-                height: '85vh',
-                maxHeight: '800px',
+                maxWidth: isMobile ? '100vw' : '960px',
+                height: isMobile ? '100dvh' : '85vh',
+                maxHeight: isMobile ? '100dvh' : '800px',
                 display: 'flex',
                 flexDirection: 'column',
-                boxShadow: '0 30px 60px rgba(0,0,0,0.7)',
+                boxShadow: 'var(--shadow-lg)',
                 overflow: 'hidden',
-                color: '#E0E8E3',
-                fontFamily: 'system-ui, -apple-system, sans-serif'
+                color: 'var(--text-default)',
+                fontFamily: 'var(--font-ui)'
             }}>
-                {/* Header Google Drive / Docs Workspace */}
+                {/* Header Documents Workspace */}
                 <div style={{
-                    padding: '20px 24px',
-                    borderBottom: '1px solid #203126',
+                    padding: '14px 20px',
+                    borderBottom: '1px solid var(--border-subtle)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '16px',
-                    background: '#16231C'
+                    background: 'var(--bg-panel)'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '10px',
-                            background: 'rgba(110, 201, 126, 0.15)',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border-subtle)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: '#6EC97E'
+                            color: 'var(--text-primary)'
                         }}>
-                            <FileText size={22} />
+                            <FileText size={18} />
                         </div>
                         <div>
-                            <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: '#F0F6F2' }}>
-                                Espace Documents ScoutRaider
+                            <h2 style={{ fontSize: '15px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
+                                Documents ScoutRaider
                             </h2>
-                            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#8BA594' }}>
-                                Accédez à tous vos raids, cartes et documents partagés
+                            <p style={{ margin: '1px 0 0', fontSize: '11px', color: 'var(--text-dim)' }}>
+                                Raids, parcours cartographiques et documents partagés
                             </p>
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <button
                             onClick={handleNewDocument}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '8px',
-                                background: '#238636',
-                                color: '#FFF',
-                                border: 'none',
-                                borderRadius: '8px',
-                                padding: '8px 16px',
-                                fontSize: '13px',
+                                gap: '6px',
+                                background: 'var(--accent-primary)',
+                                color: 'var(--accent-primary-text)',
+                                border: '1px solid var(--accent-primary)',
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '0 12px',
+                                height: '28px',
+                                fontSize: '12px',
                                 fontWeight: 600,
                                 cursor: 'pointer',
-                                boxShadow: '0 2px 6px rgba(35, 134, 54, 0.3)'
+                                transition: 'all 100ms ease'
                             }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-primary-hover)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'var(--accent-primary)'}
                         >
-                            <Plus size={16} />
+                            <Plus size={14} />
                             Nouveau document
                         </button>
 
                         <button
                             onClick={onClose}
                             style={{
-                                background: 'none',
+                                background: 'transparent',
                                 border: 'none',
-                                color: '#8BA594',
+                                color: 'var(--text-dim)',
                                 cursor: 'pointer',
-                                padding: '6px',
-                                borderRadius: '6px'
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = '#FFF'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = '#8BA594'}
+                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-dim)'}
                         >
-                            <X size={20} />
+                            <X size={18} />
                         </button>
                     </div>
                 </div>
 
                 {/* Sub-header Controls: Search + Tabs */}
                 <div style={{
-                    padding: '14px 24px',
-                    borderBottom: '1px solid #1F2E25',
+                    padding: '10px 20px',
+                    borderBottom: '1px solid var(--border-subtle)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '16px',
+                    gap: '12px',
                     flexWrap: 'wrap',
-                    background: '#121A15'
+                    background: 'var(--bg-dark)'
                 }}>
                     {/* Tabs */}
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{
+                        display: 'flex',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '2px',
+                        gap: '2px'
+                    }}>
                         <button
                             onClick={() => setActiveTab('all')}
                             style={{
-                                background: activeTab === 'all' ? '#1E3327' : 'transparent',
-                                color: activeTab === 'all' ? '#6EC97E' : '#8BA594',
-                                border: `1px solid ${activeTab === 'all' ? '#2E7D47' : 'transparent'}`,
-                                borderRadius: '7px',
-                                padding: '6px 14px',
-                                fontSize: '13px',
-                                fontWeight: 500,
-                                cursor: 'pointer'
+                                background: activeTab === 'all' ? 'var(--bg-elevated)' : 'transparent',
+                                color: activeTab === 'all' ? 'var(--text-primary)' : 'var(--text-dim)',
+                                border: `1px solid ${activeTab === 'all' ? 'var(--border-subtle)' : 'transparent'}`,
+                                borderRadius: 'var(--radius-xs)',
+                                padding: '3px 10px',
+                                fontSize: '11.5px',
+                                fontWeight: activeTab === 'all' ? 600 : 400,
+                                cursor: 'pointer',
+                                boxShadow: activeTab === 'all' ? 'var(--shadow-sm)' : 'none',
+                                transition: 'all 100ms ease'
                             }}
                         >
                             Tous ({projects.length})
@@ -252,14 +274,16 @@ export default function ProjectsDashboardModal({ onClose }: ProjectsDashboardMod
                         <button
                             onClick={() => setActiveTab('owned')}
                             style={{
-                                background: activeTab === 'owned' ? '#1E3327' : 'transparent',
-                                color: activeTab === 'owned' ? '#6EC97E' : '#8BA594',
-                                border: `1px solid ${activeTab === 'owned' ? '#2E7D47' : 'transparent'}`,
-                                borderRadius: '7px',
-                                padding: '6px 14px',
-                                fontSize: '13px',
-                                fontWeight: 500,
-                                cursor: 'pointer'
+                                background: activeTab === 'owned' ? 'var(--bg-elevated)' : 'transparent',
+                                color: activeTab === 'owned' ? 'var(--text-primary)' : 'var(--text-dim)',
+                                border: `1px solid ${activeTab === 'owned' ? 'var(--border-subtle)' : 'transparent'}`,
+                                borderRadius: 'var(--radius-xs)',
+                                padding: '3px 10px',
+                                fontSize: '11.5px',
+                                fontWeight: activeTab === 'owned' ? 600 : 400,
+                                cursor: 'pointer',
+                                boxShadow: activeTab === 'owned' ? 'var(--shadow-sm)' : 'none',
+                                transition: 'all 100ms ease'
                             }}
                         >
                             Mes documents ({projects.filter(p => p.is_owner).length})
@@ -267,17 +291,19 @@ export default function ProjectsDashboardModal({ onClose }: ProjectsDashboardMod
                         <button
                             onClick={() => setActiveTab('shared')}
                             style={{
-                                background: activeTab === 'shared' ? '#1E3327' : 'transparent',
-                                color: activeTab === 'shared' ? '#6EC97E' : '#8BA594',
-                                border: `1px solid ${activeTab === 'shared' ? '#2E7D47' : 'transparent'}`,
-                                borderRadius: '7px',
-                                padding: '6px 14px',
-                                fontSize: '13px',
-                                fontWeight: 500,
-                                cursor: 'pointer'
+                                background: activeTab === 'shared' ? 'var(--bg-elevated)' : 'transparent',
+                                color: activeTab === 'shared' ? 'var(--text-primary)' : 'var(--text-dim)',
+                                border: `1px solid ${activeTab === 'shared' ? 'var(--border-subtle)' : 'transparent'}`,
+                                borderRadius: 'var(--radius-xs)',
+                                padding: '3px 10px',
+                                fontSize: '11.5px',
+                                fontWeight: activeTab === 'shared' ? 600 : 400,
+                                cursor: 'pointer',
+                                boxShadow: activeTab === 'shared' ? 'var(--shadow-sm)' : 'none',
+                                transition: 'all 100ms ease'
                             }}
                         >
-                            Partagés avec moi ({projects.filter(p => !p.is_owner).length})
+                            Partagés ({projects.filter(p => !p.is_owner).length})
                         </button>
                     </div>
 
@@ -286,25 +312,25 @@ export default function ProjectsDashboardModal({ onClose }: ProjectsDashboardMod
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            background: '#0E1611',
-                            border: '1px solid #24382B',
-                            borderRadius: '8px',
-                            padding: '0 10px',
-                            width: '240px'
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '0 8px',
+                            height: '28px',
+                            width: '220px'
                         }}>
-                            <Search size={15} color="#6A8072" style={{ marginRight: '6px' }} />
+                            <Search size={13} color="var(--text-dim)" style={{ marginRight: '6px' }} />
                             <input
                                 type="text"
-                                placeholder="Rechercher par titre, auteur..."
+                                placeholder="Rechercher..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 style={{
                                     background: 'transparent',
                                     border: 'none',
                                     outline: 'none',
-                                    color: '#E0E8E3',
-                                    fontSize: '12px',
-                                    padding: '7px 0',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '11.5px',
                                     width: '100%'
                                 }}
                             />
@@ -314,20 +340,28 @@ export default function ProjectsDashboardModal({ onClose }: ProjectsDashboardMod
                             onClick={fetchProjects}
                             title="Actualiser"
                             style={{
-                                background: '#16231C',
-                                border: '1px solid #24382B',
-                                color: '#8BA594',
-                                borderRadius: '8px',
-                                padding: '7px 10px',
+                                background: 'var(--bg-surface)',
+                                border: '1px solid var(--border-subtle)',
+                                color: 'var(--text-dim)',
+                                borderRadius: 'var(--radius-sm)',
+                                width: '28px',
+                                height: '28px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center'
+                                justifyContent: 'center',
+                                transition: 'all 100ms ease'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = '#6EC97E'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = '#8BA594'}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.color = 'var(--text-primary)';
+                                e.currentTarget.style.borderColor = 'var(--border-strong)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.color = 'var(--text-dim)';
+                                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                            }}
                         >
-                            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
                         </button>
                     </div>
                 </div>
@@ -336,7 +370,7 @@ export default function ProjectsDashboardModal({ onClose }: ProjectsDashboardMod
                 <div style={{
                     flex: 1,
                     overflowY: 'auto',
-                    padding: '24px',
+                    padding: isMobile ? '14px' : '24px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px'
@@ -400,8 +434,8 @@ export default function ProjectsDashboardModal({ onClose }: ProjectsDashboardMod
                     ) : (
                         <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                            gap: '16px'
+                            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))',
+                            gap: '14px'
                         }}>
                             {filteredProjects.map((p) => {
                                 const isCurrent = cloudProjectId === p.id;

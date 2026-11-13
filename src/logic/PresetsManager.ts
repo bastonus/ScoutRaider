@@ -4,10 +4,29 @@
  */
 import type { PresetsFile, PresetData, PresetOverrides, CategoryConstraints } from './types';
 
+const DEFAULT_PRESET: PresetData = {
+    name: 'Seconde Classe (Niveau 2)',
+    polygonalisation: { tolerance_angle: 25, hors_piste: false, forcer_carrefours: true },
+    weights: { carte_ign: 80, texte_clair: 20 },
+    overrides: {}
+};
+
 export class PresetsManager {
-    private data: PresetsFile = { active_preset: null, factory: {}, custom: {} };
-    private _activeId: string | null = null;
-    private _activeData: PresetData | null = null;
+    private data: PresetsFile = {
+        active_preset: 'seconde_classe_1',
+        factory: {
+            seconde_classe_1: DEFAULT_PRESET,
+            arret_de_promesse_1: {
+                name: 'Raid de Promesse (Niveau 1)',
+                polygonalisation: { tolerance_angle: 10, hors_piste: false, forcer_carrefours: true },
+                weights: { carte_ign: 80, texte_clair: 20 },
+                overrides: {}
+            }
+        },
+        custom: {}
+    };
+    private _activeId: string | null = 'seconde_classe_1';
+    private _activeData: PresetData | null = DEFAULT_PRESET;
     private _loaded = false;
 
     get isLoaded(): boolean { return this._loaded; }
@@ -56,7 +75,7 @@ export class PresetsManager {
 
     /** Get the weight dictionary from the active preset */
     getWeights(): Record<string, number> {
-        return this._activeData?.weights || {};
+        return this._activeData?.weights || { carte_ign: 80, texte_clair: 20 };
     }
 
     /** Get per-module overrides from the active preset */

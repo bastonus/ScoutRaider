@@ -55,7 +55,7 @@ interface RightSidebarProps {
   activeSection: SectionId;
   onSectionChange: (id: SectionId) => void;
   onPreferencesOpen?: () => void;
-  width: number;
+  width: number | string;
 }
 
 export default function RightSidebar({ activeSection, onSectionChange, onPreferencesOpen, width }: RightSidebarProps) {
@@ -63,13 +63,15 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
     onSectionChange(id);
   };
 
+  const isFull = width === '100%' || width === 'auto';
+
   return (
     <div style={{ 
-      width: `${width}px`, 
+      width: typeof width === 'number' ? `${width}px` : width, 
       flexShrink: 0, 
       display: 'flex', 
       flexDirection: 'column',
-      borderLeft: '1px solid var(--bg-border)',
+      borderLeft: isFull ? 'none' : '1px solid var(--bg-border)',
       background: 'var(--bg-panel)',
       height: '100%'
     }}>

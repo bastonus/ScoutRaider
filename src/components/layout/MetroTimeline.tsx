@@ -202,7 +202,8 @@ export default function MetroTimeline() {
         <div style={{
             position: 'absolute', top: '14px', left: '50%', transform: 'translateX(-50%)',
             zIndex: 1200, display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: '6px', pointerEvents: 'none', width: '90%', maxWidth: '1050px'
+            gap: '6px', pointerEvents: 'none', width: 'calc(100% - 20px)', maxWidth: '1050px',
+            maxHeight: '75dvh'
         }}>
             <div style={{
                 background: 'rgba(14, 22, 17, 0.96)', border: '1px solid var(--glass-border)',
@@ -399,18 +400,18 @@ export default function MetroTimeline() {
                 )}
             </div>
 
-            {/* ── MODULE PALETTE — accessible et glissable en permanence ── */}
+            {/* ── MODULE PALETTE ── */}
             {steps.length > 0 && (
                 <div style={{
-                    background: 'rgba(14, 22, 17, 0.97)', border: '1px solid var(--glass-border)',
-                    padding: '6px 12px', borderRadius: '10px',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-                    pointerEvents: 'all', animation: 'slideInY 0.15s ease-out',
-                    display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap',
-                    backdropFilter: 'blur(14px)', width: '100%'
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
+                    padding: '6px 10px', borderRadius: 'var(--radius-sm)',
+                    boxShadow: 'var(--shadow-md)',
+                    pointerEvents: 'all',
+                    display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap',
+                    width: '100%'
                 }}>
-                    <span style={{ fontSize: '10px', fontWeight: 800, color: selection.length > 0 ? '#f59e0b' : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.4px', flexShrink: 0 }}>
-                        {selection.length > 0 ? `${selection.length} sélectionné${selection.length > 1 ? 's' : ''} →` : 'Glisser un module :'}
+                    <span style={{ fontSize: '10.5px', fontWeight: 500, color: selection.length > 0 ? 'var(--accent-secondary)' : 'var(--text-dim)', flexShrink: 0 }}>
+                        {selection.length > 0 ? `${selection.length} sélectionné${selection.length > 1 ? 's' : ''} :` : 'Modules :'}
                     </span>
                     {ALL_MODULE_IDS.map(modId => {
                         const meta = MODULE_META[modId];
@@ -423,34 +424,33 @@ export default function MetroTimeline() {
                                 onClick={() => handleAssign(modId)}
                                 title={`${meta.label} (glisser sur un tronçon ou cliquer pour assigner)`}
                                 style={{
-                                    display: 'flex', alignItems: 'center', gap: '4px',
-                                    padding: '3px 8px', borderRadius: '20px', cursor: 'grab',
-                                    background: allHave ? `${meta.color}33` : 'rgba(255,255,255,0.04)',
-                                    border: `1.5px solid ${allHave ? meta.color : 'rgba(255,255,255,0.1)'}`,
-                                    color: allHave ? meta.color : 'var(--text-dim)',
-                                    fontSize: '11px', fontWeight: 700, transition: 'all 0.12s',
-                                    boxShadow: allHave ? `0 0 8px ${meta.color}44` : 'none'
+                                    display: 'flex', alignItems: 'center', gap: '5px',
+                                    padding: '2px 7px', borderRadius: 'var(--radius-xs)', cursor: 'grab',
+                                    background: allHave ? 'var(--bg-active)' : 'var(--bg-surface)',
+                                    border: `1px solid ${allHave ? 'var(--border-strong)' : 'var(--border-subtle)'}`,
+                                    color: allHave ? 'var(--text-primary)' : 'var(--text-dim)',
+                                    fontSize: '11px', fontWeight: allHave ? 600 : 400, transition: 'all 100ms ease',
                                 }}
                                 onMouseEnter={e => {
-                                    e.currentTarget.style.background = `${meta.color}22`;
-                                    e.currentTarget.style.borderColor = meta.color;
-                                    e.currentTarget.style.color = meta.color;
+                                    e.currentTarget.style.background = 'var(--bg-hover)';
+                                    e.currentTarget.style.borderColor = 'var(--border-strong)';
+                                    e.currentTarget.style.color = 'var(--text-primary)';
                                 }}
                                 onMouseLeave={e => {
-                                    e.currentTarget.style.background = allHave ? `${meta.color}33` : 'rgba(255,255,255,0.04)';
-                                    e.currentTarget.style.borderColor = allHave ? meta.color : 'rgba(255,255,255,0.1)';
-                                    e.currentTarget.style.color = allHave ? meta.color : 'var(--text-dim)';
+                                    e.currentTarget.style.background = allHave ? 'var(--bg-active)' : 'var(--bg-surface)';
+                                    e.currentTarget.style.borderColor = allHave ? 'var(--border-strong)' : 'var(--border-subtle)';
+                                    e.currentTarget.style.color = allHave ? 'var(--text-primary)' : 'var(--text-dim)';
                                 }}
                             >
-                                <div style={{ width: '7px', height: '7px', borderRadius: '2px', background: meta.color, flexShrink: 0 }} />
+                                <div style={{ width: '6px', height: '6px', borderRadius: '1.5px', background: meta.color, flexShrink: 0 }} />
                                 {meta.label}
                             </button>
                         );
                     })}
                     {selection.length > 0 && (
                         <>
-                            <button onClick={() => handleAssign('unassigned')} style={{ padding: '3px 8px', borderRadius: '20px', cursor: 'pointer', background: 'transparent', border: '1.5px dashed rgba(255,255,255,0.15)', color: 'var(--text-dim)', fontSize: '11px', fontWeight: 700 }}>× Effacer</button>
-                            <button onClick={() => setSelection([])} style={{ marginLeft: 'auto', padding: '3px 7px', borderRadius: '5px', cursor: 'pointer', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-dim)', fontSize: '10px' }}>✕</button>
+                            <button onClick={() => handleAssign('unassigned')} style={{ padding: '2px 7px', borderRadius: 'var(--radius-xs)', cursor: 'pointer', background: 'transparent', border: '1px dashed var(--border-subtle)', color: 'var(--text-dim)', fontSize: '11px', fontWeight: 500 }}>Effacer</button>
+                            <button onClick={() => setSelection([])} style={{ marginLeft: 'auto', padding: '2px 6px', borderRadius: 'var(--radius-xs)', cursor: 'pointer', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-dim)', fontSize: '10px' }}>✕</button>
                         </>
                     )}
                 </div>

@@ -43,13 +43,13 @@ function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: (C
 
     return (
         <div ref={ref} onContextMenu={e => e.preventDefault()}
-            style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, background: 'rgba(10,16,12,0.98)', border: '1px solid rgba(110,201,126,0.18)', borderRadius: '10px', padding: '4px', minWidth: '190px', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', backdropFilter: 'blur(20px)' }}>
+            style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '4px', minWidth: '190px', boxShadow: 'var(--shadow-lg)' }}>
             {items.map((item, i) => 'separator' in item
                 ? <div key={i} style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '3px 0' }} />
                 : <button key={i} type="button" onClick={() => { item.onClick(); onClose(); }}
                     onMouseEnter={e => { e.currentTarget.style.background = item.danger ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.07)'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%', padding: '7px 10px', background: 'transparent', border: 'none', borderRadius: '7px', color: item.danger ? '#ef4444' : 'var(--text-bright)', fontSize: '12px', fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%', padding: '6px 8px', background: 'transparent', border: 'none', borderRadius: 'var(--radius-xs)', color: item.danger ? 'var(--semantic-danger)' : 'var(--text-bright)', fontSize: '12px', fontWeight: 500, cursor: 'pointer', textAlign: 'left', transition: 'all 100ms ease' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {item.icon && <span style={{ opacity: 0.7, flexShrink: 0 }}>{item.icon}</span>}
                         {item.label}
@@ -75,10 +75,10 @@ function ColorPickerPopup({ x, y, currentColor, onPick, onClose }: { x: number; 
     }, [onClose]);
     return (
         <div ref={ref} onContextMenu={e => e.preventDefault()}
-            style={{ position: 'fixed', left: x, top: y, zIndex: 10000, background: 'rgba(10,16,12,0.98)', border: '1px solid rgba(110,201,126,0.18)', borderRadius: '10px', padding: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', backdropFilter: 'blur(20px)', display: 'flex', flexWrap: 'wrap', gap: '6px', maxWidth: '170px' }}>
+            style={{ position: 'fixed', left: x, top: y, zIndex: 10000, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '8px', boxShadow: 'var(--shadow-lg)', display: 'flex', flexWrap: 'wrap', gap: '6px', maxWidth: '170px' }}>
             {PRESET_COLORS.map(c => (
                 <div key={c.value} title={c.label} onClick={() => { onPick(c.value); onClose(); }}
-                    style={{ width: '20px', height: '20px', borderRadius: '5px', background: c.value, cursor: 'pointer', boxShadow: currentColor === c.value ? '0 0 0 2.5px #fff, 0 0 0 4px rgba(255,255,255,0.15)' : '0 1px 3px rgba(0,0,0,0.4)', transform: currentColor === c.value ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.1s' }}
+                    style={{ width: '18px', height: '18px', borderRadius: 'var(--radius-xs)', background: c.value, cursor: 'pointer', boxShadow: currentColor === c.value ? '0 0 0 2px var(--text-primary)' : 'none', transform: currentColor === c.value ? 'scale(1.1)' : 'scale(1)', transition: 'transform 100ms ease' }}
                 />
             ))}
         </div>

@@ -38,14 +38,14 @@ export default function StepSeparator({ afterStepId, onAddHtml, onAddCode }: Ste
                     style={{
                         position: 'relative', zIndex: 2,
                         display: 'flex', alignItems: 'center', gap: '5px',
-                        padding: '3px 10px', borderRadius: '12px',
-                        border: `1px solid ${hovered ? 'rgba(255,255,255,0.12)' : 'transparent'}`,
-                        background: hovered ? 'var(--bg-panel)' : 'transparent',
-                        color: hovered ? 'var(--text-dim)' : 'transparent',
+                        padding: '3px 10px', borderRadius: 'var(--radius-pill)',
+                        border: `1px solid ${hovered ? 'var(--border-strong)' : 'transparent'}`,
+                        background: hovered ? 'var(--bg-elevated)' : 'transparent',
+                        color: hovered ? 'var(--text-primary)' : 'transparent',
                         cursor: 'pointer',
                         fontSize: '10px', fontWeight: 600, letterSpacing: '0.04em',
                         transition: 'all 0.15s ease',
-                        boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.25)' : 'none',
+                        boxShadow: hovered ? 'var(--shadow-sm)' : 'none',
                         whiteSpace: 'nowrap',
                     }}
                     title="Ajouter un commentaire HTML riche"
@@ -60,14 +60,14 @@ export default function StepSeparator({ afterStepId, onAddHtml, onAddCode }: Ste
                     style={{
                         position: 'relative', zIndex: 2,
                         display: 'flex', alignItems: 'center', gap: '5px',
-                        padding: '3px 10px', borderRadius: '12px',
-                        border: `1px solid ${hovered ? 'rgba(255,255,255,0.12)' : 'transparent'}`,
-                        background: hovered ? 'var(--bg-panel)' : 'transparent',
-                        color: hovered ? 'var(--text-dim)' : 'transparent',
+                        padding: '3px 10px', borderRadius: 'var(--radius-pill)',
+                        border: `1px solid ${hovered ? 'var(--border-strong)' : 'transparent'}`,
+                        background: hovered ? 'var(--bg-elevated)' : 'transparent',
+                        color: hovered ? 'var(--text-primary)' : 'transparent',
                         cursor: 'pointer',
                         fontSize: '10px', fontWeight: 600, letterSpacing: '0.04em',
                         transition: 'all 0.15s ease',
-                        boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.25)' : 'none',
+                        boxShadow: hovered ? 'var(--shadow-sm)' : 'none',
                         whiteSpace: 'nowrap',
                     }}
                     title="Ajouter un bloc de code encodé"

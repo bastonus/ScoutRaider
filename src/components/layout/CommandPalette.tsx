@@ -155,7 +155,7 @@ export default function CommandPalette({
             icon: state.show_pois_on_map ? <EyeOff size={16} color="#a855f7" /> : <Eye size={16} color="#a855f7" />,
             shortcut: 'Ctrl+Shift+P',
             keywords: 'pois monuments calvaires fontaines',
-            perform: () => dispatch({ type: 'TOGGLE_SHOW_POIS_ON_MAP' }),
+            perform: () => dispatch({ type: 'TOGGLE_POIS_ON_MAP' }),
         });
         items.push({
             id: 'action_toggle_dangers',
@@ -164,7 +164,7 @@ export default function CommandPalette({
             icon: <AlertTriangle size={16} color="#f97316" />,
             shortcut: 'Ctrl+Shift+D',
             keywords: 'danger autoroute route nationale securite',
-            perform: () => dispatch({ type: 'TOGGLE_SHOW_DANGERS_ON_MAP' }),
+            perform: () => dispatch({ type: 'TOGGLE_DANGERS_ON_MAP' }),
         });
 
         // ─── 3. Étapes du Raid ───
@@ -176,7 +176,7 @@ export default function CommandPalette({
                 icon: <Navigation size={16} color="#22c55e" />,
                 keywords: `etape ${st.label} ${st.address || ''} waypoint balise`,
                 perform: () => {
-                    dispatch({ type: 'SET_ANCHOR_STAGE', index: idx });
+                    dispatch({ type: 'SET_ANCHOR_STAGE', idx });
                     onViewModeChange('map');
                 },
             });
@@ -186,10 +186,10 @@ export default function CommandPalette({
         Object.entries(MODULE_META).forEach(([id, meta]) => {
             items.push({
                 id: `module_${id}`,
-                label: `Module d'énigme : ${meta.label} (${meta.family})`,
+                label: `Module d'énigme : ${meta.label}`,
                 category: 'Modules d\'Enigme',
                 icon: <Sparkles size={16} color="#eab308" />,
-                keywords: `${meta.label} ${meta.family} ${meta.code || ''} chiffre cryptographie`,
+                keywords: `${meta.label} chiffre cryptographie`,
                 perform: () => {
                     // Switch to text mode to edit or view module
                     onViewModeChange('text');
@@ -276,13 +276,13 @@ export default function CommandPalette({
             <div
                 onClick={e => e.stopPropagation()}
                 style={{
-                    width: '640px',
+                    width: '600px',
                     maxWidth: '92vw',
                     maxHeight: '70vh',
-                    background: '#0d130e',
-                    border: '1px solid rgba(110, 201, 126, 0.25)',
-                    borderRadius: '12px',
-                    boxShadow: '0 24px 70px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(110, 201, 126, 0.1)',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: 'var(--shadow-lg)',
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
@@ -293,40 +293,32 @@ export default function CommandPalette({
                     style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '12px',
-                        padding: '14px 18px',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                        gap: '10px',
+                        padding: '12px 16px',
+                        borderBottom: '1px solid var(--border-subtle)',
                     }}
                 >
-                    <Search size={18} color="var(--accent-default, #6ec97e)" />
+                    <Search size={16} color="var(--text-dim)" />
                     <input
                         ref={inputRef}
                         type="text"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Rechercher une action, une étape ou un module... (Entrée pour valider)"
+                        placeholder="Rechercher une action, une étape ou un module..."
                         style={{
                             flex: 1,
                             background: 'transparent',
                             border: 'none',
                             outline: 'none',
-                            color: '#ffffff',
-                            fontSize: '14px',
-                            fontWeight: 500,
+                            color: 'var(--text-primary)',
+                            fontSize: '13px',
+                            fontWeight: 400,
+                            fontFamily: 'var(--font-ui)',
                         }}
                     />
-                    <span
-                        style={{
-                            fontSize: '10px',
-                            color: 'rgba(255, 255, 255, 0.4)',
-                            background: 'rgba(255, 255, 255, 0.06)',
-                            padding: '3px 7px',
-                            borderRadius: '4px',
-                            fontWeight: 600,
-                        }}
-                    >
+                    <kbd style={{ fontSize: '9px', padding: '1px 5px' }}>
                         ESC
-                    </span>
+                    </kbd>
                 </div>
 
                 {/* Commands List */}
@@ -335,15 +327,15 @@ export default function CommandPalette({
                     style={{
                         flex: 1,
                         overflowY: 'auto',
-                        padding: '8px 6px',
+                        padding: '6px 8px',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '2px',
                     }}
                 >
                     {filteredCommands.length === 0 ? (
-                        <div style={{ padding: '32px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
-                            Aucune commande ou étape ne correspond à « {search} »
+                        <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '12px' }}>
+                            Aucune commande ne correspond à « {search} »
                         </div>
                     ) : (
                         filteredCommands.map((cmd, idx) => {
@@ -356,13 +348,12 @@ export default function CommandPalette({
                                     {showCategoryHeader && (
                                         <div
                                             style={{
-                                                fontSize: '10px',
-                                                fontWeight: 700,
-                                                color: 'rgba(110, 201, 126, 0.7)',
-                                                textTransform: 'uppercase',
-                                                letterSpacing: '0.08em',
-                                                padding: '8px 12px 4px 12px',
-                                                marginTop: idx === 0 ? '0' : '6px',
+                                                fontSize: '11px',
+                                                fontWeight: 500,
+                                                color: 'var(--text-dim)',
+                                                letterSpacing: '0.02em',
+                                                padding: '6px 8px 3px 8px',
+                                                marginTop: idx === 0 ? '0' : '4px',
                                             }}
                                         >
                                             {cmd.category}
@@ -379,45 +370,36 @@ export default function CommandPalette({
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'space-between',
-                                            padding: '9px 12px',
-                                            borderRadius: '6px',
+                                            padding: '7px 10px',
+                                            borderRadius: 'var(--radius-xs)',
                                             background: isSelected
-                                                ? 'rgba(110, 201, 126, 0.14)'
+                                                ? 'var(--bg-hover)'
                                                 : 'transparent',
                                             border: isSelected
-                                                ? '1px solid rgba(110, 201, 126, 0.28)'
+                                                ? '1px solid var(--border-strong)'
                                                 : '1px solid transparent',
                                             cursor: 'pointer',
-                                            transition: 'background 0.1s',
+                                            transition: 'all 100ms ease',
                                         }}
                                     >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 {cmd.icon}
                                             </div>
                                             <span
                                                 style={{
-                                                    fontSize: '13px',
-                                                    fontWeight: isSelected ? 600 : 400,
-                                                    color: isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.8)',
+                                                    fontSize: '12.5px',
+                                                    fontWeight: isSelected ? 500 : 400,
+                                                    color: isSelected ? 'var(--text-primary)' : 'var(--text-default)',
                                                 }}
                                             >
                                                 {cmd.label}
                                             </span>
                                         </div>
                                         {cmd.shortcut && (
-                                            <span
-                                                style={{
-                                                    fontSize: '10px',
-                                                    color: 'rgba(255, 255, 255, 0.45)',
-                                                    background: 'rgba(255, 255, 255, 0.06)',
-                                                    padding: '2px 6px',
-                                                    borderRadius: '4px',
-                                                    fontWeight: 600,
-                                                }}
-                                            >
+                                            <kbd style={{ fontSize: '9px', padding: '1px 5px' }}>
                                                 {cmd.shortcut}
-                                            </span>
+                                            </kbd>
                                         )}
                                     </div>
                                 </React.Fragment>
@@ -429,21 +411,21 @@ export default function CommandPalette({
                 {/* Footer Tips */}
                 <div
                     style={{
-                        padding: '8px 16px',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                        padding: '6px 14px',
+                        borderTop: '1px solid var(--border-subtle)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         fontSize: '11px',
-                        color: 'rgba(255, 255, 255, 0.35)',
+                        color: 'var(--text-dim)',
                     }}
                 >
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        <span>↑↓ pour naviguer</span>
-                        <span>↵ pour exécuter</span>
-                        <span>Échap pour quitter</span>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <span>↑↓ naviguer</span>
+                        <span>↵ valider</span>
+                        <span>Échap fermer</span>
                     </div>
-                    <span>ScoutRaider Suite</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px' }}>ScoutRaider</span>
                 </div>
             </div>
         </div>

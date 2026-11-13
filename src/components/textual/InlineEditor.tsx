@@ -44,14 +44,15 @@ export default function InlineEditor({ stepId, solutionText, moduleId, lineIdx, 
     return (
         <div style={{
             position: 'relative',
-            background: 'var(--bg-panel)',
-            border: '1px solid var(--accent-default)',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-subtle)',
             borderLeft: '3px solid var(--accent-default)',
-            borderRadius: '6px',
-            padding: '8px 10px',
+            borderRadius: 'var(--radius-sm)',
+            padding: '10px 12px',
             marginTop: '4px',
+            boxShadow: 'var(--shadow-md)',
         }}>
-            <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '6px', letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '6px', letterSpacing: '0.05em', fontWeight: 600 }}>
                 TEXTE CLAIR — Ctrl+Entrée pour valider
             </div>
             <textarea
@@ -62,11 +63,11 @@ export default function InlineEditor({ stepId, solutionText, moduleId, lineIdx, 
                 style={{
                     width: '100%',
                     background: 'var(--bg-base)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '4px',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-xs)',
                     color: 'var(--text-primary)',
                     fontSize: '13px',
-                    fontFamily: '"Inter", sans-serif',
+                    fontFamily: 'var(--font-ui)',
                     lineHeight: 1.6,
                     padding: '8px',
                     resize: 'vertical',
@@ -81,8 +82,8 @@ export default function InlineEditor({ stepId, solutionText, moduleId, lineIdx, 
                     onClick={onClose}
                     style={{
                         display: 'flex', alignItems: 'center', gap: '4px',
-                        background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '4px', color: 'var(--text-dim)',
+                        background: 'transparent', border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-xs)', color: 'var(--text-dim)',
                         cursor: 'pointer', padding: '4px 10px', fontSize: '11px',
                     }}
                 >
@@ -93,7 +94,7 @@ export default function InlineEditor({ stepId, solutionText, moduleId, lineIdx, 
                     style={{
                         display: 'flex', alignItems: 'center', gap: '4px',
                         background: 'var(--accent-default)', border: 'none',
-                        borderRadius: '4px', color: '#fff',
+                        borderRadius: 'var(--radius-xs)', color: '#fff',
                         cursor: 'pointer', padding: '4px 12px', fontSize: '11px', fontWeight: 700,
                     }}
                 >

@@ -88,7 +88,14 @@ const AzimutHandle = React.memo(({ idx, position, azimut, onDrag, onDragEnd }: {
                     e.target.unbindTooltip();
                 }
             }}
-        />
+        >
+            <Tooltip direction="top" offset={[0, -12]}>
+                <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
+                    <b style={{ color: '#2d8ceb' }}>Azimut {azimut || 0}°</b>
+                    <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>Glisser pour réorienter le segment</div>
+                </div>
+            </Tooltip>
+        </Marker>
     );
 });
 
@@ -105,7 +112,8 @@ export default function ActiveRouteLayer() {
 
     const steps = state.polygonal_steps;
     const showPolygons = steps.length > 0;
-    const showArrows = zoom >= 14;
+    const isAzimutTool = activeTool === 'azimut';
+    const showArrows = isAzimutTool || state.show_azimuth_arrows || zoom >= 14;
 
     // Active itinerary color — used when danger coloring is OFF
     const activeItin = (state.itineraries || []).find((it: any) => it.id === state.active_itinerary_id);
@@ -465,6 +473,11 @@ export default function ActiveRouteLayer() {
 
                 const isAzimutTool = activeTool === 'azimut';
                 const isNodeTool = activeTool === 'node';
+                const isOtherCreationTool = [
+                    'annotate_point', 'annotate_area', 'annotate_area_routed', 
+                    'annotate_draw', 'annotate_text'
+                ].includes(activeTool);
+                const canInteractWithRoute = (isRouteTool || activeTool === 'encodage') && !isOtherCreationTool;
 
                 return (
                     <React.Fragment key={`poly-seg-${idx}`}>
@@ -472,8 +485,8 @@ export default function ActiveRouteLayer() {
                         <Polyline 
                             positions={latLngs} 
                             pane={itinPane}
-                            pathOptions={{ color: 'transparent', weight: 20 }}
-                            eventHandlers={{
+                            pathOptions={{ color: 'transparent', weight: 20, interactive: canInteractWithRoute }}
+                            eventHandlers={canInteractWithRoute ? {
                                 click: (e: any) => {
                                     if (activeTool === 'encodage') {
                                         setEncodingPopupVal({ idx, latlng: [e.latlng.lat, e.latlng.lng] });
@@ -482,7 +495,7 @@ export default function ActiveRouteLayer() {
                                         if (closest.idx !== -1) {
                                             const newForced = [...state.polygonalization_settings.forced_nodes, closest.idx];
                                             dispatch({ type: 'SET_POLYGONAL_SETTINGS', settings: { forced_nodes: Array.from(new Set(newForced)) } as any });
-                                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Nœud ajouté.', notifType: 'info' });
+                                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Nœud ajouté sur le tracé.', notifType: 'info' });
                                         }
                                     } else if (activeTool === 'route' || activeTool === 'route_direct') {
                                         // Use the leg_key to find which route leg to toggle
@@ -492,29 +505,62 @@ export default function ActiveRouteLayer() {
                                             const route = state.routes[legIdx];
                                             if (activeTool === 'route_direct' && route.profile !== 'direct') {
                                                 recalculateRouteLeg(legIdx, 'direct');
+                                                dispatch({ type: 'ADD_NOTIFICATION', message: 'Tronçon converti en hors piste (ligne droite).', notifType: 'info' });
                                             } else if (activeTool === 'route' && route.profile === 'direct') {
                                                 recalculateRouteLeg(legIdx, 'pedestrian');
+                                                dispatch({ type: 'ADD_NOTIFICATION', message: 'Tronçon recalculé sur sentiers (BRouter).', notifType: 'info' });
                                             }
                                         }
                                     }
                                 }
-                            }}
+                            } : undefined}
                         >
                             {isNodeTool && (
                                 <Tooltip sticky>
                                     <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
                                         <b style={{ color: 'var(--accent-default)' }}>Outil Nœud</b><br />
-                                        <span>Clic-gauche : ajouter un nœud</span><br />
-                                        <span>Clic-droit : supprimer un nœud</span>
+                                        <span>Clic : ajouter un nœud sur ce tronçon</span>
                                     </div>
                                 </Tooltip>
                             )}
-                            {(activeTool === 'route_direct' || activeTool === 'route') && (
+                            {activeTool === 'route_direct' && (
                                 <Tooltip sticky>
                                     <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
-                                        <b style={{ color: 'var(--accent-default)' }}>Conversion de tracé</b><br />
-                                        {activeTool === 'route_direct' && <span>Clic : convertir ce tronçon en hors piste (ligne droite)</span>}
-                                        {activeTool === 'route' && <span>Clic : convertir ce tronçon en tracé pédestre (BRouter)</span>}
+                                        <b style={{ color: 'var(--accent-default)' }}>Tracé hors piste (H)</b><br />
+                                        {(() => {
+                                            const legIdx = state.routes.findIndex(r => r && r.id === (seg as any).leg_key);
+                                            const r = legIdx !== -1 ? state.routes[legIdx] : null;
+                                            return r?.profile !== 'direct' ? (
+                                                <span style={{ color: '#6ee7b7' }}>Clic : convertir en ligne droite</span>
+                                            ) : (
+                                                <span style={{ opacity: 0.7 }}>Tronçon déjà en ligne droite</span>
+                                            );
+                                        })()}
+                                    </div>
+                                </Tooltip>
+                            )}
+                            {activeTool === 'route' && (
+                                <Tooltip sticky>
+                                    <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
+                                        <b style={{ color: 'var(--accent-default)' }}>Tracé pédestre BRouter (P)</b><br />
+                                        {(() => {
+                                            const legIdx = state.routes.findIndex(r => r && r.id === (seg as any).leg_key);
+                                            const r = legIdx !== -1 ? state.routes[legIdx] : null;
+                                            return r?.profile === 'direct' ? (
+                                                <span style={{ color: '#6ee7b7' }}>Clic : recalculer sur sentiers</span>
+                                            ) : (
+                                                <span style={{ opacity: 0.7 }}>Tronçon déjà calculé sur sentiers</span>
+                                            );
+                                        })()}
+                                    </div>
+                                </Tooltip>
+                            )}
+                            {activeTool === 'encodage' && (
+                                <Tooltip sticky>
+                                    <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
+                                        <b style={{ color: 'var(--accent-default)' }}>Encodage du tronçon #{idx + 1}</b><br />
+                                        <span>Module : {MODULE_META[seg.assigned_module as import('../../logic/types').ModuleId]?.label || 'Carte IGN'}</span><br />
+                                        <span style={{ color: '#6ee7b7' }}>Clic : changer le module de chiffrement</span>
                                     </div>
                                 </Tooltip>
                             )}
@@ -528,9 +574,8 @@ export default function ActiveRouteLayer() {
                             interactive={false}
                         />
 
-                        {/* ── Azimut Arrows — ALWAYS rendered when zoom permits ── */}
-                        {/* Phase 0 fix: arrows now persist for all tools, not just azimut */}
-                        {showArrows && destPt && segDist >= 30 && (
+                        {/* ── Azimut Arrows — ALWAYS rendered when zoom permits or azimut tool is active ── */}
+                        {(isAzimutTool || (showArrows && segDist >= 20)) && destPt && (
                             <>
                                 {isAzimutTool ? (
                                     /* Draggable Azimut Handle */
@@ -579,32 +624,41 @@ export default function ActiveRouteLayer() {
                         )}
 
                         {/* ── Node Markers — rendered for ALL nodes, not just idx > 0 ── */}
-                        {/* Phase 0 fix: removed idx > 0 guard so first node is visible */}
                         <Marker 
                             position={startPt}
                             icon={nodeIcon}
-                            draggable={isNodeTool || isAzimutTool}
+                            draggable={isNodeTool}
                             eventHandlers={{
                                 dragstart: (e) => e.target.closePopup(),
                                 drag: handleNodeDrag,
                                 dragend: (e) => handleNodeDragEnd(e, idx),
                                 contextmenu: (e) => {
-                                    if (isNodeTool || isAzimutTool) {
+                                    if (isNodeTool) {
                                         L.DomEvent.preventDefault(e as any);
                                         handleNodeRemove(idx);
                                     }
                                 },
                                 click: (e) => {
-                                    if ((isNodeTool || isAzimutTool) && e.originalEvent && e.originalEvent.altKey) {
+                                    if (isNodeTool && e.originalEvent && e.originalEvent.altKey) {
                                         handleNodeRemove(idx);
                                     }
                                 }
                             }}
                         >
+                            <Tooltip direction="top" offset={[0, -8]}>
+                                <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', fontWeight: 600 }}>
+                                    Nœud polygonal #{idx + 1}
+                                    {isNodeTool ? (
+                                        <div style={{ fontSize: '10px', color: '#93c5fd', marginTop: '2px' }}>
+                                            Glisser : déplacer · Clic droit : supprimer
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </Tooltip>
                             {isNodeTool && (
                                 <Popup closeButton={false}>
                                     <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-ui)' }}>
-                                        <span style={{ color: 'var(--accent-default)', fontWeight: 700 }}>Nœud #{idx}</span>
+                                        <span style={{ color: 'var(--accent-default)', fontWeight: 700 }}>Nœud #{idx + 1}</span>
                                         <br />
                                         <span>Clic-droit ou <kbd style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '3px', padding: '1px 4px', fontSize: '10px' }}>Alt+Clic</kbd> pour supprimer</span>
                                     </div>

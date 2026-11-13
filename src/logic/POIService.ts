@@ -248,14 +248,17 @@ export class POIService {
         const OVERPASS_ENDPOINTS = [
             'https://overpass-api.de/api/interpreter',
             'https://overpass.kumi.systems/api/interpreter',
+            'https://overpass.private.coffee/api/interpreter',
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
         ];
 
         try {
             let response: Response | null = null;
+            let lastError = '';
             for (const endpoint of OVERPASS_ENDPOINTS) {
                 try {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 12000);
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
                     const res = await fetch(endpoint, {
                         method: 'POST',
                         headers: { 
@@ -268,9 +271,12 @@ export class POIService {
                     if (res.ok) {
                         response = res;
                         break;
+                    } else {
+                        lastError = `status ${res.status} (${res.statusText})`;
                     }
                 } catch (err: any) {
-                    console.debug(`[POIService] Overpass endpoint ${endpoint} failed:`, err?.message);
+                    lastError = err?.message || 'timeout/network error';
+                    console.debug(`[POIService] Overpass endpoint ${endpoint} failed:`, lastError);
                 }
             }
             
@@ -345,14 +351,68 @@ export class POIService {
                 const totalTimeMs = (performance.now() - startTime).toFixed(0);
                 Logger.info(`[POIService] Assigned ${totalAssigned} POIs across segments in ${totalTimeMs}ms total.`);
             } else {
-                Logger.error(`[POIService] Overpass error: status ${response.status} (${response.statusText})`);
-                for (const mid of missingSegments) result[mid.idx] = [];
+                const errDetail = lastError || (response ? `status ${response.status} (${response.statusText})` : 'serveurs Overpass inaccessibles');
+                Logger.warn(`[POIService] Overpass indisponible (${errDetail}), activation du fallback IGN Géoplateforme...`);
+                const ignFallback = await this._fetchIgnPoisForSegments(missingSegments);
+                for (const mid of missingSegments) {
+                    result[mid.idx] = ignFallback[mid.idx] || [];
+                }
             }
         } catch (e) {
-            console.error("Overpass fetch failed:", e);
-            for (const mid of missingSegments) result[mid.idx] = [];
+            console.warn("[POIService] Requête Overpass échouée, bascule vers IGN Géoplateforme:", e);
+            try {
+                const ignFallback = await this._fetchIgnPoisForSegments(missingSegments);
+                for (const mid of missingSegments) result[mid.idx] = ignFallback[mid.idx] || [];
+            } catch {
+                for (const mid of missingSegments) result[mid.idx] = [];
+            }
         }
 
+        return result;
+    }
+
+    /**
+     * Fallback to IGN Géoplateforme Reverse POI search when Overpass is down (502 / timeout / rate-limited).
+     */
+    private static async _fetchIgnPoisForSegments(
+        missingSegments: Array<{ idx: number; lat: number; lon: number }>
+    ): Promise<Record<number, POIResult[]>> {
+        const result: Record<number, POIResult[]> = {};
+        for (const mid of missingSegments) {
+            try {
+                const url = `https://data.geopf.fr/geocodage/reverse?index=poi&limit=5&lon=${mid.lon.toFixed(6)}&lat=${mid.lat.toFixed(6)}`;
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 4000);
+                const resp = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
+                clearTimeout(timer);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const features = data.features || [];
+                    const mapped: POIResult[] = features.map((f: any, idx: number) => {
+                        const props = f.properties || {};
+                        const name = props.toponym || (Array.isArray(props.name) ? props.name[0] : props.name) || props.city?.[0] || 'Lieu-dit';
+                        const category = Array.isArray(props.category) ? props.category[0] : (props.category || 'landmark');
+                        const coords = f.geometry?.coordinates || [mid.lon, mid.lat];
+                        return {
+                            id: `poi-ign-${mid.idx}-${idx}`,
+                            name,
+                            type: category,
+                            selected: idx === 0,
+                            lat: coords[1],
+                            lon: coords[0]
+                        };
+                    });
+                    result[mid.idx] = mapped;
+                    if (mapped.length > 0) {
+                        POIService._segmentCache.set(`${mid.lat.toFixed(5)},${mid.lon.toFixed(5)}`, mapped);
+                    }
+                } else {
+                    result[mid.idx] = [];
+                }
+            } catch {
+                result[mid.idx] = [];
+            }
+        }
         return result;
     }
 

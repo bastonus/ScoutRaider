@@ -40,10 +40,10 @@ const CATEGORY_CONSTRAINTS: Record<ModuleCategory, CategoryConstraints> = {
     },
     ign_map: {
         type: 'visual',
-        min_distance_m: 400,
-        max_distance_m: 1200,
+        min_distance_m: 0,
+        max_distance_m: null,
         max_azimuts: null,
-        forbidden_zones: ['high_poi_density', 'last_third_of_track'],
+        forbidden_zones: [],
     },
     explicit_message: {
         type: 'written',

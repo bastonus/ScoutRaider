@@ -420,6 +420,7 @@ export interface PointAnnotation {
     icon?: AnnotationIcon;
     visible: boolean;
     createdAt: number;
+    address?: string;
 }
 
 export interface AreaAnnotation {
@@ -577,5 +578,5 @@ export interface AppState {
     selected_sublayer_id: string | null;
 
     // Persisted layer display order (array of { kind, id } objects)
-    layer_order: Array<{ kind: 'itin' | 'point' | 'area' | 'draw'; id: string }>;
+    layer_order: Array<{ kind: 'itin' | 'point' | 'area' | 'draw' | 'text'; id: string }>;
 }

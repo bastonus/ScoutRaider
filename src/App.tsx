@@ -11,7 +11,15 @@ import AuthModal from './components/panels/AuthModal';
 import ProjectsDashboardModal from './components/panels/ProjectsDashboardModal';
 import ShareModal from './components/panels/ShareModal';
 import CommandPalette from './components/layout/CommandPalette';
-import { List, Library, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  PanelLeftClose, 
+  PanelLeftOpen, 
+  PanelRightClose, 
+  PanelRightOpen,
+  PanelLeft,
+  PanelRight,
+  X
+} from 'lucide-react';
 import { useApp } from './AppContext';
 import { useAuth } from './AuthContext';
 
@@ -20,8 +28,11 @@ export type ViewMode = 'map' | 'text' | 'split';
 export type SectionId = 'layers' | 'orchestration' | 'themes' | 'modules' | 'maps' | 'export';
 
 function App() {
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const isMobileOrTablet = windowWidth < 1024;
+
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [activeRightSection, setActiveRightSection] = useState<SectionId>('layers');
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -41,6 +52,23 @@ function App() {
 
   const leftResizing = useRef(false);
   const rightResizing = useRef(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const prevMobileRef = useRef(isMobileOrTablet);
+  useEffect(() => {
+    if (!prevMobileRef.current && isMobileOrTablet) {
+      setLeftSidebarOpen(false);
+      setRightSidebarOpen(false);
+    }
+    prevMobileRef.current = isMobileOrTablet;
+  }, [isMobileOrTablet]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -92,8 +120,14 @@ function App() {
 
   const toggleSidebar = (side: 'left' | 'right') => {
     if (side === 'left') {
+      if (isMobileOrTablet && !leftSidebarOpen) {
+        setRightSidebarOpen(false);
+      }
       setLeftSidebarOpen(!leftSidebarOpen);
     } else if (side === 'right') {
+      if (isMobileOrTablet && !rightSidebarOpen) {
+        setLeftSidebarOpen(false);
+      }
       setRightSidebarOpen(!rightSidebarOpen);
     }
   };
@@ -186,13 +220,13 @@ function App() {
         // Ctrl+Shift+P: Toggle POIs
         if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
           e.preventDefault();
-          dispatch({ type: 'TOGGLE_SHOW_POIS_ON_MAP' });
+          dispatch({ type: 'TOGGLE_POIS_ON_MAP' });
           return;
         }
         // Ctrl+Shift+D: Toggle Dangers
         if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'd') {
           e.preventDefault();
-          dispatch({ type: 'TOGGLE_SHOW_DANGERS_ON_MAP' });
+          dispatch({ type: 'TOGGLE_DANGERS_ON_MAP' });
           return;
         }
         // Alt+S: Toggle Carnet Participant / Solution view
@@ -207,15 +241,43 @@ function App() {
     return () => window.removeEventListener('keydown', h);
   }, [dispatch, state.carnet_view]);
 
-  const panelToggleStyle: React.CSSProperties = {
-    position: 'absolute', top: '16px', zIndex: 900,
-    height: '38px', padding: '0 10px',
-    background: 'rgba(14, 22, 17, 0.92)', backdropFilter: 'blur(14px) saturate(1.4)',
-    border: '1px solid rgba(110, 201, 126, 0.08)', borderRadius: '12px',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)',
-    color: 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', gap: '6px',
-    transition: 'all 0.15s ease-in-out'
+  // Floating panel toggle button style on map
+  // Height 40px, width 40px, radius 12px, top 16px to align perfectly with FloatingSearch (height 40px, top 16px)
+  const mapPanelToggleStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '16px',
+    zIndex: 900,
+    width: '40px',
+    height: '40px',
+    padding: 0,
+    background: 'var(--bg-elevated)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: '12px',
+    boxShadow: 'var(--shadow-lg)',
+    color: 'var(--text-dim)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    transition: 'all 100ms ease',
+  };
+
+  // Inline header bar toggle button style (in text / split mode)
+  // Height 28px, width 28px, radius 6px to fit within the 40px header bar
+  const inlinePanelToggleStyle: React.CSSProperties = {
+    width: '28px',
+    height: '28px',
+    padding: 0,
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 'var(--radius-xs)',
+    color: 'var(--text-dim)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    transition: 'all 100ms ease',
+    flexShrink: 0,
   };
 
   // In text/split mode the toggle buttons sit outside the map, so we don't need
@@ -225,7 +287,8 @@ function App() {
 
   return (
     <div className="app-shell" style={{ 
-      height: '100vh', 
+      height: '100dvh', 
+      minHeight: '100vh',
       display: 'flex', 
       flexDirection: 'column', 
       overflow: 'hidden',
@@ -243,8 +306,8 @@ function App() {
       
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
         
-        {/* LEFT SIDEBAR: Itinerary */}
-        {leftSidebarOpen && (
+        {/* DESKTOP LEFT SIDEBAR: Itinerary */}
+        {!isMobileOrTablet && leftSidebarOpen && (
           <>
             <div style={{ 
               width: `${leftWidth}px`, 
@@ -271,34 +334,52 @@ function App() {
           
           {isTextMode || isSplitMode ? (
             <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '6px 12px',
-              background: 'linear-gradient(180deg, rgba(18,26,20,0.98) 0%, rgba(14,22,17,0.95) 100%)',
-              borderBottom: '1px solid rgba(110, 201, 126, 0.07)',
+              display: 'flex', alignItems: 'center',
+              padding: '0 12px',
+              height: '40px',
+              background: 'var(--bg-dark)',
+              borderBottom: '1px solid var(--border-subtle)',
               flexShrink: 0, zIndex: 900,
+              gap: '10px'
             }}>
               <button
                 onClick={() => toggleSidebar('left')}
                 title={`${leftSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'itinéraire (Ctrl+[)`}
-                style={{ ...panelToggleStyle, position: 'static', top: 'unset', zIndex: 'unset' }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(110, 201, 126, 0.12)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(14, 22, 17, 0.92)'}
+                style={inlinePanelToggleStyle}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-hover)';
+                  e.currentTarget.style.borderColor = 'var(--border-strong)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-surface)';
+                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                  e.currentTarget.style.color = 'var(--text-dim)';
+                }}
               >
-                <List size={17} />
-                {leftSidebarOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+                {leftSidebarOpen ? <PanelLeftClose size={15} strokeWidth={2} /> : <PanelLeftOpen size={15} strokeWidth={2} />}
               </button>
               
-              <TextualHeader onExport={handleExportRequest} />
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+                <TextualHeader onExport={handleExportRequest} />
+              </div>
 
               <button
                 onClick={() => toggleSidebar('right')}
                 title={`${rightSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'orchestration (Ctrl+])`}
-                style={{ ...panelToggleStyle, position: 'static', top: 'unset', zIndex: 'unset' }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(110, 201, 126, 0.12)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(14, 22, 17, 0.92)'}
+                style={inlinePanelToggleStyle}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-hover)';
+                  e.currentTarget.style.borderColor = 'var(--border-strong)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-surface)';
+                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                  e.currentTarget.style.color = 'var(--text-dim)';
+                }}
               >
-                <Library size={17} />
-                {rightSidebarOpen ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+                {rightSidebarOpen ? <PanelRightClose size={15} strokeWidth={2} /> : <PanelRightOpen size={15} strokeWidth={2} />}
               </button>
             </div>
           ) : (
@@ -306,23 +387,37 @@ function App() {
               <button
                 onClick={() => toggleSidebar('left')}
                 title={`${leftSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'itinéraire (Ctrl+[)`}
-                style={{ ...panelToggleStyle, left: '16px', top: '16px' }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(110, 201, 126, 0.12)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(14, 22, 17, 0.92)'}
+                style={{ ...mapPanelToggleStyle, left: '16px' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-hover)';
+                  e.currentTarget.style.borderColor = 'var(--border-strong)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-elevated)';
+                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                  e.currentTarget.style.color = 'var(--text-dim)';
+                }}
               >
-                <List size={18} />
-                {leftSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                {leftSidebarOpen ? <PanelLeftClose size={18} strokeWidth={2} /> : <PanelLeftOpen size={18} strokeWidth={2} />}
               </button>
               
               <button
                 onClick={() => toggleSidebar('right')}
                 title={`${rightSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'orchestration (Ctrl+])`}
-                style={{ ...panelToggleStyle, right: '16px', top: '16px' }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(110, 201, 126, 0.12)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(14, 22, 17, 0.92)'}
+                style={{ ...mapPanelToggleStyle, right: '16px' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-hover)';
+                  e.currentTarget.style.borderColor = 'var(--border-strong)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-elevated)';
+                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                  e.currentTarget.style.color = 'var(--text-dim)';
+                }}
               >
-                <Library size={18} />
-                {rightSidebarOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                {rightSidebarOpen ? <PanelRightClose size={18} strokeWidth={2} /> : <PanelRightOpen size={18} strokeWidth={2} />}
               </button>
             </>
           )}
@@ -330,8 +425,8 @@ function App() {
           <ProjectWorkspace onExport={handleExportRequest} viewMode={viewMode} />
         </div>
 
-        {/* RIGHT SIDEBAR: Libraries */}
-        {rightSidebarOpen && (
+        {/* DESKTOP RIGHT SIDEBAR: Libraries */}
+        {!isMobileOrTablet && rightSidebarOpen && (
           <>
             {/* Right Resizer */}
             <div 
@@ -343,6 +438,57 @@ function App() {
         )}
 
       </div>
+
+      {/* MOBILE / TABLET BOTTOM SHEETS (< 1024px) */}
+      {isMobileOrTablet && leftSidebarOpen && (
+        <>
+          <div className="bottom-sheet-backdrop" onClick={() => setLeftSidebarOpen(false)} />
+          <div className="bottom-sheet-panel">
+            <div className="bottom-sheet-handle-bar" />
+            <div className="bottom-sheet-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                <PanelLeft size={16} color="var(--accent-default)" />
+                <span>Itinéraire & Calque actif</span>
+              </div>
+              <button
+                onClick={() => setLeftSidebarOpen(false)}
+                aria-label="Fermer"
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: 'var(--radius-xs)' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <LeftSidebarPanel />
+            </div>
+          </div>
+        </>
+      )}
+
+      {isMobileOrTablet && rightSidebarOpen && (
+        <>
+          <div className="bottom-sheet-backdrop" onClick={() => setRightSidebarOpen(false)} />
+          <div className="bottom-sheet-panel">
+            <div className="bottom-sheet-handle-bar" />
+            <div className="bottom-sheet-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                <PanelRight size={16} color="var(--accent-default)" />
+                <span>Calques & Orchestration</span>
+              </div>
+              <button
+                onClick={() => setRightSidebarOpen(false)}
+                aria-label="Fermer"
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: 'var(--radius-xs)' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} width="100%" />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Global Notifications */}
       <NotificationOverlay />

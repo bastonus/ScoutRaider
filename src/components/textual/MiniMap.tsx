@@ -35,6 +35,108 @@ export function calculateScaleForZoom(zoom: number, lat: number): number {
     return Math.round((SCALE_CONSTANT * cosLat) / Math.pow(2, zoom));
 }
 
+export interface SmartMapDimensions {
+    width: number;
+    height: number;
+    visualRatio: number; // width / height
+    geoRatio: number;   // spanMetersY / spanMetersX
+}
+
+/**
+ * Calcule dynamiquement les dimensions idéales (largeur, hauteur et ratio d'aspect)
+ * pour épouser la forme géographique réelle du tracé sans jamais le couper.
+ */
+export function calculateSmartMapDimensions(
+    latLngs: [number, number][],
+    containerWidth: number = 720,
+    scaleName: string = '1:25000'
+): SmartMapDimensions {
+    if (!latLngs || latLngs.length < 2) {
+        return { width: containerWidth, height: 280, visualRatio: Math.round((containerWidth / 280) * 100) / 100, geoRatio: 1 };
+    }
+
+    let minLat = Infinity, maxLat = -Infinity;
+    let minLng = Infinity, maxLng = -Infinity;
+
+    for (const [lat, lng] of latLngs) {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+    }
+
+    const midLat = (minLat + maxLat) / 2;
+    const rad = (midLat * Math.PI) / 180;
+
+    // Étendue géographique réelle au sol en mètres
+    const spanMetersY = Math.max(10, (maxLat - minLat) * 111139);
+    const spanMetersX = Math.max(10, (maxLng - minLng) * 111139 * Math.cos(rad));
+
+    const denomMap: Record<string, number> = {
+        '1:10000': 10000,
+        '1:25000': 25000,
+        '1:50000': 50000,
+        '1:100000': 100000,
+    };
+    const denom = denomMap[scaleName] || 25000;
+
+    // Résolution au sol (mètres par pixel) au zoom Leaflet calibré
+    const SCALE_CONSTANT = 591657550.5;
+    const z = Math.round(Math.log2((SCALE_CONSTANT * Math.cos(rad)) / denom) * 4) / 4;
+    const mpp = (40075016.686 * Math.cos(rad)) / (256 * Math.pow(2, z));
+
+    // Marge de confort au sol (padding dynamique) pour voir les abords et carrefours
+    const padY = Math.max(160, spanMetersY * 0.22);
+    const padX = Math.max(160, spanMetersX * 0.22);
+
+    // Dimensions minimales requises en pixels pour englober entièrement le tracé sans aucune coupure
+    const minNeededH = Math.round((spanMetersY + 2 * padY) / mpp);
+    const minNeededW = Math.round((spanMetersX + 2 * padX) / mpp);
+
+    const geoRatio = spanMetersY / spanMetersX;
+
+    let targetWidth = containerWidth;
+    let targetHeight = 300;
+
+    if (geoRatio >= 1.35) {
+        // 1. Tracé vertical (Nord-Sud) : format portrait expressif
+        // La carte est plus étroite et plus haute, mettant en valeur la trajectoire Nord-Sud
+        targetWidth = Math.min(containerWidth, Math.max(460, Math.round(containerWidth * 0.76)));
+        targetHeight = Math.min(640, Math.max(380, minNeededH));
+    } else if (geoRatio <= 0.65) {
+        // 2. Tracé horizontal (Est-Ouest) : format panoramique en bandeau
+        targetWidth = containerWidth;
+        targetHeight = Math.min(300, Math.max(185, minNeededH));
+    } else {
+        // 3. Tracé équilibré ou diagonal : format 4:3 / paysage harmonieux
+        targetWidth = Math.min(containerWidth, Math.max(500, Math.round(containerWidth * 0.90)));
+        targetHeight = Math.min(480, Math.max(260, minNeededH));
+    }
+
+    // Sécurité anti-coupure : si la hauteur ou la largeur nécessaire dépasse notre cible, on l'étend
+    if (targetHeight < minNeededH && minNeededH <= 680) {
+        targetHeight = minNeededH;
+    }
+    if (targetWidth < minNeededW && minNeededW <= containerWidth) {
+        targetWidth = minNeededW;
+    }
+
+    return {
+        width: targetWidth,
+        height: targetHeight,
+        visualRatio: Math.round((targetWidth / targetHeight) * 100) / 100,
+        geoRatio: Math.round(geoRatio * 100) / 100,
+    };
+}
+
+export function calculateSmartMapHeight(
+    latLngs: [number, number][],
+    scaleName: string = '1:25000',
+    canonicalWidth: number = 720
+): number {
+    return calculateSmartMapDimensions(latLngs, canonicalWidth, scaleName).height;
+}
+
 // ── Types ───────────────────────────────────────────────────────────────────
 
 interface MiniMapProps {
@@ -295,15 +397,28 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
     }, []);
 
     // Largeur canonique désirée par l'utilisateur
+    // Dimensions et ratio intelligents calculés dynamiquement selon l'emprise du tracé
+    const smartDims = useMemo(() => {
+        return calculateSmartMapDimensions(latLngs, wrapperAvailableWidth || 720, initialPersist?.scaleName || '1:25000');
+    }, [latLngs, wrapperAvailableWidth, initialPersist?.scaleName]);
+
+    // Largeur canonique : manuelle si fixée par l'utilisateur, sinon intelligente
     const canonicalWidth = useMemo(() => {
         if (initialPersist?.width) return initialPersist.width;
-        if (initialPersist?.widthPercent && wrapperAvailableWidth > 0) {
+        if (initialPersist?.widthPercent && initialPersist.widthPercent !== 100 && wrapperAvailableWidth > 0) {
             return Math.round((wrapperAvailableWidth * initialPersist.widthPercent) / 100);
         }
-        return Math.min(wrapperAvailableWidth || 750, 720);
-    }, [initialPersist?.width, initialPersist?.widthPercent, wrapperAvailableWidth]);
+        return smartDims.width;
+    }, [initialPersist?.width, initialPersist?.widthPercent, wrapperAvailableWidth, smartDims.width]);
 
-    const canonicalHeight = initialPersist?.height || 340;
+    // Hauteur canonique : manuelle si fixée par l'utilisateur (sauf ancienne valeur par défaut 340), sinon intelligente
+    const canonicalHeight = useMemo(() => {
+        if (initialPersist?.height && initialPersist.height !== 340) {
+            return initialPersist.height;
+        }
+        return smartDims.height;
+    }, [initialPersist?.height, smartDims.height]);
+
     const alignment = initialPersist?.alignment || 'center';
     const isLocked = initialPersist?.isLocked || false;
     const layerId = initialPersist?.layerId || '';
@@ -321,17 +436,21 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
         return 1;
     }, [canonicalWidth, wrapperAvailableWidth]);
 
-    // Dimensions visuelles réservées dans le document
-    const displayWidth = Math.round(canonicalWidth * scaleFactor);
-    const displayHeight = Math.round(canonicalHeight * scaleFactor);
-
     // ── Drag & Resize interactif ──
     const [isDragging, setIsDragging] = useState<'bottom' | 'right' | 'corner-br' | 'corner-bl' | 'corner-tr' | null>(null);
     const [dragLiveDimensions, setDragLiveDimensions] = useState<{ widthPx: number; heightPx: number } | null>(null);
 
+    // Largeur et hauteur effectives (dynamiques pendant le redimensionnement par drag)
+    const effectiveWidth = isDragging && dragLiveDimensions ? dragLiveDimensions.widthPx : canonicalWidth;
+    const effectiveHeight = isDragging && dragLiveDimensions ? dragLiveDimensions.heightPx : canonicalHeight;
+
+    // Dimensions visuelles réservées dans le document
+    const displayWidth = Math.round(effectiveWidth * scaleFactor);
+    const displayHeight = Math.round(effectiveHeight * scaleFactor);
+
     const mapBridgeRef = useRef<{ zoomIn: () => void; zoomOut: () => void } | null>(null);
 
-    // Initialisation automatique de l'échelle 1:25 000 si non persistée
+    // Initialisation automatique de l'échelle 1:25 000 si non persistée (SANS forcer height/width figés)
     useEffect(() => {
         if (!initialPersist?.scaleName || initialPersist?.zoom === undefined) {
             dispatch({
@@ -340,11 +459,9 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
                 scaleName: '1:25000',
                 zoom: zoom25k,
                 center: initialPersist?.center || midPoint,
-                width: canonicalWidth,
-                height: canonicalHeight,
             });
         }
-    }, [initialPersist, zoom25k, midPoint, canonicalWidth, canonicalHeight, dispatch, stepId]);
+    }, [stepId, initialPersist?.scaleName, initialPersist?.zoom, zoom25k, midPoint, dispatch]);
 
     const handleMapMoved = useCallback((newZoom: number, newCenter: [number, number], newBounds: [[number, number], [number, number]]) => {
         dispatch({
@@ -478,8 +595,8 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
                 {/* ── BOÎTE CANONIQUE RÉELLE (mise à l'échelle homothétique solidaire) ── */}
                 <div
                     style={{
-                        width: `${canonicalWidth}px`,
-                        height: `${canonicalHeight}px`,
+                        width: `${effectiveWidth}px`,
+                        height: `${effectiveHeight}px`,
                         position: 'absolute',
                         top: 0,
                         left: alignment === 'right' ? undefined : (alignment === 'center' ? '50%' : 0),

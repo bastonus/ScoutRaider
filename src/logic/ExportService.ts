@@ -286,12 +286,19 @@ export class ExportService {
 
             // 5. For each version, generate HTML and export
             for (const ver of versions) {
-                const htmlPayload = ExportHTMLRenderer.render(
+                let htmlPayload = ExportHTMLRenderer.render(
                     state.carnet_steps,
                     mergedTheme,
                     { ...baseOpts, isSolution: ver.isSolution },
                     fontsBase64
                 );
+
+                // Inlignage de toutes les tuiles distantes en Data URIs Base64 pour garantir zéro rectangle gris sous WeasyPrint
+                try {
+                    htmlPayload = await ExportHTMLRenderer.inlineMapTiles(htmlPayload);
+                } catch (e) {
+                    console.warn('[ExportService] Inlining map tiles error:', e);
+                }
 
                 const suffix = ver.isSolution ? '_SOLUCE' : '';
                 const docTitle = (options.title || state.document_title || 'Carnet').trim();

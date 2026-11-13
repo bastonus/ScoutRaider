@@ -6,6 +6,7 @@ import { useApp } from '../../AppContext';
 import { backgroundEngine } from '../../logic/BackgroundEngine';
 import ActiveRouteLayer from './ActiveRouteLayer';
 import InteractiveStages from './InteractiveStages';
+import RouteRubberbandLayer from './RouteRubberbandLayer';
 import CursorPreviewLine from './CursorPreviewLine';
 import InactiveItinerariesLayer from './InactiveItinerariesLayer';
 import AnnotationsMapLayer from './AnnotationsMapLayer';
@@ -240,8 +241,11 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
                 const point = (state.point_annotations || []).find(p => p.id === pointId);
                 if (!point) return;
                 forcedCoords = [point.coords[0], point.coords[1]];
-            } else if (targetEl?.closest?.('.leaflet-marker-icon, .leaflet-popup, .leaflet-control')) {
-                return;
+            } else {
+                const isGhostHandle = targetEl?.closest?.('.rubberband-ghost-handle');
+                if (!isGhostHandle && targetEl?.closest?.('.leaflet-marker-icon, .leaflet-popup, .leaflet-control')) {
+                    return;
+                }
             }
 
             const lat = forcedCoords ? forcedCoords[0] : e.latlng.lat;
@@ -271,7 +275,7 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
                 let anchorIdx = anchorRef.current;
 
                 if (selectedId !== activeItinId) {
-                    dispatch({ type: 'SET_ACTIVE_ITINERARY', id: selectedId });
+                    dispatch({ type: 'SET_ACTIVE_ITINERARY', id: selectedItin.id });
                     currentStages = selectedItin.stages || [];
                     currentRoutes = selectedItin.routes || [];
                     anchorIdx = (selectedItin.stages?.length || 0) - 1;
@@ -318,7 +322,41 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
                     });
                 }
             } else if (activeTool === 'node') {
-                console.log('Adding un nœud over', lat, lon);
+                const map = mapRef.current;
+                if (map) {
+                    const clickPt = map.latLngToContainerPoint([lat, lon]);
+                    const allCoords: [number, number][] = [];
+                    (state.routes || []).forEach(r => {
+                        if (!r) return;
+                        const coords = r.geojson?.geometry?.coordinates || r.geojson?.coordinates || [];
+                        coords.forEach((c: any) => allCoords.push([c[1], c[0]]));
+                    });
+
+                    let minPixelDist = Infinity;
+                    let closestCoordIdx = -1;
+
+                    for (let i = 0; i < allCoords.length - 1; i++) {
+                        const a = map.latLngToContainerPoint(allCoords[i]);
+                        const b = map.latLngToContainerPoint(allCoords[i + 1]);
+                        const l2 = Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2);
+                        let proj: { x: number; y: number } = { x: a.x, y: a.y };
+                        if (l2 > 0) {
+                            const t = Math.max(0, Math.min(1, ((clickPt.x - a.x) * (b.x - a.x) + (clickPt.y - a.y) * (b.y - a.y)) / l2));
+                            proj = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
+                        }
+                        const dist = Math.hypot(clickPt.x - proj.x, clickPt.y - proj.y);
+                        if (dist < minPixelDist) {
+                            minPixelDist = dist;
+                            closestCoordIdx = i;
+                        }
+                    }
+
+                    if (minPixelDist < 45 && closestCoordIdx !== -1) {
+                        const newForced = [...(state.polygonalization_settings?.forced_nodes || []), closestCoordIdx];
+                        dispatch({ type: 'SET_POLYGONAL_SETTINGS', settings: { forced_nodes: Array.from(new Set(newForced)) } as any });
+                        dispatch({ type: 'ADD_NOTIFICATION', message: 'Nœud ajouté sur le tracé.', notifType: 'info' });
+                    }
+                }
             }
         }
     });
@@ -417,6 +455,7 @@ export default function MapComponent() {
                 <DrawAnnotationsLayer />
                 <TextAnnotationsLayer />
                 <ActiveRouteLayer />
+                <RouteRubberbandLayer />
                 <CursorPreviewLine cursorPos={cursorPos} />
                 <InteractiveStages />
             </MapContainer>

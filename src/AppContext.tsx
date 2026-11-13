@@ -137,6 +137,7 @@ export type AppAction =
     | { type: 'TOGGLE_POIS_ON_MAP' }
     | { type: 'TOGGLE_DANGERS_ON_MAP' }
     | { type: 'TOGGLE_STAGES_ON_MAP' }
+    | { type: 'TOGGLE_AZIMUTH_ARROWS' }
     /**
      * Edit the plain-text of a computed (non-manual) step.
      * The new text is validated (±10% distance/azimuth tolerance) and re-encoded.
@@ -398,9 +399,59 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
         case 'SET_ACTIVE_TOOL': {
             const cleaned = cleanupEmptyLayers(state, action.tool);
+            const routeTools = ['route', 'route_direct', 'node', 'azimut', 'encodage'];
+            let nextSelectedLayerId = cleaned.selected_layer_id;
+            let nextActiveItinId = cleaned.active_itinerary_id;
+            let nextStages = cleaned.stages;
+            let nextRoutes = cleaned.routes;
+            let nextPolySteps = cleaned.polygonal_steps;
+            let nextPolyLegs = cleaned.polygonal_legs;
+            let nextCarnet = cleaned.carnet_steps;
+            let nextCustomAssignments = cleaned.custom_assignments;
+            let nextCustomLangs = cleaned.custom_languages;
+
+            if (routeTools.includes(action.tool)) {
+                // When activating a routing tool, ensure an itinerary is selected and active
+                if (!nextActiveItinId && cleaned.itineraries.length > 0) {
+                    const first = cleaned.itineraries[0];
+                    nextActiveItinId = first.id;
+                    nextStages = first.stages || [];
+                    nextRoutes = first.routes || [];
+                    nextPolySteps = first.polygonal_steps || [];
+                    nextPolyLegs = first.polygonal_legs || {};
+                    nextCarnet = first.carnet_steps || [];
+                    nextCustomAssignments = first.custom_assignments || {};
+                    nextCustomLangs = first.custom_languages || {};
+                }
+                if (nextActiveItinId) {
+                    nextSelectedLayerId = nextActiveItinId;
+                }
+            } else if (action.tool === 'annotate_area' || action.tool === 'annotate_area_routed') {
+                const isArea = (cleaned.area_annotations || []).some(a => a.id === nextSelectedLayerId);
+                if (!isArea) nextSelectedLayerId = null;
+            } else if (action.tool === 'annotate_draw') {
+                const isDraw = (cleaned.draw_annotations || []).some(d => d.id === nextSelectedLayerId);
+                if (!isDraw) nextSelectedLayerId = null;
+            } else if (action.tool === 'annotate_text') {
+                const isText = (cleaned.text_annotations || []).some(t => t.id === nextSelectedLayerId);
+                if (!isText) nextSelectedLayerId = null;
+            } else if (action.tool === 'annotate_point') {
+                const isPoint = (cleaned.point_annotations || []).some(p => p.id === nextSelectedLayerId);
+                if (!isPoint) nextSelectedLayerId = null;
+            }
+
             return {
                 ...cleaned,
                 active_tool: action.tool,
+                selected_layer_id: nextSelectedLayerId,
+                active_itinerary_id: nextActiveItinId,
+                stages: nextStages,
+                routes: nextRoutes,
+                polygonal_steps: nextPolySteps,
+                polygonal_legs: nextPolyLegs,
+                carnet_steps: nextCarnet,
+                custom_assignments: nextCustomAssignments,
+                custom_languages: nextCustomLangs,
                 anchor_stage_idx: -1,
             };
         }
@@ -430,7 +481,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 if (state.stages.length > 0) newRoutes.push(null as any);
             }
             // Re-label sequentially A, B, C…
-            const labeledStages = newStages.map((s, i) => ({ ...s, label: String.fromCharCode(65 + i) }));
+            const labeledStages: Stage[] = newStages.map((s, i) => ({
+                ...s,
+                coords: [s.coords[0], s.coords[1]] as [number, number],
+                label: String.fromCharCode(65 + i)
+            }));
             const newAnchor = labeledStages.length - 1;
 
             // Sync into active itinerary in itineraries list immediately
@@ -462,7 +517,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
             inserted.splice(action.afterIdx + 1, 0, newStage);
             const newRoutes = [...state.routes];
             newRoutes.splice(action.afterIdx + 1, 0, null as any);
-            const relabeled = inserted.map((s, i) => ({ ...s, label: String.fromCharCode(65 + i) }));
+            const relabeled: Stage[] = inserted.map((s, i) => ({
+                ...s,
+                coords: [s.coords[0], s.coords[1]] as [number, number],
+                label: String.fromCharCode(65 + i)
+            }));
             const activeId = state.active_itinerary_id;
             const updatedItins = (state.itineraries || []).map(it => it.id === activeId ? {
                 ...it,
@@ -485,8 +544,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
             if (idx === -1) return state;
             const newStages = state.stages.filter(s => s.id !== action.id);
             // Re-label remaining stages A, B, C...
-            const relabeled = newStages.map((s, i) => ({
+            const relabeled: Stage[] = newStages.map((s, i) => ({
                 ...s,
+                coords: [s.coords[0], s.coords[1]] as [number, number],
                 label: String.fromCharCode(65 + i)
             }));
             // Remove associated route legs to keep routes perfectly aligned (length = stages.length - 1)
@@ -517,8 +577,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
         case 'MOVE_STAGE': {
             pushHistory(state);
-            const movedStages = state.stages.map(s =>
-                s.id === action.id ? { ...s, coords: [action.lat, action.lon], address: action.address !== undefined ? action.address : s.address } : s
+            const movedStages: Stage[] = state.stages.map(s =>
+                s.id === action.id ? { ...s, coords: [action.lat, action.lon] as [number, number], address: action.address !== undefined ? action.address : s.address } : s
             );
             const activeId = state.active_itinerary_id;
             const updatedItins = (state.itineraries || []).map(it => it.id === activeId ? {
@@ -536,8 +596,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'REORDER_STAGES': {
             pushHistory(state);
             // Re-label in order
-            const reordered = action.stages.map((s, i) => ({
+            const reordered: Stage[] = action.stages.map((s, i) => ({
                 ...s,
+                coords: [s.coords[0], s.coords[1]] as [number, number],
                 label: String.fromCharCode(65 + i)
             }));
             return { ...state, stages: reordered, routes: [] }; // routes need full recalc
@@ -730,7 +791,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
                     routes: [],
                     polygonal_steps: [],
                     polygonal_legs: {},
-                    carnet_steps: {},
+                    carnet_steps: [],
                     custom_assignments: {},
                     custom_languages: {},
                 };
@@ -1674,6 +1735,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
         case 'TOGGLE_STAGES_ON_MAP':
             return { ...state, show_stages_on_map: !state.show_stages_on_map };
+
+        case 'TOGGLE_AZIMUTH_ARROWS':
+            return { ...state, show_azimuth_arrows: !state.show_azimuth_arrows };
 
         // ── POI persistence ────────────────────────────────────────────────
         case 'SET_SEGMENT_POIS': {
