@@ -55,10 +55,18 @@ export class CloudAuthService {
     private static GUEST_KEY = 'scoutraider_is_guest';
 
     static getBaseUrl(): string {
-        // If running in browser hosted on scoutraider.silverhorse.fr or localhost
+        // If running in browser hosted on scoutraider.silverhorse.fr → relative URLs (nginx handles /api)
         if (typeof window !== 'undefined') {
-            if (window.location && window.location.origin && !window.location.origin.startsWith('file:')) {
-                return ''; // Relative URLs hit nginx /api
+            const origin = window.location.origin;
+            if (!origin.startsWith('file:')) {
+                // On localhost in dev, check if VITE_API_URL is set to override
+                const viteApi = (import.meta as any).env?.VITE_API_URL;
+                if (viteApi) return viteApi;
+                // On localhost without local backend, fall back to prod
+                if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+                    return DEFAULT_REMOTE_API;
+                }
+                return ''; // On prod server: relative URLs hit nginx /api
             }
         }
         return DEFAULT_REMOTE_API;
