@@ -1,40 +1,68 @@
 /**
  * EditorPage.tsx — Wrapper de l'éditeur ScoutRaider pour une URL de document unique.
  * Route: /d/:identifier  (identifier = 'new' | share_token | project_id)
+ *
+ * - /d/new          → éditeur vierge, URL mise à jour vers /d/<id> après le premier save
+ * - /d/<share_token> → ouvre un doc partagé/public (token commence par doc_)
+ * - /d/<project_id>  → ouvre un projet cloud de l'utilisateur
  */
 
 import React, { useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import App from '../App';
 
 export default function EditorPage() {
     const { identifier } = useParams<{ identifier: string }>();
-    const { isLoading, isAuthenticated, isGuest, loadSharedDoc, loadFromCloud } = useAuth();
-    const loaded = useRef(false);
+    const navigate = useNavigate();
+    const {
+        isLoading,
+        isAuthenticated,
+        isGuest,
+        cloudProjectId,
+        shareToken,
+        loadSharedDoc,
+        loadFromCloud,
+        newProject,
+    } = useAuth();
 
+    // Track which identifier has already been loaded to avoid double-loads
+    const loadedIdentifier = useRef<string | null>(null);
+
+    // ── Load document when identifier changes ────────────────────────────────
     useEffect(() => {
-        if (isLoading || !identifier || loaded.current) return;
-        loaded.current = true;
+        if (isLoading) return;
+        if (!identifier) return;
+        if (loadedIdentifier.current === identifier) return;
 
-        // 'new' → blank editor, no loading needed
+        loadedIdentifier.current = identifier;
+
         if (identifier === 'new') {
+            // Reset to blank state
+            newProject();
             return;
         }
 
         const isToken = identifier.startsWith('doc_');
 
         if (isToken) {
-            // Shared/public permalink — works unauthenticated
             loadSharedDoc(identifier);
         } else if (isAuthenticated || !isGuest) {
-            // Project ID — requires authentication
             loadFromCloud(identifier);
         } else {
-            // Guest trying to open by ID — try as shared doc
             loadSharedDoc(identifier);
         }
-    }, [isLoading, identifier, isAuthenticated, isGuest, loadSharedDoc, loadFromCloud]);
+    }, [isLoading, identifier, isAuthenticated, isGuest, loadSharedDoc, loadFromCloud, newProject]);
+
+    // ── After first save on /d/new: redirect to /d/<projectId> ───────────────
+    useEffect(() => {
+        if (!cloudProjectId) return;
+        if (identifier === 'new') {
+            // Replace /d/new with the real project URL (use share_token if available)
+            const targetId = shareToken || cloudProjectId;
+            navigate(`/d/${targetId}`, { replace: true });
+        }
+    }, [cloudProjectId, shareToken, identifier, navigate]);
 
     return <App />;
 }
