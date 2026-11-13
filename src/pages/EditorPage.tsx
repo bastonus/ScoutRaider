@@ -1,22 +1,26 @@
 /**
  * EditorPage.tsx — Wrapper de l'éditeur ScoutRaider pour une URL de document unique.
- * Route: /d/:identifier  (identifier = share_token ou project_id)
+ * Route: /d/:identifier  (identifier = 'new' | share_token | project_id)
  */
 
 import React, { useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import App from '../App';
 
 export default function EditorPage() {
     const { identifier } = useParams<{ identifier: string }>();
-    const navigate = useNavigate();
     const { isLoading, isAuthenticated, isGuest, loadSharedDoc, loadFromCloud } = useAuth();
     const loaded = useRef(false);
 
     useEffect(() => {
         if (isLoading || !identifier || loaded.current) return;
         loaded.current = true;
+
+        // 'new' → blank editor, no loading needed
+        if (identifier === 'new') {
+            return;
+        }
 
         const isToken = identifier.startsWith('doc_');
 
@@ -27,7 +31,7 @@ export default function EditorPage() {
             // Project ID — requires authentication
             loadFromCloud(identifier);
         } else {
-            // Guest trying to open a project by ID — treat as shared
+            // Guest trying to open by ID — try as shared doc
             loadSharedDoc(identifier);
         }
     }, [isLoading, identifier, isAuthenticated, isGuest, loadSharedDoc, loadFromCloud]);

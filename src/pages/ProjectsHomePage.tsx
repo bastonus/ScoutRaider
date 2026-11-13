@@ -63,8 +63,7 @@ export default function ProjectsHomePage() {
     const [tab, setTab] = useState<TabFilter>('all');
     const [search, setSearch] = useState('');
     const [creating, setCreating] = useState(false);
-    const [userMenuOpen, setUserMenuOpen] = useState(false);
-    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [userMenuOpen, setUserMenuOpen] = useState(false);    const [copiedId, setCopiedId] = useState<string | null>(null);
 
     // Load projects from cloud
     const loadProjects = useCallback(async () => {
@@ -95,16 +94,10 @@ export default function ProjectsHomePage() {
         return matchSearch && matchTab;
     });
 
-    const handleNewProject = async () => {
-        setCreating(true);
-        const title = `Nouveau projet ${new Date().toLocaleDateString('fr-FR')}`;
-        try {
-            const saved = await CloudAuthService.saveProject(title, { document_title: title } as any, null);
-            navigate(`/d/${saved.id}`);
-        } catch (e: any) {
-            setError(e.message);
-            setCreating(false);
-        }
+    const handleNewProject = () => {
+        // Navigate directly to editor — the editor will start with a blank state
+        // and auto-save to cloud when the user makes their first edit
+        navigate('/d/new');
     };
 
     const handleOpen = (p: CloudProjectSummary) => {
@@ -213,18 +206,14 @@ export default function ProjectsHomePage() {
                             </p>
                         )}
                     </div>
-                    {!isGuest && (
-                        <button
-                            style={{ ...s.newBtn, opacity: creating ? 0.7 : 1 }}
-                            onClick={handleNewProject}
-                            disabled={creating}
-                        >
-                            {creating
-                                ? <Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite' }} />
-                                : <Plus size={16} />}
-                            <span>Nouveau projet</span>
-                        </button>
-                    )}
+                    {/* Bouton visible pour tous — redirige vers login si invité */}
+                    <button
+                        style={s.newBtn}
+                        onClick={isGuest ? handleGuestLogin : handleNewProject}
+                    >
+                        <Plus size={16} />
+                        <span>{isGuest ? 'Se connecter pour créer' : 'Nouveau projet'}</span>
+                    </button>
                 </div>
 
                 {/* Tabs */}
@@ -318,6 +307,18 @@ export default function ProjectsHomePage() {
                 <div style={s.overlay} onClick={() => setUserMenuOpen(false)} />
             )}
 
+            {/* FAB — Floating "Nouveau projet" button (mobile-friendly, always visible) */}
+            {!isGuest && (
+                <button
+                    style={s.fab}
+                    onClick={handleNewProject}
+                    title="Nouveau projet"
+                    aria-label="Nouveau projet"
+                >
+                    <Plus size={22} />
+                </button>
+            )}
+
             {/* CSS for animations */}
             <style>{`
                 @keyframes spin { to { transform: rotate(360deg); } }
@@ -325,6 +326,7 @@ export default function ProjectsHomePage() {
                 .project-card:hover { transform: translateY(-2px); border-color: rgba(110,201,126,0.35) !important; }
                 .action-btn:hover { background: rgba(110,201,126,0.12) !important; color: #6EC97E !important; }
                 .delete-btn:hover { background: rgba(239,68,68,0.12) !important; color: #fca5a5 !important; }
+                .fab-btn:hover { transform: scale(1.08) !important; box-shadow: 0 8px 32px rgba(110,201,126,0.4) !important; }
             `}</style>
         </div>
     );
@@ -797,5 +799,24 @@ const s: Record<string, React.CSSProperties> = {
         fontSize: '12px',
         minWidth: '24px',
         height: '24px',
+    },
+    fab: {
+        position: 'fixed',
+        bottom: '28px',
+        right: '28px',
+        width: '56px',
+        height: '56px',
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, #6EC97E, #4da85e)',
+        border: 'none',
+        color: '#0d1511',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 4px 20px rgba(110,201,126,0.35)',
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        zIndex: 200,
+        fontSize: '0',
     },
 };
