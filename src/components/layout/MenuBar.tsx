@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
     Bell, 
     Settings, 
@@ -61,6 +62,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
         logout 
     } = useAuth();
 
+    const navigate = useNavigate();
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const userMenuRef = useRef<HTMLDivElement>(null);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -395,14 +397,18 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             {/* LEFT: LOGO + GOOGLE DOCS STYLE TITLE ENCART & MENUS */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', WebkitAppRegion: 'no-drag' } as any} ref={menuRef}>
                 <div 
-                    title="ScoutRaider Suite"
+                    title="Retour à l'accueil"
+                    onClick={() => navigate('/projects')}
                     style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center',
-                        cursor: 'default',
+                        cursor: 'pointer',
                         userSelect: 'none',
-                        flexShrink: 0
+                        flexShrink: 0,
+                        borderRadius: '6px',
+                        padding: '2px',
+                        transition: 'background 0.15s',
                     }}
                 >
                     <FleurDeLysLogo size={30} style={{ 

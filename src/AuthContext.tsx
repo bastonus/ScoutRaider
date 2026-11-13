@@ -117,15 +117,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setCloudSyncStatus('guest');
             }
             if (active) setIsLoading(false);
-
-            // Check URL for ?doc=... or ?share=...
-            if (typeof window !== 'undefined') {
-                const urlParams = new URLSearchParams(window.location.search);
-                const docToken = urlParams.get('doc') || urlParams.get('share');
-                if (docToken) {
-                    loadSharedDoc(docToken);
-                }
-            }
         };
         checkSession();
         return () => { active = false; };
