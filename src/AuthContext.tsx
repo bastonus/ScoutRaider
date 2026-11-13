@@ -35,6 +35,7 @@ interface AuthContextType {
     loadFromCloud: (projectId: string) => Promise<void>;
     loadSharedDoc: (identifier: string) => Promise<void>;
     makeEditableCopy: () => Promise<void>;
+    newProject: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -147,6 +148,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     // ─── Actions ──────────────────────────────────────────────────────────────
+
+    const newProject = () => {
+        dispatch({ type: 'NEW_PROJECT' });
+        setCloudProjectId(null);
+        setCurrentProjectRole('owner');
+        setShareToken(null);
+        setCloudSyncStatus('idle');
+        setLastSavedTime(null);
+    };
 
     const login = async (username: string, password: string) => {
         setIsLoading(true);
@@ -327,6 +337,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             loadFromCloud,
             loadSharedDoc,
             makeEditableCopy,
+            newProject,
         }}>
             {children}
         </AuthContext.Provider>
