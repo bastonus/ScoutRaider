@@ -162,7 +162,7 @@ export default function TextAnnotationsLayer() {
                 points: initialQuad,
                 color: targetLayer.color || '#38bdf8',
                 fontSize: targetLayer.fontSize || 16,
-                backgroundColor: 'rgba(10, 16, 24, 0.85)',
+                backgroundColor: 'transparent',
                 opacity: 1,
                 bold: true,
                 createdAt: Date.now(),
@@ -330,6 +330,7 @@ export default function TextAnnotationsLayer() {
                         const isSelected = selectedLayerId === layer.id && selectedSublayerId === item.id;
                         const isGroupSelected = selectedLayerId === layer.id && !selectedSublayerId;
                         const isEditing = editingItemId === item.id;
+                        const hasBg = Boolean(item.backgroundColor && item.backgroundColor !== 'transparent');
 
                         return (
                             <div
@@ -348,16 +349,22 @@ export default function TextAnnotationsLayer() {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     padding: '2px 8px',
-                                    background: item.backgroundColor || 'rgba(10, 16, 24, 0.85)',
+                                    background: hasBg ? item.backgroundColor : 'transparent',
                                     border: isSelected
                                         ? `2px solid #2d8ceb`
                                         : isGroupSelected
                                         ? `1.5px dashed rgba(45, 140, 235, 0.6)`
-                                        : `1px solid rgba(255, 255, 255, 0.18)`,
-                                    borderRadius: '5px',
+                                        : isEditing
+                                        ? `1px dashed rgba(45, 140, 235, 0.8)`
+                                        : hasBg
+                                        ? `1px solid rgba(255, 255, 255, 0.18)`
+                                        : 'none',
+                                    borderRadius: hasBg ? '5px' : '2px',
                                     boxShadow: isSelected
-                                        ? '0 0 14px rgba(45, 140, 235, 0.5), 0 4px 12px rgba(0,0,0,0.7)'
-                                        : '0 2px 8px rgba(0,0,0,0.5)',
+                                        ? '0 0 14px rgba(45, 140, 235, 0.5)'
+                                        : hasBg
+                                        ? '0 2px 8px rgba(0,0,0,0.5)'
+                                        : 'none',
                                     color: item.color,
                                     fontSize: `${dynamicFontSize}px`,
                                     fontWeight: item.bold ? 700 : 500,
@@ -367,7 +374,10 @@ export default function TextAnnotationsLayer() {
                                     whiteSpace: 'nowrap',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
-                                    backdropFilter: 'blur(6px)',
+                                    textShadow: hasBg
+                                        ? 'none'
+                                        : '0 0 3px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.9)',
+                                    backdropFilter: hasBg ? 'blur(6px)' : 'none',
                                     transition: livePreviewItems ? 'none' : 'border-color 0.15s',
                                 }}
                                 onClick={(e) => {
@@ -401,6 +411,7 @@ export default function TextAnnotationsLayer() {
                                             textAlign: 'center',
                                             padding: 0,
                                             margin: 0,
+                                            textShadow: hasBg ? 'none' : '0 0 3px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.9)',
                                         }}
                                         autoFocus
                                     />
