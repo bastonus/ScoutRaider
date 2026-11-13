@@ -1,26 +1,9 @@
-# ─────────────────────────────────────────────────────────────
-# Multi-stage Dockerfile for ScoutRaider Web & Backend Engine
+# ─────────────────────────────────────────────────────────────────────
+# Dockerfile for ScoutRaider Web & Backend Engine
 # Production deployment with Coolify & PostgreSQL
-# ─────────────────────────────────────────────────────────────
+# dist/ is pre-built locally and committed — no Node build in Docker
+# ─────────────────────────────────────────────────────────────────────
 
-# Stage 1: Build the Vite Single-Page Application
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
-
-COPY package*.json ./
-# Use npm install directly — more resilient to lockfile drift and network hiccups
-# Retry up to 3 times on network failure
-RUN npm install --no-audit --no-fund --prefer-offline || \
-    npm install --no-audit --no-fund --prefer-offline || \
-    npm install --no-audit --no-fund
-
-COPY . .
-RUN npm run build
-
-# Stage 2: Production Python 3.12 Debian with Nginx & WeasyPrint
 FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -56,9 +39,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend /app/backend
 COPY legacy/modules /app/legacy/modules
 
-# Copy compiled frontend from Stage 1 into Nginx HTML dir
+# Copy pre-built frontend directly (no Node/npm needed in Docker)
 RUN rm -rf /usr/share/nginx/html/*
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY dist /usr/share/nginx/html
 
 # Copy Nginx config & runner script
 COPY nginx.conf /etc/nginx/sites-available/default
