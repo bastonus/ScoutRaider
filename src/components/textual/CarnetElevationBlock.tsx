@@ -91,22 +91,22 @@ export default function CarnetElevationBlock() {
         <div style={{
             margin: '16px 0 28px 0',
             background: 'var(--bg-panel)',
-            border: '1px solid var(--bg-border)',
-            borderRadius: '14px',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)',
             overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            boxShadow: 'var(--shadow-md)',
             transition: 'border-color 0.2s',
         }}>
             {/* ── Header bar ───────────────────────────────────────────── */}
             <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 18px',
-                borderBottom: '1px solid var(--bg-border)',
-                background: 'rgba(255,255,255,0.02)',
+                padding: '10px 18px',
+                borderBottom: '1px solid var(--border-subtle)',
+                background: 'var(--bg-dark)',
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{
-                        width: '24px', height: '24px', borderRadius: '6px',
+                        width: '24px', height: '24px', borderRadius: 'var(--radius-xs)',
                         background: 'rgba(6, 182, 212, 0.12)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: accentCyan
@@ -136,10 +136,10 @@ export default function CarnetElevationBlock() {
                         style={{
                             background: 'transparent', border: 'none',
                             color: 'var(--text-dim)', cursor: 'pointer',
-                            padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center',
+                            padding: '4px', borderRadius: 'var(--radius-xs)', display: 'flex', alignItems: 'center',
                             transition: 'color 0.15s'
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--semantic-danger)')}
                         onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
                     >
                         <EyeOff size={14} />
@@ -150,7 +150,7 @@ export default function CarnetElevationBlock() {
             {/* ── Content area ─────────────────────────────────────────── */}
             <div style={{ padding: '16px 18px' }}>
                 {error ? (
-                    <div style={{ color: '#ef4444', fontSize: '12px', padding: '8px 0' }}>
+                    <div style={{ color: 'var(--semantic-danger)', fontSize: '12px', padding: '8px 0' }}>
                         ⚠️ Impossible de charger les données altimétriques : {error}
                     </div>
                 ) : profile ? (
@@ -165,8 +165,8 @@ export default function CarnetElevationBlock() {
                             {/* D+ Ascent */}
                             <div style={{
                                 background: 'var(--bg-base)',
-                                border: '1px solid var(--bg-border)',
-                                borderRadius: '10px',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 'var(--radius-sm)',
                                 padding: '8px 12px',
                                 display: 'flex', alignItems: 'center', gap: '8px'
                             }}>
@@ -175,7 +175,7 @@ export default function CarnetElevationBlock() {
                                     <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
                                         Dénivelé +
                                     </div>
-                                    <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                                         +{profile.ascend_m} m
                                     </div>
                                 </div>
@@ -184,8 +184,8 @@ export default function CarnetElevationBlock() {
                             {/* D- Descent */}
                             <div style={{
                                 background: 'var(--bg-base)',
-                                border: '1px solid var(--bg-border)',
-                                borderRadius: '10px',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 'var(--radius-sm)',
                                 padding: '8px 12px',
                                 display: 'flex', alignItems: 'center', gap: '8px'
                             }}>
@@ -194,7 +194,7 @@ export default function CarnetElevationBlock() {
                                     <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
                                         Dénivelé -
                                     </div>
-                                    <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                                         -{profile.descend_m} m
                                     </div>
                                 </div>
@@ -203,8 +203,8 @@ export default function CarnetElevationBlock() {
                             {/* Altitude Range */}
                             <div style={{
                                 background: 'var(--bg-base)',
-                                border: '1px solid var(--bg-border)',
-                                borderRadius: '10px',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 'var(--radius-sm)',
                                 padding: '8px 12px',
                                 display: 'flex', alignItems: 'center', gap: '8px'
                             }}>
@@ -213,7 +213,7 @@ export default function CarnetElevationBlock() {
                                     <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
                                         Alt. Min / Max
                                     </div>
-                                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                                         {profile.min_alt_m}m / {profile.max_alt_m}m
                                     </div>
                                 </div>
@@ -222,8 +222,8 @@ export default function CarnetElevationBlock() {
                             {/* Estimated March Duration */}
                             <div style={{
                                 background: 'var(--bg-base)',
-                                border: '1px solid var(--bg-border)',
-                                borderRadius: '10px',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 'var(--radius-sm)',
                                 padding: '8px 12px',
                                 display: 'flex', alignItems: 'center', gap: '8px'
                             }}>
@@ -232,7 +232,7 @@ export default function CarnetElevationBlock() {
                                     <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
                                         Temps scout estimé
                                     </div>
-                                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                                         {Math.floor(profile.estimated_duration_min / 60)}h {String(profile.estimated_duration_min % 60).padStart(2, '0')}
                                     </div>
                                 </div>
@@ -244,8 +244,8 @@ export default function CarnetElevationBlock() {
                             style={{
                                 width: '100%',
                                 background: 'var(--bg-base)',
-                                border: '1px solid var(--bg-border)',
-                                borderRadius: '10px',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 'var(--radius-sm)',
                                 padding: '12px 14px 6px 14px',
                             }}
                             dangerouslySetInnerHTML={{

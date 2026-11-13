@@ -23,6 +23,13 @@ interface PreferencesModalProps {
 export default function PreferencesModal({ onClose, initialCategory = 'maps_api' }: PreferencesModalProps) {
     const { state, dispatch } = useApp();
     const [activeCategory, setActiveCategory] = useState<PrefCategory>(initialCategory);
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 640);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
     
     const [ignKey, setIgnKey] = useState(state.ign_api_key || '');
     const [mapyKey, setMapyKey] = useState(state.mapy_api_key || '');
@@ -46,51 +53,70 @@ export default function PreferencesModal({ onClose, initialCategory = 'maps_api'
             <div
                 onClick={e => e.stopPropagation()}
                 style={{
-                    width: '860px', maxWidth: '97vw', height: '580px', maxHeight: '96vh',
-                    background: '#0d0d14', borderRadius: '12px',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    boxShadow: '0 32px 80px rgba(0,0,0,0.9)',
+                    width: isMobile ? '100%' : '800px', 
+                    maxWidth: isMobile ? '100vw' : '97vw', 
+                    height: isMobile ? '100%' : '540px', 
+                    maxHeight: isMobile ? '100dvh' : '96vh',
+                    borderRadius: isMobile ? 0 : 'var(--radius-md)',
+                    background: 'var(--bg-elevated)',
+                    border: isMobile ? 'none' : '1px solid var(--border-subtle)',
+                    boxShadow: 'var(--shadow-lg)',
                     display: 'flex', flexDirection: 'column', overflow: 'hidden',
                 }}
             >
                 {/* ── Header ── */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff', letterSpacing: '0.02em' }}>Préférences</span>
-                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px' }}>Ctrl+P</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '10px 14px' : '12px 18px', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Préférences</span>
+                        {!isMobile && <kbd style={{ fontSize: '9px', padding: '1px 5px' }}>Ctrl P</kbd>}
                     </div>
-                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}>
-                        <X size={16} />
+                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '6px', borderRadius: 'var(--radius-xs)', display: 'flex', alignItems: 'center' }}>
+                        <X size={18} />
                     </button>
                 </div>
 
                 {/* ── Body ── */}
-                <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: 0 }}>
                     
-                    {/* ── LEFT: Categories ── */}
-                    <div style={{ width: '200px', flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', paddingTop: '10px', paddingBottom: '10px', overflowY: 'auto' }}>
-                        <div style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 18px', marginBottom: '6px' }}>Catégories</div>
+                    {/* ── Categories ── */}
+                    <div style={{ 
+                        width: isMobile ? '100%' : '190px', 
+                        flexShrink: 0, 
+                        borderRight: isMobile ? 'none' : '1px solid var(--border-subtle)', 
+                        borderBottom: isMobile ? '1px solid var(--border-subtle)' : 'none',
+                        display: 'flex', 
+                        flexDirection: isMobile ? 'row' : 'column', 
+                        padding: isMobile ? '4px 8px' : '8px 0', 
+                        overflowX: isMobile ? 'auto' : 'hidden',
+                        overflowY: isMobile ? 'hidden' : 'auto', 
+                        background: 'var(--bg-panel)' 
+                    }}>
+                        {!isMobile && <div style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-dim)', padding: '0 14px', marginBottom: '4px' }}>Catégories</div>}
                         {CATEGORIES.map(cat => (
                             <div
                                 key={cat.id}
                                 onClick={() => setActiveCategory(cat.id)}
                                 style={{
-                                    display: 'flex', alignItems: 'center', gap: '10px',
-                                    padding: '10px 18px', cursor: 'pointer',
-                                    background: activeCategory === cat.id ? 'rgba(110, 201, 126, 0.08)' : 'transparent',
-                                    color: activeCategory === cat.id ? 'var(--accent-default)' : 'rgba(255,255,255,0.5)',
-                                    transition: 'all 0.15s',
-                                    borderRight: activeCategory === cat.id ? '2px solid var(--accent-default)' : 'none'
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    padding: isMobile ? '8px 12px' : '8px 14px', 
+                                    cursor: 'pointer',
+                                    background: activeCategory === cat.id ? 'var(--bg-hover)' : 'transparent',
+                                    color: activeCategory === cat.id ? 'var(--text-primary)' : 'var(--text-dim)',
+                                    transition: 'all 100ms ease',
+                                    borderRight: !isMobile && activeCategory === cat.id ? '2px solid var(--accent-default)' : '2px solid transparent',
+                                    borderBottom: isMobile && activeCategory === cat.id ? '2px solid var(--accent-default)' : '2px solid transparent',
+                                    borderRadius: isMobile ? '6px' : 0,
+                                    whiteSpace: 'nowrap'
                                 }}
                             >
                                 {cat.icon}
-                                <span style={{ fontSize: '13px', fontWeight: 600 }}>{cat.label}</span>
+                                <span style={{ fontSize: '12px', fontWeight: activeCategory === cat.id ? 600 : 400 }}>{cat.label}</span>
                             </div>
                         ))}
                     </div>
 
-                    {/* ── RIGHT: Content ── */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: '24px', overflowY: 'auto' }}>
+                    {/* ── Content ── */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: isMobile ? '16px' : '24px', overflowY: 'auto' }}>
                         
                         {activeCategory === 'maps_api' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -207,23 +233,27 @@ export default function PreferencesModal({ onClose, initialCategory = 'maps_api'
                 </div>
 
                 {/* ── Footer ── */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', padding: '10px 18px', borderTop: '1px solid var(--border-subtle)', flexShrink: 0, background: 'var(--bg-panel)' }}>
                     <button
                         onClick={onClose}
-                        style={{ padding: '8px 18px', background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}
+                        style={{ padding: '0 12px', height: '30px', background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '11.5px', fontWeight: 500 }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--text-dim)'; }}
                     >
                         Annuler
                     </button>
                     <button
                         onClick={() => { handleSaveKeys(); onClose(); }}
                         style={{
-                            padding: '8px 22px', background: 'var(--accent-default)',
-                            border: 'none', borderRadius: '6px', color: '#0a0f0c', cursor: 'pointer',
-                            fontSize: '12px', fontWeight: 700,
-                            display: 'flex', alignItems: 'center', gap: '7px'
+                            padding: '0 14px', height: '30px', background: 'var(--accent-primary)',
+                            border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-sm)', color: 'var(--accent-primary-text)', cursor: 'pointer',
+                            fontSize: '11.5px', fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: '6px'
                         }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-primary-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'var(--accent-primary)'}
                     >
-                        Enregistrer les modifications
+                        Enregistrer
                     </button>
                 </div>
             </div>

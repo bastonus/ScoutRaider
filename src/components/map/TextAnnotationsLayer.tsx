@@ -331,10 +331,16 @@ export default function TextAnnotationsLayer() {
                         const isGroupSelected = selectedLayerId === layer.id && !selectedSublayerId;
                         const isEditing = editingItemId === item.id;
                         const hasBg = Boolean(item.backgroundColor && item.backgroundColor !== 'transparent');
+                        const isOtherCreationTool = [
+                            'route', 'route_direct', 'annotate_point', 'annotate_area', 
+                            'annotate_area_routed', 'annotate_draw', 'node', 'azimut'
+                        ].includes(activeTool);
+                        const canInteractWithText = isTextTool || !isOtherCreationTool;
 
                         return (
                             <div
                                 key={`text-${layer.id}-${item.id}`}
+                                title={canInteractWithText ? `Texte : "${item.text}" — Double-clic : éditer · Clic : déplacer` : undefined}
                                 style={{
                                     position: 'absolute',
                                     left: spTL.x,
@@ -343,8 +349,8 @@ export default function TextAnnotationsLayer() {
                                     height: `${height}px`,
                                     transform: `rotate(${angleDeg}deg)`,
                                     transformOrigin: 'top left',
-                                    pointerEvents: 'auto',
-                                    cursor: isEditing ? 'text' : 'pointer',
+                                    pointerEvents: canInteractWithText ? 'auto' : 'none',
+                                    cursor: isEditing ? 'text' : (canInteractWithText ? 'pointer' : 'default'),
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',

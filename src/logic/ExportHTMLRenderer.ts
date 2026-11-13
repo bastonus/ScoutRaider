@@ -1,21 +1,16 @@
 /**
- * ExportHTMLRenderer.ts — Premium HTML template engine for export.
+ * ExportHTMLRenderer.ts — Minimalist, factual, strictly contained print renderer.
  * 
- * Generates a self-contained A4 HTML document (inline CSS, @page rules for WeasyPrint,
- * embedded fonts via Google Fonts, SVG diagrams inline).
- * 
- * Inspired by legacy/utils/export_html.py + export_content.py.
- * This single HTML serves as the universal source for all export formats:
- *   - Direct HTML save
- *   - PDF via WeasyPrint (python -m weasyprint)
- *   - PDF via Electron printToPDF (fallback)
+ * Strict overflow prevention:
+ * - max-width: 100%, width: 100%, box-sizing: border-box on all elements
+ * - table-layout: fixed, word-break: break-word, overflow-wrap: anywhere
+ * - svg width="100%" height="auto" and overflow hidden
+ * - No horizontal spillover under any circumstance
  */
 
 import type { CarnetStep, ThemeData } from './types';
 import { ModuleLogic } from './ModuleLogic';
-import { ModuleRegistry } from './ModuleRegistry';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { calculateSmartMapDimensions } from '../components/textual/MiniMap';
 
 import { calculatePolygonArea, formatArea } from './GeoUtils';
 import type { PointAnnotation, AreaAnnotation, Itinerary } from './types';
@@ -42,11 +37,7 @@ export interface ExportRenderOptions {
     paperSize?: 'A4' | 'A5' | 'A3' | 'Letter';
 }
 
-// ─── CSS ──────────────────────────────────────────────────────────────────────
-
-function buildCSS(accent: string, isSolution: boolean, fontsBase64: Record<string, string>, paperSize: string = 'A4'): string {
-    const accentDark = isSolution ? '#8b2500' : '#1a3a5c';
-
+function buildCSS(fontsBase64: Record<string, string>, paperSize: string = 'A4'): string {
     let fontFaces = '';
     if (fontsBase64.morse) {
         fontFaces += `@font-face { font-family: 'Morse'; src: url('data:font/truetype;base64,${fontsBase64.morse}') format('truetype'); }\n`;
@@ -59,362 +50,620 @@ function buildCSS(accent: string, isSolution: boolean, fontsBase64: Record<strin
     }
 
     return `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Kalam:wght@400;700&display=swap');
-
 ${fontFaces}
 
-:root {
-    --accent: ${accent};
-    --accent-dark: ${accentDark};
+*, *:before, *:after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
 
 body {
-    font-family: 'Segoe UI', Tahoma, sans-serif;
-    background: #f0f4f8;
-    color: #1e293b;
-    padding: 32px 16px;
-    line-height: 1.6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #ffffff;
+    color: #111111;
+    padding: 16px;
+    line-height: 1.4;
+    font-size: 10.5pt;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 @page {
     size: ${paperSize} portrait;
-    margin: 18mm 14mm 20mm 14mm;
+    margin: 14mm 14mm 14mm 14mm;
 
     @top-left {
-        content: "SCOUTRAIDER SUITE";
-        font-family: 'Segoe UI', Tahoma, sans-serif;
-        font-size: 7.5pt;
-        letter-spacing: 1px;
-        color: #64748b;
-        vertical-align: bottom;
-        padding-bottom: 4mm;
-        border-bottom: 0.5pt solid #cbd5e1;
+        content: string(raidtitle);
+        font-family: inherit;
+        font-size: 8pt;
+        font-weight: 600;
+        color: #111111;
+        border-bottom: 1pt solid #111111;
+        padding-bottom: 2mm;
     }
 
     @top-right {
-        content: string(raidtitle);
-        font-family: 'Segoe UI', Tahoma, sans-serif;
-        font-size: 8pt;
-        font-weight: bold;
-        color: #1e293b;
-        vertical-align: bottom;
-        padding-bottom: 4mm;
-        border-bottom: 0.5pt solid #cbd5e1;
-    }
-
-    @bottom-left {
         content: string(versiontitle);
-        font-family: 'Segoe UI', Tahoma, sans-serif;
-        font-size: 7.5pt;
-        color: #94a3b8;
-        vertical-align: top;
-        padding-top: 3mm;
-        border-top: 0.5pt solid #e2e8f0;
+        font-family: inherit;
+        font-size: 8pt;
+        font-weight: 600;
+        color: #555555;
+        border-bottom: 1pt solid #111111;
+        padding-bottom: 2mm;
     }
 
     @bottom-center {
         content: counter(page) " / " counter(pages);
-        font-family: 'Segoe UI', Tahoma, sans-serif;
+        font-family: inherit;
         font-size: 8pt;
-        font-weight: 600;
-        color: #64748b;
-        vertical-align: top;
-        padding-top: 3mm;
-        border-top: 0.5pt solid #e2e8f0;
-    }
-
-    @bottom-right {
-        content: "Toujours Prêt";
-        font-family: 'Segoe UI', Tahoma, sans-serif;
-        font-size: 7.5pt;
-        font-style: italic;
-        color: #94a3b8;
-        vertical-align: top;
-        padding-top: 3mm;
-        border-top: 0.5pt solid #e2e8f0;
+        color: #666666;
+        border-top: 0.5pt solid #cccccc;
+        padding-top: 2mm;
     }
 }
 
-@page:first {
-    margin: 0;
-    @top-left { content: none; border: none; }
-    @top-right { content: none; border: none; }
-    @bottom-left { content: none; border: none; }
-    @bottom-center { content: none; border: none; }
-    @bottom-right { content: none; border: none; }
+.raid-title-target {
+    string-set: raidtitle content();
+    display: none;
+}
+
+.version-title-target {
+    string-set: versiontitle content();
+    display: none;
 }
 
 .page-header {
-    text-align: center;
-    margin-bottom: 36px;
-    border-bottom: 3px solid var(--accent);
-    padding-bottom: 16px;
+    width: 100%;
+    border-bottom: 2pt solid #111111;
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
 }
 
 h1 {
-    font-size: 24px;
-    color: var(--accent);
-    letter-spacing: 2px;
-    text-transform: uppercase;
+    font-size: 16pt;
+    font-weight: 700;
+    color: #111111;
+    letter-spacing: -0.02em;
+    margin: 0;
+    word-break: break-word;
 }
 
 .subtitle {
-    color: #64748b;
-    font-size: 11px;
-    margin-top: 4px;
+    font-size: 8.5pt;
+    color: #555555;
+    margin-top: 2px;
+    font-family: monospace;
 }
 
 .step {
-    background: #fff;
-    border-radius: 6px;
-    box-shadow: 0 1px 4px rgba(0,0,0,.08);
-    margin-bottom: 16px;
-    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+    border-bottom: 1pt solid #e5e5e5;
+    padding: 8px 0;
     break-inside: avoid;
     page-break-inside: avoid;
+    overflow: hidden;
 }
 
-.step-body p, .step-body div, .msg, .visual-msg, .encoded {
-    orphans: 3;
-    widows: 3;
-}
-
-.step-header {
-    background: var(--accent);
-    color: #fff;
-    padding: 10px 14px;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.step-num {
-    background: rgba(255,255,255,.25);
-    border-radius: 50%;
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    font-weight: 700;
-    flex-shrink: 0;
-}
-
-.step-body {
-    padding: 12px 14px;
-}
-
-.msg {
-    display: flex;
-    gap: 8px;
-    padding: 7px 0;
-    border-bottom: 1px solid #f1f5f9;
-    align-items: flex-start;
-}
-.msg:last-child {
+.step:last-child {
     border-bottom: none;
 }
 
-.msg-num {
-    min-width: 20px;
-    height: 20px;
-    background: var(--accent);
-    color: #fff;
-    border-radius: 50%;
-    font-size: 9px;
+.step-meta {
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.step-num {
+    font-size: 9.5pt;
     font-weight: 700;
-    text-align: center;
-    line-height: 20px;
+    color: #111111;
+    font-family: monospace;
     flex-shrink: 0;
 }
 
-.encoded {
-    font-size: 13px;
+.step-leg {
+    font-size: 9.5pt;
     font-weight: 600;
-    color: #1e293b;
-    word-break: break-all;
-}
-
-.clair-hint {
-    font-size: 10px;
-    color: #94a3b8;
-    margin-top: 2px;
-    font-style: italic;
-}
-
-.visual-msg {
-    font-size: 12px;
-    color: #475569;
-}
-
-.svg-container {
-    text-align: center;
-    margin: 12px 0;
-}
-
-.step-map-card {
-    margin: 8px 0;
-    border: 1pt solid #cbd5e1;
-    border-radius: 4px;
-    background: #f8fafc;
+    color: #111111;
     overflow: hidden;
-    break-inside: avoid;
-    page-break-inside: avoid;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.step-map-header {
-    background: #f1f5f9;
-    border-bottom: 0.5pt solid #cbd5e1;
-    padding: 6px 10px;
+.step-metrics {
     font-size: 8.5pt;
-    font-weight: bold;
-    display: flex;
-    justify-content: space-between;
+    color: #666666;
+    margin-left: auto;
+    font-family: monospace;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
-.step-map-visual {
-    padding: 10px 12px;
-    border-left: 3pt solid #16a34a;
-    background: #f0fdf4;
-    font-size: 9pt;
-    color: #1e293b;
-}
-
-.map-placeholder {
+.step-content {
     width: 100%;
-    min-height: 180px;
-    background: #e2e8f0;
-    border-radius: 4px;
-    border: 1px solid #cbd5e1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #64748b;
-    font-size: 10pt;
-    margin-bottom: 6px;
+    font-size: 10.5pt;
+    color: #111111;
+    line-height: 1.4;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
-/* ── Typography per module ── */
+.encoded {
+    width: 100%;
+    font-size: 11pt;
+    color: #000000;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.solution-clair {
+    width: 100%;
+    font-size: 9pt;
+    color: #555555;
+    margin-top: 3px;
+    border-left: 2pt solid #111111;
+    padding-left: 6px;
+    font-style: italic;
+    word-break: break-word;
+}
+
+/* Module fonts */
 .font-morse {
     font-family: 'Morse', 'Courier New', monospace;
-    font-size: 20px;
+    font-size: 15pt;
     line-height: 1.2;
+    letter-spacing: 1px;
 }
 
 .font-templier {
     font-family: 'TemplarsCipherPlus', 'Courier New', monospace;
-    font-size: 20px;
+    font-size: 15pt;
     line-height: 1.2;
 }
 
-.font-maritime, .font-drapeaux {
+.font-maritime {
     font-family: 'Maritime', monospace;
-    font-size: 24px;
+    font-size: 16pt;
     line-height: 1.2;
 }
 
-.font-cassis, .font-avocat {
-    font-family: 'Kalam', cursive;
-    font-size: 15px;
+.font-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.font-vigenere, .font-polybe {
-    font-family: 'Courier Prime', monospace;
-    font-size: 14px;
-    letter-spacing: 1px;
+/* Map cards */
+.step-map-card {
+    width: 100%;
+    max-width: 100%;
+    margin: 6px 0;
+    border: 1pt solid #111111;
+    padding: 6px;
+    background: #ffffff;
+    overflow: hidden;
 }
 
-/* ── Annexes ── */
-.annexe, .annexe-section {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    padding: 14px;
-    margin-top: 16px;
+.map-placeholder {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 150px;
+    background: #f5f5f5;
+    border: 0.5pt solid #cccccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666666;
+    font-size: 8.5pt;
+    font-family: monospace;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+/* Strict Tables */
+table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin: 8px 0;
+    font-size: 8.5pt;
+}
+
+th, td {
+    border: 0.5pt solid #cccccc;
+    padding: 4px 6px;
+    text-align: left;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+}
+
+th {
+    background: #f5f5f5;
+    font-weight: 600;
+    color: #111111;
+}
+
+/* SVGs */
+svg {
+    max-width: 100% !important;
+    height: auto !important;
+}
+
+/* Annexes */
+.annexe-section {
+    width: 100%;
+    max-width: 100%;
+    margin-top: 20px;
+    border-top: 1.5pt solid #111111;
+    padding-top: 10px;
     break-before: page;
     page-break-before: always;
     break-inside: avoid;
-    page-break-inside: avoid;
+    overflow: hidden;
 }
-.annexe h3 {
-    font-size: 11px;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 10px;
-}
-.morse-grid, .nato-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-.morse-cell, .nato-cell {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 4px;
-    padding: 4px 7px;
-    text-align: center;
-    min-width: 44px;
-}
-.mc, .nc {
-    display: block;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--accent);
-}
-.ms {
-    font-family: 'Courier New', monospace;
-    font-size: 10px;
-    color: #475569;
-}
-.nw {
-    display: block;
-    font-size: 9px;
-    color: #475569;
-}
-.annexe-table {
-    border-collapse: collapse;
-    font-size: 10px;
-    width: auto;
-    margin: 0 auto;
-}
-.annexe-table th, .annexe-table td {
-    border: 1px solid #e2e8f0;
-    padding: 3px 5px;
-    text-align: center;
-}
-.annexe-table th {
-    background: var(--accent);
-    color: #fff;
-}
-.vig-scroll { overflow-x: auto; }
-.vig-table td { min-width: 14px; padding: 2px; font-size: 8px; }
 
-/* ── Footer ── */
-.page-footer {
+.annexe-title {
+    font-size: 10.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    color: #111111;
+    letter-spacing: 0.04em;
+}
+
+.morse-grid, .nato-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 3px;
+    width: 100%;
+}
+
+.morse-cell, .nato-cell {
+    border: 0.5pt solid #dddddd;
+    padding: 2px 4px;
     text-align: center;
-    margin-top: 32px;
-    color: #94a3b8;
-    font-size: 10px;
-    border-top: 1px solid #e2e8f0;
-    padding-top: 12px;
+    font-size: 8pt;
+    overflow: hidden;
+}
+
+.mc, .nc {
+    font-weight: 700;
+    font-family: monospace;
 }
 `;
 }
 
-// ─── Annexe Renderers ─────────────────────────────────────────────────────────
+function getModuleFontClass(moduleId: string): string {
+    const map: Record<string, string> = {
+        morse: 'font-morse',
+        templier: 'font-templier',
+        maritime: 'font-maritime',
+        vigenere: 'font-mono',
+        polybe: 'font-mono',
+    };
+    return map[moduleId] || '';
+}
+
+/**
+ * Projette une coordonnée (lat, lng) en pixels monde Web Mercator (EPSG:3857) au niveau de zoom donné.
+ */
+function latLngToWorldPixel(lat: number, lng: number, zoom: number): { x: number; y: number } {
+    const latRad = (lat * Math.PI) / 180;
+    const n = Math.pow(2, zoom);
+    const x = ((lng + 180) / 360) * n * 256;
+    const y = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n * 256;
+    return { x, y };
+}
+
+/**
+ * Génère le SVG autonome de la carte avec ses tuiles réelles, son tracé vectoriel,
+ * ses points de départ et d'arrivée, ses annotations et son échelle dynamique au sol.
+ */
+function generateStaticMapSvg(params: {
+    latLngs: [number, number][];
+    center: [number, number]; // [lat, lng]
+    zoom: number;
+    width: number;
+    height: number;
+    layerId?: string;
+    showRoute?: boolean;
+    showEndpoints?: boolean;
+    showAnnotations?: boolean;
+    pointAnnotations?: any[];
+    areaAnnotations?: any[];
+}): { svg: string; formattedScale: string } {
+    const { latLngs, center, zoom, width, height, layerId, showRoute, showEndpoints, showAnnotations, pointAnnotations, areaAnnotations } = params;
+
+    const W = Math.round(width);
+    const H = Math.round(height);
+
+    // zProj : zoom fractionnaire utilisé pour toutes les projections pixel — donne l'échelle EXACTE demandée.
+    // zTile : entier strict pour les URLs WMTS/OSM (l'API rejette tout non-entier).
+    const zProj = Math.min(18, Math.max(8, zoom));
+    const zTile = Math.min(18, Math.max(8, Math.round(zoom)));
+
+    // Pixel monde du centre (projection à l'échelle fractionnaire exacte)
+    const cPx = latLngToWorldPixel(center[0], center[1], zProj);
+    const originX = cPx.x - W / 2;
+    const originY = cPx.y - H / 2;
+
+    // Tuiles requises : positions à l'aide du zoom entier pour les indices de tuile,
+    // mais positions pixel en cohérence avec zProj
+    const cPxTile = latLngToWorldPixel(center[0], center[1], zTile);
+    const originXTile = cPxTile.x - W / 2;
+    const originYTile = cPxTile.y - H / 2;
+    const minTx = Math.floor(originXTile / 256);
+    const maxTx = Math.floor((originXTile + W) / 256);
+    const minTy = Math.floor(originYTile / 256);
+    const maxTy = Math.floor((originYTile + H) / 256);
+
+    let tilesSvg = '';
+    for (let ty = minTy; ty <= maxTy; ty++) {
+        for (let tx = minTx; tx <= maxTx; tx++) {
+            const px = Math.round(tx * 256 - originX);
+            const py = Math.round(ty * 256 - originY);
+            let url = '';
+            if (layerId === 'OSM') {
+                url = `https://tile.openstreetmap.org/${z}/${tx}/${ty}.png`;
+            } else if (layerId === 'CYCLOSM') {
+                url = `https://tile-cyclosm.openstreetmap.fr/cyclosm/${z}/${tx}/${ty}.png`;
+            } else if (layerId === 'SAT.IGN') {
+                url = `https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${ty}&TILECOL=${tx}`;
+            } else {
+                // Défaut Plan IGN v2
+                url = `https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${ty}&TILECOL=${tx}`;
+            }
+            tilesSvg += `    <image href="${url}" x="${px}" y="${py}" width="256" height="256" preserveAspectRatio="none" />
+`;
+        }
+    }
+
+    // Tracé de l'étape
+    let routeSvg = '';
+    if (showRoute !== false && latLngs.length >= 2) {
+        const pts = latLngs.map(p => {
+            const pos = latLngToWorldPixel(p[0], p[1], z);
+            return `${Math.round(pos.x - originX)},${Math.round(pos.y - originY)}`;
+        }).join(' ');
+        routeSvg = `    <polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95" />
+`;
+    }
+
+    // Points de départ (vert) et d'arrivée (rouge)
+    let endpointsSvg = '';
+    if (showEndpoints !== false && latLngs.length > 0) {
+        const pStart = latLngToWorldPixel(latLngs[0][0], latLngs[0][1], zProj);
+        const pEnd = latLngToWorldPixel(latLngs[latLngs.length - 1][0], latLngs[latLngs.length - 1][1], zProj);
+        endpointsSvg += `    <circle cx="${Math.round(pStart.x - originX)}" cy="${Math.round(pStart.y - originY)}" r="6" fill="#22c55e" stroke="#ffffff" stroke-width="2" />
+`;
+        endpointsSvg += `    <circle cx="${Math.round(pEnd.x - originX)}" cy="${Math.round(pEnd.y - originY)}" r="6" fill="#ef4444" stroke="#ffffff" stroke-width="2" />
+`;
+    }
+
+    // Annotations (aires et repères)
+    let annotationsSvg = '';
+    if (showAnnotations !== false) {
+        if (areaAnnotations) {
+            for (const area of areaAnnotations) {
+                if (!area.coords || area.coords.length < 3) continue;
+                const pts = area.coords.map((c: any) => {
+                    const pos = latLngToWorldPixel(c[0], c[1], zProj);
+                    return `${Math.round(pos.x - originX)},${Math.round(pos.y - originY)}`;
+                }).join(' ');
+                annotationsSvg += `    <polygon points="${pts}" fill="${area.color || '#3b82f6'}" fill-opacity="${area.fillOpacity ?? 0.25}" stroke="${area.color || '#3b82f6'}" stroke-width="2" />
+`;
+            }
+        }
+        if (pointAnnotations) {
+            for (const pt of pointAnnotations) {
+                if (!pt.coords) continue;
+                const pos = latLngToWorldPixel(pt.coords[0], pt.coords[1], zProj);
+                const x = Math.round(pos.x - originX);
+                const y = Math.round(pos.y - originY);
+                if (x >= -20 && x <= W + 20 && y >= -20 && y <= H + 20) {
+                    annotationsSvg += `    <circle cx="${x}" cy="${y}" r="5.5" fill="${pt.color || '#f59e0b'}" stroke="#ffffff" stroke-width="1.5" />
+`;
+                    if (pt.title) {
+                        annotationsSvg += `    <text x="${x}" y="${y - 8}" font-family="sans-serif" font-size="9px" font-weight="bold" fill="#0f172a" text-anchor="middle" stroke="#ffffff" stroke-width="2.5" paint-order="stroke fill">${pt.title}</text>
+`;
+                    }
+                }
+            }
+        }
+    }
+
+    // ─── Échelle réelle et barre métrique dynamique ─────────────────────────
+    // Résolution au sol (mètres par pixel) EPSG:3857
+    const latRad = (center[0] * Math.PI) / 180;
+    const mpp = (156543.03392 * Math.cos(latRad)) / Math.pow(2, zProj);
+
+    // Dénominateur de l'échelle réelle à 96 DPI standard (1 px = 0.0254 / 96 m)
+    const scaleDenominator = mpp * (96 / 0.0254);
+    const roundedScale = Math.round(scaleDenominator / 1000) * 1000;
+    const formattedScale = `1:${roundedScale.toLocaleString('fr-FR')}`;
+
+    // Choix automatique d'une graduation métrique esthétique (entre 60px et 140px)
+    const distanceCandidates = [50, 100, 200, 250, 500, 1000, 2000, 5000, 10000];
+    let barDistanceM = 500;
+    for (const cand of distanceCandidates) {
+        const px = cand / mpp;
+        if (px >= 60 && px <= 140) {
+            barDistanceM = cand;
+            break;
+        }
+    }
+    // Largeur de la barre au pixel près
+    const barWidthPx = Math.round(barDistanceM / mpp);
+    const halfBarWidthPx = Math.round(barWidthPx / 2);
+    const barLabel = barDistanceM >= 1000 ? `${barDistanceM / 1000} km` : `${barDistanceM} m`;
+
+    const scaleBarSvg = `
+    <g transform="translate(10, ${H - 24})">
+        <rect x="0" y="0" width="${barWidthPx + 16}" height="18" fill="rgba(255,255,255,0.85)" stroke="#1e293b" stroke-width="0.75" />
+        <rect x="8" y="5" width="${halfBarWidthPx}" height="3.5" fill="#0f172a" />
+        <rect x="${8 + halfBarWidthPx}" y="5" width="${barWidthPx - halfBarWidthPx}" height="3.5" fill="#ffffff" stroke="#0f172a" stroke-width="0.5" />
+        <text x="${8 + barWidthPx / 2}" y="15" font-family="monospace" font-size="7.5px" font-weight="bold" fill="#0f172a" text-anchor="middle">${barLabel}</text>
+    </g>
+    <g transform="translate(${W - 100}, ${H - 12})">
+        <rect x="-4" y="-8" width="100" height="12" fill="rgba(255,255,255,0.75)" />
+        <text x="46" y="1" font-family="monospace" font-size="6.5px" fill="#475569" text-anchor="middle">IGN &bull; ${formattedScale}</text>
+    </g>`;
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display: block; width: 100%; max-width: ${W}px; height: auto; border: 1.5px solid #0f172a; background: #e2e8f0; overflow: hidden; margin: 0 auto;">
+${tilesSvg}${annotationsSvg}${routeSvg}${endpointsSvg}${scaleBarSvg}
+</svg>`;
+
+    return { svg, formattedScale };
+}
+
+function renderStep(step: CarnetStep, stepNum: number, isSolution: boolean, exportOptions?: ExportRenderOptions): string {
+    const fromTo = step.fromLabel && step.toLabel
+        ? `${step.fromLabel} → ${step.toLabel}`
+        : step.fromLabel || '';
+
+    let visualContent = '';
+    if (step.moduleId === 'gilwell' && step.gilwellSvg) {
+        visualContent = `<div style="margin: 4px 0; width: 100%; max-width: 100%; overflow: hidden;">${step.gilwellSvg}</div>`;
+    } else if (['carte_ign', 'carte_simple', 'drapeaux'].includes(step.moduleId)) {
+        const latLngs = (step.coords || []).map((c: any) => [c[1], c[0]] as [number, number]);
+        const midPoint = latLngs.length > 0 ? latLngs[Math.floor(latLngs.length / 2)] : [48.85, 2.35] as [number, number];
+        const center = step.mapPersist?.center || (step.mapCenter ? [step.mapCenter[0], step.mapCenter[1]] as [number, number] : midPoint);
+        const smartDims = calculateSmartMapDimensions(latLngs, 680, step.mapPersist?.scaleName || '1:25000');
+        const h = (step.mapPersist?.height && step.mapPersist.height !== 340) ? step.mapPersist.height : smartDims.height;
+        const w = step.mapPersist?.width ? step.mapPersist.width : smartDims.width;
+
+        // ─── Zoom pour l'export ───────────────────────────────────────────────
+        // Constante EPSG:3857 @ 96 DPI (identique à MiniMap.tsx)
+        const SCALE_CONSTANT_EXPORT = 591657550.5;
+        const centerLatRad = (center[0] * Math.PI) / 180;
+        const cosCenter = Math.cos(centerLatRad);
+
+        // 1. Zoom cible depuis l'échelle demandée (fractionnaire exact → préserve l'échelle au pixel près)
+        const scaleDenomMap: Record<string, number> = {
+            '1:10000': 10000, '1:25000': 25000, '1:50000': 50000, '1:100000': 100000,
+        };
+        const scaleNameKey = step.mapPersist?.scaleName || '1:25000';
+        const scaleDenom = scaleDenomMap[scaleNameKey] || 25000;
+        const scaleZoom = Math.log2((SCALE_CONSTANT_EXPORT * cosCenter) / scaleDenom);
+
+        // 2. Zoom anti-rognage minimal (garantit que tout le tracé rentre dans le cadre)
+        let antiClipZoom = scaleZoom; // par défaut on ne clippe pas
+        if (latLngs.length >= 2) {
+            let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+            for (const p of latLngs) {
+                if (p[0] < minLat) minLat = p[0];
+                if (p[0] > maxLat) maxLat = p[0];
+                if (p[1] < minLng) minLng = p[1];
+                if (p[1] > maxLng) maxLng = p[1];
+            }
+            const spanXMeters = (maxLng - minLng) * 111320 * cosCenter;
+            const spanYMeters = (maxLat - minLat) * 110540;
+            const reqMppX = spanXMeters / (w * 0.78);
+            const reqMppY = spanYMeters / (h * 0.78);
+            const maxReqMpp = Math.max(reqMppX, reqMppY);
+            if (maxReqMpp > 0) {
+                antiClipZoom = Math.log2((156543.03392 * cosCenter) / maxReqMpp);
+            }
+        }
+
+        // 3. Zoom effectif :
+        //    - Si l'utilisateur a verrouillé manuellement (cadenas), on respecte son zoom exact.
+        //    - Sinon, on prend le zoom de l'échelle choisie, mais pas plus zoomé que l'anti-rognage.
+        let effectiveZoom: number;
+        if (step.mapPersist?.zoom !== undefined && step.mapPersist.isLocked) {
+            // Carte verrouillée : zoom utilisateur exact (toujours entier pour les tuiles WMTS,
+            // mais ici on passe un float — generateStaticMapSvg gère zProj/zTile séparément)
+            effectiveZoom = step.mapPersist.zoom;
+        } else if (step.mapPersist?.scaleName && scaleNameKey !== 'auto') {
+            // Échelle explicitement choisie : on respecte scaleZoom, avec plancher anti-rognage
+            effectiveZoom = Math.min(scaleZoom, antiClipZoom + 0.5); // +0.5 de tolérance
+        } else if (step.mapPersist?.zoom !== undefined) {
+            // Zoom persisté sans échelle explicite
+            effectiveZoom = Math.min(step.mapPersist.zoom, antiClipZoom + 0.5);
+        } else {
+            // Aucune préférence : zoom anti-rognage (vue d'ensemble)
+            effectiveZoom = Math.min(antiClipZoom, scaleZoom);
+        }
+        // Bornes de sécurité
+        effectiveZoom = Math.min(18, Math.max(8, effectiveZoom));
+
+        const { svg: mapSvg, formattedScale } = generateStaticMapSvg({
+            latLngs,
+            center,
+            zoom: effectiveZoom,
+            width: w,
+            height: h,
+            layerId: step.mapPersist?.layerId,
+            showRoute: step.mapPersist?.showRoute,
+            showEndpoints: step.mapPersist?.showEndpoints,
+            showAnnotations: step.mapPersist?.showAnnotations,
+            pointAnnotations: exportOptions?.pointAnnotations,
+            areaAnnotations: exportOptions?.areaAnnotations,
+        });
+
+        const rawLabel = (step.fromLabel || '').trim();
+        const fromLabelClean = (rawLabel && rawLabel.toLowerCase() !== 'none') ? rawLabel : '';
+
+        visualContent = `
+        <div class="step-map-card">
+            <div style="font-size: 8pt; font-family: monospace; margin-bottom: 4px; display: flex; justify-content: space-between; color: #334155;">
+                <span>EXTRAIT CARTOGRAPHIQUE (${formattedScale}${fromLabelClean ? ' — ' + fromLabelClean : ''})</span>
+                <span>Cap ${step.azimuth || 0}° &bull; ${step.distanceM || 0}m</span>
+            </div>
+            <div style="width: 100%; max-width: 100%; overflow: hidden; display: flex; justify-content: center; margin: 4px 0;">
+                ${mapSvg}
+            </div>
+        </div>`;
+    }
+
+    const fontClass = getModuleFontClass(step.moduleId);
+    const displayText = isSolution ? step.solutionText : step.encodedText;
+    const isEncoded = !isSolution && step.moduleId !== 'texte_clair' && displayText !== step.solutionText;
+
+    let textContent = '';
+    if (!['carte_ign', 'carte_simple', 'gilwell'].includes(step.moduleId) && displayText) {
+        if (isEncoded) {
+            textContent += `<div class="encoded ${fontClass}">${displayText.replace(/\n/g, '<br>')}</div>`;
+            if (isSolution && step.solutionText) {
+                textContent += `<div class="solution-clair">${step.solutionText}</div>`;
+            }
+        } else {
+            textContent += `<div class="step-content">${displayText.replace(/\n/g, '<br>')}</div>`;
+        }
+    }
+
+    return `
+  <div class="step">
+    <div class="step-meta">
+      <span class="step-num">#${stepNum}</span>
+      ${fromTo ? `<span class="step-leg">${fromTo}</span>` : ''}
+      <span class="step-metrics">${step.distanceM ? `${step.distanceM}m` : ''} ${step.azimuth ? `(${step.azimuth}°)` : ''}</span>
+    </div>
+    ${visualContent}
+    ${textContent}
+  </div>`;
+}
 
 function renderMorseAnnexe(): string {
     const table = ModuleLogic.getMorseTable();
-    let html = '<div class="annexe-section"><h2 class="annexe-title">TABLE MORSE</h2><div class="morse-grid">';
+    let html = '<div class="annexe-section"><div class="annexe-title">Table Morse</div><div class="morse-grid">';
     for (const [char, code] of Object.entries(table)) {
-        html += `<div class="morse-cell"><span class="morse-char">${char.toUpperCase()}</span><span class="morse-code">${code}</span></div>`;
+        html += `<div class="morse-cell"><span class="mc">${char.toUpperCase()}</span> : <code>${code}</code></div>`;
     }
     html += '</div></div>';
     return html;
@@ -422,335 +671,147 @@ function renderMorseAnnexe(): string {
 
 function renderPolybeAnnexe(): string {
     const grid = ModuleLogic.getPolybeGrid();
-    let html = '<div class="annexe-section"><h2 class="annexe-title">CARRÉ DE POLYBE</h2>';
-    html += '<table class="annexe-table"><tr><th></th>';
-    for (let c = 1; c <= 6; c++) html += `<th>${c}</th>`;
+    let html = '<div class="annexe-section"><div class="annexe-title">Carré de Polybe</div>';
+    html += '<table><tr><th style="width: 14%;"></th>';
+    for (let c = 1; c <= 6; c++) html += `<th style="width: 14%; text-align: center;">${c}</th>`;
     html += '</tr>';
     for (let r = 0; r < 6; r++) {
-        html += `<tr><th>${r + 1}</th>`;
+        html += `<tr><th style="text-align: center;">${r + 1}</th>`;
         for (let c = 0; c < 6; c++) {
-            html += `<td><strong>${grid[r][c].char}</strong><br><small style="color:#999">${grid[r][c].coord}</small></td>`;
+            html += `<td style="text-align: center;"><strong>${grid[r][c].char}</strong> <span style="color:#666; font-size:7pt;">${grid[r][c].coord}</span></td>`;
         }
         html += '</tr>';
     }
-    html += '</table>';
-    html += '<p style="text-align:center;font-size:9pt;color:#666;">Lecture : Ligne (1er chiffre) puis Colonne (2ème chiffre). Ex: 21 = G</p>';
-    html += '</div>';
+    html += '</table></div>';
     return html;
 }
 
 function renderVigenereAnnexe(key: string): string {
     const { alphabet, table } = ModuleLogic.getVigenereTable(key);
-    let html = `<div class="annexe-section"><h2 class="annexe-title">CARRÉ DE VIGENÈRE — Clé : <code>${key}</code></h2>`;
-    html += '<div class="vig-scroll"><table class="annexe-table vig-table"><tr><th></th>';
-    for (const c of alphabet) html += `<th>${c}</th>`;
+    let html = `<div class="annexe-section"><div class="annexe-title">Table de Vigenère (Clé : ${key})</div>`;
+    html += '<table style="font-size: 7.5pt;"><tr><th style="width: 3.5%;"></th>';
+    for (const c of alphabet) html += `<th style="width: 3.7%; text-align: center; padding: 2px 1px;">${c}</th>`;
     html += '</tr>';
     for (let i = 0; i < table.length; i++) {
-        html += `<tr><th>${alphabet[i]}</th>`;
-        for (const c of table[i]) html += `<td>${c}</td>`;
+        html += `<tr><th style="text-align: center; padding: 2px 1px;">${alphabet[i]}</th>`;
+        for (const c of table[i]) html += `<td style="text-align: center; padding: 2px 1px;">${c}</td>`;
         html += '</tr>';
     }
-    html += '</table></div></div>';
+    html += '</table></div>';
     return html;
 }
 
 function renderMaritimeAnnexe(): string {
     const nato = ModuleLogic.getNATOAlphabet();
-    let html = '<div class="annexe-section"><h2 class="annexe-title">CODE MARITIME (NATO)</h2><div class="nato-grid">';
+    let html = '<div class="annexe-section"><div class="annexe-title">Code Maritime & Radio (OTAN)</div><div class="nato-grid">';
     for (const [char, word] of Object.entries(nato)) {
-        html += `<div class="nato-cell"><span class="nato-char">${char.toUpperCase()}</span><span class="nato-word">${word}</span></div>`;
+        html += `<div class="nato-cell"><span class="nc">${char.toUpperCase()}</span>: ${word}</div>`;
     }
     html += '</div></div>';
     return html;
 }
 
-function renderGilwellAnnexe(): string {
-    return `
-    <div class="annexe-section">
-        <h2 class="annexe-title">GUIDE DU RELEVÉ GILWELL</h2>
-        <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px 16px; font-size: 9pt; color: #334155; line-height: 1.5;">
-            <p style="margin-bottom: 8px;"><strong>Interprétation des azimuts vectoriels :</strong></p>
-            <ul style="margin-left: 20px;">
-                <li>Le point <strong style="color: #16a34a;">VERT</strong> indique votre position de départ de l'étape.</li>
-                <li>Chaque flèche vectorielle indique le cap magnétique en degrés et la distance métrique du segment.</li>
-                <li>Le point <strong style="color: #dc2626;">ROUGE</strong> marque l'arrivée du tronçon Gilwell.</li>
-            </ul>
-        </div>
-    </div>`;
-}
-
-function renderMapPaginationAnnexe(plan: PaginationPlan, svg?: string): string {
-    const scaleLabel = plan.scale >= 1000 ? `1 : ${plan.scale / 1000} 000` : `1 : ${plan.scale}`;
-    let html = `
-    <div class="annexe-section" style="page-break-before: always; margin-top: 24px;">
-        <h2 class="annexe-title">DÉCOUPAGE TOPOGRAPHIQUE DES PLANCHES (${scaleLabel})</h2>
-        <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-                <span style="font-size: 10pt; font-weight: bold; color: #0284c7;">
-                    🗺️ Plan d'assemblage (${plan.pages.length} feuille${plan.pages.length > 1 ? 's' : ''} A4)
-                </span>
-                <span style="font-size: 8.5pt; color: #475569;">
-                    ${plan.nLandscape > 0 ? `${plan.nLandscape} Paysage` : ''}${plan.mixed ? ' · ' : ''}${plan.nPortrait > 0 ? `${plan.nPortrait} Portrait` : ''} · Recouvrement 10mm
-                </span>
-            </div>
-            ${svg ? `<div style="margin-bottom: 14px; text-align: center;">${svg}</div>` : ''}
-            <table style="width: 100%; border-collapse: collapse; font-size: 8pt; color: #334155;">
-                <thead>
-                    <tr style="background: #f1f5f9; border-bottom: 1px solid #cbd5e1; text-align: left;">
-                        <th style="padding: 6px 8px;">Feuille</th>
-                        <th style="padding: 6px 8px;">Format & Orient.</th>
-                        <th style="padding: 6px 8px;">Centre (Lat, Lon)</th>
-                        <th style="padding: 6px 8px;">Emprise (SW / NE)</th>
-                        <th style="padding: 6px 8px;">Raccords voisins</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-    for (const p of plan.pages) {
-        const nbStrs = Object.entries(p.nb).map(([dir, nums]) => `${dir} → F${nums.join(', ')}`).join(' · ') || '—';
-        html += `
-                    <tr style="border-bottom: 1px solid #f1f5f9;">
-                        <td style="padding: 6px 8px; font-weight: bold; color: #0284c7;">Feuille ${p.n}</td>
-                        <td style="padding: 6px 8px;">A4 ${p.orient === 'landscape' ? 'Paysage' : 'Portrait'}</td>
-                        <td style="padding: 6px 8px; font-family: monospace;">${p.center[0].toFixed(5)}, ${p.center[1].toFixed(5)}</td>
-                        <td style="padding: 6px 8px; font-family: monospace; font-size: 7.5pt; color: #64748b;">
-                            [${p.sw[0].toFixed(4)}, ${p.sw[1].toFixed(4)}] à [${p.ne[0].toFixed(4)}, ${p.ne[1].toFixed(4)}]
-                        </td>
-                        <td style="padding: 6px 8px; font-weight: 500; color: #d97706;">${nbStrs}</td>
-                    </tr>`;
-    }
-
-    html += `
-                </tbody>
-            </table>
-        </div>
-    </div>`;
-    return html;
-}
-
-// ─── Step Renderer ────────────────────────────────────────────────────────────
-
-function getModuleFontClass(moduleId: string): string {
-    const map: Record<string, string> = {
-        morse: 'font-morse',
-        vigenere: 'font-vigenere',
-        polybe: 'font-polybe',
-        cassis: 'font-cassis',
-        avocat: 'font-avocat',
-        templier: 'font-templier',
-        maritime: 'font-maritime',
-    };
-    return map[moduleId] || '';
-}
-
-function renderStep(step: CarnetStep, stepNum: number, isSolution: boolean, themeLabels: Record<string, string>): string {
-    const moduleLabel = themeLabels[`${step.moduleId}_label`]
-        || ModuleRegistry.getMeta(step.moduleId)?.label
-        || step.moduleId;
-
-    const fromTo = step.fromLabel && step.toLabel
-        ? `${step.fromLabel} → ${step.toLabel}`
-        : step.fromLabel || '';
-
-    // Visual content (Gilwell SVG, map placeholder, Carte Simple)
-    let visualContent = '';
-    if (step.moduleId === 'gilwell' && step.gilwellSvg) {
-        visualContent = `<div class="gilwell-svg">${step.gilwellSvg}</div>`;
-    } else if (['carte_ign', 'carte_simple', 'drapeaux'].includes(step.moduleId)) {
-        const center = step.mapPersist?.center ? step.mapPersist.center.join(',') : (step.mapCenter ? step.mapCenter.join(',') : '');
-        const zoom = step.mapPersist?.zoom || step.mapZoom || 15;
-        const h = step.mapPersist?.height ? `${step.mapPersist.height}px` : '240px';
-        const w = step.mapPersist?.width ? `${step.mapPersist.width}px` : (step.mapPersist?.widthPercent ? `${step.mapPersist.widthPercent}%` : '100%');
-        const isCarteSimple = step.moduleId === 'carte_simple';
-        const mapTitle = isCarteSimple ? 'CARTE SIMPLE' : 'CARTE IGN';
-        visualContent = `
-        <div class="step-map-card">
-            <div class="step-map-header">
-                <span>🗺️ ${mapTitle} — ${fromTo || 'TRONÇON DIRECT'}</span>
-                <span style="color:#64748b; font-weight:normal;">Azimut ${step.azimuth || 0}° &bull; ${step.distanceM || 0}m</span>
-            </div>
-            <div class="step-map-visual">
-                <strong>Suivre le cap ${step.azimuth || 0}° sur ${step.distanceM || 0} mètres.</strong><br>
-                <span style="font-size: 8pt; color: #15803d; font-style: italic;">Se repérer directement sur la carte topographique sans chiffrement.</span>
-            </div>
-            <div class="map-placeholder" data-center="${center}" data-zoom="${zoom}" data-scale="${step.mapPersist?.scaleName || '1:25000'}" data-show-route="${step.mapPersist?.showRoute !== false}" data-show-endpoints="${step.mapPersist?.showEndpoints !== false}" data-show-annotations="${step.mapPersist?.showAnnotations !== false}" style="height:${h}; width:${w}; margin: 6px auto 0 auto; border-radius: 0; border: 1.5px solid #1e293b;">
-                [Extrait ${mapTitle} (${step.mapPersist?.scaleName || '1:25 000'}) — zone ${fromTo || 'N/A'}]
-            </div>
-        </div>`;
-    }
-
-    // Text content
-    const fontClass = getModuleFontClass(step.moduleId);
-    const displayText = isSolution ? step.solutionText : step.encodedText;
-    const isEncoded = !isSolution && step.moduleId !== 'texte_clair' && displayText !== step.solutionText;
-
-    let textContent = '';
-    if (!['carte_ign', 'carte_simple', 'gilwell'].includes(step.moduleId) && displayText) {
-        textContent += '<div class="msg">';
-        textContent += `<div class="msg-num">1</div>`;
-        if (isEncoded) {
-            textContent += `<div><div class="encoded ${fontClass}">${displayText.replace(/\n/g, '<br>')}</div><div class="clair-hint">${step.solutionText}</div></div>`;
-        } else {
-            textContent += `<div class="visual-msg">${displayText.replace(/\n/g, '<br>')}</div>`;
-        }
-        textContent += '</div>';
-    }
-
-    return `
-  <div class="step">
-    <div class="step-header">
-      <div class="step-num">${stepNum}</div>
-      ${fromTo ? `<span>${fromTo}</span>` : ''}
-      <span style="margin-left:auto">${moduleLabel}</span>
-    </div>
-    <div class="step-body">
-      ${visualContent}
-      ${textContent}
-    </div>
-  </div>`;
-}
-
-// ─── Annotations & Areas Renderer ──────────────────────────────────────────
-
 function renderAnnotationsSection(
     points: PointAnnotation[] = [],
-    areas: AreaAnnotation[] = [],
-    itineraries: Itinerary[] = []
+    areas: AreaAnnotation[] = []
 ): string {
     const activePoints = points.filter(p => p.visible !== false);
     const activeAreas = areas.filter(a => a.visible !== false);
 
-    if (activePoints.length === 0 && activeAreas.length === 0 && itineraries.length <= 1) {
-        return '';
-    }
+    if (activePoints.length === 0 && activeAreas.length === 0) return '';
 
-    let html = `
-  <div class="step" style="page-break-inside: avoid; margin-top: 24px;">
-    <div class="step-header" style="background: #1e3a2b;">
-      <span style="font-size: 13px;">🗺️ Repères & Périmètres Délimités du Raid</span>
-    </div>
-    <div class="step-body" style="padding: 14px 18px; font-size: 11px;">
-`;
+    let html = `<div class="annexe-section"><div class="annexe-title">Repères & Périmètres Délimités</div>`;
 
-    // Multi-itineraries summary
-    if (itineraries.length > 1) {
-        html += `
-      <div style="margin-bottom: 16px;">
-        <div style="font-weight: 700; color: #1e3a2b; margin-bottom: 6px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;">
-          Itinéraires du projet (${itineraries.length}) :
-        </div>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-`;
-        for (const it of itineraries) {
-            const dist = (it.routes || []).reduce((acc: number, r: any) => acc + (r?.distance_m || 0), 0) / 1000;
-            html += `
-          <div style="padding: 6px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid ${it.color || '#2d8ceb'}; border-radius: 4px;">
-            <b>${it.name}</b> — ${(dist > 0 ? dist.toFixed(1) + ' km · ' : '')}${it.stages?.length || 0} étapes
-          </div>
-`;
-        }
-        html += `
-        </div>
-      </div>
-`;
-    }
-
-    // Points de repère
     if (activePoints.length > 0) {
         html += `
-      <div style="margin-bottom: 16px;">
-        <div style="font-weight: 700; color: #1e3a2b; margin-bottom: 6px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;">
-          Points de repère & Balises (${activePoints.length}) :
-        </div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+        <table>
           <thead>
-            <tr style="background: #f1f5f9; text-align: left; font-size: 10px; color: #64748b;">
-              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Repère</th>
-              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Coordonnées GPS</th>
-              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Notes & Consignes</th>
+            <tr>
+              <th style="width: 25%;">Repère</th>
+              <th style="width: 30%;">Coordonnées GPS</th>
+              <th style="width: 45%;">Consignes</th>
             </tr>
           </thead>
-          <tbody>
-`;
+          <tbody>`;
         for (const pt of activePoints) {
             html += `
             <tr>
-              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-weight: 700;">
-                <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${pt.color || '#3b82f6'}; margin-right:6px;"></span>
-                ${pt.title}
-              </td>
-              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-family: monospace; font-size: 10px; color: #475569;">
-                ${pt.coords[0].toFixed(5)}, ${pt.coords[1].toFixed(5)}
-              </td>
-              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; color: #334155;">
-                ${pt.text || '—'}
-              </td>
-            </tr>
-`;
+              <td><strong>${pt.title}</strong></td>
+              <td style="font-family: monospace;">${pt.coords[0].toFixed(5)}, ${pt.coords[1].toFixed(5)}</td>
+              <td>${pt.text || '—'}</td>
+            </tr>`;
         }
-        html += `
-          </tbody>
-        </table>
-      </div>
-`;
+        html += `</tbody></table>`;
     }
 
-    // Zones & Périmètres
     if (activeAreas.length > 0) {
         html += `
-      <div>
-        <div style="font-weight: 700; color: #1e3a2b; margin-bottom: 6px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;">
-          Zones & Périmètres délimités (${activeAreas.length}) :
-        </div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+        <table>
           <thead>
-            <tr style="background: #f1f5f9; text-align: left; font-size: 10px; color: #64748b;">
-              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Zone</th>
-              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Superficie calculée</th>
-              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Sommets</th>
-              <th style="padding: 6px 8px; border: 1px solid #e2e8f0;">Règles & Consignes</th>
+            <tr>
+              <th style="width: 25%;">Zone</th>
+              <th style="width: 25%;">Superficie</th>
+              <th style="width: 50%;">Consignes</th>
             </tr>
           </thead>
-          <tbody>
-`;
+          <tbody>`;
         for (const a of activeAreas) {
             const surface = a.formatted_area || formatArea(calculatePolygonArea(a.coords));
             html += `
             <tr>
-              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-weight: 700;">
-                <span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:${a.color || '#10b981'}; margin-right:6px;"></span>
-                ${a.title}
-              </td>
-              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-weight: 700; color: #15803d;">
-                ${surface}
-              </td>
-              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-size: 10px; color: #64748b;">
-                ${a.coords.length} sommets
-              </td>
-              <td style="padding: 6px 8px; border: 1px solid #e2e8f0; color: #334155;">
-                ${a.text || '—'}
-              </td>
-            </tr>
-`;
+              <td><strong>${a.title}</strong></td>
+              <td style="font-family: monospace;">${surface}</td>
+              <td>${a.text || '—'}</td>
+            </tr>`;
         }
-        html += `
-          </tbody>
-        </table>
-      </div>
-`;
+        html += `</tbody></table>`;
     }
 
-    html += `
-    </div>
-  </div>
-`;
-
+    html += `</div>`;
     return html;
 }
 
-// ─── Main Renderer ────────────────────────────────────────────────────────────
-
 export class ExportHTMLRenderer {
+    /**
+     * Pré-télécharge les tuiles distantes trouvées dans le HTML et les convertit
+     * en data:image/png;base64,... pour que WeasyPrint ne souffre d'aucune tuile manquante.
+     */
+    static async inlineMapTiles(html: string): Promise<string> {
+        const tileRegex = /<image\s+([^>]*?)href="(https:\/\/[^"]+)"([^>]*?)\/>/g;
+        const matches = Array.from(html.matchAll(tileRegex));
+        if (!matches.length) return html;
+
+        const uniqueUrls = Array.from(new Set(matches.map(m => m[2])));
+        const cache = new Map<string, string>();
+
+        await Promise.all(uniqueUrls.map(async url => {
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const buffer = await res.arrayBuffer();
+                        const bytes = new Uint8Array(buffer);
+                        let binary = '';
+                        for (let i = 0; i < bytes.byteLength; i++) {
+                            binary += String.fromCharCode(bytes[i]);
+                        }
+                        const contentType = res.headers.get('content-type') || 'image/png';
+                        const b64 = `data:${contentType};base64,${btoa(binary)}`;
+                        cache.set(url, b64);
+                        return;
+                    }
+                } catch {
+                    // Retry once
+                }
+            }
+        }));
+
+        let inlinedHtml = html;
+        for (const [url, b64] of cache.entries()) {
+            inlinedHtml = inlinedHtml.split(url).join(b64);
+        }
+        return inlinedHtml;
+    }
 
     static render(
         steps: CarnetStep[],
@@ -758,118 +819,59 @@ export class ExportHTMLRenderer {
         options: ExportRenderOptions,
         fontsBase64: Record<string, string> = {}
     ): string {
-        const accent = options.isSolution ? '#b44a2b' : '#2d5a8e';
-        const css = buildCSS(accent, options.isSolution, fontsBase64, options.paperSize || 'A4');
-        const themeLabels = theme.labels || {};
+        const css = buildCSS(fontsBase64, options.paperSize || 'A4');
         const roleLabel = options.isSolution ? 'SOLUTION' : 'PARTICIPANT';
 
-        // ── Head ──
         let html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${options.title} — ${roleLabel}</title>
+    <title>${options.title || 'Carnet de route'} — ${roleLabel}</title>
     <style>${css}</style>
 </head>
 <body>
-  <span class="raid-title-target">${options.title || options.themeTitle || 'CARNET DE ROUTE'}</span>
+  <span class="raid-title-target">${options.title || 'CARNET DE ROUTE'}</span>
   <span class="version-title-target">${roleLabel}</span>
-`;
 
-        // ── Header ──
-        html += `
   <div class="page-header">
-    <h1>${options.title || options.themeTitle}</h1>
-    <div class="subtitle">${options.title && options.themeTitle && options.themeTitle !== options.title ? `${options.themeTitle} · ` : ''}${steps.length} étapes · ${roleLabel} · ScoutRaider Suite</div>
+    <div>
+      <h1>${options.title || 'CARNET DE ROUTE'}</h1>
+      <div class="subtitle">${steps.length} étapes &bull; ${roleLabel} &bull; ${new Date().toLocaleDateString('fr-FR')}</div>
+    </div>
   </div>
 `;
 
-        // ── Profil Altimétrique ──
         if (options.includeElevationProfile && options.elevationSvg) {
             const stats = options.elevationStats;
             html += `
-  <div style="margin: 0 0 24px 0; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); page-break-inside: avoid;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-      <div style="font-weight: 700; color: #0e7490; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;">
-        ⛰️ Profil Altimétrique & Topographie du Parcours
-      </div>
-      ${stats ? `
-      <div style="display: flex; gap: 12px; font-size: 10px; color: #475569;">
-        <span><b>D+ :</b> +${stats.ascend_m}m</span>
-        <span><b>D- :</b> -${stats.descend_m}m</span>
-        <span><b>Alt :</b> ${stats.min_alt_m}m / ${stats.max_alt_m}m</span>
-        <span><b>Durée marche estimée :</b> ${Math.floor(stats.duration_min / 60)}h${String(stats.duration_min % 60).padStart(2, '0')}</span>
-      </div>` : ''}
+  <div style="width: 100%; margin-bottom: 16px; border-bottom: 1pt solid #111111; padding-bottom: 10px; page-break-inside: avoid; overflow: hidden;">
+    <div style="font-size: 8.5pt; font-family: monospace; font-weight: 700; margin-bottom: 4px;">
+        PROFIL ALTIMÉTRIQUE ${stats ? `&bull; D+ +${stats.ascend_m}m &bull; D- -${stats.descend_m}m &bull; ${stats.min_alt_m}m / ${stats.max_alt_m}m` : ''}
     </div>
-    <div style="width: 100%; overflow: hidden; padding: 4px 0;">
-      ${options.elevationSvg}
-    </div>
-  </div>
-`;
+    <div style="width: 100%; max-width: 100%; overflow: hidden;">${options.elevationSvg}</div>
+  </div>`;
         }
 
-        // ── Steps ──
         let stepNum = 1;
         for (const step of steps) {
-            html += renderStep(step, stepNum, options.isSolution, themeLabels);
+            html += renderStep(step, stepNum, options.isSolution, options);
             stepNum++;
         }
 
-        // ── Repères, Zones & Multi-Itinéraires ──
-        html += renderAnnotationsSection(
-            options.pointAnnotations,
-            options.areaAnnotations,
-            options.itineraries
-        );
+        html += renderAnnotationsSection(options.pointAnnotations, options.areaAnnotations);
 
-        // ── Annexes ──
         if (options.includeAnnexes) {
             const usedModules = new Set(steps.map(s => s.moduleId));
-
-            if (usedModules.has('morse')) {
-                html += renderMorseAnnexe();
-            }
-            if (usedModules.has('polybe')) {
-                html += renderPolybeAnnexe();
-            }
-            if (usedModules.has('vigenere')) {
-                html += renderVigenereAnnexe(options.vigenereKey);
-            }
-            if (usedModules.has('maritime')) {
-                html += renderMaritimeAnnexe();
-            }
-            if (usedModules.has('gilwell')) {
-                html += renderGilwellAnnexe();
-            }
-            if (options.includeMapPagination && options.mapPaginationPlan) {
-                html += renderMapPaginationAnnexe(options.mapPaginationPlan, options.mapPaginationSvg);
-            }
+            if (usedModules.has('morse')) html += renderMorseAnnexe();
+            if (usedModules.has('polybe')) html += renderPolybeAnnexe();
+            if (usedModules.has('vigenere')) html += renderVigenereAnnexe(options.vigenereKey);
+            if (usedModules.has('maritime')) html += renderMaritimeAnnexe();
         }
-
-        // ── Footer ──
-        html += `
-  <div class="page-footer">ScoutRaider Suite · ${options.themeTitle} · ${roleLabel}</div>
-`;
 
         html += `
 </body>
 </html>`;
-
         return html;
-    }
-
-    /**
-     * Convenience: render both Participant and Solution HTML documents.
-     */
-    static renderBoth(
-        steps: CarnetStep[],
-        theme: ThemeData,
-        baseOptions: Omit<ExportRenderOptions, 'isSolution'>
-    ): { participant: string; solution: string } {
-        return {
-            participant: this.render(steps, theme, { ...baseOptions, isSolution: false }),
-            solution: this.render(steps, theme, { ...baseOptions, isSolution: true }),
-        };
     }
 }

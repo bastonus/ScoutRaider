@@ -15,6 +15,7 @@ interface StageMarkerProps {
     total: number;
     isMovable: boolean;
     isAnchored: boolean;
+    activeTool: string;
     pane?: string;
     onDragEnd: (idx: number, lat: number, lon: number) => void;
     onRemove: (idx: number) => void;
@@ -23,7 +24,7 @@ interface StageMarkerProps {
 }
 
 const StageMarker = React.memo(function StageMarker({
-    stage, idx, total, isMovable, isAnchored, pane,
+    stage, idx, total, isMovable, isAnchored, activeTool, pane,
     onDragEnd, onRemove, onAnchor, onUnAnchor,
 }: StageMarkerProps) {
     const markerRef = useRef<any>(null);
@@ -75,12 +76,14 @@ const StageMarker = React.memo(function StageMarker({
 
     const handleClick = useCallback((e: any) => {
         L.DomEvent.stopPropagation(e.originalEvent);
-        if (isAnchored) {
-            onUnAnchor();
-        } else {
-            onAnchor(idx);
+        if (activeTool === 'route' || activeTool === 'route_direct') {
+            if (isAnchored) {
+                onUnAnchor();
+            } else {
+                onAnchor(idx);
+            }
         }
-    }, [idx, isAnchored, onAnchor, onUnAnchor]);
+    }, [idx, isAnchored, onAnchor, onUnAnchor, activeTool]);
 
     const handleContextMenu = useCallback(() => {
         onRemove(idx);
@@ -105,10 +108,20 @@ const StageMarker = React.memo(function StageMarker({
             draggable={isMovable}
             eventHandlers={eventHandlers}
         >
-            <Tooltip direction="top" offset={[0, -10]} opacity={0.9}>
-                <span style={{ fontSize: '11px', fontWeight: 600 }}>
-                    {isMovable ? 'Glisser pour déplacer · Clic droit : supprimer' : 'Clic droit : supprimer'}
-                </span>
+            <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
+                <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
+                    <b style={{ color: dotColor }}>Étape {stage.label}</b>
+                    {stage.address ? <div style={{ fontSize: '9px', color: '#cbd5e1', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stage.address}</div> : null}
+                    <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>
+                        {isAnchored ? (
+                            <span style={{ color: '#60a5fa' }}>Clic : désancrer · </span>
+                        ) : (activeTool === 'route' || activeTool === 'route_direct') ? (
+                            <span style={{ color: '#6ee7b7' }}>Clic : ancrer pour insérer · </span>
+                        ) : null}
+                        {isMovable ? 'Glisser : déplacer · ' : ''}
+                        Clic droit : supprimer
+                    </div>
+                </div>
             </Tooltip>
         </Marker>
     );
@@ -206,6 +219,7 @@ export default function InteractiveStages() {
                     total={state.stages.length}
                     isMovable={isMovable}
                     isAnchored={anchorIdx === idx}
+                    activeTool={state.active_tool}
                     pane={activeItinPane}
                     onDragEnd={handleDragEnd}
                     onRemove={handleRemove}

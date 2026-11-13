@@ -21,9 +21,10 @@ export class Orchestrator {
         manualAssignments: Record<string, string>
     ) {
         this.segments = segments;
-        this.weights = weights;
-        this.overrides = overrides;
-        this.manualAssignments = manualAssignments;
+        const hasValidWeights = weights && Object.keys(weights).some(k => (weights[k] || 0) > 0);
+        this.weights = hasValidWeights ? weights : { carte_ign: 80, texte_clair: 20 };
+        this.overrides = overrides || {};
+        this.manualAssignments = manualAssignments || {};
         this.history = [];
         this.assignments = {};
     }

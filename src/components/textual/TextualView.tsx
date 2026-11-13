@@ -115,12 +115,12 @@ export default function TextualView({ onExport, viewMode }: { onExport?: () => v
             {warningCount > 0 && (
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '6px 20px',
-                    background: 'rgba(239,68,68,0.08)',
-                    borderBottom: '1px solid rgba(239,68,68,0.15)',
-                    fontSize: '11px', color: '#ef4444', fontWeight: 600,
+                    padding: '8px 20px',
+                    background: 'var(--semantic-danger-bg)',
+                    borderBottom: '1px solid rgba(239, 68, 68, 0.2)',
+                    fontSize: '11px', color: 'var(--semantic-danger)', fontWeight: 600,
                 }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--semantic-danger)', display: 'inline-block' }} />
                     {warningCount} erreur{warningCount > 1 ? 's' : ''} de contrainte — vérifiez les étapes marquées
                 </div>
             )}
@@ -136,18 +136,18 @@ export default function TextualView({ onExport, viewMode }: { onExport?: () => v
                     <div style={{
                         flex: 1, display: 'flex', flexDirection: 'column',
                         alignItems: 'center', justifyContent: 'center',
-                        color: '#94a3b8', gap: '14px', paddingTop: '80px',
+                        color: 'var(--text-dim)', gap: '14px', paddingTop: '80px',
                     }}>
-                        <div style={{ fontSize: '52px' }}>📋</div>
-                        <div style={{ fontSize: '16px', fontWeight: 700, color: '#64748b' }}>
+                        <div style={{ fontSize: '48px', opacity: 0.8 }}>📋</div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
                             Aucune étape calculée
                         </div>
-                        <div style={{ fontSize: '13px', textAlign: 'center', maxWidth: '380px', lineHeight: 1.6, color: '#94a3b8' }}>
+                        <div style={{ fontSize: '13px', textAlign: 'center', maxWidth: '380px', lineHeight: 1.6, color: 'var(--text-dim)' }}>
                             {state.polygonal_steps.length > 0 ? (
                                 <>Le carnet se génère automatiquement. Si rien n'apparaît, cliquez ci-dessous.</>
                             ) : (
                                 <>Tracez votre itinéraire dans la vue carte, puis calculez l'itinéraire.
-                                Le carnet de route se mettra à jour <strong style={{ color: '#64748b' }}>automatiquement</strong>.</>
+                                Le carnet de route se mettra à jour <strong style={{ color: 'var(--text-primary)' }}>automatiquement</strong>.</>
                             )}
                         </div>
                         {state.polygonal_steps.length > 0 && (
@@ -156,8 +156,8 @@ export default function TextualView({ onExport, viewMode }: { onExport?: () => v
                                 style={{
                                     marginTop: '8px', padding: '8px 18px',
                                     background: 'var(--accent-default)', color: '#ffffff', border: 'none',
-                                    borderRadius: '8px', fontSize: '12px', fontWeight: 700,
-                                    cursor: 'pointer',
+                                    borderRadius: 'var(--radius-sm)', fontSize: '12px', fontWeight: 700,
+                                    cursor: 'pointer', boxShadow: 'var(--shadow-sm)',
                                 }}
                             >
                                 Générer le carnet
@@ -226,14 +226,14 @@ export default function TextualView({ onExport, viewMode }: { onExport?: () => v
                     return (
                         <div style={{ marginTop: '40px', paddingBottom: '40px' }}>
                             {hasMorse && (
-                                <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '6px', padding: '14px', marginTop: '16px' }}>
-                                    <h3 style={{ fontSize: '11px', color: accentColor, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>TABLE MORSE</h3>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '16px', marginTop: '16px' }}>
+                                    <h3 style={{ fontSize: '11px', color: accentColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', fontWeight: 700 }}>TABLE MORSE</h3>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                         {Object.entries(ModuleLogic.getMorseTable()).map(([char, code]) => (
-                                            <div key={char} style={{ background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '4px', padding: '4px 7px', textAlign: 'center', minWidth: '44px' }}>
+                                            <div key={char} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xs)', padding: '6px 8px', textAlign: 'center', minWidth: '44px' }}>
                                                 <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: accentColor }}>{char.toUpperCase()}</span>
                                                 <span style={{ display: 'block', fontFamily: '"Morse", "Courier New", monospace', fontSize: '24px', color: 'var(--text-dim)', marginTop: '2px', letterSpacing: '2px' }}>{char.toUpperCase()}</span>
-                                                <span style={{ display: 'block', fontFamily: '"Courier New", monospace', fontSize: '10px', color: 'var(--text-dim)' }}>{code}</span>
+                                                <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-dim)' }}>{code}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -241,48 +241,48 @@ export default function TextualView({ onExport, viewMode }: { onExport?: () => v
                             )}
 
                             {hasPolybe && (
-                                <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '6px', padding: '14px', marginTop: '16px' }}>
-                                    <h3 style={{ fontSize: '11px', color: accentColor, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>CARRÉ DE POLYBE</h3>
-                                    <table style={{ borderCollapse: 'collapse', fontSize: '10px', width: 'auto', margin: '0 auto' }}>
+                                <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '16px', marginTop: '16px' }}>
+                                    <h3 style={{ fontSize: '11px', color: accentColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', fontWeight: 700 }}>CARRÉ DE POLYBE</h3>
+                                    <table style={{ borderCollapse: 'collapse', fontSize: '11px', width: 'auto', margin: '0 auto' }}>
                                         <tbody>
                                             <tr>
-                                                <th style={{ border: '1px solid var(--bg-border)', padding: '3px 5px', textAlign: 'center', background: accentColor, color: '#fff' }}></th>
-                                                {[1, 2, 3, 4, 5, 6].map(i => <th key={i} style={{ border: '1px solid var(--bg-border)', padding: '3px 5px', textAlign: 'center', background: accentColor, color: '#fff' }}>{i}</th>)}
+                                                <th style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: accentColor, color: '#fff' }}></th>
+                                                {[1, 2, 3, 4, 5, 6].map(i => <th key={i} style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: accentColor, color: '#fff' }}>{i}</th>)}
                                             </tr>
                                             {ModuleLogic.getPolybeGrid().map((row, rIdx) => (
                                                 <tr key={rIdx}>
-                                                    <th style={{ border: '1px solid var(--bg-border)', padding: '3px 5px', textAlign: 'center', background: accentColor, color: '#fff' }}>{rIdx + 1}</th>
+                                                    <th style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: accentColor, color: '#fff' }}>{rIdx + 1}</th>
                                                     {row.map((cell, cIdx) => (
-                                                        <td key={cIdx} style={{ border: '1px solid var(--bg-border)', padding: '3px 5px', textAlign: 'center' }}>
-                                                            <b style={{ color: 'var(--text-primary)' }}>{cell.char}</b><br/><small style={{ color: 'var(--text-dim)' }}>{cell.coord}</small>
+                                                        <td key={cIdx} style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center' }}>
+                                                            <b style={{ color: 'var(--text-primary)' }}>{cell.char}</b><br/><small style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{cell.coord}</small>
                                                         </td>
                                                     ))}
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
-                                    <p style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '6px' }}>Lecture : Ligne (1er chiffre) puis Colonne (2ème chiffre). Ex: 21=G</p>
+                                    <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '8px', textAlign: 'center' }}>Lecture : Ligne (1er chiffre) puis Colonne (2ème chiffre). Ex: 21 = G</p>
                                 </div>
                             )}
 
                             {hasVigenere && (() => {
                                 const v = ModuleLogic.getVigenereTable(themeManager.getTheme(state.theme_id).vigenere_key || 'MOUSTACHE');
                                 return (
-                                    <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '6px', padding: '14px', marginTop: '16px' }}>
-                                        <h3 style={{ fontSize: '11px', color: accentColor, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
-                                            CARRÉ DE VIGENÈRE — Clé : <code>{v.key}</code>
+                                    <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '16px', marginTop: '16px' }}>
+                                        <h3 style={{ fontSize: '11px', color: accentColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', fontWeight: 700 }}>
+                                            CARRÉ DE VIGENÈRE — Clé : <code style={{ fontFamily: 'var(--font-mono)', background: 'var(--bg-surface)', padding: '2px 6px', borderRadius: 'var(--radius-xs)' }}>{v.key}</code>
                                         </h3>
                                         <div style={{ overflowX: 'auto' }}>
-                                            <table style={{ borderCollapse: 'collapse', fontSize: '10px', width: 'auto', margin: '0 auto' }}>
+                                            <table style={{ borderCollapse: 'collapse', fontSize: '10px', width: 'auto', margin: '0 auto', fontFamily: 'var(--font-mono)' }}>
                                                 <tbody>
                                                     <tr>
-                                                        <th style={{ border: '1px solid var(--bg-border)', padding: '3px 5px', textAlign: 'center', background: accentColor, color: '#fff' }}></th>
-                                                        {v.alphabet.split('').map(c => <th key={c} style={{ border: '1px solid var(--bg-border)', padding: '3px 5px', textAlign: 'center', background: accentColor, color: '#fff' }}>{c}</th>)}
+                                                        <th style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: accentColor, color: '#fff' }}></th>
+                                                        {v.alphabet.split('').map(c => <th key={c} style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: accentColor, color: '#fff' }}>{c}</th>)}
                                                     </tr>
                                                     {v.table.map((row, rIdx) => (
                                                         <tr key={rIdx}>
-                                                            <th style={{ border: '1px solid var(--bg-border)', padding: '3px 5px', textAlign: 'center', background: accentColor, color: '#fff' }}>{v.alphabet[rIdx]}</th>
-                                                            {row.map((c, cIdx) => <td key={cIdx} style={{ border: '1px solid var(--bg-border)', padding: '2px', textAlign: 'center', minWidth: '14px', fontSize: '8px', color: 'var(--text-primary)' }}>{c}</td>)}
+                                                            <th style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: accentColor, color: '#fff' }}>{v.alphabet[rIdx]}</th>
+                                                            {row.map((c, cIdx) => <td key={cIdx} style={{ border: '1px solid var(--border-subtle)', padding: '3px', textAlign: 'center', minWidth: '16px', fontSize: '9px', color: 'var(--text-primary)' }}>{c}</td>)}
                                                         </tr>
                                                     ))}
                                                 </tbody>
@@ -293,11 +293,11 @@ export default function TextualView({ onExport, viewMode }: { onExport?: () => v
                             })()}
 
                             {hasMaritime && (
-                                <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '6px', padding: '14px', marginTop: '16px' }}>
-                                    <h3 style={{ fontSize: '11px', color: accentColor, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>CODE MARITIME (NATO)</h3>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '16px', marginTop: '16px' }}>
+                                    <h3 style={{ fontSize: '11px', color: accentColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', fontWeight: 700 }}>CODE MARITIME (NATO)</h3>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                         {Object.entries(ModuleLogic.getNATOAlphabet()).map(([char, word]) => (
-                                            <div key={char} style={{ background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '4px', padding: '4px 7px', textAlign: 'center', minWidth: '50px' }}>
+                                            <div key={char} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xs)', padding: '6px 8px', textAlign: 'center', minWidth: '50px' }}>
                                                 <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: accentColor }}>{char.toUpperCase()}</span>
                                                 <span style={{ display: 'block', fontFamily: '"Maritime", "Courier New", monospace', fontSize: '32px', color: 'var(--text-dim)', marginTop: '4px' }}>{char.toUpperCase()}</span>
                                                 <span style={{ display: 'block', fontSize: '9px', color: 'var(--text-dim)', marginTop: '4px' }}>{word}</span>
@@ -308,10 +308,10 @@ export default function TextualView({ onExport, viewMode }: { onExport?: () => v
                             )}
 
                             {hasTemplier && (
-                                <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '6px', padding: '14px', marginTop: '16px' }}>
-                                    <h3 style={{ fontSize: '11px', color: accentColor, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>CODE TEMPLIER</h3>
+                                <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '16px', marginTop: '16px' }}>
+                                    <h3 style={{ fontSize: '11px', color: accentColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', fontWeight: 700 }}>CODE TEMPLIER</h3>
                                     <div style={{ textAlign: 'center' }}>
-                                        <img src="/assets/images/code_templier.jpg" alt="Code Templier" style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', border: '1px solid var(--bg-border)', objectFit: 'contain' }} />
+                                        <img src="/assets/images/code_templier.jpg" alt="Code Templier" style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border-subtle)', objectFit: 'contain' }} />
                                     </div>
                                 </div>
                             )}

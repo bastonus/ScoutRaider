@@ -151,17 +151,16 @@ export default function ElevationProfileBar() {
                     style={{
                         display: 'flex', alignItems: 'center', gap: '8px',
                         padding: '7px 14px',
-                        background: 'rgba(14, 22, 17, 0.92)',
-                        backdropFilter: 'blur(14px) saturate(1.4)',
-                        border: '1px solid rgba(110, 201, 126, 0.12)',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border-subtle)',
                         borderRadius: '20px',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+                        boxShadow: 'var(--shadow-lg)',
                         color: 'var(--text-primary)',
                         fontSize: '12px', fontWeight: 600,
                         cursor: 'pointer', transition: 'all 0.15s ease'
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = accentCyan)}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(110, 201, 126, 0.12)')}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-strong)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border-subtle)')}
                 >
                     <Mountain size={14} color={accentCyan} />
                     <span>D+ <b>{profile.ascend_m}m</b></span>
@@ -181,11 +180,10 @@ export default function ElevationProfileBar() {
             left: '20px',
             right: '20px',
             zIndex: 1050,
-            background: 'rgba(14, 22, 17, 0.95)',
-            backdropFilter: 'blur(16px) saturate(1.5)',
-            border: '1px solid rgba(110, 201, 126, 0.15)',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-subtle)',
             borderRadius: '16px',
-            boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+            boxShadow: 'var(--shadow-lg)',
             padding: '12px 18px 8px 18px',
             display: 'flex', flexDirection: 'column', gap: '6px',
             pointerEvents: 'all',

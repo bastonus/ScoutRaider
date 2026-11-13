@@ -16,6 +16,12 @@ export default function InactiveItinerariesLayer() {
     const isItinActiveAndSelected = selectedId === activeId;
     const hasFocusedItin = isRouteTool && isItinActiveAndSelected;
 
+    // Creation/drawing tools must NEVER have their clicks intercepted by inactive routes
+    const isCreationTool = [
+        'route', 'route_direct', 'annotate_point', 'annotate_area', 
+        'annotate_area_routed', 'annotate_draw', 'annotate_text', 'node'
+    ].includes(state.active_tool);
+
     // All visible itineraries that are not currently in active-editing mode
     // (If user selected an Area/Point/Draw or no layer, ALL itineraries are dashed!)
     const dashedItineraries = itineraries.filter(it => {
@@ -29,9 +35,7 @@ export default function InactiveItinerariesLayer() {
     if (dashedItineraries.length === 0) return null;
 
     const handleSelectItin = (itinId: string, itinName: string) => {
-        // Don't steal focus from annotation tools (draw, area, point)
-        const annotationTools = ['annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw', 'annotate_text'];
-        if (annotationTools.includes(state.active_tool)) return;
+        if (isCreationTool) return;
         dispatch({ type: 'SET_SELECTED_LAYER', id: itinId });
         dispatch({ type: 'ADD_NOTIFICATION', message: `Itinéraire actif : ${itinName}`, notifType: 'info' });
     };
@@ -64,20 +68,22 @@ export default function InactiveItinerariesLayer() {
                                 <Polyline
                                     positions={positions}
                                     pane={layerPaneName(itin.id)}
-                                    pathOptions={{ color: 'transparent', weight: 26, interactive: true } as any}
-                                    eventHandlers={{
+                                    pathOptions={{ color: 'transparent', weight: 26, interactive: !isCreationTool } as any}
+                                    eventHandlers={!isCreationTool ? {
                                         click: (e) => {
                                             L.DomEvent.stopPropagation(e);
                                             handleSelectItin(itin.id, itin.name);
                                         }
-                                    }}
+                                    } : undefined}
                                 >
-                                    <Tooltip sticky>
-                                        <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
-                                            <span style={{ fontWeight: 700, color }}>{itin.name}</span>
-                                            <div style={{ fontSize: '10px', color: '#aaa', marginTop: '2px' }}>Clic : sélectionner cet itinéraire</div>
-                                        </div>
-                                    </Tooltip>
+                                    {!isCreationTool && (
+                                        <Tooltip sticky>
+                                            <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
+                                                <span style={{ fontWeight: 700, color }}>{itin.name}</span>
+                                                <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>Clic : activer et éditer cet itinéraire</div>
+                                            </div>
+                                        </Tooltip>
+                                    )}
                                 </Polyline>
                                 
                                 {/* Visible dashed route */}
@@ -101,20 +107,22 @@ export default function InactiveItinerariesLayer() {
                                 <Polyline
                                     positions={fallbackLine}
                                     pane={layerPaneName(itin.id)}
-                                    pathOptions={{ color: 'transparent', weight: 26, interactive: true } as any}
-                                    eventHandlers={{
+                                    pathOptions={{ color: 'transparent', weight: 26, interactive: !isCreationTool } as any}
+                                    eventHandlers={!isCreationTool ? {
                                         click: (e) => {
                                             L.DomEvent.stopPropagation(e);
                                             handleSelectItin(itin.id, itin.name);
                                         }
-                                    }}
+                                    } : undefined}
                                 >
-                                    <Tooltip sticky>
-                                        <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
-                                            <span style={{ fontWeight: 700, color }}>{itin.name}</span>
-                                            <div style={{ fontSize: '10px', color: '#aaa', marginTop: '2px' }}>Clic : sélectionner cet itinéraire</div>
-                                        </div>
-                                    </Tooltip>
+                                    {!isCreationTool && (
+                                        <Tooltip sticky>
+                                            <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
+                                                <span style={{ fontWeight: 700, color }}>{itin.name}</span>
+                                                <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>Clic : activer et éditer cet itinéraire</div>
+                                            </div>
+                                        </Tooltip>
+                                    )}
                                 </Polyline>
                                 <Polyline
                                     positions={fallbackLine}
@@ -153,7 +161,7 @@ export default function InactiveItinerariesLayer() {
                                         justify-content: center;
                                         box-shadow: 0 2px 6px rgba(0,0,0,0.6);
                                         font-family: 'Inter', sans-serif;
-                                        cursor: pointer;
+                                        cursor: ${isCreationTool ? 'default' : 'pointer'};
                                     ">
                                         ${stage.label}
                                     </div>
@@ -169,19 +177,23 @@ export default function InactiveItinerariesLayer() {
                                     icon={icon}
                                     pane={layerPaneName(itin.id)}
                                     zIndexOffset={500}
-                                    eventHandlers={{
+                                    interactive={!isCreationTool}
+                                    eventHandlers={!isCreationTool ? {
                                         click: (e) => {
                                             L.DomEvent.stopPropagation(e);
                                             handleSelectItin(itin.id, itin.name);
                                         }
-                                    }}
+                                    } : undefined}
                                 >
-                                    <Tooltip direction="top" offset={[0, -12]}>
-                                        <div style={{ fontSize: '11px', fontWeight: 600 }}>
-                                            <span style={{ color }}>{itin.name}</span> — Étape {stage.label}
-                                            {stage.address ? <div style={{ fontSize: '9px', color: '#999' }}>{stage.address}</div> : null}
-                                        </div>
-                                    </Tooltip>
+                                    {!isCreationTool && (
+                                        <Tooltip direction="top" offset={[0, -12]}>
+                                            <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
+                                                <span style={{ fontWeight: 700, color }}>{itin.name}</span> — Étape {stage.label}
+                                                {stage.address ? <div style={{ fontSize: '9px', color: '#cbd5e1' }}>{stage.address}</div> : null}
+                                                <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>Clic : activer et éditer cet itinéraire</div>
+                                            </div>
+                                        </Tooltip>
+                                    )}
                                 </Marker>
                             );
                         })}

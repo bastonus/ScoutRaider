@@ -9,10 +9,10 @@
         "forcer_carrefours": true
       },
       "weights": {
-        "texte_clair": 80,
-        "morse": 20,
+        "texte_clair": 20,
+        "carte_ign": 80,
+        "morse": 0,
         "vigenere": 0,
-        "carte_ign": 0,
         "gilwell": 0,
         "drapeaux": 0,
         "azimut_pur": 0,
@@ -36,11 +36,12 @@
         "forcer_carrefours": true
       },
       "weights": {
-        "texte_clair": 40,
-        "morse": 20,
-        "carte_ign": 20,
-        "gilwell": 10,
-        "drapeaux": 10,
+        "texte_clair": 20,
+        "carte_ign": 80,
+        "morse": 0,
+        "carte_simple": 0,
+        "gilwell": 0,
+        "drapeaux": 0,
         "polybe": 0,
         "templier": 0,
         "maritime": 0,
