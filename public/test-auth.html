@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScoutRaider — Test Connexion</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0d1511; color: #e8f5eb; padding: 24px; min-height: 100vh; }
+  h1 { color: #6EC97E; margin-bottom: 24px; font-size: 20px; }
+  h2 { color: #6EC97E; margin: 20px 0 10px; font-size: 15px; border-bottom: 1px solid rgba(110,201,126,0.2); padding-bottom: 6px; }
+  .card { background: #141E18; border: 1px solid rgba(110,201,126,0.18); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(110,201,126,0.25); border-radius: 7px; padding: 9px 12px; color: #e8f5eb; font-size: 14px; outline: none; margin-bottom: 10px; }
+  button { background: linear-gradient(135deg, #6EC97E, #4da85e); color: #0d1511; border: none; border-radius: 7px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; margin-right: 8px; margin-bottom: 8px; }
+  button.secondary { background: rgba(110,201,126,0.1); color: #6EC97E; border: 1px solid rgba(110,201,126,0.3); }
+  .result { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 13px; font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
+  .ok { border-left: 3px solid #6EC97E; }
+  .err { border-left: 3px solid #ef4444; color: #fca5a5; }
+  .warn { border-left: 3px solid #f59e0b; color: #fcd34d; }
+  label { font-size: 12px; color: rgba(232,245,235,0.5); display: block; margin-bottom: 4px; }
+  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .field { flex: 1; min-width: 140px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 8px; }
+  .badge-ok { background: rgba(110,201,126,0.15); color: #6EC97E; }
+  .badge-err { background: rgba(239,68,68,0.15); color: #fca5a5; }
+</style>
+</head>
+<body>
+<h1>🔧 ScoutRaider — Diagnostic Connexion</h1>
+
+<!-- HEALTH -->
+<div class="card">
+  <h2>1. Statut Backend <span id="health-badge"></span></h2>
+  <button onclick="checkHealth()">Tester /health</button>
+  <div id="health-result" class="result" style="display:none"></div>
+</div>
+
+<!-- CHECK USER -->
+<div class="card">
+  <h2>2. Vérifier si un compte existe</h2>
+  <div class="row">
+    <div class="field">
+      <label>Nom d'utilisateur</label>
+      <input id="check-username" type="text" placeholder="mon_pseudo" />
+    </div>
+    <button onclick="checkUser()">Vérifier</button>
+  </div>
+  <div id="check-result" class="result" style="display:none"></div>
+</div>
+
+<!-- REGISTER -->
+<div class="card">
+  <h2>3. Créer un compte (Inscription)</h2>
+  <div class="row">
+    <div class="field">
+      <label>Nom d'utilisateur (≥ 3 caractères)</label>
+      <input id="reg-username" type="text" placeholder="mon_pseudo" />
+    </div>
+    <div class="field">
+      <label>Mot de passe (≥ 6 caractères)</label>
+      <input id="reg-password" type="password" placeholder="••••••••" />
+    </div>
+    <div class="field">
+      <label>E-mail (optionnel)</label>
+      <input id="reg-email" type="email" placeholder="email@exemple.fr" />
+    </div>
+  </div>
+  <button onclick="doRegister()">S'inscrire</button>
+  <div id="reg-result" class="result" style="display:none"></div>
+</div>
+
+<!-- LOGIN -->
+<div class="card">
+  <h2>4. Se connecter (Login)</h2>
+  <div class="row">
+    <div class="field">
+      <label>Nom d'utilisateur</label>
+      <input id="login-username" type="text" placeholder="mon_pseudo" />
+    </div>
+    <div class="field">
+      <label>Mot de passe</label>
+      <input id="login-password" type="password" placeholder="••••••••" />
+    </div>
+  </div>
+  <button onclick="doLogin()">Se connecter</button>
+  <div id="login-result" class="result" style="display:none"></div>
+</div>
+
+<!-- TOKEN -->
+<div class="card">
+  <h2>5. Session actuelle (localStorage)</h2>
+  <button onclick="showToken()">Afficher le token</button>
+  <button class="secondary" onclick="clearToken()">Effacer le token</button>
+  <div id="token-result" class="result" style="display:none"></div>
+</div>
+
+<script>
+const BASE = '';  // même domaine — nginx proxy vers /api/
+
+function show(id, text, type) {
+  const el = document.getElementById(id);
+  el.style.display = 'block';
+  el.className = 'result ' + (type || '');
+  el.textContent = text;
+}
+
+function fmt(obj) {
+  return JSON.stringify(obj, null, 2);
+}
+
+async function checkHealth() {
+  try {
+    const r = await fetch(BASE + '/health');
+    const d = await r.json();
+    const badge = document.getElementById('health-badge');
+    if (d.status === 'ok') {
+      badge.innerHTML = '<span class="badge badge-ok">✓ OK — ' + d.db_mode + '</span>';
+      show('health-result', fmt(d), 'ok');
+    } else {
+      badge.innerHTML = '<span class="badge badge-err">✗ Erreur</span>';
+      show('health-result', fmt(d), 'err');
+    }
+  } catch(e) {
+    show('health-result', 'Erreur réseau : ' + e.message, 'err');
+  }
+}
+
+async function checkUser() {
+  const u = document.getElementById('check-username').value.trim();
+  if (!u) { show('check-result', 'Entrez un nom d\'utilisateur.', 'warn'); return; }
+  try {
+    const r = await fetch(BASE + '/api/auth/check/' + encodeURIComponent(u));
+    const d = await r.json();
+    const type = d.exists ? 'ok' : 'warn';
+    show('check-result', 
+      (d.exists ? '✓ Compte trouvé !' : '✗ Compte introuvable — utilisez "Inscription" pour créer ce compte.') +
+      '\n\nDB mode : ' + d.db_mode + '\n' + fmt(d), type);
+  } catch(e) {
+    show('check-result', 'Erreur : ' + e.message, 'err');
+  }
+}
+
+async function doRegister() {
+  const username = document.getElementById('reg-username').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const email    = document.getElementById('reg-email').value.trim() || null;
+  if (!username || !password) { show('reg-result', 'Remplissez nom d\'utilisateur et mot de passe.', 'warn'); return; }
+  try {
+    const r = await fetch(BASE + '/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, email })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      localStorage.setItem('scoutraider_auth_token', d.token);
+      localStorage.removeItem('scoutraider_is_guest');
+      show('reg-result', '✓ Compte créé et connecté !\n\nToken sauvegardé dans localStorage.\n\n' + fmt(d), 'ok');
+    } else {
+      show('reg-result', '✗ Erreur ' + r.status + '\n' + (d.detail || fmt(d)), 'err');
+    }
+  } catch(e) {
+    show('reg-result', 'Erreur réseau : ' + e.message, 'err');
+  }
+}
+
+async function doLogin() {
+  const username_or_email = document.getElementById('login-username').value.trim();
+  const password          = document.getElementById('login-password').value;
+  if (!username_or_email || !password) { show('login-result', 'Remplissez les champs.', 'warn'); return; }
+  try {
+    const r = await fetch(BASE + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username_or_email, password })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      localStorage.setItem('scoutraider_auth_token', d.token);
+      localStorage.removeItem('scoutraider_is_guest');
+      show('login-result', '✓ Connexion réussie !\n\nToken sauvegardé.\n\n' + fmt(d), 'ok');
+    } else {
+      show('login-result', '✗ Erreur ' + r.status + ' — ' + (d.detail || 'Identifiants incorrects') +
+        '\n\n→ Si vous n\'avez pas encore de compte, utilisez la section "Inscription" (#3) ci-dessus.', 'err');
+    }
+  } catch(e) {
+    show('login-result', 'Erreur réseau : ' + e.message, 'err');
+  }
+}
+
+function showToken() {
+  const t = localStorage.getItem('scoutraider_auth_token');
+  const g = localStorage.getItem('scoutraider_is_guest');
+  if (t) {
+    // Decode JWT payload (no verification)
+    try {
+      const parts = t.split('.');
+      const payload = JSON.parse(atob(parts[1]));
+      const expDate = new Date(payload.exp * 1000);
+      const expired = expDate < new Date();
+      show('token-result',
+        (expired ? '⚠ TOKEN EXPIRÉ\n' : '✓ Token valide\n') +
+        'Expire : ' + expDate.toLocaleString('fr-FR') + '\n' +
+        'Username : ' + payload.username + '\n' +
+        'User ID  : ' + payload.sub + '\n\n' +
+        'Payload complet :\n' + fmt(payload),
+        expired ? 'err' : 'ok');
+    } catch {
+      show('token-result', 'Token présent (impossible à décoder) :\n' + t.substring(0, 60) + '...', 'warn');
+    }
+  } else {
+    show('token-result', (g === 'true' ? 'Mode invité actif. ' : '') + 'Aucun token JWT en localStorage.', 'warn');
+  }
+}
+
+function clearToken() {
+  localStorage.removeItem('scoutraider_auth_token');
+  localStorage.setItem('scoutraider_is_guest', 'true');
+  show('token-result', '✓ Token effacé. Vous êtes maintenant déconnecté(e).', 'ok');
+}
+
+// Auto-check health on load
+window.addEventListener('load', checkHealth);
+</script>
+</body>
+</html>
