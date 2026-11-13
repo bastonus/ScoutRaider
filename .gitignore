@@ -19,3 +19,7 @@ backend/app/storage/*.pdf
 backend/app/storage/*.db
 backend/app/storage/*.sqlite
 .pytest_cache/
+
+# Cartes raster IGN (fichiers volumineux)
+*.rmap
+France IGN*/
