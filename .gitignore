@@ -1,5 +1,5 @@
 node_modules/
-dist/
+# dist/ now committed for reproducible deployments
 dist_electron/
 python-dist/
 build_output.txt
