@@ -10,6 +10,7 @@ scoutraider.log
 .vscode
 .gemini
 legacy
+!legacy/modules
 python-dist
 Mapy.com_files
 Mapy.com.html
