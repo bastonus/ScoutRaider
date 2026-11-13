@@ -3,8 +3,8 @@
  * Route: /projects (nécessite d'être connecté ou invité)
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { CloudAuthService, type CloudProjectSummary } from '../logic/CloudAuthService';
 import FleurDeLysLogo from '../components/layout/FleurDeLysLogo';
@@ -13,6 +13,7 @@ import {
     Plus,
     LogOut,
     FolderOpen,
+    RefreshCw,
     Share2,
     Copy,
     Trash2,
@@ -55,6 +56,7 @@ function formatRelativeDate(dateStr: string): string {
 
 export default function ProjectsHomePage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, isGuest, isLoading, isAuthenticated, logout } = useAuth();
 
     const [projects, setProjects] = useState<CloudProjectSummary[]>([]);
@@ -63,12 +65,16 @@ export default function ProjectsHomePage() {
     const [tab, setTab] = useState<TabFilter>('all');
     const [search, setSearch] = useState('');
     const [creating, setCreating] = useState(false);
-    const [userMenuOpen, setUserMenuOpen] = useState(false);    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [userMenuOpen, setUserMenuOpen] = useState(false);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const loadingRef = useRef(false);
 
-    // Load projects from cloud
-    const loadProjects = useCallback(async () => {
+    // Load projects from cloud — silently refreshes without showing spinner if already has data
+    const loadProjects = useCallback(async (silent = false) => {
         if (isGuest || !isAuthenticated) return;
-        setLoadingProjects(true);
+        if (loadingRef.current) return; // prevent concurrent fetches
+        loadingRef.current = true;
+        if (!silent) setLoadingProjects(true);
         setError(null);
         try {
             const list = await CloudAuthService.listProjects();
@@ -77,12 +83,41 @@ export default function ProjectsHomePage() {
             setError(e.message || 'Impossible de charger les projets.');
         } finally {
             setLoadingProjects(false);
+            loadingRef.current = false;
         }
     }, [isGuest, isAuthenticated]);
 
+    // Initial load when auth resolves
     useEffect(() => {
         if (!isLoading) loadProjects();
     }, [isLoading, loadProjects]);
+
+    // Refresh when window regains focus (user comes back from editor tab)
+    useEffect(() => {
+        const onFocus = () => { if (!isLoading && isAuthenticated && !isGuest) loadProjects(true); };
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
+    }, [isLoading, isAuthenticated, isGuest, loadProjects]);
+
+    // Refresh when page becomes visible (browser tab switch)
+    useEffect(() => {
+        const onVisible = () => {
+            if (document.visibilityState === 'visible' && !isLoading && isAuthenticated && !isGuest) {
+                loadProjects(true);
+            }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => document.removeEventListener('visibilitychange', onVisible);
+    }, [isLoading, isAuthenticated, isGuest, loadProjects]);
+
+    // Refresh each time the user navigates back to /projects (location.key changes per visit)
+    const prevLocationKey = useRef(location.key);
+    useEffect(() => {
+        if (location.key !== prevLocationKey.current) {
+            prevLocationKey.current = location.key;
+            if (!isLoading && isAuthenticated && !isGuest) loadProjects(true);
+        }
+    }, [location.key, isLoading, isAuthenticated, isGuest, loadProjects]);
 
     // Filter projects
     const filteredProjects = projects.filter(p => {
@@ -156,6 +191,18 @@ export default function ProjectsHomePage() {
                             onChange={e => setSearch(e.target.value)}
                         />
                     </div>
+
+                    {/* Refresh button */}
+                    {!isGuest && (
+                        <button
+                            style={s.refreshBtn}
+                            onClick={() => loadProjects(false)}
+                            title="Actualiser"
+                            disabled={loadingProjects}
+                        >
+                            <RefreshCw size={15} style={loadingProjects ? { animation: 'spin 0.8s linear infinite' } : {}} />
+                        </button>
+                    )}
 
                     {/* User menu */}
                     <div style={s.userArea} onClick={() => setUserMenuOpen(o => !o)}>
@@ -799,6 +846,19 @@ const s: Record<string, React.CSSProperties> = {
         fontSize: '12px',
         minWidth: '24px',
         height: '24px',
+    },
+    refreshBtn: {
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(110,201,126,0.15)',
+        borderRadius: '8px',
+        color: 'rgba(232,245,235,0.5)',
+        cursor: 'pointer',
+        padding: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'color 0.15s, background 0.15s',
+        flexShrink: 0,
     },
     fab: {
         position: 'fixed',
