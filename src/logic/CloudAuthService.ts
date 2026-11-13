@@ -157,7 +157,8 @@ export class CloudAuthService {
                 headers: this.getHeaders()
             });
             if (!res.ok) {
-                if (res.status === 401) {
+                if (res.status === 401 || res.status === 404) {
+                    // Token invalid or user no longer exists — clear session
                     this.logout();
                 }
                 return null;
