@@ -83,6 +83,16 @@ def health_check():
     }
 
 
+@app.get("/api/auth/check/{username}", tags=["Auth"])
+async def check_user_exists(username: str):
+    """Check whether a username exists (no password exposed). Useful for diagnostics."""
+    user = await db.get_user_by_username(username)
+    return {
+        "exists": user is not None,
+        "db_mode": "sqlite" if db._use_sqlite else "postgresql"
+    }
+
+
 # ─── Auth Models & Endpoints ──────────────────────────────────────────────────
 
 class RegisterRequest(BaseModel):
@@ -135,7 +145,10 @@ async def login(payload: LoginRequest):
         user = await db.get_user_by_email(identifier)
 
     if not user or not auth.verify_password(payload.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Identifiants incorrects.")
+        raise HTTPException(
+            status_code=401,
+            detail="Identifiants incorrects. Vérifiez votre nom d'utilisateur et mot de passe, ou créez un compte via l'onglet Inscription."
+        )
 
     token = auth.create_access_token(user["id"], user["username"], user.get("email"))
     return {

@@ -40,7 +40,12 @@ export default function LoginPage() {
             }
             navigate('/projects', { replace: true });
         } catch (err: any) {
-            setError(err.message || 'Une erreur est survenue.');
+            const msg: string = err.message || 'Une erreur est survenue.';
+            setError(msg);
+            // Si identifiants incorrects en mode login → suggérer l'inscription
+            if (tab === 'login' && (msg.includes('Identifiants') || msg.includes('401') || msg.includes('incorrect'))) {
+                setError(msg + '\n\n→ Pas encore de compte ? Utilisez l\'onglet "Inscription" ci-dessus.');
+            }
         } finally {
             setSubmitting(false);
         }
@@ -140,7 +145,23 @@ export default function LoginPage() {
                     </div>
 
                     {error && (
-                        <div style={styles.errorBox}>{error}</div>
+                        <div style={styles.errorBox}>
+                            <span style={{ whiteSpace: 'pre-line' }}>
+                                {error.split('\n\n→')[0]}
+                            </span>
+                            {tab === 'login' && error.includes('Identifiants') && (
+                                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(239,68,68,0.2)' }}>
+                                    Pas encore de compte ?{' '}
+                                    <button
+                                        type="button"
+                                        style={{ background: 'none', border: 'none', color: '#6EC97E', cursor: 'pointer', padding: 0, fontSize: '13px', textDecoration: 'underline' }}
+                                        onClick={() => { setTab('register'); setError(null); }}
+                                    >
+                                        Créer un compte
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     <button
