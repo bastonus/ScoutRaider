@@ -317,8 +317,9 @@ const styles: Record<string, React.CSSProperties> = {
     wordmarkText: {
         display: 'flex',
         alignItems: 'baseline',
-        gap: '6px',
+        gap: '0',
         lineHeight: 1,
+        position: 'relative',
     },
     wordScout: {
         fontSize: '48px',
@@ -335,13 +336,15 @@ const styles: Record<string, React.CSSProperties> = {
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
     },
     versionBadge: {
+        position: 'absolute',
+        left: '100%',
+        bottom: '6px',
+        marginLeft: '6px',
         fontSize: '11px',
         fontWeight: 500,
         color: '#3F3F46',
         letterSpacing: '0.04em',
-        alignSelf: 'flex-end',
-        marginBottom: '6px',
-        marginLeft: '2px',
+        whiteSpace: 'nowrap' as const,
     },
     tagline: {
         margin: 0,
