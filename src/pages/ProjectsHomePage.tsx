@@ -253,13 +253,13 @@ export default function ProjectsHomePage() {
                             </p>
                         )}
                     </div>
-                    {/* Bouton visible pour tous — redirige vers login si invité */}
+                    {/* Bouton Nouveau projet — disponible pour tous, invité ou connecté */}
                     <button
                         style={s.newBtn}
-                        onClick={isGuest ? handleGuestLogin : handleNewProject}
+                        onClick={handleNewProject}
                     >
                         <Plus size={16} />
-                        <span>{isGuest ? 'Se connecter pour créer' : 'Nouveau projet'}</span>
+                        <span>Nouveau projet</span>
                     </button>
                 </div>
 
@@ -305,11 +305,16 @@ export default function ProjectsHomePage() {
                 {isGuest && !loadingProjects && (
                     <div style={s.emptyState}>
                         <FolderOpen size={48} style={{ color: 'rgba(110,201,126,0.3)', marginBottom: '12px' }} />
-                        <p style={s.emptyTitle}>Aucun projet cloud disponible</p>
-                        <p style={s.emptyHint}>Connectez-vous pour accéder à vos projets.</p>
-                        <button style={s.newBtn} onClick={handleGuestLogin}>
-                            <User size={16} /> Se connecter
-                        </button>
+                        <p style={s.emptyTitle}>Mode invité — projets locaux uniquement</p>
+                        <p style={s.emptyHint}>Vos projets ne sont pas sauvegardés sur le cloud. Connectez-vous pour activer la synchronisation.</p>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                            <button style={s.newBtn} onClick={handleNewProject}>
+                                <Plus size={16} /> Nouveau projet
+                            </button>
+                            <button style={{ ...s.newBtn, background: 'transparent', border: '1px solid rgba(110,201,126,0.3)', color: '#6EC97E', boxShadow: 'none' }} onClick={handleGuestLogin}>
+                                <User size={16} /> Se connecter
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -354,17 +359,15 @@ export default function ProjectsHomePage() {
                 <div style={s.overlay} onClick={() => setUserMenuOpen(false)} />
             )}
 
-            {/* FAB — Floating "Nouveau projet" button (mobile-friendly, always visible) */}
-            {!isGuest && (
-                <button
-                    style={s.fab}
+            {/* FAB — Floating "Nouveau projet" button (mobile-friendly, toujours visible) */}
+            <button
+                style={s.fab}
                     onClick={handleNewProject}
                     title="Nouveau projet"
                     aria-label="Nouveau projet"
                 >
                     <Plus size={22} />
                 </button>
-            )}
 
             {/* CSS for animations */}
             <style>{`
