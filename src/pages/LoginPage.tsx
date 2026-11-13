@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import FleurDeLysLogo from '../components/layout/FleurDeLysLogo';
+import { version } from '../../package.json';
 
 type Tab = 'login' | 'register';
 
@@ -155,6 +156,7 @@ export default function LoginPage() {
                     <div style={styles.wordmarkText}>
                         <span style={styles.wordScout}>Scout</span>
                         <span style={styles.wordRaider}>Raider</span>
+                        <span style={styles.versionBadge}>v{version}</span>
                     </div>
                     <p style={styles.tagline}>Suite de cartographie tactique</p>
                 </div>
@@ -315,7 +317,7 @@ const styles: Record<string, React.CSSProperties> = {
     wordmarkText: {
         display: 'flex',
         alignItems: 'baseline',
-        gap: '0',
+        gap: '6px',
         lineHeight: 1,
     },
     wordScout: {
@@ -331,6 +333,15 @@ const styles: Record<string, React.CSSProperties> = {
         letterSpacing: '-2px',
         color: '#6EC97E',
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+    },
+    versionBadge: {
+        fontSize: '11px',
+        fontWeight: 500,
+        color: '#3F3F46',
+        letterSpacing: '0.04em',
+        alignSelf: 'flex-end',
+        marginBottom: '6px',
+        marginLeft: '2px',
     },
     tagline: {
         margin: 0,

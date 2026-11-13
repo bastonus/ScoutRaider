@@ -8,6 +8,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { CloudAuthService, type CloudProjectSummary } from '../logic/CloudAuthService';
 import FleurDeLysLogo from '../components/layout/FleurDeLysLogo';
+import { version } from '../../package.json';
 import {
     Search,
     Plus,
@@ -169,104 +170,84 @@ export default function ProjectsHomePage() {
     // ── Render ───────────────────────────────────────────────────────────
     return (
         <div style={s.page}>
-            {/* ── Top bar ── */}
-            <header style={s.topBar}>
-                <div style={s.topBarInner}>
-                    {/* Logo */}
-                    <div style={s.logoArea}>
-                        <div style={s.logoIconWrap}>
-                            <FleurDeLysLogo size={28} color="#6EC97E" />
-                        </div>
-                        <span>
-                            <span style={s.logoTextScout}>Scout</span><span style={s.logoTextRaider}>Raider</span>
-                        </span>
-                    </div>
 
-                    {/* Search */}
-                    <div style={s.searchWrap}>
-                        <Search size={16} style={s.searchIcon} />
+            {/* ── Top-right session button ── */}
+            <div style={s.sessionCorner}>
+                {isGuest ? (
+                    <button style={s.sessionBtn} onClick={handleGuestLogin}>
+                        <User size={14} />
+                        <span>Connexion</span>
+                    </button>
+                ) : (
+                    <div style={{ position: 'relative' }}>
+                        <button style={s.sessionBtn} onClick={() => setUserMenuOpen(o => !o)}>
+                            <span style={s.avatarInitial}>{(user?.username || '?')[0].toUpperCase()}</span>
+                            <span style={s.sessionUser}>{user?.username || ''}</span>
+                            <ChevronDown size={12} style={{ color: '#52525B' }} />
+                        </button>
+                        {userMenuOpen && (
+                            <div style={s.userDropdown} onClick={e => e.stopPropagation()}>
+                                <button style={s.dropdownItem} onClick={handleLogout}>
+                                    <LogOut size={14} /> Déconnexion
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Click-away for user menu */}
+            {userMenuOpen && (
+                <div style={s.overlay} onClick={() => setUserMenuOpen(false)} />
+            )}
+
+            {/* ── Hero wordmark ── */}
+            <div style={s.hero}>
+                <div style={s.heroLogo}>
+                    <FleurDeLysLogo size={64} color="#6EC97E" />
+                </div>
+                <h1 style={s.heroTitle}>
+                    <span style={s.heroScout}>Scout</span><span style={s.heroRaider}>Raider</span>
+                    <span style={s.heroVersion}>v{version}</span>
+                </h1>
+                <p style={s.heroSub}>Suite de cartographie tactique</p>
+
+                {/* Search + new project row */}
+                <div style={s.heroRow}>
+                    <div style={s.heroSearch}>
+                        <Search size={16} style={s.heroSearchIcon} />
                         <input
-                            style={s.searchInput}
+                            style={s.heroSearchInput}
                             type="text"
                             placeholder="Rechercher un projet…"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
+                            autoFocus
                         />
-                    </div>
-
-                    {/* Refresh button */}
-                    {!isGuest && (
-                        <button
-                            style={s.refreshBtn}
-                            onClick={() => loadProjects(false)}
-                            title="Actualiser"
-                            disabled={loadingProjects}
-                        >
-                            <RefreshCw size={15} style={loadingProjects ? { animation: 'spin 0.8s linear infinite' } : {}} />
-                        </button>
-                    )}
-
-                    {/* User menu */}
-                    <div style={s.userArea} onClick={() => setUserMenuOpen(o => !o)}>
-                        <div style={s.avatar}>
-                            {isGuest
-                                ? <User size={16} color="rgba(232,245,235,0.6)" />
-                                : <span style={s.avatarInitial}>{(user?.username || '?')[0].toUpperCase()}</span>
-                            }
-                        </div>
-                        <span style={s.userName}>
-                            {isGuest ? 'Invité' : (user?.username || '')}
-                        </span>
-                        <ChevronDown size={14} style={{ color: 'rgba(232,245,235,0.4)' }} />
-
-                        {userMenuOpen && (
-                            <div style={s.userDropdown} onClick={e => e.stopPropagation()}>
-                                {isGuest ? (
-                                    <button style={s.dropdownItem} onClick={handleGuestLogin}>
-                                        <User size={14} /> Se connecter
-                                    </button>
-                                ) : (
-                                    <button style={s.dropdownItem} onClick={handleLogout}>
-                                        <LogOut size={14} /> Déconnexion
-                                    </button>
-                                )}
-                            </div>
+                        {!isGuest && (
+                            <button
+                                style={s.heroRefresh}
+                                onClick={() => loadProjects(false)}
+                                title="Actualiser"
+                                disabled={loadingProjects}
+                            >
+                                <RefreshCw size={14} style={loadingProjects ? { animation: 'spin 0.8s linear infinite' } : {}} />
+                            </button>
                         )}
                     </div>
-                </div>
-            </header>
-
-            {/* ── Main content ── */}
-            <main style={s.main}>
-                {/* Greeting + new btn */}
-                <div style={s.greetingRow}>
-                    <div>
-                        <h2 style={s.greeting}>
-                            {isGuest
-                                ? 'Bienvenue, Invité 👋'
-                                : getGreeting(user?.username || '')}
-                        </h2>
-                        {isGuest && (
-                            <p style={s.guestHint}>
-                                <button style={s.guestLoginLink} onClick={handleGuestLogin}>
-                                    Connectez-vous
-                                </button>{' '}
-                                pour accéder à vos projets cloud.
-                            </p>
-                        )}
-                    </div>
-                    {/* Bouton Nouveau projet — disponible pour tous, invité ou connecté */}
-                    <button
-                        style={s.newBtn}
-                        onClick={handleNewProject}
-                    >
-                        <Plus size={16} />
+                    <button style={s.newBtn} onClick={handleNewProject}>
+                        <Plus size={15} />
                         <span>Nouveau projet</span>
                     </button>
                 </div>
+            </div>
 
-                {/* Tabs */}
+            {/* ── Main content ── */}
+            <main style={s.main}>
+
+                {/* Tabs row */}
                 {!isGuest && (
+                <div style={s.toolRow}>
                     <div style={s.tabRow}>
                         {(['all', 'mine', 'shared'] as TabFilter[]).map(t => (
                             <button
@@ -274,7 +255,7 @@ export default function ProjectsHomePage() {
                                 style={{ ...s.tabBtn, ...(tab === t ? s.tabBtnActive : {}) }}
                                 onClick={() => setTab(t)}
                             >
-                                {t === 'all' ? 'Tous' : t === 'mine' ? 'Mes documents' : 'Partagés avec moi'}
+                                {t === 'all' ? 'Tous' : t === 'mine' ? 'Mes projets' : 'Partagés'}
                                 {t !== 'all' && (
                                     <span style={s.tabCount}>
                                         {t === 'mine'
@@ -285,6 +266,7 @@ export default function ProjectsHomePage() {
                             </button>
                         ))}
                     </div>
+                </div>
                 )}
 
                 {/* Error */}
@@ -298,42 +280,32 @@ export default function ProjectsHomePage() {
                 {/* Loading */}
                 {loadingProjects && (
                     <div style={s.loadingRow}>
-                        <Loader2 size={22} style={{ animation: 'spin 0.8s linear infinite', color: '#2563EB' }} />
-                        <span style={{ color: 'rgba(232,245,235,0.4)', fontSize: '14px' }}>Chargement…</span>
+                        <Loader2 size={20} style={{ animation: 'spin 0.8s linear infinite', color: '#2563EB' }} />
+                        <span style={{ color: '#52525B', fontSize: '13px' }}>Chargement…</span>
                     </div>
                 )}
 
-                {/* Guest placeholder */}
+                {/* Guest state */}
                 {isGuest && !loadingProjects && (
                     <div style={s.emptyState}>
-                        <FolderOpen size={48} style={{ color: '#3F3F46', marginBottom: '12px' }} />
-                        <p style={s.emptyTitle}>Mode invité — projets locaux uniquement</p>
-                        <p style={s.emptyHint}>Vos projets ne sont pas sauvegardés sur le cloud. Connectez-vous pour activer la synchronisation.</p>
-                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                            <button style={s.newBtn} onClick={handleNewProject}>
-                                <Plus size={16} /> Nouveau projet
-                            </button>
-                            <button style={{ ...s.newBtn, background: 'transparent', border: '1px solid #27272A', color: '#71717A', boxShadow: 'none' }} onClick={handleGuestLogin}>
-                                <User size={16} /> Se connecter
-                            </button>
-                        </div>
+                        <FolderOpen size={36} style={{ color: '#3F3F46', marginBottom: '12px' }} />
+                        <p style={s.emptyTitle}>Mode invité</p>
+                        <p style={s.emptyHint}>Connectez-vous pour accéder à vos projets cloud et activer la synchronisation.</p>
+                        <button style={s.newBtn} onClick={handleGuestLogin}>
+                            <User size={14} /> Se connecter
+                        </button>
                     </div>
                 )}
 
                 {/* Empty state */}
                 {!isGuest && !loadingProjects && filteredProjects.length === 0 && (
                     <div style={s.emptyState}>
-                        <FileText size={48} style={{ color: '#3F3F46', marginBottom: '12px' }} />
+                        <FileText size={36} style={{ color: '#3F3F46', marginBottom: '12px' }} />
                         <p style={s.emptyTitle}>
                             {search ? `Aucun résultat pour "${search}"` : 'Aucun projet pour le moment'}
                         </p>
                         {!search && (
                             <p style={s.emptyHint}>Créez votre premier projet pour commencer.</p>
-                        )}
-                        {!search && (
-                            <button style={s.newBtn} onClick={handleNewProject}>
-                                <Plus size={16} /> Nouveau projet
-                            </button>
                         )}
                     </div>
                 )}
@@ -356,22 +328,7 @@ export default function ProjectsHomePage() {
                 )}
             </main>
 
-            {/* Click-away for user menu */}
-            {userMenuOpen && (
-                <div style={s.overlay} onClick={() => setUserMenuOpen(false)} />
-            )}
-
-            {/* FAB — Floating "Nouveau projet" button (mobile-friendly, toujours visible) */}
-            <button
-                style={s.fab}
-                    onClick={handleNewProject}
-                    title="Nouveau projet"
-                    aria-label="Nouveau projet"
-                >
-                    <Plus size={22} />
-                </button>
-
-            {/* CSS for animations */}
+            {/* CSS */}
             <style>{`
                 @keyframes spin { to { transform: rotate(360deg); } }
                 @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
@@ -403,7 +360,7 @@ function ProjectCard({ project: p, onOpen, onCopyLink, onDelete, copied }: CardP
         >
             {/* Card preview */}
             <div style={s.cardPreview}>
-                <FileText size={32} style={{ color: 'rgba(110,201,126,0.4)' }} />
+                <FileText size={32} style={{ color: '#3F3F46' }} />
             </div>
 
             {/* Card body */}
@@ -475,205 +432,156 @@ const s: Record<string, React.CSSProperties> = {
         display: 'flex',
         flexDirection: 'column',
     },
-    topBar: {
-        background: '#121215',
-        borderBottom: '1px solid #27272A',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
+
+    // ── Session corner (top-right) ──
+    sessionCorner: {
+        position: 'fixed',
+        top: '20px',
+        right: '24px',
+        zIndex: 200,
     },
-    topBarInner: {
-        maxWidth: '1280px',
-        margin: '0 auto',
+    sessionBtn: {
         display: 'flex',
         alignItems: 'center',
-        gap: '16px',
-        padding: '10px 24px',
-    },
-    logoArea: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        flexShrink: 0,
-    },
-    logoIconWrap: {
-        width: '32px',
-        height: '32px',
-        background: 'rgba(110,201,126,0.08)',
-        borderRadius: '8px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: '1px solid #27272A',
-    },
-    logoText: {
-        fontWeight: 700,
-        fontSize: '16px',
-        letterSpacing: '-0.3px',
-    },
-    logoTextScout: {
-        color: '#52525B',
-    },
-    logoTextRaider: {
-        color: '#6EC97E',
-    },
-    searchWrap: {
-        flex: 1,
-        maxWidth: '480px',
-        position: 'relative',
-        display: 'flex',
-        alignItems: 'center',
-    },
-    searchIcon: {
-        position: 'absolute',
-        left: '12px',
-        color: '#52525B',
-        pointerEvents: 'none',
-    } as any,
-    searchInput: {
-        width: '100%',
+        gap: '7px',
         background: '#1C1C21',
         border: '1px solid #27272A',
         borderRadius: '10px',
-        padding: '8px 12px 8px 36px',
-        color: '#FAFAFA',
+        padding: '7px 13px',
+        color: '#A1A1AA',
         fontSize: '13px',
-        outline: 'none',
-        boxSizing: 'border-box',
+        fontWeight: 500,
+        cursor: 'pointer',
         fontFamily: 'inherit',
         transition: 'border-color 120ms ease',
     },
-    userArea: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        cursor: 'pointer',
-        padding: '5px 10px',
-        borderRadius: '10px',
-        background: '#1C1C21',
-        border: '1px solid #27272A',
-        position: 'relative',
-        flexShrink: 0,
-        userSelect: 'none',
-        transition: 'border-color 120ms ease',
-    },
-    avatar: {
-        width: '26px',
-        height: '26px',
-        borderRadius: '50%',
-        background: '#27272A',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: '1px solid #3F3F46',
-    },
-    avatarInitial: {
-        fontSize: '12px',
-        fontWeight: 700,
-        color: '#6EC97E',
-    },
-    userName: {
-        fontSize: '13px',
-        fontWeight: 500,
+    sessionUser: {
         color: '#D4D4D8',
         maxWidth: '120px',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
+    } as React.CSSProperties,
+
+    // ── Hero ──
+    hero: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        paddingTop: '72px',
+        paddingBottom: '48px',
+        paddingLeft: '24px',
+        paddingRight: '24px',
+        gap: '0px',
     },
-    userDropdown: {
-        position: 'absolute',
-        top: 'calc(100% + 6px)',
-        right: 0,
-        background: '#1C1C21',
-        border: '1px solid #27272A',
-        borderRadius: '12px',
-        padding: '4px',
-        minWidth: '160px',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.85)',
-        animation: 'fadeIn 0.15s ease',
-        zIndex: 200,
+    heroLogo: {
+        marginBottom: '16px',
+        opacity: 0.9,
     },
-    dropdownItem: {
+    heroTitle: {
+        margin: 0,
+        fontSize: 'clamp(48px, 10vw, 80px)',
+        fontWeight: 800,
+        letterSpacing: '-3px',
+        lineHeight: 1,
+        marginBottom: '10px',
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: '8px',
+    },
+    heroScout: {
+        color: '#3F3F46',
+    },
+    heroRaider: {
+        color: '#6EC97E',
+    },
+    heroVersion: {
+        fontSize: '13px',
+        fontWeight: 500,
+        color: '#3F3F46',
+        letterSpacing: '0.04em',
+        alignSelf: 'flex-end',
+        marginBottom: '8px',
+    },
+    heroSub: {
+        margin: '0 0 28px',
+        fontSize: '13px',
+        color: '#3F3F46',
+        letterSpacing: '0.5px',
+        textTransform: 'uppercase' as const,
+        fontWeight: 500,
+    },
+    heroRow: {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
         width: '100%',
-        background: 'transparent',
-        border: 'none',
-        color: '#A1A1AA',
-        fontSize: '13px',
-        padding: '8px 10px',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        textAlign: 'left',
-        fontFamily: 'inherit',
-        transition: 'background 120ms ease, color 120ms ease',
+        maxWidth: '600px',
     },
-    overlay: {
-        position: 'fixed',
-        inset: 0,
-        zIndex: 99,
-    },
-    main: {
-        maxWidth: '1280px',
-        width: '100%',
-        margin: '0 auto',
-        padding: '32px 24px',
-        flex: 1,
-    },
-    greetingRow: {
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: '16px',
-        marginBottom: '28px',
-        flexWrap: 'wrap',
-    },
-    greeting: {
-        margin: 0,
-        fontSize: 'clamp(20px, 4vw, 26px)',
-        fontWeight: 700,
-        color: '#FAFAFA',
-        letterSpacing: '-0.4px',
-    },
-    guestHint: {
-        margin: '6px 0 0',
-        fontSize: '13px',
-        color: '#52525B',
-    },
-    guestLoginLink: {
-        background: 'none',
-        border: 'none',
-        color: '#2563EB',
-        cursor: 'pointer',
-        fontSize: '13px',
-        padding: 0,
-        textDecoration: 'underline',
-        fontFamily: 'inherit',
-    },
-    newBtn: {
+    heroSearch: {
+        position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        gap: '7px',
-        background: '#2563EB',
-        color: '#FFFFFF',
-        border: 'none',
+        flex: 1,
+        background: 'transparent',
+        border: '1px solid #27272A',
         borderRadius: '10px',
-        padding: '9px 18px',
-        fontSize: '13px',
-        fontWeight: 700,
-        cursor: 'pointer',
+        overflow: 'hidden',
+        transition: 'border-color 120ms ease',
+        height: '38px',
+    } as React.CSSProperties,
+    heroSearchIcon: {
+        position: 'absolute',
+        left: '12px',
+        color: '#3F3F46',
+        pointerEvents: 'none',
         flexShrink: 0,
-        boxShadow: '0 2px 8px rgba(37,99,235,0.3)',
-        transition: 'background 120ms ease',
+    } as React.CSSProperties,
+    heroSearchInput: {
+        flex: 1,
+        background: 'transparent',
+        border: 'none',
+        outline: 'none',
+        padding: '0 40px 0 36px',
+        color: '#A1A1AA',
+        fontSize: '13px',
         fontFamily: 'inherit',
+        height: '100%',
+    },
+    heroRefresh: {
+        background: 'transparent',
+        border: 'none',
+        borderLeft: '1px solid #27272A',
+        color: '#3F3F46',
+        cursor: 'pointer',
+        padding: '0 10px',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        transition: 'color 120ms ease',
+        flexShrink: 0,
+    } as React.CSSProperties,
+
+    // ── Main ──
+    main: {
+        maxWidth: '1200px',
+        width: '100%',
+        margin: '0 auto',
+        padding: '0 24px 80px',
+        flex: 1,
+    },
+    toolRow: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        marginBottom: '20px',
+        flexWrap: 'wrap' as const,
     },
     tabRow: {
         display: 'flex',
         gap: '4px',
-        marginBottom: '24px',
-        flexWrap: 'wrap',
+        flexWrap: 'wrap' as const,
     },
     tabBtn: {
         display: 'flex',
@@ -684,7 +592,7 @@ const s: Record<string, React.CSSProperties> = {
         color: '#52525B',
         borderRadius: '8px',
         padding: '6px 14px',
-        fontSize: '13px',
+        fontSize: '12px',
         fontWeight: 500,
         cursor: 'pointer',
         transition: 'all 120ms ease',
@@ -702,9 +610,30 @@ const s: Record<string, React.CSSProperties> = {
         fontSize: '10px',
         fontWeight: 700,
         borderRadius: '20px',
-        padding: '1px 7px',
+        padding: '1px 6px',
         fontFamily: "'JetBrains Mono', monospace",
     },
+    newBtn: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        background: '#2563EB',
+        color: '#FFFFFF',
+        border: 'none',
+        borderRadius: '10px',
+        padding: '0 16px',
+        height: '38px',
+        fontSize: '13px',
+        fontWeight: 600,
+        cursor: 'pointer',
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
+        boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+        transition: 'background 120ms ease',
+        fontFamily: 'inherit',
+    },
+
+    // ── Feedback ──
     errorBox: {
         display: 'flex',
         alignItems: 'center',
@@ -737,12 +666,12 @@ const s: Record<string, React.CSSProperties> = {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '80px 24px',
+        padding: '60px 24px',
         textAlign: 'center',
         gap: '8px',
     },
     emptyTitle: {
-        fontSize: '16px',
+        fontSize: '15px',
         fontWeight: 600,
         color: '#52525B',
         margin: 0,
@@ -751,11 +680,14 @@ const s: Record<string, React.CSSProperties> = {
         fontSize: '13px',
         color: '#3F3F46',
         marginBottom: '16px',
+        maxWidth: '360px',
     },
+
+    // ── Grid & cards ──
     grid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-        gap: '12px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+        gap: '10px',
         animation: 'fadeIn 0.2s ease',
     },
     card: {
@@ -769,7 +701,7 @@ const s: Record<string, React.CSSProperties> = {
         flexDirection: 'column',
     },
     cardPreview: {
-        height: '72px',
+        height: '64px',
         background: '#1C1C21',
         display: 'flex',
         alignItems: 'center',
@@ -777,7 +709,7 @@ const s: Record<string, React.CSSProperties> = {
         borderBottom: '1px solid #27272A',
     },
     cardBody: {
-        padding: '12px 14px',
+        padding: '10px 12px',
         display: 'flex',
         flexDirection: 'column',
         gap: '6px',
@@ -786,7 +718,7 @@ const s: Record<string, React.CSSProperties> = {
     cardTop: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '6px',
+        gap: '5px',
     },
     cardTitle: {
         fontSize: '13px',
@@ -844,14 +776,14 @@ const s: Record<string, React.CSSProperties> = {
     dateText: {
         display: 'flex',
         alignItems: 'center',
-        fontSize: '11px',
+        fontSize: '10px',
         color: '#3F3F46',
         gap: '3px',
         fontFamily: "'JetBrains Mono', monospace",
     },
     actionRow: {
         display: 'flex',
-        gap: '4px',
+        gap: '3px',
     },
     actionBtn: {
         display: 'flex',
@@ -868,88 +800,71 @@ const s: Record<string, React.CSSProperties> = {
         minWidth: '24px',
         height: '24px',
     },
-    refreshBtn: {
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(110,201,126,0.15)',
+
+    // ── Misc ──
+    overlay: {
+        position: 'fixed',
+        inset: 0,
+        zIndex: 99,
+    },
+    userDropdown: {
+        position: 'absolute',
+        top: 'calc(100% + 6px)',
+        right: 0,
+        background: '#1C1C21',
+        border: '1px solid #27272A',
+        borderRadius: '12px',
+        padding: '4px',
+        minWidth: '160px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.85)',
+        animation: 'fadeIn 0.15s ease',
+        zIndex: 300,
+    },
+    dropdownItem: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        width: '100%',
+        background: 'transparent',
+        border: 'none',
+        color: '#A1A1AA',
+        fontSize: '13px',
+        padding: '8px 10px',
         borderRadius: '8px',
-        color: 'rgba(232,245,235,0.5)',
         cursor: 'pointer',
-        padding: '8px',
+        textAlign: 'left',
+        fontFamily: 'inherit',
+    },
+    avatarInitial: {
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#6EC97E',
+        width: '20px',
+        height: '20px',
+        borderRadius: '50%',
+        background: 'rgba(110,201,126,0.1)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transition: 'color 0.15s, background 0.15s',
         flexShrink: 0,
-    },
+    } as React.CSSProperties,
     fab: {
         position: 'fixed',
         bottom: '28px',
         right: '28px',
-        width: '56px',
-        height: '56px',
+        width: '52px',
+        height: '52px',
         borderRadius: '50%',
-        background: 'linear-gradient(135deg, #6EC97E, #4da85e)',
+        background: '#2563EB',
         border: 'none',
-        color: '#0d1511',
+        color: '#FFFFFF',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         cursor: 'pointer',
-        boxShadow: '0 4px 20px rgba(110,201,126,0.35)',
+        boxShadow: '0 4px 20px rgba(37,99,235,0.35)',
         transition: 'transform 0.15s, box-shadow 0.15s',
         zIndex: 200,
         fontSize: '0',
-    },
-    badgePrivate: {
-        background: 'rgba(255,255,255,0.05)',
-        color: 'rgba(232,245,235,0.4)',
-    },
-    badgeRole: {
-        background: 'rgba(99,102,241,0.15)',
-        color: '#a5b4fc',
-    },
-    badgeOwner: {
-        background: 'rgba(245,158,11,0.12)',
-        color: '#fcd34d',
-    },
-    ownerLine: {
-        display: 'flex',
-        alignItems: 'center',
-        fontSize: '11px',
-        color: 'rgba(232,245,235,0.4)',
-        margin: 0,
-    },
-    cardFooter: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginTop: '4px',
-        gap: '8px',
-    },
-    dateText: {
-        display: 'flex',
-        alignItems: 'center',
-        fontSize: '11px',
-        color: 'rgba(232,245,235,0.3)',
-        gap: '3px',
-    },
-    actionRow: {
-        display: 'flex',
-        gap: '4px',
-    },
-    actionBtn: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'transparent',
-        border: 'none',
-        color: 'rgba(232,245,235,0.4)',
-        cursor: 'pointer',
-        padding: '5px',
-        borderRadius: '5px',
-        transition: 'background 0.12s, color 0.12s',
-        fontSize: '12px',
-        minWidth: '24px',
-        height: '24px',
     },
 };
