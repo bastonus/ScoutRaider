@@ -108,9 +108,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         setIsGuest(false);
                         setCloudSyncStatus('saved');
                     } else {
-                        setUser(null);
-                        setIsGuest(true);
-                        setCloudSyncStatus('guest');
+                        // profile is null — check if token was cleared (auth failure)
+                        // or just a network/server error (keep session using local decode)
+                        const stillHasToken = !!CloudAuthService.getToken();
+                        if (stillHasToken) {
+                            // Server unreachable but token still valid — stay logged in
+                            const local = CloudAuthService.decodeTokenLocally();
+                            if (local) {
+                                setUser(local);
+                                setIsGuest(false);
+                                setCloudSyncStatus('idle');
+                            } else {
+                                // Token expired or corrupt
+                                setUser(null);
+                                setIsGuest(true);
+                                setCloudSyncStatus('guest');
+                            }
+                        } else {
+                            // Token was cleared by logout() inside getMe() — auth failure
+                            setUser(null);
+                            setIsGuest(true);
+                            setCloudSyncStatus('guest');
+                        }
                     }
                 }
             } else {
