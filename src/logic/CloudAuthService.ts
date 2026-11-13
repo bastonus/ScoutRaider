@@ -158,13 +158,39 @@ export class CloudAuthService {
             });
             if (!res.ok) {
                 if (res.status === 401 || res.status === 404) {
-                    // Token invalid or user no longer exists — clear session
+                    // Token explicitly rejected by server — clear session
                     this.logout();
+                    return null;
                 }
-                return null;
+                // 5xx or other error — network/server issue, keep token, fall through to local decode
+                return this.decodeTokenLocally();
             }
             const data = await res.json();
             return data.user;
+        } catch {
+            // Network error (offline, timeout, etc.) — don't log out, use local JWT decode
+            return this.decodeTokenLocally();
+        }
+    }
+
+    /** Decode JWT payload locally (no signature verification) — for offline fallback only. */
+    static decodeTokenLocally(): UserProfile | null {
+        const token = this.getToken();
+        if (!token) return null;
+        try {
+            const parts = token.split('.');
+            if (parts.length !== 3) return null;
+            const payload = JSON.parse(atob(parts[1]));
+            // Check expiry
+            if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+                this.logout();
+                return null;
+            }
+            return {
+                id: payload.sub,
+                username: payload.username,
+                email: payload.email || null,
+            };
         } catch {
             return null;
         }
