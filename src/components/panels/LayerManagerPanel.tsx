@@ -404,6 +404,18 @@ export default function LayerManagerPanel() {
         ]});
     };
 
+    const openTextCtx = (e: React.MouseEvent, text: TextAnnotation) => {
+        e.preventDefault(); e.stopPropagation();
+        setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+            { icon: <Pencil size={13} />, label: 'Renommer', shortcut: 'F2', onClick: () => setRenamingId(text.id) },
+            { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: text.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: text.color, onPick: c => dispatch({ type: 'UPDATE_TEXT_ANNOTATION', id: text.id, patch: { color: c } } as any) }) },
+            { separator: true },
+            { icon: <Eye size={13} />, label: text.visible ? 'Masquer' : 'Afficher', shortcut: 'Espace', onClick: () => dispatch({ type: 'TOGGLE_TEXT_VISIBILITY', id: text.id } as any) },
+            { separator: true },
+            { icon: <Trash2 size={13} />, label: 'Supprimer', shortcut: 'Suppr', danger: true, onClick: () => dispatch({ type: 'REMOVE_TEXT_ANNOTATION', id: text.id } as any) },
+        ]});
+    };
+
     // ── Render one item ───────────────────────────────────────────────
     const renderItem = (item: OrderItem, idx: number) => {
         const isDraggingOver = dropOver === idx;
@@ -587,10 +599,108 @@ export default function LayerManagerPanel() {
             );
         }
 
+        if (item.kind === 'text') {
+            const text = texts.find(t => t.id === item.id);
+            if (!text) return null;
+            const isRenaming = renamingId === text.id;
+            const isExpanded = expandedTextIds.has(text.id);
+            const textItems = text.texts || [];
+            const toggleExpand = (e: React.MouseEvent) => {
+                e.stopPropagation();
+                setExpandedTextIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(text.id)) next.delete(text.id);
+                    else next.add(text.id);
+                    return next;
+                });
+            };
+
+            return (
+                <div key={item.id} style={wrapStyle} {...dragProps}>
+                    <LayerRow icon={<Type size={12} />} label={text.title}
+                        sublabel={`${textItems.length} texte${textItems.length !== 1 ? 's' : ''}`}
+                        color={text.color} visible={text.visible}
+                        isEditing={isRenaming} isSelected={isSelected && !selectedSublayerId}
+                        expandToggle={textItems.length > 0 ? (
+                            <button
+                                type="button"
+                                onClick={toggleExpand}
+                                style={{ background: 'transparent', border: 'none', padding: '0 2px', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center' }}
+                            >
+                                {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                            </button>
+                        ) : undefined}
+                        onToggleVisible={() => dispatch({ type: 'TOGGLE_TEXT_VISIBILITY', id: text.id } as any)}
+                        onContextMenu={e => openTextCtx(e, text)}
+                        dragHandleProps={{}}
+                        renameSlot={<InlineRename value={text.title} onConfirm={v => { dispatch({ type: 'UPDATE_TEXT_ANNOTATION', id: text.id, patch: { title: v } } as any); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
+                    />
+                    {/* ── Sub-text item list ── */}
+                    {isExpanded && textItems.length > 0 && (
+                        <div style={{ marginLeft: '22px', borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                            {textItems.map((tItem, tIdx) => {
+                                const isSubSelected = isSelected && selectedSublayerId === tItem.id;
+                                return (
+                                    <div
+                                        key={tItem.id}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            dispatch({ type: 'SET_SELECTED_SUBLAYER', layerId: text.id, sublayerId: tItem.id });
+                                        }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '7px',
+                                            padding: '4px 8px 4px 10px',
+                                            background: isSubSelected ? 'rgba(45,140,235,0.14)' : 'transparent',
+                                            borderLeft: isSubSelected ? '2px solid #2d8ceb' : '2px solid transparent',
+                                            cursor: 'pointer',
+                                            transition: 'background 0.1s',
+                                        }}
+                                        onMouseEnter={e => { if (!isSubSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                        onMouseLeave={e => { if (!isSubSelected) e.currentTarget.style.background = 'transparent'; }}
+                                    >
+                                        <div
+                                            title="Changer la couleur"
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setColorPicker({
+                                                    x: e.clientX, y: e.clientY,
+                                                    currentColor: tItem.color,
+                                                    onPick: (c) => dispatch({ type: 'UPDATE_TEXT_ITEM', textId: text.id, itemId: tItem.id, patch: { color: c } } as any)
+                                                });
+                                            }}
+                                            style={{ width: '8px', height: '8px', borderRadius: '2px', background: tItem.color, flexShrink: 0, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.25)' }}
+                                        />
+                                        <span style={{ fontSize: '11px', color: isSubSelected ? '#fff' : 'var(--text-bright)', flex: 1, fontWeight: isSubSelected ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {tItem.text || `Texte ${tIdx + 1}`}
+                                        </span>
+                                        <span style={{ fontSize: '10px', color: 'var(--text-dim)', padding: '1px 4px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
+                                            {tItem.fontSize}px
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={e => { e.stopPropagation(); dispatch({ type: 'REMOVE_TEXT_ITEM', textId: text.id, itemId: tItem.id } as any); }}
+                                            title="Supprimer ce texte"
+                                            style={{ background: 'transparent', border: 'none', padding: '1px 3px', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', borderRadius: '3px' }}
+                                            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                                            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+                                        >
+                                            <Trash2 size={11} />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         return null;
     };
 
-    const isEmpty = itineraries.length === 0 && points.length === 0 && areas.length === 0 && draws.length === 0;
+    const isEmpty = itineraries.length === 0 && points.length === 0 && areas.length === 0 && draws.length === 0 && texts.length === 0;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-panel)', userSelect: 'none', fontSize: '12px', color: 'var(--text-primary)' }}>
@@ -639,6 +749,12 @@ export default function LayerManagerPanel() {
                     title="Activer l'outil Dessin (B)"
                     style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: state.active_tool === 'annotate_draw' ? '#f59e0b' : 'rgba(245,158,11,0.1)', border: `1px solid ${state.active_tool === 'annotate_draw' ? '#f59e0b' : 'rgba(245,158,11,0.22)'}`, color: state.active_tool === 'annotate_draw' ? '#fff' : '#fcd34d', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
                     <Paintbrush size={15} />Dessin
+                </button>
+                <button type="button"
+                    onClick={() => { dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_text' }); dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour placer un texte.', notifType: 'info' }); }}
+                    title="Activer l'outil Texte (T)"
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: state.active_tool === 'annotate_text' ? '#38bdf8' : 'rgba(56,189,248,0.1)', border: `1px solid ${state.active_tool === 'annotate_text' ? '#38bdf8' : 'rgba(56,189,248,0.22)'}`, color: state.active_tool === 'annotate_text' ? '#fff' : '#7dd3fc', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
+                    <Type size={15} />Texte
                 </button>
             </div>
 
