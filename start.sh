@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 echo "==> Starting ScoutRaider FastAPI Backend Engine..."
@@ -9,5 +9,5 @@ echo "==> Starting Nginx HTTP Gateway on port 80..."
 nginx -g "daemon off;" &
 NGINX_PID=$!
 
-# Exit when either process exits
+# Exit when either process exits (requires bash >= 4.3)
 wait -n $BACKEND_PID $NGINX_PID
