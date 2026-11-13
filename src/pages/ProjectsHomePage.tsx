@@ -177,7 +177,9 @@ export default function ProjectsHomePage() {
                         <div style={s.logoIconWrap}>
                             <FleurDeLysLogo size={28} color="#6EC97E" />
                         </div>
-                        <span style={s.logoText}>ScoutRaider</span>
+                        <span>
+                            <span style={s.logoTextScout}>Scout</span><span style={s.logoTextRaider}>Raider</span>
+                        </span>
                     </div>
 
                     {/* Search */}
@@ -296,7 +298,7 @@ export default function ProjectsHomePage() {
                 {/* Loading */}
                 {loadingProjects && (
                     <div style={s.loadingRow}>
-                        <Loader2 size={22} style={{ animation: 'spin 0.8s linear infinite', color: '#6EC97E' }} />
+                        <Loader2 size={22} style={{ animation: 'spin 0.8s linear infinite', color: '#2563EB' }} />
                         <span style={{ color: 'rgba(232,245,235,0.4)', fontSize: '14px' }}>Chargement…</span>
                     </div>
                 )}
@@ -304,14 +306,14 @@ export default function ProjectsHomePage() {
                 {/* Guest placeholder */}
                 {isGuest && !loadingProjects && (
                     <div style={s.emptyState}>
-                        <FolderOpen size={48} style={{ color: 'rgba(110,201,126,0.3)', marginBottom: '12px' }} />
+                        <FolderOpen size={48} style={{ color: '#3F3F46', marginBottom: '12px' }} />
                         <p style={s.emptyTitle}>Mode invité — projets locaux uniquement</p>
                         <p style={s.emptyHint}>Vos projets ne sont pas sauvegardés sur le cloud. Connectez-vous pour activer la synchronisation.</p>
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
                             <button style={s.newBtn} onClick={handleNewProject}>
                                 <Plus size={16} /> Nouveau projet
                             </button>
-                            <button style={{ ...s.newBtn, background: 'transparent', border: '1px solid rgba(110,201,126,0.3)', color: '#6EC97E', boxShadow: 'none' }} onClick={handleGuestLogin}>
+                            <button style={{ ...s.newBtn, background: 'transparent', border: '1px solid #27272A', color: '#71717A', boxShadow: 'none' }} onClick={handleGuestLogin}>
                                 <User size={16} /> Se connecter
                             </button>
                         </div>
@@ -321,7 +323,7 @@ export default function ProjectsHomePage() {
                 {/* Empty state */}
                 {!isGuest && !loadingProjects && filteredProjects.length === 0 && (
                     <div style={s.emptyState}>
-                        <FileText size={48} style={{ color: 'rgba(110,201,126,0.3)', marginBottom: '12px' }} />
+                        <FileText size={48} style={{ color: '#3F3F46', marginBottom: '12px' }} />
                         <p style={s.emptyTitle}>
                             {search ? `Aucun résultat pour "${search}"` : 'Aucun projet pour le moment'}
                         </p>
@@ -373,10 +375,10 @@ export default function ProjectsHomePage() {
             <style>{`
                 @keyframes spin { to { transform: rotate(360deg); } }
                 @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-                .project-card:hover { transform: translateY(-2px); border-color: rgba(110,201,126,0.35) !important; }
-                .action-btn:hover { background: rgba(110,201,126,0.12) !important; color: #6EC97E !important; }
-                .delete-btn:hover { background: rgba(239,68,68,0.12) !important; color: #fca5a5 !important; }
-                .fab-btn:hover { transform: scale(1.08) !important; box-shadow: 0 8px 32px rgba(110,201,126,0.4) !important; }
+                .project-card:hover { transform: translateY(-1px); border-color: #3F3F46 !important; }
+                .action-btn:hover { background: #27272A !important; color: #FAFAFA !important; }
+                .delete-btn:hover { background: rgba(239,68,68,0.1) !important; color: #FCA5A5 !important; }
+                .fab-btn:hover { transform: scale(1.06) !important; box-shadow: 0 8px 24px rgba(37,99,235,0.4) !important; }
             `}</style>
         </div>
     );
@@ -467,15 +469,15 @@ function ProjectCard({ project: p, onOpen, onCopyLink, onDelete, copied }: CardP
 const s: Record<string, React.CSSProperties> = {
     page: {
         minHeight: '100vh',
-        background: '#0d1511',
-        color: '#e8f5eb',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        background: '#09090B',
+        color: '#FAFAFA',
+        fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif",
         display: 'flex',
         flexDirection: 'column',
     },
     topBar: {
-        background: '#141E18',
-        borderBottom: '1px solid rgba(110,201,126,0.12)',
+        background: '#121215',
+        borderBottom: '1px solid #27272A',
         position: 'sticky',
         top: 0,
         zIndex: 100,
@@ -486,29 +488,34 @@ const s: Record<string, React.CSSProperties> = {
         display: 'flex',
         alignItems: 'center',
         gap: '16px',
-        padding: '12px 24px',
+        padding: '10px 24px',
     },
     logoArea: {
         display: 'flex',
         alignItems: 'center',
-        gap: '10px',
+        gap: '8px',
         flexShrink: 0,
     },
     logoIconWrap: {
-        width: '36px',
-        height: '36px',
-        background: 'rgba(110,201,126,0.1)',
+        width: '32px',
+        height: '32px',
+        background: 'rgba(110,201,126,0.08)',
         borderRadius: '8px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        border: '1px solid rgba(110,201,126,0.18)',
+        border: '1px solid #27272A',
     },
     logoText: {
         fontWeight: 700,
-        fontSize: '18px',
-        color: '#e8f5eb',
+        fontSize: '16px',
         letterSpacing: '-0.3px',
+    },
+    logoTextScout: {
+        color: '#52525B',
+    },
+    logoTextRaider: {
+        color: '#6EC97E',
     },
     searchWrap: {
         flex: 1,
@@ -520,52 +527,55 @@ const s: Record<string, React.CSSProperties> = {
     searchIcon: {
         position: 'absolute',
         left: '12px',
-        color: 'rgba(232,245,235,0.35)',
+        color: '#52525B',
         pointerEvents: 'none',
     } as any,
     searchInput: {
         width: '100%',
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(110,201,126,0.15)',
-        borderRadius: '8px',
-        padding: '9px 12px 9px 36px',
-        color: '#e8f5eb',
-        fontSize: '14px',
+        background: '#1C1C21',
+        border: '1px solid #27272A',
+        borderRadius: '10px',
+        padding: '8px 12px 8px 36px',
+        color: '#FAFAFA',
+        fontSize: '13px',
         outline: 'none',
         boxSizing: 'border-box',
+        fontFamily: 'inherit',
+        transition: 'border-color 120ms ease',
     },
     userArea: {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
         cursor: 'pointer',
-        padding: '6px 10px',
-        borderRadius: '8px',
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(110,201,126,0.12)',
+        padding: '5px 10px',
+        borderRadius: '10px',
+        background: '#1C1C21',
+        border: '1px solid #27272A',
         position: 'relative',
         flexShrink: 0,
         userSelect: 'none',
+        transition: 'border-color 120ms ease',
     },
     avatar: {
-        width: '28px',
-        height: '28px',
+        width: '26px',
+        height: '26px',
         borderRadius: '50%',
-        background: 'rgba(110,201,126,0.15)',
+        background: '#27272A',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        border: '1px solid rgba(110,201,126,0.25)',
+        border: '1px solid #3F3F46',
     },
     avatarInitial: {
-        fontSize: '13px',
+        fontSize: '12px',
         fontWeight: 700,
         color: '#6EC97E',
     },
     userName: {
         fontSize: '13px',
         fontWeight: 500,
-        color: 'rgba(232,245,235,0.8)',
+        color: '#D4D4D8',
         maxWidth: '120px',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -575,12 +585,12 @@ const s: Record<string, React.CSSProperties> = {
         position: 'absolute',
         top: 'calc(100% + 6px)',
         right: 0,
-        background: '#1a2820',
-        border: '1px solid rgba(110,201,126,0.2)',
-        borderRadius: '10px',
-        padding: '6px',
+        background: '#1C1C21',
+        border: '1px solid #27272A',
+        borderRadius: '12px',
+        padding: '4px',
         minWidth: '160px',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.85)',
         animation: 'fadeIn 0.15s ease',
         zIndex: 200,
     },
@@ -591,12 +601,14 @@ const s: Record<string, React.CSSProperties> = {
         width: '100%',
         background: 'transparent',
         border: 'none',
-        color: 'rgba(232,245,235,0.75)',
+        color: '#A1A1AA',
         fontSize: '13px',
         padding: '8px 10px',
-        borderRadius: '6px',
+        borderRadius: '8px',
         cursor: 'pointer',
         textAlign: 'left',
+        fontFamily: 'inherit',
+        transition: 'background 120ms ease, color 120ms ease',
     },
     overlay: {
         position: 'fixed',
@@ -620,40 +632,42 @@ const s: Record<string, React.CSSProperties> = {
     },
     greeting: {
         margin: 0,
-        fontSize: 'clamp(20px, 4vw, 28px)',
+        fontSize: 'clamp(20px, 4vw, 26px)',
         fontWeight: 700,
-        color: '#e8f5eb',
-        letterSpacing: '-0.3px',
+        color: '#FAFAFA',
+        letterSpacing: '-0.4px',
     },
     guestHint: {
         margin: '6px 0 0',
-        fontSize: '14px',
-        color: 'rgba(232,245,235,0.4)',
+        fontSize: '13px',
+        color: '#52525B',
     },
     guestLoginLink: {
         background: 'none',
         border: 'none',
-        color: '#6EC97E',
+        color: '#2563EB',
         cursor: 'pointer',
-        fontSize: '14px',
+        fontSize: '13px',
         padding: 0,
         textDecoration: 'underline',
+        fontFamily: 'inherit',
     },
     newBtn: {
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        background: 'linear-gradient(135deg, #6EC97E, #4da85e)',
-        color: '#0d1511',
+        gap: '7px',
+        background: '#2563EB',
+        color: '#FFFFFF',
         border: 'none',
         borderRadius: '10px',
-        padding: '10px 20px',
-        fontSize: '14px',
+        padding: '9px 18px',
+        fontSize: '13px',
         fontWeight: 700,
         cursor: 'pointer',
         flexShrink: 0,
-        boxShadow: '0 4px 16px rgba(110,201,126,0.25)',
-        transition: 'opacity 0.15s, transform 0.1s',
+        boxShadow: '0 2px 8px rgba(37,99,235,0.3)',
+        transition: 'background 120ms ease',
+        fontFamily: 'inherit',
     },
     tabRow: {
         display: 'flex',
@@ -666,44 +680,47 @@ const s: Record<string, React.CSSProperties> = {
         alignItems: 'center',
         gap: '6px',
         background: 'transparent',
-        border: '1px solid rgba(110,201,126,0.12)',
-        color: 'rgba(232,245,235,0.5)',
+        border: '1px solid #27272A',
+        color: '#52525B',
         borderRadius: '8px',
-        padding: '7px 16px',
+        padding: '6px 14px',
         fontSize: '13px',
         fontWeight: 500,
         cursor: 'pointer',
-        transition: 'all 0.15s',
+        transition: 'all 120ms ease',
+        fontFamily: 'inherit',
     },
     tabBtnActive: {
-        background: 'rgba(110,201,126,0.1)',
-        border: '1px solid rgba(110,201,126,0.3)',
-        color: '#6EC97E',
+        background: '#1C1C21',
+        border: '1px solid #3F3F46',
+        color: '#FAFAFA',
+        fontWeight: 600,
     },
     tabCount: {
-        background: 'rgba(110,201,126,0.15)',
-        color: '#6EC97E',
-        fontSize: '11px',
+        background: '#27272A',
+        color: '#71717A',
+        fontSize: '10px',
         fontWeight: 700,
         borderRadius: '20px',
         padding: '1px 7px',
+        fontFamily: "'JetBrains Mono', monospace",
     },
     errorBox: {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        background: 'rgba(239,68,68,0.1)',
-        border: '1px solid rgba(239,68,68,0.25)',
-        borderRadius: '8px',
+        background: 'rgba(239,68,68,0.08)',
+        border: '1px solid rgba(239,68,68,0.2)',
+        borderRadius: '10px',
         padding: '10px 14px',
-        color: '#fca5a5',
+        color: '#FCA5A5',
         fontSize: '13px',
         marginBottom: '20px',
     },
     errorClose: {
         background: 'none',
         border: 'none',
-        color: '#fca5a5',
+        color: '#FCA5A5',
         cursor: 'pointer',
         fontSize: '14px',
         padding: '0 4px',
@@ -725,25 +742,25 @@ const s: Record<string, React.CSSProperties> = {
         gap: '8px',
     },
     emptyTitle: {
-        fontSize: '18px',
+        fontSize: '16px',
         fontWeight: 600,
-        color: 'rgba(232,245,235,0.6)',
+        color: '#52525B',
         margin: 0,
     },
     emptyHint: {
-        fontSize: '14px',
-        color: 'rgba(232,245,235,0.3)',
+        fontSize: '13px',
+        color: '#3F3F46',
         marginBottom: '16px',
     },
     grid: {
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-        gap: '16px',
+        gap: '12px',
         animation: 'fadeIn 0.2s ease',
     },
     card: {
-        background: '#141E18',
-        border: '1px solid rgba(110,201,126,0.15)',
+        background: '#121215',
+        border: '1px solid #27272A',
         borderRadius: '12px',
         overflow: 'hidden',
         cursor: 'pointer',
@@ -752,12 +769,12 @@ const s: Record<string, React.CSSProperties> = {
         flexDirection: 'column',
     },
     cardPreview: {
-        height: '80px',
-        background: 'rgba(110,201,126,0.04)',
+        height: '72px',
+        background: '#1C1C21',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderBottom: '1px solid rgba(110,201,126,0.08)',
+        borderBottom: '1px solid #27272A',
     },
     cardBody: {
         padding: '12px 14px',
@@ -772,9 +789,9 @@ const s: Record<string, React.CSSProperties> = {
         gap: '6px',
     },
     cardTitle: {
-        fontSize: '14px',
+        fontSize: '13px',
         fontWeight: 600,
-        color: '#e8f5eb',
+        color: '#FAFAFA',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
@@ -795,8 +812,93 @@ const s: Record<string, React.CSSProperties> = {
         padding: '2px 6px',
     },
     badgePublic: {
-        background: 'rgba(110,201,126,0.12)',
+        background: 'rgba(110,201,126,0.08)',
         color: '#6EC97E',
+    },
+    badgePrivate: {
+        background: '#1C1C21',
+        color: '#52525B',
+    },
+    badgeRole: {
+        background: 'rgba(99,102,241,0.1)',
+        color: '#A5B4FC',
+    },
+    badgeOwner: {
+        background: 'rgba(245,158,11,0.08)',
+        color: '#FCD34D',
+    },
+    ownerLine: {
+        display: 'flex',
+        alignItems: 'center',
+        fontSize: '11px',
+        color: '#52525B',
+        margin: 0,
+    },
+    cardFooter: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: '4px',
+        gap: '8px',
+    },
+    dateText: {
+        display: 'flex',
+        alignItems: 'center',
+        fontSize: '11px',
+        color: '#3F3F46',
+        gap: '3px',
+        fontFamily: "'JetBrains Mono', monospace",
+    },
+    actionRow: {
+        display: 'flex',
+        gap: '4px',
+    },
+    actionBtn: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'transparent',
+        border: 'none',
+        color: '#52525B',
+        cursor: 'pointer',
+        padding: '5px',
+        borderRadius: '5px',
+        transition: 'background 120ms ease, color 120ms ease',
+        fontSize: '12px',
+        minWidth: '24px',
+        height: '24px',
+    },
+    refreshBtn: {
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(110,201,126,0.15)',
+        borderRadius: '8px',
+        color: 'rgba(232,245,235,0.5)',
+        cursor: 'pointer',
+        padding: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'color 0.15s, background 0.15s',
+        flexShrink: 0,
+    },
+    fab: {
+        position: 'fixed',
+        bottom: '28px',
+        right: '28px',
+        width: '56px',
+        height: '56px',
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, #6EC97E, #4da85e)',
+        border: 'none',
+        color: '#0d1511',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 4px 20px rgba(110,201,126,0.35)',
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        zIndex: 200,
+        fontSize: '0',
     },
     badgePrivate: {
         background: 'rgba(255,255,255,0.05)',
@@ -849,37 +951,5 @@ const s: Record<string, React.CSSProperties> = {
         fontSize: '12px',
         minWidth: '24px',
         height: '24px',
-    },
-    refreshBtn: {
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(110,201,126,0.15)',
-        borderRadius: '8px',
-        color: 'rgba(232,245,235,0.5)',
-        cursor: 'pointer',
-        padding: '8px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transition: 'color 0.15s, background 0.15s',
-        flexShrink: 0,
-    },
-    fab: {
-        position: 'fixed',
-        bottom: '28px',
-        right: '28px',
-        width: '56px',
-        height: '56px',
-        borderRadius: '50%',
-        background: 'linear-gradient(135deg, #6EC97E, #4da85e)',
-        border: 'none',
-        color: '#0d1511',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        boxShadow: '0 4px 20px rgba(110,201,126,0.35)',
-        transition: 'transform 0.15s, box-shadow 0.15s',
-        zIndex: 200,
-        fontSize: '0',
     },
 };
