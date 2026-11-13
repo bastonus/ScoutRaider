@@ -1,5 +1,5 @@
 node_modules
-dist
+# dist/ is now committed and must be included in Docker build context
 dist_electron
 build
 build_output.txt
