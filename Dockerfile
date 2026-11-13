@@ -11,7 +11,11 @@ WORKDIR /app
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 
 COPY package*.json ./
-RUN npm ci || npm install --no-audit --no-fund
+# Use npm install directly — more resilient to lockfile drift and network hiccups
+# Retry up to 3 times on network failure
+RUN npm install --no-audit --no-fund --prefer-offline || \
+    npm install --no-audit --no-fund --prefer-offline || \
+    npm install --no-audit --no-fund
 
 COPY . .
 RUN npm run build
