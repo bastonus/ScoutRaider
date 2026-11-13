@@ -122,9 +122,9 @@ export default function TextualHeader({ onExport }: TextualHeaderProps) {
             justifyContent: 'space-between',
             gap: '8px',
             width: '100%',
-            overflowX: 'auto',
-            scrollbarWidth: 'none',
+            overflow: 'visible',
             userSelect: 'none',
+            position: 'relative',
         }}>
             {/* ═══ SECTION 1 (GAUCHE): MODE DE CARNET (PARTICIPANT / SOLUTION) ═══ */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>

@@ -335,12 +335,15 @@ function App() {
           {isTextMode || isSplitMode ? (
             <div style={{
               display: 'flex', alignItems: 'center',
-              padding: '0 12px',
+              padding: '0 8px',
               height: '40px',
               background: 'var(--bg-dark)',
               borderBottom: '1px solid var(--border-subtle)',
-              flexShrink: 0, zIndex: 900,
-              gap: '10px'
+              flexShrink: 0,
+              zIndex: 1000,
+              overflow: 'visible',
+              gap: '8px',
+              position: 'relative',
             }}>
               <button
                 onClick={() => toggleSidebar('left')}
@@ -360,7 +363,7 @@ function App() {
                 {leftSidebarOpen ? <PanelLeftClose size={15} strokeWidth={2} /> : <PanelLeftOpen size={15} strokeWidth={2} />}
               </button>
               
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'visible' }}>
                 <TextualHeader onExport={handleExportRequest} />
               </div>
 
