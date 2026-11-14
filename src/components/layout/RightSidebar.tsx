@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronRight, ChevronDown, Store } from 'lucide-react';
 import DifficultyLibrary from '../panels/DifficultyLibrary';
 import ThemePanel from '../panels/ThemePanel';
 import LibraryPanel from '../panels/LibraryPanel';
@@ -55,10 +55,11 @@ interface RightSidebarProps {
   activeSection: SectionId;
   onSectionChange: (id: SectionId) => void;
   onPreferencesOpen?: () => void;
+  onMarketplaceOpen?: () => void;
   width: number | string;
 }
 
-export default function RightSidebar({ activeSection, onSectionChange, onPreferencesOpen, width }: RightSidebarProps) {
+export default function RightSidebar({ activeSection, onSectionChange, onPreferencesOpen, onMarketplaceOpen, width }: RightSidebarProps) {
   const toggle = (id: SectionId) => {
     onSectionChange(id);
   };
@@ -81,6 +82,34 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
           display: none !important;
         }
       `}</style>
+
+      {/* Fast Marketplace Trigger */}
+      {onMarketplaceOpen && (
+        <div style={{ padding: '8px', borderBottom: '1px solid var(--bg-border)' }}>
+          <button
+            onClick={onMarketplaceOpen}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '7px 12px',
+              background: 'linear-gradient(135deg, rgba(110,201,126,0.15), rgba(14,165,233,0.15))',
+              border: '1px solid rgba(110,201,126,0.3)',
+              borderRadius: '6px',
+              color: 'var(--accent-default, #6EC97E)',
+              fontSize: '11.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Store size={14} />
+            <span>Marketplace des Modules</span>
+          </button>
+        </div>
+      )}
       
       <AccordionSection 
         title="Calques" 
@@ -91,7 +120,7 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
       </AccordionSection>
 
       <AccordionSection 
-        title="Orchestration Automatique" 
+        title="Orchestrations" 
         isOpen={activeSection === 'orchestration'} 
         onToggle={() => toggle('orchestration')}
       >
@@ -99,7 +128,7 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
       </AccordionSection>
 
       <AccordionSection 
-        title="Bibliothèque de Thèmes" 
+        title="Thèmes" 
         isOpen={activeSection === 'themes'} 
         onToggle={() => toggle('themes')}
       >
@@ -107,7 +136,7 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
       </AccordionSection>
 
       <AccordionSection 
-        title="Bibliothèque de Modules" 
+        title="Codes & Énigmes" 
         isOpen={activeSection === 'modules'} 
         onToggle={() => toggle('modules')}
       >
@@ -115,7 +144,7 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
       </AccordionSection>
 
       <AccordionSection 
-        title="Bibliothèque de Cartes" 
+        title="Fonds de carte" 
         isOpen={activeSection === 'maps'} 
         onToggle={() => toggle('maps')}
       >

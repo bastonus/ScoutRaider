@@ -207,11 +207,13 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         boxShadow: 'none',
     });
 
+    const isMobileOrTablet = typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
+
     return (
         <div ref={containerRef} id="top-left-container" style={{
             position: 'absolute',
             top: '16px',
-            left: isSplitMode ? '16px' : '68px',
+            left: (isSplitMode || isMobileOrTablet) ? '16px' : '68px',
             zIndex: 1100,
             display: 'flex',
             gap: '8px',

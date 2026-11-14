@@ -11,7 +11,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     PYTHONPATH=/app \
-    USE_SQLITE=true \
     DATABASE_URL="postgres://postgres:F1VvmCz2cibxD9al/p9Rw+GjCuH0xLkkm8ksDYCe5lc=@dqitb10gzxtpiejn4kj3ub9b:5432/postgres"
 
 # Install system dependencies (WeasyPrint, fonts, Nginx, curl)

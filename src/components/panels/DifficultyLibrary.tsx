@@ -44,9 +44,9 @@ export default function DifficultyLibrary() {
   return (
     <>
       <LibraryBase 
-        title="Encodage Automatique" 
+        title="Orchestrations" 
         items={presets} 
-        addItemLabel="Nouveau Preset"
+        addItemLabel="Nouvelle règle"
         activeItemId={state.active_preset_id}
         onItemClick={handleSelect}
         onEditClick={() => setEditorOpen(true)}

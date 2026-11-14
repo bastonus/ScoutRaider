@@ -9,7 +9,7 @@ from .models import PresetConfig
 BUILTIN_PRESETS: Dict[str, PresetConfig] = {
     "arret_de_promesse_1": PresetConfig(
         id="arret_de_promesse_1",
-        name="Raid de Promesse (Niveau 1 - Débutant)",
+        name="Débutant (Niveau 1)",
         description="Parcours accessible, forte proportion de texte en clair et initiation légère au Morse.",
         weights={
             "texte_clair": 80.0,
@@ -31,7 +31,7 @@ BUILTIN_PRESETS: Dict[str, PresetConfig] = {
     ),
     "seconde_classe_1": PresetConfig(
         id="seconde_classe_1",
-        name="Seconde Classe (Niveau 2 - Intermédiaire)",
+        name="Intermédiaire (Niveau 2)",
         description="Introduction de la lecture de carte et des techniques visuelles.",
         weights={
             "texte_clair": 35.0,
@@ -55,7 +55,7 @@ BUILTIN_PRESETS: Dict[str, PresetConfig] = {
     ),
     "premiere_classe_1": PresetConfig(
         id="premiere_classe_1",
-        name="Première Classe (Niveau 3 - Avancé)",
+        name="Avancé (Niveau 3)",
         description="Diversité cryptographique riche (Polybe, Templier, Avocat, Cassis, Morse, Carte Simple).",
         weights={
             "texte_clair": 10.0,
@@ -78,7 +78,7 @@ BUILTIN_PRESETS: Dict[str, PresetConfig] = {
     ),
     "raider_1": PresetConfig(
         id="raider_1",
-        name="Raider (Niveau 4 - Expert)",
+        name="Expert (Niveau 4)",
         description="Orientation poussée avec Vigenère plafonné, signaux maritimes, carte simple et carte IGN.",
         weights={
             "carte_simple": 25.0,

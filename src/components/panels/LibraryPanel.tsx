@@ -35,9 +35,9 @@ export default function LibraryPanel() {
   return (
     <>
       <LibraryBase 
-        title="Modules" 
+        title="Codes & Énigmes" 
         items={modules} 
-        addItemLabel="Nouveau Module"
+        addItemLabel="Nouveau code"
         activeItemId={activeModule}
         onItemClick={(item) => setActiveModule(item.id)}
         onEditClick={() => setEditorOpen(true)}

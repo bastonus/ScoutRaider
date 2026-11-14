@@ -10,6 +10,7 @@ import PreferencesModal from './components/panels/PreferencesModal';
 import AuthModal from './components/panels/AuthModal';
 import ProjectsDashboardModal from './components/panels/ProjectsDashboardModal';
 import ShareModal from './components/panels/ShareModal';
+import MarketplaceModal from './components/panels/MarketplaceModal';
 import CommandPalette from './components/layout/CommandPalette';
 import { 
   PanelLeftClose, 
@@ -38,6 +39,7 @@ function App() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [marketplaceModalOpen, setMarketplaceModalOpen] = useState(false);
   const { 
     authModalOpen, 
     setAuthModalOpen, 
@@ -154,6 +156,18 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault();
         setPreferencesModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+
+  // Global Ctrl+M (Marketplace)
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        setMarketplaceModalOpen(true);
       }
     };
     window.addEventListener('keydown', h);
@@ -302,6 +316,7 @@ function App() {
         onPreferencesOpen={() => setPreferencesModalOpen(true)}
         onSetRightSection={setActiveRightSection}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+        onOpenMarketplace={() => setMarketplaceModalOpen(true)}
       />
       
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
@@ -385,7 +400,7 @@ function App() {
                 {rightSidebarOpen ? <PanelRightClose size={15} strokeWidth={2} /> : <PanelRightOpen size={15} strokeWidth={2} />}
               </button>
             </div>
-          ) : (
+          ) : !isMobileOrTablet ? (
             <>
               <button
                 onClick={() => toggleSidebar('left')}
@@ -423,7 +438,7 @@ function App() {
                 {rightSidebarOpen ? <PanelRightClose size={18} strokeWidth={2} /> : <PanelRightOpen size={18} strokeWidth={2} />}
               </button>
             </>
-          )}
+          ) : null}
 
           <ProjectWorkspace onExport={handleExportRequest} viewMode={viewMode} />
         </div>
@@ -436,7 +451,7 @@ function App() {
               onMouseDown={(e) => { e.preventDefault(); rightResizing.current = true; document.body.style.cursor = 'col-resize'; }}
               style={{ width: '4px', cursor: 'col-resize', background: 'var(--bg-border)', zIndex: 10, marginLeft: '-2px', marginRight: '-2px' }}
             />
-            <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} width={rightWidth} />
+            <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} onMarketplaceOpen={() => setMarketplaceModalOpen(true)} width={rightWidth} />
           </>
         )}
 
@@ -491,7 +506,7 @@ function App() {
               </button>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} width="100%" />
+              <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} onMarketplaceOpen={() => setMarketplaceModalOpen(true)} width="100%" />
             </div>
           </div>
         </>
@@ -519,6 +534,7 @@ function App() {
       {authModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} />}
       {projectsModalOpen && <ProjectsDashboardModal onClose={() => setProjectsModalOpen(false)} />}
       {shareModalOpen && <ShareModal onClose={() => setShareModalOpen(false)} />}
+      {marketplaceModalOpen && <MarketplaceModal onClose={() => setMarketplaceModalOpen(false)} />}
     </div>
   );
 }

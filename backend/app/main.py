@@ -12,6 +12,7 @@ Exposes REST APIs for:
 import os
 import json
 import logging
+import asyncio
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
@@ -88,11 +89,27 @@ app.add_middleware(
 # ─── Health ───────────────────────────────────────────────────────────────────
 
 @app.get("/health", tags=["System"])
-def health_check():
+async def health_check():
+    pg_test_err = None
+    pg_reachable = False
+    try:
+        import asyncpg
+        pg_url = os.getenv("DATABASE_URL", db.DEFAULT_PG_URL)
+        conn = await asyncio.wait_for(asyncpg.connect(pg_url), timeout=3.0)
+        await conn.close()
+        pg_reachable = True
+    except Exception as e:
+        pg_reachable = False
+        pg_test_err = str(e)
+
     return {
         "status": "ok",
         "engine": "ScoutRaider-Backend",
         "db_mode": "sqlite" if db._use_sqlite else "postgresql",
+        "sqlite_path": db._sqlite_path if db._use_sqlite else None,
+        "pg_reachable": pg_reachable,
+        "pg_init_error": db._pg_error,
+        "pg_live_test_error": pg_test_err,
         "loaded_modules_count": len(registry.list_all())
     }
 
