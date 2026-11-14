@@ -33,6 +33,7 @@ const CELL: React.CSSProperties = {
   padding: '4px',
   boxShadow: 'none',
   pointerEvents: 'all' as const,
+  overflow: 'visible',
   flexShrink: 0,
 };
 
@@ -90,15 +91,19 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
 
   // Click outside to close route dropdown
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (routeMenuRef.current && !routeMenuRef.current.contains(e.target as Node)) {
         setRouteMenuOpen(false);
       }
     };
     if (routeMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, [routeMenuOpen]);
 
   // Keyboard shortcuts
@@ -261,8 +266,7 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
           pointerEvents: 'none',
           background: 'transparent',
           maxWidth: 'calc(100% - 20px)',
-          overflowX: 'auto',
-          scrollbarWidth: 'none',
+          overflow: 'visible',
           padding: '4px',
         }}
       >
@@ -278,12 +282,16 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
             {/* Tracé avec sélecteur développant */}
             <div style={{ position: 'relative' }} ref={routeMenuRef}>
               <button
-                onClick={() => {
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (!isRouteActive) {
                     onToolChange(lastRouteMode);
                   }
                   setRouteMenuOpen(prev => !prev);
                 }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 title={lastRouteMode === 'route' ? "Tracé pédestre BRouter (P) — Cliquer pour changer de mode" : "Tracé polygonal hors piste (H) — Cliquer pour changer de mode"}
                 style={{
                   display: 'flex',
@@ -320,42 +328,57 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
                 )}
                 {/* Micro chevron indicatif du panneau déroulant */}
                 <ChevronUp 
-                  size={9} 
+                  size={10} 
                   style={{ 
                     position: 'absolute', 
                     bottom: '2px', 
                     right: '2px', 
-                    opacity: isRouteActive ? 0.95 : 0.5 
+                    opacity: isRouteActive ? 0.95 : 0.6,
+                    transform: routeMenuOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 120ms ease',
                   }} 
                 />
               </button>
 
               {/* Panneau déroulant de choix de tracé */}
               {routeMenuOpen && (
-                <div style={{
-                  position: 'absolute',
-                  bottom: '44px',
-                  left: isMobile ? '-8px' : '0',
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid var(--border-strong)',
-                  borderRadius: '12px',
-                  boxShadow: 'var(--shadow-lg)',
-                  padding: '5px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px',
-                  minWidth: '210px',
-                  zIndex: 2500,
-                  animation: 'routePopoverIn 140ms cubic-bezier(0.16, 1, 0.3, 1)',
-                }}>
+                <div 
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 8px)',
+                    left: '0',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-strong)',
+                    borderRadius: '12px',
+                    boxShadow: 'var(--shadow-lg)',
+                    padding: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '3px',
+                    minWidth: '220px',
+                    zIndex: 5000,
+                    pointerEvents: 'all',
+                    animation: 'routePopoverIn 140ms cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                >
                   <div style={{ padding: '6px 8px 3px', fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Type de tracé
                   </div>
                   <button
-                    onClick={() => {
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onToolChange('route');
                       setLastRouteMode('route');
                       setRouteMenuOpen(false);
+                    }}
+                    onMouseEnter={(e) => {
+                      if (activeTool !== 'route') e.currentTarget.style.background = 'var(--bg-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (activeTool !== 'route') e.currentTarget.style.background = 'transparent';
                     }}
                     style={{
                       display: 'flex',
@@ -384,10 +407,18 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
                   </button>
 
                   <button
-                    onClick={() => {
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onToolChange('route_direct');
                       setLastRouteMode('route_direct');
                       setRouteMenuOpen(false);
+                    }}
+                    onMouseEnter={(e) => {
+                      if (activeTool !== 'route_direct') e.currentTarget.style.background = 'var(--bg-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (activeTool !== 'route_direct') e.currentTarget.style.background = 'transparent';
                     }}
                     style={{
                       display: 'flex',
