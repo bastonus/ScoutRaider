@@ -11,6 +11,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     PYTHONPATH=/app \
+    USE_SQLITE=true \
     DATABASE_URL="postgres://postgres:MOED1tbZpPwzb1llUs74g8hVY62T8WiAyeroiOJxl5QVcL8sTM4cvZbRAZpC7Lm7@dqitb10gzxtpiejn4kj3ub9b:5432/postgres"
 
 # Install system dependencies (WeasyPrint, fonts, Nginx, curl)
@@ -30,6 +31,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Persistent data directory for SQLite DB (mount as volume in Coolify)
+RUN mkdir -p /data && chmod 777 /data
+VOLUME ["/data"]
 
 # Install Python requirements
 COPY backend/requirements.txt ./

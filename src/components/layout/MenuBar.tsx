@@ -26,9 +26,11 @@ import {
     Lock,
     Menu,
     ChevronDown,
-    ChevronRight
+    ChevronRight,
+    Sparkles
 } from 'lucide-react';
 import FleurDeLysLogo from './FleurDeLysLogo';
+import AICopilotModal from '../panels/AICopilotModal';
 import { useApp } from '../../AppContext';
 import { useAuth } from '../../AuthContext';
 import { StateManager } from '../../logic/StateManager';
@@ -80,6 +82,8 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
     const [isTablet, setIsTablet] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [expandedMobileMenu, setExpandedMobileMenu] = useState<string | null>(null);
+    const [aiModalOpen, setAiModalOpen] = useState(false);
+    const [aiModalTab, setAiModalTab] = useState<'narrative' | 'riddles' | 'safety' | 'mcp' | 'config'>('narrative');
 
     useEffect(() => {
         const handleResize = () => {
@@ -204,6 +208,10 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     case 'e':
                         e.preventDefault();
                         onExport?.();
+                        break;
+                    case 'i':
+                        e.preventDefault();
+                        setAiModalOpen(true);
                         break;
                     case 's':
                         e.preventDefault();
@@ -331,6 +339,15 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             { label: 'Carte seule', shortcut: 'Alt+1', action: () => onViewModeChange?.('map') },
             { label: 'Texte seul', shortcut: 'Alt+2', action: () => onViewModeChange?.('text') },
             { label: 'Vue côte à côte', shortcut: 'Alt+3', action: () => onViewModeChange?.('split') },
+        ],
+        'IA & MCP': [
+            { label: 'Ouvrir le Copilote de Raid...', shortcut: 'Ctrl+I', action: () => { setAiModalTab('narrative'); setAiModalOpen(true); } },
+            { label: 'Scénariser le raid (thème & récits)...', action: () => { setAiModalTab('narrative'); setAiModalOpen(true); } },
+            { label: 'Créer des énigmes codées...', action: () => { setAiModalTab('riddles'); setAiModalOpen(true); } },
+            { label: 'Auditer la sécurité topographique...', action: () => { setAiModalTab('safety'); setAiModalOpen(true); } },
+            { divider: true },
+            { label: 'Connecteurs & Serveur MCP...', action: () => { setAiModalTab('mcp'); setAiModalOpen(true); } },
+            { label: 'Configuration Fournisseurs IA...', action: () => { setAiModalTab('config'); setAiModalOpen(true); } },
         ],
         'Aide': [
             { label: 'Vérifier les mises à jour...', action: async () => {
@@ -701,6 +718,40 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     <Search size={12} color="var(--text-dim)" />
                     {!isTablet && <span>Commandes</span>}
                     {!isTablet && <kbd style={{ fontSize: '9px', padding: '0 4px', height: '16px', borderRadius: '4px' }}>Ctrl K</kbd>}
+                </button>
+
+                {/* AI Copilot & MCP Trigger */}
+                <button
+                    onClick={() => { setAiModalTab('narrative'); setAiModalOpen(true); }}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: isTablet ? '0 8px' : '0 10px',
+                        height: '28px',
+                        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        borderRadius: 'var(--radius-pill)',
+                        color: '#34d399',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 100ms ease',
+                        WebkitAppRegion: 'no-drag',
+                    } as any}
+                    onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = '#10b981';
+                        e.currentTarget.style.color = '#fff';
+                    }}
+                    onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                        e.currentTarget.style.color = '#34d399';
+                    }}
+                    title="Copilote IA & Hub MCP (Ctrl+I)"
+                >
+                    <Sparkles size={12} color="#10b981" />
+                    {!isTablet && <span>IA & MCP</span>}
                 </button>
             </div>
 
@@ -1189,6 +1240,13 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     </div>
                 </>
             )}
+
+            {/* AI Copilot & MCP Hub Modal */}
+            <AICopilotModal
+                isOpen={aiModalOpen}
+                onClose={() => setAiModalOpen(false)}
+                initialTab={aiModalTab}
+            />
         </header>
     );
 }
