@@ -11,16 +11,12 @@ import {
   Type, 
   ArrowLeft, 
   ChevronUp, 
-  FileText, 
-  Layers,
-  KeyRound,
-  Route
+  KeyRound
 } from 'lucide-react';
 
 interface FloatingToolbarProps {
   activeTool: string;
   onToolChange: (toolId: string) => void;
-  onToggleSidebar?: (side: 'left' | 'right') => void;
 }
 
 // ── Shared island cell style ──────────────────────────────────────────────────
@@ -57,7 +53,7 @@ function RouteSentiersAreaIcon({ size = 18 }: { size?: number }) {
 
 const ANNOTATION_TOOLS = ['annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw', 'annotate_text'];
 
-export default function FloatingToolbar({ activeTool, onToolChange, onToggleSidebar }: FloatingToolbarProps) {
+export default function FloatingToolbar({ activeTool, onToolChange }: FloatingToolbarProps) {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   
   // 'main' = Tracé, Nœud, Azimut, Encodage, Panneau d'annotations
@@ -270,68 +266,6 @@ export default function FloatingToolbar({ activeTool, onToolChange, onToggleSide
           padding: '4px',
         }}
       >
-        {/* Cellule Volets mobiles (Itinéraire & Calques) sur petit écran */}
-        {isMobile && onToggleSidebar && (
-          <div style={CELL}>
-            <button
-              onClick={() => onToggleSidebar('left')}
-              title="Étapes de l'itinéraire (Volet)"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '34px',
-                height: '34px',
-                border: '1px solid transparent',
-                background: 'transparent',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                color: 'var(--text-dim)',
-                transition: 'all 100ms ease',
-                flexShrink: 0,
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'var(--bg-hover)';
-                e.currentTarget.style.color = 'var(--text-primary)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = 'var(--text-dim)';
-              }}
-            >
-              <Route size={18} strokeWidth={2.1} />
-            </button>
-            <button
-              onClick={() => onToggleSidebar('right')}
-              title="Calques & Cartographie"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '34px',
-                height: '34px',
-                border: '1px solid transparent',
-                background: 'transparent',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                color: 'var(--text-dim)',
-                transition: 'all 100ms ease',
-                flexShrink: 0,
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'var(--bg-hover)';
-                e.currentTarget.style.color = 'var(--text-primary)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = 'var(--text-dim)';
-              }}
-            >
-              <Layers size={18} strokeWidth={2.1} />
-            </button>
-          </div>
-        )}
-
         {/* ── MODE 1 : OUTILS PRINCIPAUX (Tracé regroupé, Nœud, Azimut, Annotations) ── */}
         {toolbarMode === 'main' ? (
           <div
