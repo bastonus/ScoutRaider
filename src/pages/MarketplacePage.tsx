@@ -242,7 +242,7 @@ export default function MarketplacePage() {
       {/* ── Top Navigation Bar ── */}
       <header style={s.navbar}>
         <div style={s.navLeft}>
-          <button style={s.backBtn} onClick={handleBack} title="Retour">
+          <button style={s.backBtn} className="back-btn" onClick={handleBack} title="Retour">
             <ArrowLeft size={16} />
             <span>Retour</span>
           </button>
@@ -331,6 +331,7 @@ export default function MarketplacePage() {
               return (
                 <button
                   key={tab.id}
+                  className="tab-btn"
                   style={{
                     ...s.tabBtn,
                     ...(active ? s.tabBtnActive : {})
@@ -408,7 +409,7 @@ export default function MarketplacePage() {
               const isOwner = user && (mod.author_id === user.id || mod.author_username === user.username);
 
               return (
-                <div key={mod.id} style={s.card}>
+                <div key={mod.id} className="module-card" style={s.card}>
                   {/* Card Preview Header */}
                   <div style={s.cardPreviewArea}>
                     {mod.preview_image ? (
@@ -468,6 +469,7 @@ export default function MarketplacePage() {
                     <div style={s.cardFooter}>
                       <button
                         onClick={() => handleToggleLibrary(mod)}
+                        className="sync-btn"
                         style={{
                           ...s.syncBtn,
                           ...(inLib ? s.syncBtnActive : {})
@@ -481,6 +483,7 @@ export default function MarketplacePage() {
                       <div style={s.actionRow}>
                         <button
                           onClick={() => handleOpenEditor(mod)}
+                          className="icon-action-btn"
                           title="Modifier le code / informations"
                           style={s.iconActionBtn}
                         >
@@ -489,6 +492,7 @@ export default function MarketplacePage() {
 
                         <button
                           onClick={e => handleFork(mod, e)}
+                          className="icon-action-btn"
                           title="Forker ce module (créer votre propre copie dérivée)"
                           style={s.iconActionBtn}
                         >
@@ -498,6 +502,7 @@ export default function MarketplacePage() {
                         {isOwner && (
                           <button
                             onClick={e => handleDelete(mod, e)}
+                            className="icon-action-btn"
                             title="Supprimer ce module"
                             style={{ ...s.iconActionBtn, color: '#ef4444' }}
                           >
@@ -538,6 +543,34 @@ export default function MarketplacePage() {
           <span>{displayedModules.length} module{displayedModules.length > 1 ? 's' : ''} listé{displayedModules.length > 1 ? 's' : ''}</span>
         </div>
       </footer>
+
+      {/* ── Dynamic Hover Styles ── */}
+      <style>{`
+        .module-card {
+          transition: transform 140ms ease, border-color 140ms ease !important;
+        }
+        .module-card:hover {
+          transform: translateY(-2px);
+          border-color: #3F3F46 !important;
+        }
+        .icon-action-btn:hover {
+          background: #1C1C21 !important;
+          color: #FAFAFA !important;
+          border-color: #3F3F46 !important;
+        }
+        .sync-btn:hover {
+          border-color: #3F3F46 !important;
+          color: #FAFAFA !important;
+        }
+        .back-btn:hover {
+          border-color: #3F3F46 !important;
+          color: #FAFAFA !important;
+        }
+        .tab-btn:hover {
+          border-color: #3F3F46 !important;
+          color: #D4D4D8 !important;
+        }
+      `}</style>
 
       {/* ── Editor Modal ── */}
       {editorOpen && editingModule && (

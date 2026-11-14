@@ -32,6 +32,7 @@ export type ViewMode = 'map' | 'text' | 'split';
 export type SectionId = 'layers' | 'orchestration' | 'themes' | 'modules' | 'maps' | 'export';
 
 function App() {
+  const navigate = useNavigate();
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const isMobileOrTablet = windowWidth < 1024;
 
@@ -42,7 +43,6 @@ function App() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [marketplaceModalOpen, setMarketplaceModalOpen] = useState(false);
   const { 
     authModalOpen, 
     setAuthModalOpen, 
@@ -172,12 +172,12 @@ function App() {
     const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm') {
         e.preventDefault();
-        setMarketplaceModalOpen(true);
+        navigate('/marketplace');
       }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, []);
+  }, [navigate]);
 
   // Global Ctrl+K (Command Palette)
   useEffect(() => {
@@ -321,7 +321,7 @@ function App() {
         onPreferencesOpen={() => setPreferencesModalOpen(true)}
         onSetRightSection={setActiveRightSection}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-        onOpenMarketplace={() => setMarketplaceModalOpen(true)}
+        onOpenMarketplace={() => navigate('/marketplace')}
       />
       
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
@@ -460,7 +460,7 @@ function App() {
               onMouseDown={(e) => { e.preventDefault(); rightResizing.current = true; document.body.style.cursor = 'col-resize'; }}
               style={{ width: '4px', cursor: 'col-resize', background: 'var(--bg-border)', zIndex: 10, marginLeft: '-2px', marginRight: '-2px' }}
             />
-            <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} onMarketplaceOpen={() => setMarketplaceModalOpen(true)} width={rightWidth} />
+            <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} onMarketplaceOpen={() => navigate('/marketplace')} width={rightWidth} />
           </>
         )}
 
@@ -536,7 +536,7 @@ function App() {
               </button>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} onMarketplaceOpen={() => setMarketplaceModalOpen(true)} width="100%" />
+              <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} onMarketplaceOpen={() => navigate('/marketplace')} width="100%" />
             </div>
           </div>
         </>
@@ -564,7 +564,6 @@ function App() {
       {authModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} />}
       {projectsModalOpen && <ProjectsDashboardModal onClose={() => setProjectsModalOpen(false)} />}
       {shareModalOpen && <ShareModal onClose={() => setShareModalOpen(false)} />}
-      {marketplaceModalOpen && <MarketplaceModal onClose={() => setMarketplaceModalOpen(false)} />}
       {accessDenied && (
         <DocAccessDeniedModal
           projectId={accessDenied.projectId}

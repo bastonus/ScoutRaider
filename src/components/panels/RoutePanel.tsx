@@ -166,7 +166,7 @@ function StageRow({ stage, idx, total, isDragged, onDragStart, onDragOver, onDro
                 onDragEnd={handleRowDragEnd}
                 style={{
                     display: 'flex', alignItems: 'center', gap: '8px', padding: '0 8px 0 6px',
-                    minHeight: '32px',
+                    minHeight: '36px',
                     background: isFocused ? 'var(--bg-surface)' : 'var(--bg-dark)',
                     border: `1px solid ${isFocused ? 'var(--border-strong)' : 'var(--border-subtle)'}`,
                     borderRadius: 'var(--radius-sm)', transition: 'all 100ms ease',
@@ -177,14 +177,14 @@ function StageRow({ stage, idx, total, isDragged, onDragStart, onDragOver, onDro
                     onMouseDown={handleGripMouseDown}
                     onMouseUp={() => { if (rowRef.current) rowRef.current.setAttribute('draggable', 'false'); }}
                     title="Glisser pour réordonner"
-                    style={{ cursor: 'grab', padding: '2px', marginLeft: '-2px', flexShrink: 0, display: 'flex', alignItems: 'center' }}
+                    style={{ cursor: 'grab', padding: '4px 2px', marginLeft: '-2px', flexShrink: 0, display: 'flex', alignItems: 'center' }}
                 >
-                    <GripVertical size={13} style={{ color: 'var(--text-dim)', opacity: isDraggingRow ? 0.9 : 0.45 }} />
+                    <GripVertical size={14} style={{ color: 'var(--text-dim)', opacity: isDraggingRow ? 0.9 : 0.45 }} />
                 </div>
                 <div style={{
-                    width: '20px', height: '20px', borderRadius: 'var(--radius-xs)',
+                    width: '22px', height: '22px', borderRadius: 'var(--radius-xs)',
                     background: isFocused ? dotColor : 'var(--bg-elevated)', border: `1px solid ${dotColor}`,
-                    color: isFocused ? '#111' : dotColor, fontWeight: 700, fontSize: '10px',
+                    color: isFocused ? '#111' : dotColor, fontWeight: 700, fontSize: '10.5px',
                     fontFamily: 'var(--font-mono)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     transition: 'all 100ms ease',
@@ -203,10 +203,10 @@ function StageRow({ stage, idx, total, isDragged, onDragStart, onDragOver, onDro
                     style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '12px', fontFamily: 'var(--font-ui)', minWidth: 0 }}
                 />
                 <button type="button" onClick={handleDelete} title="Supprimer"
-                    style={{ width: '20px', height: '20px', borderRadius: 'var(--radius-xs)', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 100ms ease', flexShrink: 0 }}
+                    style={{ width: '26px', height: '26px', borderRadius: 'var(--radius-xs)', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 100ms ease', flexShrink: 0 }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--semantic-danger-bg)'; (e.currentTarget as HTMLElement).style.color = 'var(--semantic-danger)'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'; }}>
-                    <X size={12} strokeWidth={2} />
+                    <X size={14} strokeWidth={2} />
                 </button>
             </div>
             {showResults && results.length > 0 && <SmartDropdown results={results} onSelect={handleSelect} anchorRef={wrapperRef} />}

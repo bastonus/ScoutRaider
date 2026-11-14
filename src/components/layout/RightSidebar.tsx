@@ -10,10 +10,11 @@ interface AccordionSectionProps {
   title: string;
   isOpen: boolean;
   onToggle: () => void;
+  isMobile?: boolean;
   children: React.ReactNode;
 }
 
-function AccordionSection({ title, isOpen, onToggle, children }: AccordionSectionProps) {
+function AccordionSection({ title, isOpen, onToggle, isMobile = false, children }: AccordionSectionProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flexGrow: isOpen ? 1 : 0, flexShrink: 0, flexBasis: isOpen ? '0%' : 'auto', overflow: 'hidden' }}>
       <div 
@@ -21,13 +22,14 @@ function AccordionSection({ title, isOpen, onToggle, children }: AccordionSectio
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '4px',
-          padding: '6px 8px',
-          background: isOpen ? 'rgba(255,255,255,0.02)' : 'transparent',
+          gap: '6px',
+          padding: isMobile ? '12px 14px' : '6px 8px',
+          minHeight: isMobile ? '44px' : 'auto',
+          background: isOpen ? 'rgba(255,255,255,0.03)' : 'transparent',
           borderBottom: '1px solid var(--bg-border)',
           cursor: 'pointer',
           color: 'var(--text-primary)',
-          fontSize: '11px',
+          fontSize: isMobile ? '12px' : '11px',
           fontWeight: 700,
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
@@ -35,10 +37,10 @@ function AccordionSection({ title, isOpen, onToggle, children }: AccordionSectio
           marginTop: '-1px' // Collapse double borders
         }}
         onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-        onMouseLeave={(e) => e.currentTarget.style.background = isOpen ? 'rgba(255,255,255,0.02)' : 'transparent'}
+        onMouseLeave={(e) => e.currentTarget.style.background = isOpen ? 'rgba(255,255,255,0.03)' : 'transparent'}
       >
-        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        {title}
+        {isOpen ? <ChevronDown size={isMobile ? 16 : 14} /> : <ChevronRight size={isMobile ? 16 : 14} />}
+        <span>{title}</span>
       </div>
       {isOpen && (
         <div className="accordion-content" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -115,6 +117,7 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
         title="Calques" 
         isOpen={activeSection === 'layers'} 
         onToggle={() => toggle('layers')}
+        isMobile={isFull}
       >
         <LayerManagerPanel />
       </AccordionSection>
@@ -123,6 +126,7 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
         title="Orchestrations" 
         isOpen={activeSection === 'orchestration'} 
         onToggle={() => toggle('orchestration')}
+        isMobile={isFull}
       >
         <DifficultyLibrary />
       </AccordionSection>
@@ -131,6 +135,7 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
         title="Thèmes" 
         isOpen={activeSection === 'themes'} 
         onToggle={() => toggle('themes')}
+        isMobile={isFull}
       >
         <ThemePanel />
       </AccordionSection>
@@ -139,6 +144,7 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
         title="Codes & Énigmes" 
         isOpen={activeSection === 'modules'} 
         onToggle={() => toggle('modules')}
+        isMobile={isFull}
       >
         <LibraryPanel />
       </AccordionSection>
@@ -147,6 +153,7 @@ export default function RightSidebar({ activeSection, onSectionChange, onPrefere
         title="Fonds de carte" 
         isOpen={activeSection === 'maps'} 
         onToggle={() => toggle('maps')}
+        isMobile={isFull}
       >
         <MapLibraryPanel 
           onSetRightSection={onSectionChange} 
