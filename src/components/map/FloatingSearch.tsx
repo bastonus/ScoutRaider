@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Search, Loader2, Route, ChevronUp, X } from 'lucide-react';
 import { mapRef } from './MapComponent';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
 import { MAP_LAYERS } from '../../logic/MapConfig';
+import RoutePanel from '../panels/RoutePanel';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface SearchResult {
@@ -62,6 +63,21 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
     const [isSearching, setIsSearching] = useState(false);
     const [isSatellite, setIsSatellite] = useState(false);
     const [geoState, setGeoState] = useState<GeoState>('idle');
+    const [isRouteExpanded, setIsRouteExpanded] = useState(false);
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Listen to custom toggle event for route panel (e.g. from Ctrl+[ or menu shortcuts)
+    useEffect(() => {
+        const handleToggle = () => setIsRouteExpanded(prev => !prev);
+        window.addEventListener('scoutraider:toggle-route-panel', handleToggle);
+        return () => window.removeEventListener('scoutraider:toggle-route-panel', handleToggle);
+    }, []);
 
     useEffect(() => {
         const layer = MAP_LAYERS[state.active_ign_layer || 'PLAN.IGN'];
@@ -151,6 +167,25 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         mapRef.current?.flyTo([r.lat, r.lon], 15, { duration: 1 });
     };
 
+    const totalDistanceKm = useMemo(() => {
+        let total = 0;
+        const R = 6371e3;
+        for (const leg of state.routes) {
+            if (!leg || !leg.geojson?.geometry) continue;
+            const coords = leg.geojson.geometry.coordinates;
+            if (!coords || coords.length < 2) continue;
+            for (let i = 0; i < coords.length - 1; i++) {
+                const [, lat1] = coords[i], [, lat2] = coords[i + 1];
+                const [lon1] = coords[i], [lon2] = coords[i + 1];
+                const p1 = lat1 * Math.PI / 180, p2 = lat2 * Math.PI / 180;
+                const dp = (lat2 - lat1) * Math.PI / 180, dl = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+                total += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            }
+        }
+        return total > 0 ? (total / 1000).toFixed(1) : null;
+    }, [state.routes]);
+
     const geoIcon = () => {
         if (geoState === 'loading') {
             return (
@@ -183,9 +218,6 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         );
     };
 
-    // Inner radius rule:
-    // Container: padding 4px, border-radius 14px, height 40px
-    // Inner buttons: 32px × 32px, border-radius 10px (14px - 4px = 10px).
     const toolbarStyle: React.CSSProperties = {
         display: 'flex',
         alignItems: 'center',
@@ -197,6 +229,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         borderRadius: '14px',
         boxShadow: 'none',
         pointerEvents: 'all',
+        flexShrink: 0,
     };
 
     const tbBtnStyle = (active = false): React.CSSProperties => ({
@@ -214,178 +247,352 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         boxShadow: 'none',
     });
 
-    const isMobileOrTablet = typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
+    const hasStages = state.stages && state.stages.length > 0;
 
     return (
-        <div ref={containerRef} id="top-left-container" style={{
-            position: 'absolute',
-            top: '16px',
-            left: (isSplitMode || isMobileOrTablet) ? '16px' : '68px',
-            zIndex: 1100,
-            display: 'flex',
-            gap: '8px',
-            pointerEvents: 'none',
-            alignItems: 'center',
-            transition: 'left 0.2s ease',
-        }}>
-            {/* ── SEARCH BAR ── */}
-            <div style={{
+        <>
+            <style>{`
+                @keyframes modularCardIn {
+                    0% {
+                        opacity: 0;
+                        transform: translateY(-6px) scale(0.98);
+                    }
+                    100% {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+            `}</style>
+
+            <div ref={containerRef} id="top-left-container" style={{
+                position: 'absolute',
+                top: '16px',
+                left: '16px',
+                zIndex: 1100,
                 display: 'flex',
                 flexDirection: 'column',
-                pointerEvents: 'all',
-                position: 'relative',
+                gap: '8px',
+                pointerEvents: 'none',
+                maxWidth: isMobile ? 'calc(100vw - 32px)' : '440px',
+                width: isRouteExpanded ? (isMobile ? 'calc(100vw - 32px)' : '380px') : 'auto',
+                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}>
+                {/* ── TOP BAR (SEARCH + ITINÉRAIRE + SATELLITE/GEO) ── */}
                 <div style={{
                     display: 'flex',
-                    alignItems: 'center',
                     gap: '8px',
-                    padding: '0 12px',
-                    height: '40px',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: showResults ? '14px 14px 0 0' : '14px',
-                    boxShadow: 'none',
-                    transition: 'border-color 100ms ease',
+                    pointerEvents: 'none',
+                    alignItems: 'center',
+                    width: '100%',
                 }}>
-                    {isSearching ? (
-                        <Loader2 size={15} className="spin" color="var(--accent-default)" />
-                    ) : (
-                        <Search size={15} color="var(--text-dim)" strokeWidth={2} />
-                    )}
-                    <input
-                        type="text"
-                        placeholder="Rechercher..."
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            outline: 'none',
-                            color: 'var(--text-primary)',
-                            fontSize: '13px',
-                            width: 'clamp(110px, 25vw, 210px)',
-                            fontFamily: 'var(--font-ui)',
-                        }}
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        onFocus={() => results.length > 0 && setShowResults(true)}
-                    />
-                    {query && (
-                        <button
-                            type="button"
-                            onClick={() => { setQuery(''); setShowResults(false); }}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: 'var(--text-dim)',
-                                padding: '0',
-                                lineHeight: 1,
-                                fontSize: '15px'
-                            }}
-                        >
-                            ×
-                        </button>
-                    )}
-                </div>
-
-                {/* ── DROPDOWN RESULTS ── */}
-                {showResults && (
+                    {/* Unified Search + Itinéraire Island */}
                     <div style={{
-                        position: 'absolute',
-                        top: '40px',
-                        left: 0,
-                        right: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '0 4px 0 10px',
+                        height: '40px',
                         background: 'var(--bg-elevated)',
                         border: '1px solid var(--border-subtle)',
-                        borderTop: 'none',
-                        borderRadius: '0 0 14px 14px',
-                        boxShadow: 'var(--shadow-lg)',
-                        maxHeight: '220px',
-                        overflowY: 'auto',
-                        zIndex: 1200,
-                        padding: '4px',
+                        borderRadius: showResults ? '14px 14px 0 0' : '14px',
+                        boxShadow: 'none',
+                        transition: 'border-color 100ms ease',
+                        pointerEvents: 'all',
+                        position: 'relative',
+                        flex: 1,
+                        minWidth: 0,
                     }}>
-                        {results.map((r, i) => (
-                            <div
-                                key={i}
-                                onClick={() => selectResult(r)}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        {isSearching ? (
+                            <Loader2 size={15} className="spin" color="var(--accent-default)" style={{ flexShrink: 0 }} />
+                        ) : (
+                            <Search size={15} color="var(--text-dim)" strokeWidth={2} style={{ flexShrink: 0 }} />
+                        )}
+                        <input
+                            type="text"
+                            placeholder="Rechercher..."
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                outline: 'none',
+                                color: 'var(--text-primary)',
+                                fontSize: '13px',
+                                width: '100%',
+                                minWidth: '60px',
+                                fontFamily: 'var(--font-ui)',
+                            }}
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onFocus={() => results.length > 0 && setShowResults(true)}
+                        />
+                        {query && (
+                            <button
+                                type="button"
+                                onClick={() => { setQuery(''); setShowResults(false); }}
                                 style={{
-                                    padding: '7px 10px',
+                                    background: 'none',
+                                    border: 'none',
                                     cursor: 'pointer',
-                                    fontSize: '11.5px',
-                                    color: 'var(--text-primary)',
-                                    borderRadius: '8px',
-                                    display: 'flex',
-                                    gap: '8px',
-                                    alignItems: 'flex-start',
-                                    transition: 'background 100ms ease',
+                                    color: 'var(--text-dim)',
+                                    padding: '0 4px',
+                                    lineHeight: 1,
+                                    fontSize: '15px',
+                                    flexShrink: 0,
                                 }}
                             >
-                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--accent-default)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
-                                    <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" />
-                                </svg>
-                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {r.label}
-                                    {r.postcode && <span style={{ color: 'var(--text-dim)', marginLeft: '6px', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>{r.postcode}</span>}
+                                ×
+                            </button>
+                        )}
+
+                        <div style={{ width: '1px', height: '20px', background: 'var(--border-subtle)', margin: '0 2px', flexShrink: 0 }} />
+
+                        {/* BOUTON ITINÉRAIRE MODULAIRE DÉVELOPPANT */}
+                        <button
+                            type="button"
+                            onClick={() => setIsRouteExpanded(prev => !prev)}
+                            title={isRouteExpanded ? "Masquer les étapes de l'itinéraire" : "Ouvrir les étapes de l'itinéraire"}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                height: '32px',
+                                padding: isMobile ? '0 8px' : '0 10px',
+                                borderRadius: '10px',
+                                border: isRouteExpanded ? '1px solid var(--accent-default)' : '1px solid transparent',
+                                background: isRouteExpanded 
+                                    ? 'var(--accent-default)' 
+                                    : hasStages 
+                                        ? 'rgba(110, 201, 126, 0.12)' 
+                                        : 'transparent',
+                                color: isRouteExpanded 
+                                    ? '#ffffff' 
+                                    : hasStages 
+                                        ? 'var(--accent-default)' 
+                                        : 'var(--text-dim)',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                flexShrink: 0,
+                                transition: 'all 120ms ease',
+                            }}
+                            onMouseEnter={e => {
+                                if (!isRouteExpanded) {
+                                    e.currentTarget.style.background = 'var(--bg-hover)';
+                                    e.currentTarget.style.color = 'var(--text-primary)';
+                                }
+                            }}
+                            onMouseLeave={e => {
+                                if (!isRouteExpanded) {
+                                    e.currentTarget.style.background = hasStages ? 'rgba(110, 201, 126, 0.12)' : 'transparent';
+                                    e.currentTarget.style.color = hasStages ? 'var(--accent-default)' : 'var(--text-dim)';
+                                }
+                            }}
+                        >
+                            <Route size={16} strokeWidth={2.2} />
+                            {!isMobile && <span>Étapes</span>}
+                            {hasStages && (
+                                <span style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    padding: '1px 5px',
+                                    borderRadius: '10px',
+                                    background: isRouteExpanded ? 'rgba(255,255,255,0.25)' : 'var(--accent-default)',
+                                    color: '#ffffff',
+                                    lineHeight: 1.2,
+                                    fontFamily: 'var(--font-mono)',
+                                }}>
+                                    {state.stages.length}
                                 </span>
+                            )}
+                        </button>
+
+                        {/* ── DROPDOWN RESULTS ── */}
+                        {showResults && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '40px',
+                                left: 0,
+                                right: 0,
+                                background: 'var(--bg-elevated)',
+                                border: '1px solid var(--border-subtle)',
+                                borderTop: 'none',
+                                borderRadius: '0 0 14px 14px',
+                                boxShadow: 'var(--shadow-lg)',
+                                maxHeight: '220px',
+                                overflowY: 'auto',
+                                zIndex: 1200,
+                                padding: '4px',
+                            }}>
+                                {results.map((r, i) => (
+                                    <div
+                                        key={i}
+                                        onClick={() => selectResult(r)}
+                                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                        style={{
+                                            padding: '7px 10px',
+                                            cursor: 'pointer',
+                                            fontSize: '11.5px',
+                                            color: 'var(--text-primary)',
+                                            borderRadius: '8px',
+                                            display: 'flex',
+                                            gap: '8px',
+                                            alignItems: 'flex-start',
+                                            transition: 'background 100ms ease',
+                                        }}
+                                    >
+                                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--accent-default)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                                            <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" />
+                                        </svg>
+                                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {r.label}
+                                            {r.postcode && <span style={{ color: 'var(--text-dim)', marginLeft: '6px', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>{r.postcode}</span>}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        )}
+                    </div>
+
+                    {/* ── SATELLITE + GEOLOCATE PILL ── */}
+                    <div style={toolbarStyle}>
+                        {/* Satellite */}
+                        <button
+                            type="button"
+                            onClick={handleSatellite}
+                            style={tbBtnStyle(isSatellite)}
+                            title={isSatellite ? 'Vue carte topographique' : 'Vue satellite'}
+                            onMouseEnter={e => {
+                                if (!isSatellite) {
+                                    e.currentTarget.style.background = 'var(--bg-hover)';
+                                    e.currentTarget.style.color = 'var(--text-primary)';
+                                }
+                            }}
+                            onMouseLeave={e => {
+                                if (!isSatellite) {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = 'var(--text-dim)';
+                                }
+                            }}
+                        >
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M13 13.74a2 2 0 0 1-2 0L2.5 8.87a1 1 0 0 1 0-1.74L11 2.26a2 2 0 0 1 2 0l8.5 4.87a1 1 0 0 1 0 1.74z" />
+                                <path d="m20 14.285 1.5.845a1 1 0 0 1 0 1.74L13 21.74a2 2 0 0 1-2 0l-8.5-4.87a1 1 0 0 1 0-1.74l1.5-.845" />
+                            </svg>
+                        </button>
+
+                        <div style={{ width: '1px', height: '22px', background: 'var(--border-subtle)', margin: '0 2px' }} />
+
+                        {/* Geolocate */}
+                        <button
+                            type="button"
+                            onClick={handleGeolocate}
+                            style={{ ...tbBtnStyle(geoState === 'done'), ...(geoState === 'loading' ? { opacity: 0.7 } : {}) }}
+                            title="Me localiser"
+                            onMouseEnter={e => {
+                                if (geoState !== 'done') {
+                                    e.currentTarget.style.background = 'var(--bg-hover)';
+                                    e.currentTarget.style.color = 'var(--text-primary)';
+                                }
+                            }}
+                            onMouseLeave={e => {
+                                if (geoState !== 'done') {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = 'var(--text-dim)';
+                                }
+                            }}
+                        >
+                            {geoIcon()}
+                        </button>
+                    </div>
+                </div>
+
+                {/* ── EXPANDED MODULAR ROUTE PANEL (MAPS STYLE) ── */}
+                {isRouteExpanded && (
+                    <div style={{
+                        pointerEvents: 'all',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: '16px',
+                        boxShadow: 'var(--shadow-lg)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        width: isMobile ? '100%' : '380px',
+                        maxHeight: isMobile ? 'calc(100dvh - 160px)' : '520px',
+                        animation: 'modularCardIn 160ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    }}>
+                        {/* Header with Title, Stats & Close */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 14px',
+                            borderBottom: '1px solid var(--border-subtle)',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            flexShrink: 0,
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '8px',
+                                    background: 'rgba(110, 201, 126, 0.14)',
+                                    color: 'var(--accent-default)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}>
+                                    <Route size={16} strokeWidth={2.2} />
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                        Itinéraire & Étapes
+                                    </div>
+                                    <div style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>
+                                        {hasStages
+                                            ? `${state.stages.length} étape${state.stages.length > 1 ? 's' : ''}${totalDistanceKm ? ` • ${totalDistanceKm} km` : ''}`
+                                            : 'Aucune étape définie'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsRouteExpanded(false)}
+                                title="Replier le panneau d'itinéraire"
+                                style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '8px',
+                                    background: 'transparent',
+                                    border: '1px solid var(--border-subtle)',
+                                    color: 'var(--text-dim)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 100ms ease',
+                                }}
+                                onMouseEnter={e => {
+                                    e.currentTarget.style.background = 'var(--bg-hover)';
+                                    e.currentTarget.style.color = 'var(--text-primary)';
+                                }}
+                                onMouseLeave={e => {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = 'var(--text-dim)';
+                                }}
+                            >
+                                <ChevronUp size={16} />
+                            </button>
+                        </div>
+
+                        {/* RoutePanel Embedded Body */}
+                        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                            <RoutePanel embedded={true} onClose={() => setIsRouteExpanded(false)} />
+                        </div>
                     </div>
                 )}
             </div>
-
-            {/* ── SATELLITE + GEOLOCATE PILL ── */}
-            <div style={toolbarStyle}>
-                {/* Satellite */}
-                <button
-                    type="button"
-                    onClick={handleSatellite}
-                    style={tbBtnStyle(isSatellite)}
-                    title={isSatellite ? 'Vue carte topographique' : 'Vue satellite'}
-                    onMouseEnter={e => {
-                        if (!isSatellite) {
-                            e.currentTarget.style.background = 'var(--bg-hover)';
-                            e.currentTarget.style.color = 'var(--text-primary)';
-                        }
-                    }}
-                    onMouseLeave={e => {
-                        if (!isSatellite) {
-                            e.currentTarget.style.background = 'transparent';
-                            e.currentTarget.style.color = 'var(--text-dim)';
-                        }
-                    }}
-                >
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M13 13.74a2 2 0 0 1-2 0L2.5 8.87a1 1 0 0 1 0-1.74L11 2.26a2 2 0 0 1 2 0l8.5 4.87a1 1 0 0 1 0 1.74z" />
-                        <path d="m20 14.285 1.5.845a1 1 0 0 1 0 1.74L13 21.74a2 2 0 0 1-2 0l-8.5-4.87a1 1 0 0 1 0-1.74l1.5-.845" />
-                    </svg>
-                </button>
-
-                <div style={{ width: '1px', height: '22px', background: 'var(--border-subtle)', margin: '0 2px' }} />
-
-                {/* Geolocate */}
-                <button
-                    type="button"
-                    onClick={handleGeolocate}
-                    style={{ ...tbBtnStyle(geoState === 'done'), ...(geoState === 'loading' ? { opacity: 0.7 } : {}) }}
-                    title="Me localiser"
-                    onMouseEnter={e => {
-                        if (geoState !== 'done') {
-                            e.currentTarget.style.background = 'var(--bg-hover)';
-                            e.currentTarget.style.color = 'var(--text-primary)';
-                        }
-                    }}
-                    onMouseLeave={e => {
-                        if (geoState !== 'done') {
-                            e.currentTarget.style.background = 'transparent';
-                            e.currentTarget.style.color = 'var(--text-dim)';
-                        }
-                    }}
-                >
-                    {geoIcon()}
-                </button>
-            </div>
-        </div>
+        </>
     );
 }

@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import MenuBar from './components/layout/MenuBar';
 import ProjectWorkspace from './components/layout/ProjectWorkspace';
-import LeftSidebarPanel from './components/panels/LeftSidebarPanel';
 import RightSidebar from './components/layout/RightSidebar';
 import NotificationOverlay from './components/map/NotificationOverlay';
 import TextualHeader from './components/textual/TextualHeader';
@@ -14,11 +13,8 @@ import ShareModal from './components/panels/ShareModal';
 import DocAccessDeniedModal from './components/panels/DocAccessDeniedModal';
 import CommandPalette from './components/layout/CommandPalette';
 import { 
-  PanelLeftClose, 
-  PanelLeftOpen, 
   PanelRightClose, 
   PanelRightOpen,
-  PanelLeft,
   PanelRight,
   FileText,
   Layers,
@@ -36,7 +32,6 @@ function App() {
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const isMobileOrTablet = windowWidth < 1024;
 
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [activeRightSection, setActiveRightSection] = useState<SectionId>('layers');
   const [viewMode, setViewMode] = useState<ViewMode>('map');
@@ -54,10 +49,7 @@ function App() {
     clearAccessDenied
   } = useAuth();
 
-  const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
-
-  const leftResizing = useRef(false);
   const rightResizing = useRef(false);
 
   useEffect(() => {
@@ -71,7 +63,6 @@ function App() {
   const prevMobileRef = useRef(isMobileOrTablet);
   useEffect(() => {
     if (!prevMobileRef.current && isMobileOrTablet) {
-      setLeftSidebarOpen(false);
       setRightSidebarOpen(false);
     }
     prevMobileRef.current = isMobileOrTablet;
@@ -79,14 +70,11 @@ function App() {
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (leftResizing.current) {
-        setLeftWidth(Math.max(200, Math.min(600, e.clientX)));
-      } else if (rightResizing.current) {
+      if (rightResizing.current) {
         setRightWidth(Math.max(200, Math.min(600, window.innerWidth - e.clientX)));
       }
     };
     const handleMouseUp = () => {
-      leftResizing.current = false;
       rightResizing.current = false;
       document.body.style.cursor = 'default';
     };
@@ -114,7 +102,7 @@ function App() {
         if (e.ctrlKey) {
             if (e.key === '[') {
                 e.preventDefault();
-                setLeftSidebarOpen(prev => !prev);
+                window.dispatchEvent(new CustomEvent('scoutraider:toggle-route-panel'));
             } else if (e.key === ']') {
                 e.preventDefault();
                 setRightSidebarOpen(prev => !prev);
@@ -127,14 +115,8 @@ function App() {
 
   const toggleSidebar = (side: 'left' | 'right') => {
     if (side === 'left') {
-      if (isMobileOrTablet && !leftSidebarOpen) {
-        setRightSidebarOpen(false);
-      }
-      setLeftSidebarOpen(!leftSidebarOpen);
+      window.dispatchEvent(new CustomEvent('scoutraider:toggle-route-panel'));
     } else if (side === 'right') {
-      if (isMobileOrTablet && !rightSidebarOpen) {
-        setLeftSidebarOpen(false);
-      }
       setRightSidebarOpen(!rightSidebarOpen);
     }
   };
@@ -325,29 +307,6 @@ function App() {
       />
       
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-        
-        {/* DESKTOP LEFT SIDEBAR: Itinerary */}
-        {!isMobileOrTablet && leftSidebarOpen && (
-          <>
-            <div style={{ 
-              width: `${leftWidth}px`, 
-              flexShrink: 0, 
-              display: 'flex', 
-              flexDirection: 'column',
-              background: 'var(--bg-panel)',
-              borderRight: '1px solid var(--bg-border)',
-              height: '100%',
-              overflow: 'hidden'
-            }}>
-              <LeftSidebarPanel />
-            </div>
-            {/* Left Resizer */}
-            <div 
-              onMouseDown={(e) => { e.preventDefault(); leftResizing.current = true; document.body.style.cursor = 'col-resize'; }}
-              style={{ width: '4px', cursor: 'col-resize', background: 'var(--bg-border)', zIndex: 10, marginLeft: '-2px', marginRight: '-2px' }}
-            />
-          </>
-        )}
 
         {/* MAIN WORKSPACE */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', position: 'relative' }}>
@@ -355,8 +314,8 @@ function App() {
           {isTextMode || isSplitMode ? (
             <div style={{
               display: 'flex', alignItems: 'center',
-              padding: '0 8px',
-              height: '40px',
+              padding: isMobileOrTablet ? '0 8px' : '0 12px',
+              height: isMobileOrTablet ? '44px' : '46px',
               background: 'var(--bg-dark)',
               borderBottom: '1px solid var(--border-subtle)',
               flexShrink: 0,
@@ -365,26 +324,6 @@ function App() {
               gap: '8px',
               position: 'relative',
             }}>
-              {!isMobileOrTablet && (
-                <button
-                  onClick={() => toggleSidebar('left')}
-                  title={`${leftSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'itinéraire (Ctrl+[)`}
-                  style={inlinePanelToggleStyle}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--bg-hover)';
-                    e.currentTarget.style.borderColor = 'var(--border-strong)';
-                    e.currentTarget.style.color = 'var(--text-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--bg-surface)';
-                    e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                    e.currentTarget.style.color = 'var(--text-dim)';
-                  }}
-                >
-                  {leftSidebarOpen ? <PanelLeftClose size={15} strokeWidth={2} /> : <PanelLeftOpen size={15} strokeWidth={2} />}
-                </button>
-              )}
-              
               <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'visible' }}>
                 <TextualHeader onExport={handleExportRequest} />
               </div>
@@ -410,43 +349,23 @@ function App() {
               )}
             </div>
           ) : !isMobileOrTablet ? (
-            <>
-              <button
-                onClick={() => toggleSidebar('left')}
-                title={`${leftSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'itinéraire (Ctrl+[)`}
-                style={{ ...mapPanelToggleStyle, left: '16px' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-hover)';
-                  e.currentTarget.style.borderColor = 'var(--border-strong)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-elevated)';
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                  e.currentTarget.style.color = 'var(--text-dim)';
-                }}
-              >
-                {leftSidebarOpen ? <PanelLeftClose size={18} strokeWidth={2} /> : <PanelLeftOpen size={18} strokeWidth={2} />}
-              </button>
-              
-              <button
-                onClick={() => toggleSidebar('right')}
-                title={`${rightSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'orchestration (Ctrl+])`}
-                style={{ ...mapPanelToggleStyle, right: '16px' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-hover)';
-                  e.currentTarget.style.borderColor = 'var(--border-strong)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-elevated)';
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                  e.currentTarget.style.color = 'var(--text-dim)';
-                }}
-              >
-                {rightSidebarOpen ? <PanelRightClose size={18} strokeWidth={2} /> : <PanelRightOpen size={18} strokeWidth={2} />}
-              </button>
-            </>
+            <button
+              onClick={() => toggleSidebar('right')}
+              title={`${rightSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'orchestration (Ctrl+])`}
+              style={{ ...mapPanelToggleStyle, right: '16px' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--bg-hover)';
+                e.currentTarget.style.borderColor = 'var(--border-strong)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--bg-elevated)';
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                e.currentTarget.style.color = 'var(--text-dim)';
+              }}
+            >
+              {rightSidebarOpen ? <PanelRightClose size={18} strokeWidth={2} /> : <PanelRightOpen size={18} strokeWidth={2} />}
+            </button>
           ) : null}
 
           <ProjectWorkspace onExport={handleExportRequest} viewMode={viewMode} onToggleSidebar={toggleSidebar} />
@@ -466,54 +385,7 @@ function App() {
 
       </div>
 
-      {/* MOBILE / TABLET BOTTOM SHEETS (< 1024px) */}
-      {isMobileOrTablet && leftSidebarOpen && (
-        <>
-          <div className="bottom-sheet-backdrop" onClick={() => setLeftSidebarOpen(false)} />
-          <div className="bottom-sheet-panel">
-            <div className="bottom-sheet-handle-zone" onClick={() => setLeftSidebarOpen(false)} role="button" aria-label="Fermer le volet">
-              <div className="bottom-sheet-handle-bar" />
-            </div>
-            <div className="bottom-sheet-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                <FileText size={16} color="var(--accent-default)" />
-                <span>Carnet & Itinéraire</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button
-                  onClick={() => {
-                    setViewMode('text');
-                    setLeftSidebarOpen(false);
-                  }}
-                  title="Ouvrir le mode Carnet en plein écran"
-                  style={{
-                    padding: '3px 8px',
-                    borderRadius: '4px',
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-primary)',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Plein écran
-                </button>
-                <button
-                  onClick={() => setLeftSidebarOpen(false)}
-                  aria-label="Fermer"
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: 'var(--radius-xs)' }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              <LeftSidebarPanel />
-            </div>
-          </div>
-        </>
-      )}
+      {/* MOBILE / TABLET RIGHT BOTTOM SHEET (CALQUES & CARTOGRAPHIE) (< 1024px) */}
 
       {isMobileOrTablet && rightSidebarOpen && (
         <>

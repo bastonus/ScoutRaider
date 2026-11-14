@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Route } from 'lucide-react';
+import { Layers } from 'lucide-react';
 import MapComponent from './MapComponent';
 import FloatingSearch from './FloatingSearch';
 import FloatingToolbar from './FloatingToolbar';
@@ -37,7 +37,7 @@ export default function MapWorkspace({ isSplitMode = false, onToggleSidebar }: M
             
             {!showMetro && <FloatingSearch isSplitMode={isSplitMode} />}
 
-            {/* BOUTONS FLOTTANTS DES PANNEAUX (CALQUES & ÉTAPES) SUR MOBILE */}
+            {/* BOUTON FLOTTANT DU VOLET CALQUES & CARTOGRAPHIE SUR MOBILE */}
             {isMobile && onToggleSidebar && (
                 <div style={{
                     position: 'absolute',
@@ -76,35 +76,6 @@ export default function MapWorkspace({ isSplitMode = false, onToggleSidebar }: M
                         }}
                     >
                         <Layers size={18} strokeWidth={2.1} />
-                    </button>
-
-                    <button
-                        onClick={() => onToggleSidebar('left')}
-                        title="Étapes de l'itinéraire"
-                        style={{
-                            width: '38px',
-                            height: '38px',
-                            borderRadius: '12px',
-                            background: 'var(--bg-elevated)',
-                            border: '1px solid var(--border-subtle)',
-                            boxShadow: 'var(--shadow-sm)',
-                            color: 'var(--text-dim)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            transition: 'all 100ms ease'
-                        }}
-                        onMouseEnter={e => {
-                            e.currentTarget.style.background = 'var(--bg-hover)';
-                            e.currentTarget.style.color = 'var(--text-primary)';
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.background = 'var(--bg-elevated)';
-                            e.currentTarget.style.color = 'var(--text-dim)';
-                        }}
-                    >
-                        <Route size={18} strokeWidth={2.1} />
                     </button>
                 </div>
             )}

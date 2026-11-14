@@ -928,20 +928,13 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     </div>
                 )}
 
-                {/* SIDEBAR TOGGLES (Desktop only - mobile uses bottom sheets accessed via bottom toolbar) */}
+                {/* SIDEBAR TOGGLE (Desktop only: right orchestration/libraries sidebar) */}
                 {!isMobile && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginRight: '4px', paddingRight: '10px', borderRight: '1px solid var(--bg-border)' }}>
                         <button 
                             className="btn-icon btn-sm" 
-                            onClick={() => onToggleSidebar?.('left')}
-                            title="Basculer la barre latérale gauche"
-                        >
-                            <PanelLeft size={17} strokeWidth={2.2} />
-                        </button>
-                        <button 
-                            className="btn-icon btn-sm" 
                             onClick={() => onToggleSidebar?.('right')}
-                            title="Basculer la barre latérale droite"
+                            title="Basculer le panneau latéral droit (Ctrl+])"
                         >
                             <PanelRight size={17} strokeWidth={2.2} />
                         </button>

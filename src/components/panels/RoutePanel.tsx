@@ -386,7 +386,12 @@ function DropZone({ insertAfterIdx, dist, isDirect, onDrop, onToggleDirect }: { 
 }
 
 // ── Main RoutePanel ────────────────────────────────────────────────────────────
-export default function RoutePanel() {
+interface RoutePanelProps {
+    embedded?: boolean;
+    onClose?: () => void;
+}
+
+export default function RoutePanel({ embedded = false, onClose }: RoutePanelProps) {
     const { state, dispatch } = useApp();
     const stages = state.stages;
     const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
@@ -498,8 +503,8 @@ export default function RoutePanel() {
             flexDirection: 'column', 
             height: '100%', 
             overflow: 'hidden',
-            background: 'var(--bg-panel)',
-            borderRight: '1px solid var(--bg-border)'
+            background: embedded ? 'transparent' : 'var(--bg-panel)',
+            borderRight: embedded ? 'none' : '1px solid var(--bg-border)'
         }}>
             {/* Route toolbar */}
             {stages.length >= 2 && (
@@ -507,9 +512,9 @@ export default function RoutePanel() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '8px 14px',
+                    padding: embedded ? '6px 12px' : '8px 14px',
                     borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-                    background: 'rgba(0, 0, 0, 0.15)',
+                    background: embedded ? 'transparent' : 'rgba(0, 0, 0, 0.15)',
                     flexShrink: 0,
                 }}>
                     <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600 }}>
@@ -545,12 +550,12 @@ export default function RoutePanel() {
             <div ref={scrollRef} style={{ 
                 flex: 1, 
                 overflowY: 'auto', 
-                padding: '16px', 
+                padding: embedded ? '12px' : '16px', 
                 scrollBehavior: 'smooth',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '16px',
-                background: 'rgba(0,0,0,0.15)'
+                gap: embedded ? '10px' : '16px',
+                background: embedded ? 'transparent' : 'rgba(0,0,0,0.15)'
             }}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                     {stages.map((stage, idx) => (
