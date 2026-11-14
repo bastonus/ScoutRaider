@@ -410,19 +410,19 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
 
     return (
         <header className="menu-bar" style={{
-            height: '54px',
+            height: isMobile ? '46px' : '54px',
             userSelect: 'none',
             background: 'var(--bg-dark)',
             borderBottom: '1px solid var(--glass-border)',
             display: 'flex',
             alignItems: 'center',
-            padding: '0 16px',
+            padding: isMobile ? '0 8px' : '0 16px',
             justifyContent: 'space-between',
             zIndex: 2000,
         } as React.CSSProperties & { WebkitAppRegion: string }}>
 {/* @ts-ignore WebkitAppRegion is Electron-specific */}
             {/* LEFT: LOGO + GOOGLE DOCS STYLE TITLE ENCART & MENUS */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', WebkitAppRegion: 'no-drag' } as any} ref={menuRef}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '12px', flexShrink: 0, WebkitAppRegion: 'no-drag' } as any} ref={menuRef}>
                 <div 
                     title="Retour à l'accueil"
                     onClick={() => navigate('/projects')}
@@ -438,7 +438,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                         transition: 'background 0.15s',
                     }}
                 >
-                    <FleurDeLysLogo size={30} style={{ 
+                    <FleurDeLysLogo size={isMobile ? 24 : 30} style={{ 
                         filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
                         borderRadius: '6px'
                     }} />
@@ -446,7 +446,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
 
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1px' }}>
                     {/* Top Row: Google Docs style Document Title */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px' }}>
                         <span
                             ref={measureSpanRef}
                             style={{
@@ -455,7 +455,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                                 height: 0,
                                 overflow: 'hidden',
                                 whiteSpace: 'pre',
-                                fontSize: '15px',
+                                fontSize: isMobile ? '13px' : '15px',
                                 fontWeight: 600,
                                 fontFamily: 'inherit',
                                 pointerEvents: 'none'
@@ -481,16 +481,17 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                             title="Renommer le document"
                             placeholder="Document sans titre"
                             style={{
-                                width: `${titleWidth}px`,
+                                width: isMobile ? `${Math.min(105, titleWidth)}px` : `${titleWidth}px`,
+                                maxWidth: isMobile ? '105px' : '320px',
                                 height: '22px',
                                 background: 'transparent',
                                 border: '1px solid transparent',
                                 borderRadius: '4px',
                                 color: '#ffffff',
-                                fontSize: '15px',
+                                fontSize: isMobile ? '13px' : '15px',
                                 fontWeight: 600,
                                 lineHeight: '20px',
-                                padding: '1px 6px',
+                                padding: '1px 4px',
                                 outline: 'none',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s ease',
@@ -632,8 +633,67 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                 </div>
             </div>
 
-            {/* CENTER: View Mode Toggle & Command Palette (Hidden on Mobile < 768px) */}
-            {!isMobile && (
+            {/* CENTER: View Mode Switcher */}
+            {isMobile ? (
+                /* PROMINENT MOBILE SEGMENTED CONTROL: CARTE vs CARNET */
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: 'var(--bg-surface)',
+                    borderRadius: 'var(--radius-pill)',
+                    padding: '2px',
+                    border: '1px solid var(--border-subtle)',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                    gap: '2px',
+                    flexShrink: 0,
+                    margin: '0 6px',
+                    WebkitAppRegion: 'no-drag'
+                } as any}>
+                    <button
+                        onClick={() => onViewModeChange?.('map')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '4px 11px',
+                            borderRadius: 'var(--radius-pill)',
+                            border: 'none',
+                            background: viewMode === 'map' ? 'var(--accent-default)' : 'transparent',
+                            color: viewMode === 'map' ? '#ffffff' : 'var(--text-dim)',
+                            fontSize: '12px',
+                            fontWeight: viewMode === 'map' ? 700 : 500,
+                            cursor: 'pointer',
+                            transition: 'all 120ms ease',
+                            boxShadow: viewMode === 'map' ? '0 2px 6px rgba(110, 201, 126, 0.4)' : 'none'
+                        }}
+                    >
+                        <MapIcon size={13} strokeWidth={2.4} />
+                        <span>Carte</span>
+                    </button>
+
+                    <button
+                        onClick={() => onViewModeChange?.('text')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '4px 11px',
+                            borderRadius: 'var(--radius-pill)',
+                            border: 'none',
+                            background: viewMode === 'text' ? 'var(--accent-default)' : 'transparent',
+                            color: viewMode === 'text' ? '#ffffff' : 'var(--text-dim)',
+                            fontSize: '12px',
+                            fontWeight: viewMode === 'text' ? 700 : 500,
+                            cursor: 'pointer',
+                            transition: 'all 120ms ease',
+                            boxShadow: viewMode === 'text' ? '0 2px 6px rgba(110, 201, 126, 0.4)' : 'none'
+                        }}
+                    >
+                        <FileText size={13} strokeWidth={2.4} />
+                        <span>Carnet</span>
+                    </button>
+                </div>
+            ) : (
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isTablet ? '6px' : '10px', WebkitAppRegion: 'drag' } as any}>
                     {/* View Mode Switcher */}
                     <div style={{
@@ -792,8 +852,8 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     </button>
                 )}
 
-                {/* EXPORT BUTTON — ALWAYS VISIBLE & TOUCH-FRIENDLY ON MOBILE */}
-                {isMobile && (
+                {/* EXPORT BUTTON — Desktop only (accessible via Profile Menu on mobile) */}
+                {!isMobile && onExport && (
                     <button
                         onClick={onExport}
                         title="Exporter le carnet de raid"
@@ -820,7 +880,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                 )}
 
                 {/* UPDATE STATUS PILL */}
-                {updateStatus !== 'idle' && (
+                {!isMobile && updateStatus !== 'idle' && (
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -888,101 +948,70 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     </div>
                 )}
 
-                {/* MOBILE QUICK VIEW TOGGLE (Carte / Carnet Textuel) */}
-                {isMobile && (
-                    <button
-                        onClick={() => onViewModeChange?.(viewMode === 'map' ? 'text' : 'map')}
-                        title={viewMode === 'map' ? "Afficher le carnet textuel" : "Afficher la carte"}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '3px 8px',
-                            borderRadius: 'var(--radius-pill)',
-                            border: `1px solid ${viewMode === 'text' ? 'var(--accent-default)' : 'var(--border-subtle)'}`,
-                            background: viewMode === 'text' ? 'var(--accent-default)' : 'var(--bg-surface)',
-                            color: viewMode === 'text' ? '#ffffff' : 'var(--text-primary)',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            marginRight: '3px',
-                        }}
-                    >
-                        {viewMode === 'map' ? (
-                            <>
-                                <FileText size={13} />
-                                <span>Carnet</span>
-                            </>
-                        ) : (
-                            <>
-                                <MapIcon size={13} />
-                                <span>Carte</span>
-                            </>
-                        )}
-                    </button>
-                )}
+                {/* PREFERENCES & NOTIFICATIONS (Desktop only - accessible via Profile Menu on mobile) */}
+                {!isMobile && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', position: 'relative' }}>
+                        <button 
+                            className="btn-icon btn-sm" 
+                            title="Préférences (Ctrl+P)"
+                            onClick={onPreferencesOpen}
+                        >
+                            <Settings size={17} strokeWidth={2.2} />
+                        </button>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', position: 'relative' }}>
-                    <button 
-                        className="btn-icon btn-sm" 
-                        title="Préférences (Ctrl+P)"
-                        onClick={onPreferencesOpen}
-                    >
-                        <Settings size={17} strokeWidth={2.2} />
-                    </button>
-
-                    <button 
-                        className="btn-icon btn-sm" 
-                        title="Historique des notifications"
-                        onClick={() => {
-                            setShowNotifHistory(!showNotifHistory);
-                            setOpenMenu(null);
-                        }}
-                    >
-                        <Bell size={17} strokeWidth={2.2} />
-                        {state.notifications.length > 0 && (
-                            <div style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', background: 'var(--semantic-red)', borderRadius: '50%' }} />
-                        )}
-                    </button>
-                    
-                    {showNotifHistory && (
-                        <div style={{
-                            position: 'absolute', top: '100%', right: 0, marginTop: '8px',
-                            width: '320px', maxHeight: '400px', overflowY: 'auto',
-                            background: 'var(--bg-panel)', border: '1px solid var(--bg-border)',
-                            borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-glass)',
-                            zIndex: 3000, display: 'flex', flexDirection: 'column'
-                        }}>
-                            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                Historique des Notifications
-                            </div>
-                            {state.notifications.length === 0 ? (
-                                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '12px' }}>
-                                    Aucune notification.
+                        <button 
+                            className="btn-icon btn-sm" 
+                            title="Historique des notifications"
+                            onClick={() => {
+                                setShowNotifHistory(!showNotifHistory);
+                                setOpenMenu(null);
+                            }}
+                        >
+                            <Bell size={17} strokeWidth={2.2} />
+                            {state.notifications.length > 0 && (
+                                <div style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', background: 'var(--semantic-red)', borderRadius: '50%' }} />
+                            )}
+                        </button>
+                        
+                        {showNotifHistory && (
+                            <div style={{
+                                position: 'absolute', top: '100%', right: 0, marginTop: '8px',
+                                width: '320px', maxHeight: '400px', overflowY: 'auto',
+                                background: 'var(--bg-panel)', border: '1px solid var(--bg-border)',
+                                borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-glass)',
+                                zIndex: 3000, display: 'flex', flexDirection: 'column'
+                            }}>
+                                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    Historique des Notifications
                                 </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    {[...state.notifications].reverse().map(notif => (
-                                        <div key={notif.id} style={{
-                                            padding: '12px 16px', borderBottom: '1px solid var(--glass-border)',
-                                            display: 'flex', gap: '12px', alignItems: 'flex-start',
-                                            background: notif.type === 'error' ? 'rgba(239, 68, 68, 0.05)' : notif.type === 'warning' ? 'rgba(212, 145, 74, 0.05)' : 'transparent'
-                                        }}>
-                                            <div style={{ color: notif.type === 'error' ? 'var(--semantic-red)' : notif.type === 'warning' ? 'var(--semantic-orange)' : 'var(--semantic-green)', marginTop: '2px' }}>
-                                                •
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                                                    {notif.message}
+                                {state.notifications.length === 0 ? (
+                                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '12px' }}>
+                                        Aucune notification.
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        {[...state.notifications].reverse().map(notif => (
+                                            <div key={notif.id} style={{
+                                                padding: '12px 16px', borderBottom: '1px solid var(--glass-border)',
+                                                display: 'flex', gap: '12px', alignItems: 'flex-start',
+                                                background: notif.type === 'error' ? 'rgba(239, 68, 68, 0.05)' : notif.type === 'warning' ? 'rgba(212, 145, 74, 0.05)' : 'transparent'
+                                            }}>
+                                                <div style={{ color: notif.type === 'error' ? 'var(--semantic-red)' : notif.type === 'warning' ? 'var(--semantic-orange)' : 'var(--semantic-green)', marginTop: '2px' }}>
+                                                    •
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                                                        {notif.message}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* USER PROFILE AVATAR CIRCLE (Tout à droite - Ouvre le Menu & Profil sur Mobile) */}
                 <div style={{ position: 'relative', marginLeft: '2px' }} ref={userMenuRef}>
@@ -1308,6 +1337,36 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                                     </div>
                                 )}
                             </div>
+
+                            {/* BOUTON D'EXPORT RAPIDE MOBILE */}
+                            {onExport && (
+                                <button
+                                    onClick={() => {
+                                        setMobileMenuOpen(false);
+                                        onExport();
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        padding: '10px 14px',
+                                        borderRadius: 'var(--radius-sm)',
+                                        background: 'var(--accent-default)',
+                                        border: 'none',
+                                        color: '#ffffff',
+                                        fontSize: '12.5px',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        marginBottom: '12px',
+                                        boxShadow: '0 2px 8px rgba(110, 201, 126, 0.35)'
+                                    }}
+                                >
+                                    <Download size={15} strokeWidth={2.4} />
+                                    <span>Exporter le carnet de raid</span>
+                                </button>
+                            )}
 
                             {/* VIEW MODE SWITCHER */}
                             <div style={{

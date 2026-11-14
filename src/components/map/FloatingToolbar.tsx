@@ -13,7 +13,8 @@ import {
   ChevronUp, 
   FileText, 
   Layers,
-  KeyRound
+  KeyRound,
+  Route
 } from 'lucide-react';
 
 interface FloatingToolbarProps {
@@ -274,7 +275,7 @@ export default function FloatingToolbar({ activeTool, onToolChange, onToggleSide
           <div style={CELL}>
             <button
               onClick={() => onToggleSidebar('left')}
-              title="Carnet & Itinéraire"
+              title="Étapes de l'itinéraire (Volet)"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -298,7 +299,7 @@ export default function FloatingToolbar({ activeTool, onToolChange, onToggleSide
                 e.currentTarget.style.color = 'var(--text-dim)';
               }}
             >
-              <FileText size={18} strokeWidth={2.1} />
+              <Route size={18} strokeWidth={2.1} />
             </button>
             <button
               onClick={() => onToggleSidebar('right')}
