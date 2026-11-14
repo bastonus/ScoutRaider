@@ -466,6 +466,61 @@ def render_raw_html_to_pdf(payload: RawHtmlPdfRequest):
     )
 
 
+# ─── AI Copilot & Storytelling ────────────────────────────────────────────────
+
+@app.post("/api/ai/narrative", response_model=GenerateNarrativeResponse, tags=["AI"])
+async def generate_narrative_endpoint(payload: GenerateNarrativeRequest):
+    """Generate an immersive raid narrative (theme, stage stories, intro/outro)."""
+    return await ai_service.generate_narrative(payload)
+
+
+@app.post("/api/ai/riddle", response_model=GenerateRiddleResponse, tags=["AI"])
+async def generate_riddle_endpoint(payload: GenerateRiddleRequest):
+    """Generate an encoded pedagogical riddle tied to a POI."""
+    return await ai_service.generate_riddle(payload)
+
+
+@app.post("/api/ai/safety-audit", response_model=SafetyAuditResponse, tags=["AI"])
+async def safety_audit_endpoint(payload: SafetyAuditRequest):
+    """Perform a trail safety audit considering distances, elevation and age group."""
+    return await ai_service.audit_safety(payload)
+
+
+# ─── Model Context Protocol (MCP) Endpoint ───────────────────────────────────
+
+@app.post("/api/mcp", tags=["MCP"])
+async def mcp_rpc_endpoint(payload: Dict[str, Any]):
+    """Standard JSON-RPC 2.0 endpoint for MCP Clients (Antigravity, Claude, Cursor)."""
+    return mcp_server.handle_request(payload)
+
+
+# ─── Connector Hub Endpoints ──────────────────────────────────────────────────
+
+@app.get("/api/connectors", tags=["Connectors"])
+def list_connectors():
+    """List all registered external data connectors."""
+    return connector_registry.list_all()
+
+
+@app.post("/api/connectors/{connector_id}/fetch", tags=["Connectors"])
+async def fetch_connector_data(connector_id: str, query: Dict[str, Any]):
+    """Query data from a registered connector (e.g. OSM Overpass)."""
+    conn = connector_registry.get(connector_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail=f"Connector '{connector_id}' not found.")
+    return await conn.fetch(query)
+
+
+@app.get("/api/connectors/{connector_id}/test", tags=["Connectors"])
+async def test_connector_endpoint(connector_id: str):
+    """Test connectivity to the external service."""
+    conn = connector_registry.get(connector_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail=f"Connector '{connector_id}' not found.")
+    is_ok = await conn.test_connection()
+    return {"connector_id": connector_id, "healthy": is_ok}
+
+
 # ─── Production SPA Static Mount ──────────────────────────────────────────────
 
 DIST_DIR = PROJECT_ROOT / "dist"
