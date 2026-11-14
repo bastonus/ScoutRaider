@@ -188,7 +188,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         background: 'var(--bg-elevated)',
         border: '1px solid var(--border-subtle)',
         borderRadius: '14px',
-        boxShadow: 'var(--shadow-lg)',
+        boxShadow: 'none',
         pointerEvents: 'all',
     };
 
@@ -237,7 +237,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                     background: 'var(--bg-elevated)',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: showResults ? '14px 14px 0 0' : '14px',
-                    boxShadow: 'var(--shadow-lg)',
+                    boxShadow: 'none',
                     transition: 'border-color 100ms ease',
                 }}>
                     <Search size={15} color="var(--text-dim)" strokeWidth={2} />

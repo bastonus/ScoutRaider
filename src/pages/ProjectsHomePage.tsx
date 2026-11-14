@@ -351,7 +351,6 @@ export default function ProjectsHomePage() {
                 .project-card:hover { transform: translateY(-1px); border-color: #3F3F46 !important; }
                 .action-btn:hover { background: #27272A !important; color: #FAFAFA !important; }
                 .delete-btn:hover { background: rgba(239,68,68,0.1) !important; color: #FCA5A5 !important; }
-                .fab-btn:hover { transform: scale(1.06) !important; box-shadow: 0 8px 24px rgba(37,99,235,0.4) !important; }
             `}</style>
 
             {/* Marketplace Modal */}
@@ -649,7 +648,7 @@ const s: Record<string, React.CSSProperties> = {
         cursor: 'pointer',
         flexShrink: 0,
         whiteSpace: 'nowrap',
-        boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+        boxShadow: 'none',
         transition: 'background 120ms ease',
         fontFamily: 'inherit',
     },

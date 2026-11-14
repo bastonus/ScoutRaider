@@ -35,7 +35,7 @@ export default function ControlToolbar() {
         background: 'var(--bg-elevated)',
         border: '1px solid var(--border-subtle)',
         borderRadius: '14px',
-        boxShadow: 'var(--shadow-lg)',
+        boxShadow: 'none',
         pointerEvents: 'all',
     };
 

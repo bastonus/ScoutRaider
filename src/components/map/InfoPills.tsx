@@ -25,7 +25,7 @@ export default function InfoPills() {
         color: 'var(--text-primary)',
         background: 'var(--bg-elevated)',
         border: '1px solid var(--border-subtle)',
-        boxShadow: 'var(--shadow-md)',
+        boxShadow: 'none',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',

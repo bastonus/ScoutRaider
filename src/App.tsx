@@ -267,7 +267,7 @@ function App() {
     background: 'var(--bg-elevated)',
     border: '1px solid var(--border-subtle)',
     borderRadius: '12px',
-    boxShadow: 'var(--shadow-lg)',
+    boxShadow: 'none',
     color: 'var(--text-dim)',
     display: 'flex',
     alignItems: 'center',
