@@ -27,8 +27,7 @@ import {
     Menu,
     ChevronDown,
     ChevronRight,
-    Sparkles,
-    Store
+    Download
 } from 'lucide-react';
 import FleurDeLysLogo from './FleurDeLysLogo';
 import AICopilotModal from '../panels/AICopilotModal';
@@ -732,42 +731,6 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                             <kbd style={{ fontSize: '9px', padding: '0 4px', height: '16px', borderRadius: '4px' }}>Ctrl K</kbd>
                         </button>
                     )}
-
-                    {/* AI Copilot & MCP Trigger */}
-                    {!isTablet && (
-                        <button
-                            onClick={() => { setAiModalTab('narrative'); setAiModalOpen(true); }}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                padding: '0 10px',
-                                height: '28px',
-                                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.1) 100%)',
-                                border: '1px solid rgba(16, 185, 129, 0.3)',
-                                borderRadius: 'var(--radius-pill)',
-                                color: '#34d399',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                transition: 'all 100ms ease',
-                                WebkitAppRegion: 'no-drag',
-                            } as any}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.borderColor = '#10b981';
-                                e.currentTarget.style.color = '#fff';
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-                                e.currentTarget.style.color = '#34d399';
-                            }}
-                            title="Copilote IA & Hub MCP (Ctrl+I)"
-                        >
-                            <Sparkles size={12} color="#10b981" />
-                            <span>IA & MCP</span>
-                        </button>
-                    )}
                 </div>
             )}
 
@@ -810,78 +773,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     </div>
                 )}
 
-                {/* MARKETPLACE BUTTON (Desktop & Tablet) */}
-                {!isMobile && (
-                    <button
-                        onClick={onOpenMarketplace}
-                        title="Marketplace : codes, énigmes, orchestrations & communauté"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            background: 'rgba(110, 201, 126, 0.12)',
-                            border: '1px solid rgba(110, 201, 126, 0.3)',
-                            borderRadius: 'var(--radius-main)',
-                            padding: isTablet ? '0 8px' : '0 12px',
-                            height: '28px',
-                            color: '#6EC97E',
-                            fontSize: '11.5px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            transition: 'all 100ms ease'
-                        }}
-                        onMouseEnter={e => {
-                            e.currentTarget.style.background = 'rgba(110, 201, 126, 0.22)';
-                            e.currentTarget.style.borderColor = '#6EC97E';
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.background = 'rgba(110, 201, 126, 0.12)';
-                            e.currentTarget.style.borderColor = 'rgba(110, 201, 126, 0.3)';
-                        }}
-                    >
-                        <Store size={13} color="#6EC97E" />
-                        {!isTablet && <span>Marketplace</span>}
-                    </button>
-                )}
 
-                {/* ESPACE DOCUMENTS BUTTON (Desktop & Tablet) */}
-                {!isMobile && (
-                    <button
-                        onClick={() => {
-                            if (isGuest) setAuthModalOpen(true);
-                            else setProjectsModalOpen(true);
-                        }}
-                        title="Ouvrir l'Espace Documents Cloud"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            background: 'var(--bg-surface)',
-                            border: '1px solid var(--border-subtle)',
-                            borderRadius: 'var(--radius-main)',
-                            padding: isTablet ? '0 8px' : '0 12px',
-                            height: '28px',
-                            color: 'var(--text-primary)',
-                            fontSize: '11.5px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            transition: 'all 100ms ease'
-                        }}
-                        onMouseEnter={e => {
-                            e.currentTarget.style.background = 'var(--bg-hover)';
-                            e.currentTarget.style.borderColor = 'var(--border-strong)';
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.background = 'var(--bg-surface)';
-                            e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                        }}
-                    >
-                        <FolderOpen size={13} color="var(--text-dim)" />
-                        {!isTablet && <span>Documents</span>}
-                    </button>
-                )}
 
                 {/* SHARE BUTTON (Desktop & Tablet) */}
                 {!isMobile && (
