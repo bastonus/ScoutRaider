@@ -37,7 +37,6 @@ export default function TabRenderer(props: any) {
                     <div style={{ 
                         width: '6px', height: '6px', borderRadius: '50%', 
                         background: 'var(--accent-default)', marginLeft: '6px',
-                        boxShadow: '0 0 8px var(--accent-glow)',
                         animation: 'pulse 2s infinite'
                     }} title="Non sauvegardé" />
                 )}

@@ -26,7 +26,7 @@ import {
     FileText,
     Loader2,
     Eye,
-    Store
+    Boxes
 } from 'lucide-react';
 
 type TabFilter = 'all' | 'mine' | 'shared';
@@ -247,7 +247,7 @@ export default function ProjectsHomePage() {
                         onClick={() => navigate('/marketplace')}
                         title="Ouvrir la Marketplace des Modules de code & Orchestrations"
                     >
-                        <Store size={15} />
+                        <Boxes size={15} />
                         <span>Marketplace</span>
                     </button>
                     <button style={s.newBtn} onClick={handleNewProject}>

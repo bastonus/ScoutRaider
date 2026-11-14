@@ -130,7 +130,9 @@ export type AppAction =
     | { type: 'UPDATE_MANUAL_TEXT'; stepId: string; text: string }
     | { type: 'INSERT_MANUAL_STEP'; afterStepId: string; content: string }
     /** New 2-button separator: insert a typed manual block (html or code) */
-    | { type: 'INSERT_MANUAL_STEP_TYPED'; afterStepId: string; content: string; manualType: 'html' | 'code'; moduleId?: string; anchorSegmentIdx?: number }
+    | { type: 'INSERT_MANUAL_STEP_TYPED'; afterStepId: string; content: string; manualType: 'html' | 'code'; moduleId?: string; anchorSegmentIdx?: number; isTitleStep?: boolean }
+    | { type: 'CONVERT_MANUAL_STEP_TYPE'; stepId: string; targetType: 'html' | 'code'; moduleId?: ModuleId }
+    | { type: 'LOCK_DOCUMENT_TITLE' }
     | { type: 'REMOVE_MANUAL_STEP'; stepId: string }
     | { type: 'SET_NAV_LANGUAGE'; stepId?: string; segIdx?: number; lang: CarnetStep['navLanguage'] }
     | { type: 'TOGGLE_POI'; stepId?: string; segIdx?: number; poiId: string }
@@ -1437,10 +1439,16 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
         case 'TOGGLE_ANNEXE': {
             pushHistory(state);
-            const set = new Set(state.enabled_annexes || []);
-            if (set.has(action.annexeId)) set.delete(action.annexeId);
-            else set.add(action.annexeId);
-            return { ...state, enabled_annexes: Array.from(set) };
+            const disabled = new Set(state.disabled_annexes || []);
+            if (disabled.has(action.annexeId)) {
+                disabled.delete(action.annexeId);
+            } else {
+                disabled.add(action.annexeId);
+            }
+            return {
+                ...state,
+                disabled_annexes: Array.from(disabled)
+            };
         }
 
         case 'SET_CARNET_VIEW':
@@ -1455,35 +1463,81 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'MANUAL_MODULE_ASSIGNMENT': {
             pushHistory(state);
             const stepToChange = state.carnet_steps.find(s => s.id === action.stepId);
-            if (!stepToChange) return state;
 
-            if (stepToChange.isManual) {
+            if (stepToChange && stepToChange.isManual) {
                 const newSteps = state.carnet_steps.map(s => {
                     if (s.id !== action.stepId) return s;
                     return regenerateStepTexts({ ...s, moduleId: action.moduleId as ModuleId }, state);
                 });
                 return { ...state, carnet_steps: autoMergeSteps(newSteps) };
-            } else {
-                // Update custom assignments for computed segments
-                const newAssignments = { ...state.custom_assignments };
-                const polySteps = [...state.polygonal_steps];
-                if (stepToChange.segmentIndices) {
-                    stepToChange.segmentIndices.forEach(idx => {
-                        newAssignments[idx.toString()] = action.moduleId;
-                        if (polySteps[idx]) {
-                            polySteps[idx] = { ...polySteps[idx], assigned_module: action.moduleId as ModuleId };
-                        }
-                    });
-                }
-                const nextState = { ...state, custom_assignments: newAssignments, polygonal_steps: polySteps };
-                return autoRebuildCarnet(nextState);
             }
+
+            // Check if step is inside inlineManualSteps
+            let inlineFound = false;
+            const updatedStepsWithInline = state.carnet_steps.map(s => {
+                if (s.inlineManualSteps) {
+                    let changed = false;
+                    const newInline = { ...s.inlineManualSteps };
+                    for (const [k, v] of Object.entries(newInline)) {
+                        if (v.id === action.stepId) {
+                            newInline[k as any] = regenerateStepTexts({ ...v, moduleId: action.moduleId as ModuleId }, state);
+                            changed = true;
+                            inlineFound = true;
+                        }
+                    }
+                    if (changed) return { ...s, inlineManualSteps: newInline };
+                }
+                return s;
+            });
+            if (inlineFound) {
+                return { ...state, carnet_steps: updatedStepsWithInline };
+            }
+
+            if (!stepToChange) return state;
+
+            // Update custom assignments for computed segments
+            const newAssignments = { ...state.custom_assignments };
+            const polySteps = [...state.polygonal_steps];
+            if (stepToChange.segmentIndices) {
+                stepToChange.segmentIndices.forEach(idx => {
+                    newAssignments[idx.toString()] = action.moduleId;
+                    if (polySteps[idx]) {
+                        polySteps[idx] = { ...polySteps[idx], assigned_module: action.moduleId as ModuleId };
+                    }
+                });
+            }
+            const nextState = { ...state, custom_assignments: newAssignments, polygonal_steps: polySteps };
+            return autoRebuildCarnet(nextState);
         }
 
         case 'UPDATE_MANUAL_TEXT': {
             const _theme1 = themeManager.getTheme();
+
+            // Synchronisation du titre du document :
+            // Le premier texte commenté devient le titre du document une seule fois.
+            let newDocTitle = state.document_title;
+            const titleAlreadySynced = state.document_title_synced ?? false;
+
+            if (!titleAlreadySynced) {
+                // Trouver le premier bloc manuel de carnet_steps
+                const firstManual = state.carnet_steps.find(s => s.isManual);
+                if (firstManual && firstManual.id === action.stepId) {
+                    const cleanText = (action.text || '')
+                        .replace(/<[^>]+>/g, '')
+                        .replace(/&nbsp;/g, ' ')
+                        .trim();
+                    if (cleanText.length > 0) {
+                        const firstLine = cleanText.split('\n')[0].trim().slice(0, 60);
+                        if (firstLine.length > 0) {
+                            newDocTitle = firstLine;
+                        }
+                    }
+                }
+            }
+
             return {
                 ...state,
+                document_title: newDocTitle,
                 carnet_steps: state.carnet_steps.map(s => {
                     if (s.id === action.stepId) {
                         const encoded = ModuleLogic.encode(s.moduleId, action.text, { key: _theme1.vigenere_key });
@@ -1504,6 +1558,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
                     return s;
                 })
             };
+        }
+
+        case 'LOCK_DOCUMENT_TITLE': {
+            if (state.document_title && state.document_title !== 'Document sans titre') {
+                return { ...state, document_title_synced: true };
+            }
+            return state;
         }
 
         case 'INSERT_MANUAL_STEP': {
@@ -1596,10 +1657,69 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 isManual: true,
                 manualType: action.manualType,
                 anchorSegmentIdx: anchorSegmentIdxT,
+                isTitleStep: action.isTitleStep,
             };
             const stepsT = [...state.carnet_steps];
             stepsT.splice(afterIdxT + 1, 0, typedStep);
             return autoRebuildCarnet({ ...state, carnet_steps: stepsT });
+        }
+
+        case 'CONVERT_MANUAL_STEP_TYPE': {
+            pushHistory(state);
+            const theme_c = themeManager.getTheme(state.theme_id);
+            const updateStep = (s: CarnetStep): CarnetStep => {
+                if (s.id !== action.stepId) return s;
+                if (action.targetType === 'code') {
+                    // Nettoyer les balises HTML éventuelles pour récupérer le texte brut
+                    const rawText = (s.solutionText || '')
+                        .replace(/<p[^>]*>/gi, '')
+                        .replace(/<\/p>/gi, '\n')
+                        .replace(/<br\s*[\/]?>/gi, '\n')
+                        .replace(/<[^>]+>/g, '')
+                        .replace(/&nbsp;/g, ' ')
+                        .trim();
+                    const modId = (action.moduleId || (s.moduleId && s.moduleId !== 'texte_clair' ? s.moduleId : 'morse')) as ModuleId;
+                    const encoded = ModuleLogic.encode(modId, rawText, { key: theme_c.vigenere_key });
+                    return {
+                        ...s,
+                        manualType: 'code',
+                        moduleId: modId,
+                        solutionText: rawText,
+                        encodedText: encoded,
+                    };
+                } else {
+                    // targetType === 'html'
+                    const rawText = s.solutionText || '';
+                    const htmlContent = rawText.startsWith('<p>')
+                        ? rawText
+                        : (rawText ? `<p>${rawText.replace(/\n/g, '<br>')}</p>` : '');
+                    return {
+                        ...s,
+                        manualType: 'html',
+                        moduleId: 'texte_clair',
+                        solutionText: htmlContent,
+                        encodedText: htmlContent,
+                    };
+                }
+            };
+
+            const newSteps = state.carnet_steps.map(s => {
+                if (s.id === action.stepId) return updateStep(s);
+                if (s.inlineManualSteps) {
+                    let changed = false;
+                    const newInline = { ...s.inlineManualSteps };
+                    for (const [k, v] of Object.entries(newInline)) {
+                        if (v.id === action.stepId) {
+                            newInline[k as any] = updateStep(v);
+                            changed = true;
+                        }
+                    }
+                    if (changed) return { ...s, inlineManualSteps: newInline };
+                }
+                return s;
+            });
+
+            return autoRebuildCarnet({ ...state, carnet_steps: newSteps });
         }
 
         case 'EDIT_COMPUTED_TEXT': {
@@ -1798,7 +1918,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'SET_DOCUMENT_TITLE':
-            return { ...state, document_title: action.title.trim() || 'Document sans titre' };
+            return {
+                ...state,
+                document_title: action.title.trim() || 'Document sans titre',
+                document_title_synced: true,
+            };
 
         case 'SET_CURRENT_FILEPATH':
             return { ...state, current_filepath: action.filepath };

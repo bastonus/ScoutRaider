@@ -225,6 +225,8 @@ export interface CarnetStep {
      * Only relevant when isManual === true.
      */
     manualType?: 'html' | 'code';
+    /** If true, this is the initial title comment step that can auto-name the document */
+    isTitleStep?: boolean;
     /**
      * If true, this computed step's text has been manually edited by the user.
      * When set, constraint warnings are suppressed for this step.
@@ -501,6 +503,7 @@ export type CarnetView = 'participant' | 'solution';
 export interface AppState {
     version: string;
     document_title: string;
+    document_title_synced?: boolean;
     current_filepath?: string | null;
     active_mode: AppMode;
 
@@ -564,6 +567,7 @@ export interface AppState {
     carnet_include_general_map: boolean;
     carnet_include_elevation_profile?: boolean;
     enabled_annexes: AnnexeId[];
+    disabled_annexes?: AnnexeId[];
 
     // Export
     export_queue: ExportJob[];

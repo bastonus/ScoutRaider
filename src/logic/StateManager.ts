@@ -71,6 +71,7 @@ export class StateManager {
         return {
             version: CURRENT_SCHEMA_VERSION,
             document_title: 'Document sans titre',
+            document_title_synced: false,
             current_filepath: null,
             active_mode: 'map',
 
@@ -125,7 +126,24 @@ export class StateManager {
             theme_id: 'Neutre',
             theme_overrides: {},
 
-            carnet_steps: [],
+            carnet_steps: [
+                {
+                    id: 'manual-title',
+                    fromLabel: '',
+                    toLabel: '',
+                    moduleId: 'texte_clair',
+                    distanceM: 0,
+                    azimuth: 0,
+                    coords: [],
+                    solutionText: '',
+                    encodedText: '',
+                    warnings: [],
+                    isManual: true,
+                    manualType: 'html',
+                    isTitleStep: true,
+                    anchorSegmentIdx: -1,
+                }
+            ],
             carnet_view: 'participant',
             carnet_include_general_map: true,
             carnet_include_elevation_profile: true,

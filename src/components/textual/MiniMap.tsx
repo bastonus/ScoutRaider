@@ -419,7 +419,7 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
         return smartDims.height;
     }, [initialPersist?.height, smartDims.height]);
 
-    const alignment = initialPersist?.alignment || 'center';
+    const alignment = initialPersist?.alignment === 'right' ? 'right' : 'left';
     const isLocked = initialPersist?.isLocked || false;
     const layerId = initialPersist?.layerId || '';
     const showRoute = initialPersist?.showRoute !== false;

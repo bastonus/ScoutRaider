@@ -6,10 +6,12 @@ import type { ViewMode } from '../../App';
 interface ProjectWorkspaceProps {
     onExport?: () => void;
     viewMode?: ViewMode;
+    onViewModeChange?: (mode: ViewMode) => void;
     onToggleSidebar?: (side: 'left' | 'right') => void;
+    rightSidebarOpen?: boolean;
 }
 
-export default function ProjectWorkspace({ onExport, viewMode = 'map', onToggleSidebar }: ProjectWorkspaceProps) {
+export default function ProjectWorkspace({ onExport, viewMode = 'map', onViewModeChange, onToggleSidebar, rightSidebarOpen }: ProjectWorkspaceProps) {
     const [mapWidthRatio, setMapWidthRatio] = useState(50);
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const resizing = useRef(false);
@@ -71,7 +73,11 @@ export default function ProjectWorkspace({ onExport, viewMode = 'map', onToggleS
                         position: 'relative', 
                         flexShrink: 0 
                     }}>
-                        <MapWorkspace isSplitMode={viewMode === 'split'} onToggleSidebar={onToggleSidebar} />
+                        <MapWorkspace 
+                            isSplitMode={viewMode === 'split'} 
+                            onViewModeChange={onViewModeChange}
+                            onToggleSidebar={onToggleSidebar} 
+                        />
                     </div>
                 )}
                 
@@ -104,7 +110,13 @@ export default function ProjectWorkspace({ onExport, viewMode = 'map', onToggleS
                         minHeight: 0,
                         overflow: 'hidden'
                     }}>
-                        <TextualView onExport={onExport} viewMode={viewMode} />
+                        <TextualView 
+                            onExport={onExport} 
+                            viewMode={viewMode} 
+                            onViewModeChange={onViewModeChange}
+                            onToggleSidebar={onToggleSidebar} 
+                            rightSidebarOpen={rightSidebarOpen} 
+                        />
                     </div>
                 )}
             </div>

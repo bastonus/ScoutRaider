@@ -28,7 +28,8 @@ import {
     ChevronDown,
     ChevronRight,
     Download,
-    FileText
+    FileText,
+    Boxes
 } from 'lucide-react';
 import FleurDeLysLogo from './FleurDeLysLogo';
 import AICopilotModal from '../panels/AICopilotModal';
@@ -40,6 +41,7 @@ import type { ViewMode, SectionId } from '../../App';
 interface MenuBarProps {
     onSearch?: (query: string) => void;
     onToggleSidebar?: (side: 'left' | 'right') => void;
+    rightSidebarOpen?: boolean;
     viewMode?: ViewMode;
     onViewModeChange?: (mode: ViewMode) => void;
     onExport?: () => void;
@@ -49,7 +51,7 @@ interface MenuBarProps {
     onOpenMarketplace?: () => void;
 }
 
-export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeChange, onExport, onPreferencesOpen, onSetRightSection, onOpenCommandPalette, onOpenMarketplace }: MenuBarProps) {
+export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 'map', onViewModeChange, onExport, onPreferencesOpen, onSetRightSection, onOpenCommandPalette, onOpenMarketplace }: MenuBarProps) {
     const { state, dispatch } = useApp();
     const { 
         user, 
@@ -352,10 +354,12 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             { label: 'Configuration Fournisseurs IA...', action: () => { setAiModalTab('config'); setAiModalOpen(true); } },
         ],
         'Marketplace': [
-            { label: 'Ouvrir la Marketplace...', shortcut: 'Ctrl+M', action: () => onOpenMarketplace?.() },
-            { label: 'Codes & Énigmes communautaires...', action: () => onOpenMarketplace?.() },
-            { label: 'Orchestrations & Presets partagés...', action: () => onOpenMarketplace?.() },
-            { label: 'Thèmes & Feuilles de style...', action: () => onOpenMarketplace?.() },
+            { label: 'Ouvrir la Marketplace & Hub...', shortcut: 'Ctrl+M', action: () => onOpenMarketplace?.() },
+            { divider: true },
+            { label: 'Fonds de carte...', action: () => { onSetRightSection?.('maps'); onToggleSidebar?.('right'); } },
+            { label: 'Codes & Énigmes...', action: () => { onSetRightSection?.('modules'); onToggleSidebar?.('right'); } },
+            { label: 'Règles de raid & Difficulté...', action: () => { onSetRightSection?.('orchestration'); onToggleSidebar?.('right'); } },
+            { label: 'Thèmes & Récits...', action: () => { onSetRightSection?.('themes'); onToggleSidebar?.('right'); } },
             { divider: true },
             { label: 'Ma Bibliothèque synchronisée...', action: () => onOpenMarketplace?.() },
         ],
@@ -410,215 +414,243 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
 
     return (
         <header className="menu-bar" style={{
-            height: isMobile ? '46px' : '54px',
+            height: isMobile ? 'auto' : '54px',
             userSelect: 'none',
             background: 'var(--bg-dark)',
             borderBottom: '1px solid var(--glass-border)',
             display: 'flex',
-            alignItems: 'center',
-            padding: isMobile ? '0 8px' : '0 16px',
-            justifyContent: 'space-between',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            padding: isMobile ? '0' : '0 16px',
+            justifyContent: isMobile ? 'flex-start' : 'space-between',
             zIndex: 2000,
         } as React.CSSProperties & { WebkitAppRegion: string }}>
 {/* @ts-ignore WebkitAppRegion is Electron-specific */}
-            {/* LEFT: LOGO + GOOGLE DOCS STYLE TITLE ENCART & MENUS */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '12px', flexShrink: 0, WebkitAppRegion: 'no-drag' } as any} ref={menuRef}>
-                <div 
-                    title="Retour à l'accueil"
-                    onClick={() => navigate('/projects')}
-                    style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                        flexShrink: 0,
-                        borderRadius: '6px',
-                        padding: '2px',
-                        transition: 'background 0.15s',
-                    }}
-                >
-                    <FleurDeLysLogo size={isMobile ? 24 : 30} style={{ 
-                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
-                        borderRadius: '6px'
-                    }} />
-                </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1px' }}>
-                    {/* Top Row: Google Docs style Document Title */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px' }}>
-                        <span
-                            ref={measureSpanRef}
-                            style={{
-                                position: 'absolute',
-                                visibility: 'hidden',
-                                height: 0,
-                                overflow: 'hidden',
-                                whiteSpace: 'pre',
-                                fontSize: isMobile ? '13px' : '15px',
-                                fontWeight: 600,
-                                fontFamily: 'inherit',
-                                pointerEvents: 'none'
-                            }}
-                        >
-                            {titleInput || 'Document sans titre'}
-                        </span>
+            {isMobile ? (
+                <>
+                    {/* ═══ MOBILE ROW 1: Logo+Titre à gauche, Partage+Profil à droite ═══ */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        height: '42px',
+                        padding: '0 10px',
+                        boxSizing: 'border-box',
+                        WebkitAppRegion: 'no-drag'
+                    } as any}>
+                        {/* Gauche: Logo + Titre + Cloud */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, marginRight: '8px' }}>
+                            <div
+                                title="Retour à l'accueil"
+                                onClick={() => navigate('/projects')}
+                                style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    cursor: 'pointer', userSelect: 'none', flexShrink: 0,
+                                    borderRadius: '6px', padding: '2px',
+                                }}
+                            >
+                                <FleurDeLysLogo size={24} style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))', borderRadius: '6px' }} />
+                            </div>
 
-                        <input
-                            type="text"
-                            value={titleInput}
-                            onChange={(e) => setTitleInput(e.target.value)}
-                            onBlur={handleCommitTitle}
-                            onFocus={(e) => e.target.select()}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.currentTarget.blur();
-                                } else if (e.key === 'Escape') {
-                                    setTitleInput(state.document_title || 'Document sans titre');
-                                    e.currentTarget.blur();
-                                }
-                            }}
-                            title="Renommer le document"
-                            placeholder="Document sans titre"
-                            style={{
-                                width: isMobile ? `${Math.min(105, titleWidth)}px` : `${titleWidth}px`,
-                                maxWidth: isMobile ? '105px' : '320px',
-                                height: '22px',
-                                background: 'transparent',
-                                border: '1px solid transparent',
-                                borderRadius: '4px',
-                                color: '#ffffff',
-                                fontSize: isMobile ? '13px' : '15px',
-                                fontWeight: 600,
-                                lineHeight: '20px',
-                                padding: '1px 4px',
-                                outline: 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                textOverflow: 'ellipsis',
-                            }}
-                            onMouseEnter={(e) => {
-                                if (document.activeElement !== e.currentTarget) {
-                                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.22)';
-                                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                if (document.activeElement !== e.currentTarget) {
-                                    e.currentTarget.style.borderColor = 'transparent';
-                                    e.currentTarget.style.backgroundColor = 'transparent';
-                                }
-                            }}
-                            onFocusCapture={(e) => {
-                                e.currentTarget.style.borderColor = 'var(--accent-default)';
-                                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.35)';
-                                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(110, 201, 126, 0.18)';
-                                e.currentTarget.style.cursor = 'text';
-                            }}
-                            onBlurCapture={(e) => {
-                                e.currentTarget.style.borderColor = 'transparent';
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                                e.currentTarget.style.boxShadow = 'none';
-                                e.currentTarget.style.cursor = 'pointer';
-                            }}
-                        />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, flex: 1 }}>
+                                <input
+                                    type="text"
+                                    value={titleInput}
+                                    onChange={(e) => setTitleInput(e.target.value)}
+                                    onBlur={handleCommitTitle}
+                                    onFocus={(e) => e.target.select()}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') e.currentTarget.blur();
+                                        else if (e.key === 'Escape') { setTitleInput(state.document_title || 'Document sans titre'); e.currentTarget.blur(); }
+                                    }}
+                                    title="Renommer le document"
+                                    placeholder="Document sans titre"
+                                    style={{
+                                        flex: 1, minWidth: 0, height: '24px',
+                                        background: 'transparent', border: '1px solid transparent',
+                                        borderRadius: '4px', color: '#ffffff', fontSize: '13.5px',
+                                        fontWeight: 600, lineHeight: '20px', padding: '1px 4px',
+                                        outline: 'none', cursor: 'pointer',
+                                        transition: 'all 0.15s ease', textOverflow: 'ellipsis',
+                                    }}
+                                    onMouseEnter={(e) => { if (document.activeElement !== e.currentTarget) { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.22)'; e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; } }}
+                                    onMouseLeave={(e) => { if (document.activeElement !== e.currentTarget) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; } }}
+                                    onFocusCapture={(e) => { e.currentTarget.style.borderColor = 'var(--accent-default)'; e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.35)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(110, 201, 126, 0.18)'; e.currentTarget.style.cursor = 'text'; }}
+                                    onBlurCapture={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.cursor = 'pointer'; }}
+                                />
+                                <div
+                                    onClick={() => { if (isGuest) setAuthModalOpen(true); else setProjectsModalOpen(true); }}
+                                    title={isGuest ? "Mode Invité" : cloudSyncStatus === 'saving' ? "Enregistrement..." : cloudSyncStatus === 'error' ? "Erreur sync" : "Synchronisé"}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', flexShrink: 0,
+                                        color: isGuest ? 'rgba(255,255,255,0.35)' : cloudSyncStatus === 'error' ? '#ef4444' : cloudSyncStatus === 'saving' ? '#60a5fa' : 'var(--accent-default)',
+                                        opacity: 0.85, padding: '2px', borderRadius: '4px', cursor: 'pointer'
+                                    }}
+                                >
+                                    {isGuest ? <CloudOff size={13} /> : cloudSyncStatus === 'saving' ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : cloudSyncStatus === 'error' ? <CloudOff size={13} /> : <Cloud size={13} />}
+                                </div>
+                            </div>
+                        </div>
 
-                        {/* Save status icon (Google Docs cloud status) */}
-                        <div 
-                            onClick={() => {
-                                if (isGuest) setAuthModalOpen(true);
-                                else setProjectsModalOpen(true);
-                            }}
-                            title={
-                                isGuest 
-                                    ? "Mode Invité : les modifications ne sont pas sauvegardées sur le serveur. Cliquez pour vous connecter."
-                                    : cloudSyncStatus === 'saving'
-                                    ? "Enregistrement automatique dans le cloud..."
-                                    : cloudSyncStatus === 'error'
-                                    ? "Erreur de synchronisation cloud. Cliquez pour réessayer."
-                                    : "Toutes les modifications sont enregistrées dans le cloud PostgreSQL."
-                            }
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                                color: isGuest 
-                                    ? 'rgba(255, 255, 255, 0.35)' 
-                                    : cloudSyncStatus === 'error' 
-                                    ? '#ef4444' 
-                                    : cloudSyncStatus === 'saving'
-                                    ? '#60a5fa'
-                                    : 'var(--accent-default)',
-                                opacity: 0.85,
-                                padding: '2px 4px',
-                                borderRadius: '4px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            {isGuest ? (
-                                <CloudOff size={13} />
-                            ) : cloudSyncStatus === 'saving' ? (
-                                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                            ) : cloudSyncStatus === 'error' ? (
-                                <CloudOff size={13} />
-                            ) : (
-                                <Cloud size={13} />
-                            )}
+                        {/* Droite: Partage + Profil */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            <button
+                                onClick={() => { if (isGuest) setAuthModalOpen(true); else setShareModalOpen(true); }}
+                                title="Partager ce document"
+                                style={{
+                                    width: '30px', height: '30px', borderRadius: '50%',
+                                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    cursor: 'pointer', color: 'var(--text-primary)',
+                                    transition: 'all 100ms ease', flexShrink: 0, padding: 0
+                                }}
+                            >
+                                <Share2 size={14} color="var(--text-dim)" />
+                            </button>
+                            <button
+                                onClick={() => setMobileMenuOpen(true)}
+                                title={!isGuest && user ? `Menu & Profil : ${user.username}` : "Menu & Connexion"}
+                                style={{
+                                    width: '30px', height: '30px', borderRadius: '50%',
+                                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    position: 'relative', padding: 0, color: 'var(--text-primary)',
+                                    transition: 'all 100ms ease', flexShrink: 0
+                                }}
+                            >
+                                {!isGuest && user?.username ? (
+                                    <span style={{ fontSize: '11.5px', fontWeight: 600, textTransform: 'uppercase' }}>{user.username.charAt(0)}</span>
+                                ) : (
+                                    <User size={14} />
+                                )}
+                                <span style={{
+                                    position: 'absolute', bottom: '-1px', right: '-1px',
+                                    width: '7px', height: '7px', borderRadius: '50%',
+                                    background: isGuest ? 'var(--semantic-warning)' : cloudSyncStatus === 'saving' ? '#60A5FA' : cloudSyncStatus === 'error' ? 'var(--semantic-danger)' : 'var(--semantic-success)',
+                                    border: '1.5px solid var(--bg-dark)'
+                                }} />
+                            </button>
                         </div>
                     </div>
 
-                    {/* Bottom Row: Menus on Desktop Only (Hidden on Mobile, accessed via profile button) */}
-                    {!isMobile && (
-                        <nav style={{ display: 'flex', gap: '2px', fontSize: '11.5px', fontWeight: 500, color: 'var(--text-dim)', marginLeft: '-4px' }}>
+                    {/* ═══ MOBILE ROW 2: Carte / Carnet / Market — full width, compressible ═══ */}
+                    <div style={{
+                        display: 'flex', alignItems: 'center',
+                        width: '100%', padding: '0 8px 6px 8px', boxSizing: 'border-box',
+                        WebkitAppRegion: 'no-drag'
+                    } as any}>
+                        <div style={{
+                            display: 'flex', alignItems: 'center', width: '100%',
+                            background: 'var(--bg-elevated)', borderRadius: '12px',
+                            padding: '3px', border: '1px solid var(--border-subtle)',
+                            boxShadow: 'var(--shadow-sm, 0 2px 8px rgba(0,0,0,0.25))', gap: '3px'
+                        }}>
+                            <button
+                                onClick={() => onViewModeChange?.('map')}
+                                style={{
+                                    flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    gap: '5px', height: '30px', borderRadius: '9px', border: 'none',
+                                    background: viewMode === 'map' && !rightSidebarOpen ? 'var(--accent-default)' : 'transparent',
+                                    color: viewMode === 'map' && !rightSidebarOpen ? '#ffffff' : 'var(--text-dim)',
+                                    fontSize: '11.5px', fontWeight: viewMode === 'map' && !rightSidebarOpen ? 700 : 500,
+                                    cursor: 'pointer', transition: 'all 120ms ease',
+                                    boxShadow: viewMode === 'map' && !rightSidebarOpen ? '0 2px 8px var(--accent-glow)' : 'none'
+                                }}
+                            >
+                                <MapIcon size={13} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Carte</span>
+                            </button>
+                            <button
+                                onClick={() => onViewModeChange?.('text')}
+                                style={{
+                                    flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    gap: '5px', height: '30px', borderRadius: '9px', border: 'none',
+                                    background: viewMode === 'text' && !rightSidebarOpen ? 'var(--accent-default)' : 'transparent',
+                                    color: viewMode === 'text' && !rightSidebarOpen ? '#ffffff' : 'var(--text-dim)',
+                                    fontSize: '11.5px', fontWeight: viewMode === 'text' && !rightSidebarOpen ? 700 : 500,
+                                    cursor: 'pointer', transition: 'all 120ms ease',
+                                    boxShadow: viewMode === 'text' && !rightSidebarOpen ? '0 2px 8px var(--accent-glow)' : 'none'
+                                }}
+                            >
+                                <FileText size={13} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Carnet</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (onToggleSidebar) onToggleSidebar('right');
+                                    else if (onOpenMarketplace) onOpenMarketplace();
+                                    else window.dispatchEvent(new CustomEvent('scoutraider:open-marketplace'));
+                                }}
+                                style={{
+                                    flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    gap: '5px', height: '30px', borderRadius: '9px', border: 'none',
+                                    background: rightSidebarOpen ? 'var(--accent-default)' : 'transparent',
+                                    color: rightSidebarOpen ? '#ffffff' : 'var(--text-dim)',
+                                    fontSize: '11.5px', fontWeight: rightSidebarOpen ? 700 : 500,
+                                    cursor: 'pointer', transition: 'all 120ms ease',
+                                    boxShadow: rightSidebarOpen ? '0 2px 8px var(--accent-glow)' : 'none'
+                                }}
+                            >
+                                <Boxes size={13} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Market</span>
+                            </button>
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <>
+            {/* ═══ DESKTOP LEFT: Logo + Title + Menus ═══ */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: isTablet ? '8px' : '12px', flexShrink: 0, WebkitAppRegion: 'no-drag' } as any} ref={menuRef}>
+                <div
+                    title="Retour à l'accueil"
+                    onClick={() => navigate('/projects')}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', flexShrink: 0, borderRadius: '6px', padding: '2px', transition: 'background 0.15s' }}
+                >
+                    <FleurDeLysLogo size={30} style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))', borderRadius: '6px' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span ref={measureSpanRef} style={{ position: 'absolute', visibility: 'hidden', height: 0, overflow: 'hidden', whiteSpace: 'pre', fontSize: '15px', fontWeight: 600, fontFamily: 'inherit', pointerEvents: 'none' }}>
+                            {titleInput || 'Document sans titre'}
+                        </span>
+                        <input
+                            type="text" value={titleInput}
+                            onChange={(e) => setTitleInput(e.target.value)}
+                            onBlur={handleCommitTitle}
+                            onFocus={(e) => e.target.select()}
+                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); else if (e.key === 'Escape') { setTitleInput(state.document_title || 'Document sans titre'); e.currentTarget.blur(); } }}
+                            title="Renommer le document" placeholder="Document sans titre"
+                            style={{ width: `${titleWidth}px`, maxWidth: '320px', height: '22px', background: 'transparent', border: '1px solid transparent', borderRadius: '4px', color: '#ffffff', fontSize: '15px', fontWeight: 600, lineHeight: '20px', padding: '1px 4px', outline: 'none', cursor: 'pointer', transition: 'all 0.15s ease', textOverflow: 'ellipsis' }}
+                            onMouseEnter={(e) => { if (document.activeElement !== e.currentTarget) { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.22)'; e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; } }}
+                            onMouseLeave={(e) => { if (document.activeElement !== e.currentTarget) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; } }}
+                            onFocusCapture={(e) => { e.currentTarget.style.borderColor = 'var(--accent-default)'; e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.35)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(110, 201, 126, 0.18)'; e.currentTarget.style.cursor = 'text'; }}
+                            onBlurCapture={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.cursor = 'pointer'; }}
+                        />
+                        <div
+                            onClick={() => { if (isGuest) setAuthModalOpen(true); else setProjectsModalOpen(true); }}
+                            title={isGuest ? "Mode Invité" : cloudSyncStatus === 'saving' ? "Enregistrement..." : cloudSyncStatus === 'error' ? "Erreur sync" : "Synchronisé cloud PostgreSQL"}
+                            style={{ display: 'flex', alignItems: 'center', gap: '3px', color: isGuest ? 'rgba(255,255,255,0.35)' : cloudSyncStatus === 'error' ? '#ef4444' : cloudSyncStatus === 'saving' ? '#60a5fa' : 'var(--accent-default)', opacity: 0.85, padding: '2px 4px', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            {isGuest ? <CloudOff size={13} /> : cloudSyncStatus === 'saving' ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : cloudSyncStatus === 'error' ? <CloudOff size={13} /> : <Cloud size={13} />}
+                        </div>
+                    </div>
+                    <nav style={{ display: 'flex', gap: '2px', fontSize: '11.5px', fontWeight: 500, color: 'var(--text-dim)', marginLeft: '-4px' }}>
                         {Object.entries(menus).map(([name, items]) => (
                             <div key={name} style={{ position: 'relative' }}>
-                                <span 
-                                    className="menu-btn" 
-                                    onClick={() => toggleMenu(name)}
-                                    onMouseEnter={() => openMenu && setOpenMenu(name)}
-                                    style={{ 
-                                        padding: '4px 10px', 
-                                        borderRadius: '4px', 
-                                        cursor: 'pointer',
-                                        background: openMenu === name ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
-                                        color: openMenu === name ? 'var(--text-primary)' : 'var(--text-dim)'
-                                    }}
-                                >
+                                <span className="menu-btn" onClick={() => toggleMenu(name)} onMouseEnter={() => openMenu && setOpenMenu(name)}
+                                    style={{ padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', background: openMenu === name ? 'rgba(255, 255, 255, 0.05)' : 'transparent', color: openMenu === name ? 'var(--text-primary)' : 'var(--text-dim)' }}>
                                     {name}
                                 </span>
-                                
                                 {openMenu === name && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '100%',
-                                        left: 0,
-                                        marginTop: '4px',
-                                        background: 'var(--bg-panel)',
-                                        border: '1px solid var(--bg-border)',
-                                        borderRadius: '6px',
-                                        boxShadow: 'var(--shadow-glass)',
-                                        minWidth: '220px',
-                                        padding: '4px 0',
-                                        zIndex: 3000
-                                    }}>
+                                    <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '6px', boxShadow: 'var(--shadow-glass)', minWidth: '220px', padding: '4px 0', zIndex: 3000 }}>
                                         {items.map((item, idx) =>
                                             (item as any).divider ? (
                                                 <div key={idx} style={{ height: '1px', background: 'var(--bg-border)', margin: '4px 0' }} />
                                             ) : (
-                                                <div 
-                                                    key={idx}
-                                                    className="menu-item-hover"
-                                                    onClick={() => handleAction((item as any).action as () => void)}
-                                                    style={{
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        padding: '6px 16px',
-                                                        cursor: 'pointer',
-                                                        color: 'var(--text-primary)',
-                                                        fontSize: '12px',
-                                                        fontWeight: 500
-                                                    }}
-                                                >
+                                                <div key={idx} className="menu-item-hover" onClick={() => handleAction((item as any).action as () => void)}
+                                                    style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 16px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '12px', fontWeight: 500 }}>
                                                     <span>{(item as any).label}</span>
                                                     {(item as any).shortcut && <span style={{ color: 'var(--text-dim)', fontSize: '11px' }}>{(item as any).shortcut}</span>}
                                                 </div>
@@ -629,274 +661,57 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                             </div>
                         ))}
                     </nav>
-                    )}
                 </div>
             </div>
 
-            {/* CENTER: View Mode Switcher */}
-            {isMobile ? (
-                /* PROMINENT MOBILE SEGMENTED CONTROL: CARTE vs CARNET */
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    background: 'var(--bg-surface)',
-                    borderRadius: 'var(--radius-pill)',
-                    padding: '2px',
-                    border: '1px solid var(--border-subtle)',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-                    gap: '2px',
-                    flexShrink: 0,
-                    margin: '0 6px',
-                    WebkitAppRegion: 'no-drag'
-                } as any}>
-                    <button
-                        onClick={() => onViewModeChange?.('map')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '4px 11px',
-                            borderRadius: 'var(--radius-pill)',
-                            border: 'none',
-                            background: viewMode === 'map' ? 'var(--accent-default)' : 'transparent',
-                            color: viewMode === 'map' ? '#ffffff' : 'var(--text-dim)',
-                            fontSize: '12px',
-                            fontWeight: viewMode === 'map' ? 700 : 500,
-                            cursor: 'pointer',
-                            transition: 'all 120ms ease',
-                            boxShadow: viewMode === 'map' ? '0 2px 6px rgba(110, 201, 126, 0.4)' : 'none'
-                        }}
-                    >
-                        <MapIcon size={13} strokeWidth={2.4} />
-                        <span>Carte</span>
+            {/* ═══ DESKTOP CENTER: Command Palette ═══ */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', WebkitAppRegion: 'drag' } as any}>
+                {!isTablet && onOpenCommandPalette && (
+                    <button onClick={onOpenCommandPalette}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0 12px', height: '28px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-pill)', color: 'var(--text-dim)', fontSize: '11.5px', fontWeight: 400, cursor: 'pointer', transition: 'all 100ms ease', WebkitAppRegion: 'no-drag', maxWidth: '260px', width: '100%' } as any}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--text-dim)'; }}
+                        title="Ouvrir la palette de commandes (Ctrl+K)">
+                        <Search size={12} color="var(--text-dim)" />
+                        <span style={{ flex: 1, textAlign: 'left' }}>Commandes...</span>
+                        <kbd style={{ fontSize: '9px', padding: '0 4px', height: '16px', borderRadius: '4px' }}>Ctrl K</kbd>
                     </button>
+                )}
+            </div>
 
-                    <button
-                        onClick={() => onViewModeChange?.('text')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '4px 11px',
-                            borderRadius: 'var(--radius-pill)',
-                            border: 'none',
-                            background: viewMode === 'text' ? 'var(--accent-default)' : 'transparent',
-                            color: viewMode === 'text' ? '#ffffff' : 'var(--text-dim)',
-                            fontSize: '12px',
-                            fontWeight: viewMode === 'text' ? 700 : 500,
-                            cursor: 'pointer',
-                            transition: 'all 120ms ease',
-                            boxShadow: viewMode === 'text' ? '0 2px 6px rgba(110, 201, 126, 0.4)' : 'none'
-                        }}
-                    >
-                        <FileText size={13} strokeWidth={2.4} />
-                        <span>Carnet</span>
-                    </button>
-                </div>
-            ) : (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isTablet ? '6px' : '10px', WebkitAppRegion: 'drag' } as any}>
-                    {/* View Mode Switcher */}
-                    <div style={{
-                        display: 'flex',
-                        background: 'var(--bg-surface)',
-                        borderRadius: 'var(--radius-pill)',
-                        padding: '3px',
-                        border: '1px solid var(--border-subtle)',
-                        WebkitAppRegion: 'no-drag',
-                        gap: '3px'
-                    } as any}>
-                        <button
-                            onClick={() => onViewModeChange?.('map')}
-                            style={getViewBtnStyle(viewMode === 'map', false)}
-                            title="Vue Carte Topographique (Ctrl+1)"
-                        >
-                            <MapIcon size={13} />
-                            {!isTablet && <span>Carte</span>}
-                            {!isTablet && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: '2px', padding: '0 3px', borderRadius: '2px', background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)' }}>Ctrl+1</span>}
-                        </button>
-                        <button
-                            onClick={() => onViewModeChange?.('text')}
-                            style={getViewBtnStyle(viewMode === 'text', false)}
-                            title="Vue Carnet Textuel (Ctrl+2)"
-                        >
-                            <Type size={13} />
-                            {!isTablet && <span>Texte</span>}
-                            {!isTablet && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: '2px', padding: '0 3px', borderRadius: '2px', background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)' }}>Ctrl+2</span>}
-                        </button>
-                        <button
-                            onClick={() => onViewModeChange?.(viewMode === 'split' ? 'map' : 'split')}
-                            style={getViewBtnStyle(viewMode === 'split', false)}
-                            title="Vue scindée Carte + Texte (Ctrl+3)"
-                        >
-                            <Columns size={13} />
-                            {!isTablet && <span>Side-by-side</span>}
-                            {!isTablet && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: '2px', padding: '0 3px', borderRadius: '2px', background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)' }}>Ctrl+3</span>}
-                        </button>
-                    </div>
-
-                    {/* Quick Command Trigger */}
-                    {!isTablet && (
-                        <button
-                            onClick={onOpenCommandPalette}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                padding: '0 10px',
-                                height: '28px',
-                                background: 'var(--bg-surface)',
-                                border: '1px solid var(--border-subtle)',
-                                borderRadius: 'var(--radius-pill)',
-                                color: 'var(--text-dim)',
-                                fontSize: '11px',
-                                fontWeight: 400,
-                                cursor: 'pointer',
-                                transition: 'all 100ms ease',
-                                WebkitAppRegion: 'no-drag',
-                            } as any}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.borderColor = 'var(--border-strong)';
-                                e.currentTarget.style.color = 'var(--text-primary)';
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                                e.currentTarget.style.color = 'var(--text-dim)';
-                            }}
-                            title="Ouvrir la palette de commandes (Ctrl+K)"
-                        >
-                            <Search size={12} color="var(--text-dim)" />
-                            <span>Commandes</span>
-                            <kbd style={{ fontSize: '9px', padding: '0 4px', height: '16px', borderRadius: '4px' }}>Ctrl K</kbd>
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {/* RIGHT: CONTROLS & WINDOWS */}
+            {/* ═══ DESKTOP RIGHT: Controls ═══ */}
             <div style={{ display: 'flex', alignItems: 'center', gap: isTablet ? '4px' : '8px', WebkitAppRegion: 'no-drag' } as any}>
-                
-                {/* READ-ONLY VIEWER BADGE */}
                 {currentProjectRole === 'viewer' && (
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '3px 10px',
-                        borderRadius: 'var(--radius-pill)',
-                        background: 'rgba(239, 68, 68, 0.15)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        color: '#fca5a5',
-                        fontSize: '11px',
-                        fontWeight: 600
-                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 10px', borderRadius: 'var(--radius-pill)', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', fontSize: '11px', fontWeight: 600 }}>
                         <Eye size={13} />
                         {!isTablet && <span>Lecture seule</span>}
-                        <button
-                            onClick={makeEditableCopy}
-                            title="Créer une copie modifiable enregistrée dans votre compte"
-                            style={{
-                                background: '#2e7d47',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 'var(--radius-pill)',
-                                padding: '2px 8px',
-                                fontSize: '10px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                marginLeft: '4px'
-                            }}
-                        >
-                            Créer une copie
-                        </button>
+                        <button onClick={makeEditableCopy} title="Créer une copie modifiable" style={{ background: '#2e7d47', color: '#fff', border: 'none', borderRadius: 'var(--radius-pill)', padding: '2px 8px', fontSize: '10px', fontWeight: 600, cursor: 'pointer', marginLeft: '4px' }}>Créer une copie</button>
                     </div>
                 )}
-
-
-
-                {/* SHARE BUTTON (Desktop & Tablet) */}
-                {!isMobile && (
-                    <button
-                        onClick={() => {
-                            if (isGuest) setAuthModalOpen(true);
-                            else setShareModalOpen(true);
-                        }}
-                        title="Partager ce document"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            background: 'var(--bg-surface)',
-                            border: '1px solid var(--border-subtle)',
-                            borderRadius: 'var(--radius-main)',
-                            padding: isTablet ? '0 8px' : '0 12px',
-                            height: '28px',
-                            color: 'var(--text-primary)',
-                            fontSize: '11.5px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            transition: 'all 100ms ease'
-                        }}
-                        onMouseEnter={e => {
-                            e.currentTarget.style.background = 'var(--bg-hover)';
-                            e.currentTarget.style.borderColor = 'var(--border-strong)';
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.background = 'var(--bg-surface)';
-                            e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                        }}
+                <button
+                    onClick={() => { if (isGuest) setAuthModalOpen(true); else setShareModalOpen(true); }}
+                    title="Partager ce document"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-main)', padding: isTablet ? '0 8px' : '0 12px', height: '28px', color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 500, cursor: 'pointer', transition: 'all 100ms ease' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--border-strong)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-surface)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
+                >
+                    <Share2 size={13} color="var(--text-dim)" />
+                    {!isTablet && <span>Partager</span>}
+                </button>
+                {onExport && (
+                    <button onClick={onExport} title="Exporter le carnet de raid (Ctrl+E)"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-main)', padding: isTablet ? '0 8px' : '0 12px', height: '28px', color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 500, cursor: 'pointer', transition: 'all 100ms ease', flexShrink: 0 }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--border-strong)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-surface)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
                     >
-                        <Share2 size={13} color="var(--text-dim)" />
-                        {!isTablet && <span>Partager</span>}
+                        <Download size={13} color="var(--text-dim)" />
+                        {!isTablet && <span>Export</span>}
                     </button>
                 )}
-
-                {/* EXPORT BUTTON — Desktop only (accessible via Profile Menu on mobile) */}
-                {!isMobile && onExport && (
-                    <button
-                        onClick={onExport}
-                        title="Exporter le carnet de raid"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '5px',
-                            background: 'var(--accent-default)',
-                            border: '1px solid var(--accent-default)',
-                            borderRadius: 'var(--radius-xs)',
-                            padding: '0 10px',
-                            height: '28px',
-                            color: '#ffffff',
-                            fontSize: '11.5px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            flexShrink: 0
-                        }}
-                    >
-                        <Download size={13} strokeWidth={2.5} />
-                        <span>Export</span>
-                    </button>
-                )}
-
-                {/* UPDATE STATUS PILL */}
-                {!isMobile && updateStatus !== 'idle' && (
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        background: 'rgba(110, 201, 126, 0.1)',
-                        border: '1px solid rgba(110, 201, 126, 0.2)',
-                        marginRight: '8px'
-                    }}>
-                        {updateStatus === 'checking' && (
-                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Recherche...</span>
-                        )}
-                        {updateStatus === 'available' && (
-                            <span style={{ fontSize: '11px', color: 'var(--accent-default)', fontWeight: 700 }}>Mise à jour disponible</span>
-                        )}
+                {updateStatus !== 'idle' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderRadius: '20px', background: 'rgba(110, 201, 126, 0.1)', border: '1px solid rgba(110, 201, 126, 0.2)', marginRight: '8px' }}>
+                        {updateStatus === 'checking' && <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Recherche...</span>}
+                        {updateStatus === 'available' && <span style={{ fontSize: '11px', color: 'var(--accent-default)', fontWeight: 700 }}>Mise à jour disponible</span>}
                         {updateStatus === 'downloading' && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
@@ -906,251 +721,75 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                             </div>
                         )}
                         {updateStatus === 'downloaded' && (
-                            <button 
-                                onClick={() => (window as any).electronAPI?.quitAndInstall()}
-                                style={{
-                                    background: 'var(--accent-default)',
-                                    border: 'none',
-                                    borderRadius: '12px',
-                                    padding: '2px 10px',
-                                    fontSize: '10.5px',
-                                    fontWeight: 800,
-                                    color: '#0a100d',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '5px'
-                                }}
-                            >
+                            <button onClick={() => (window as any).electronAPI?.quitAndInstall()}
+                                style={{ background: 'var(--accent-default)', border: 'none', borderRadius: '12px', padding: '2px 10px', fontSize: '10.5px', fontWeight: 800, color: '#0a100d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                 Redémarrer pour mettre à jour
                             </button>
                         )}
                     </div>
                 )}
-
-                {/* SIDEBAR TOGGLE (Desktop only: right orchestration/libraries sidebar) */}
-                {!isMobile && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginRight: '4px', paddingRight: '10px', borderRight: '1px solid var(--bg-border)' }}>
-                        <button 
-                            className="btn-icon btn-sm" 
-                            onClick={() => onToggleSidebar?.('right')}
-                            title="Basculer le panneau latéral droit (Ctrl+])"
-                        >
-                            <PanelRight size={17} strokeWidth={2.2} />
-                        </button>
-                    </div>
-                )}
-
-                {/* PREFERENCES & NOTIFICATIONS (Desktop only - accessible via Profile Menu on mobile) */}
-                {!isMobile && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', position: 'relative' }}>
-                        <button 
-                            className="btn-icon btn-sm" 
-                            title="Préférences (Ctrl+P)"
-                            onClick={onPreferencesOpen}
-                        >
-                            <Settings size={17} strokeWidth={2.2} />
-                        </button>
-
-                        <button 
-                            className="btn-icon btn-sm" 
-                            title="Historique des notifications"
-                            onClick={() => {
-                                setShowNotifHistory(!showNotifHistory);
-                                setOpenMenu(null);
-                            }}
-                        >
-                            <Bell size={17} strokeWidth={2.2} />
-                            {state.notifications.length > 0 && (
-                                <div style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', background: 'var(--semantic-red)', borderRadius: '50%' }} />
-                            )}
-                        </button>
-                        
-                        {showNotifHistory && (
-                            <div style={{
-                                position: 'absolute', top: '100%', right: 0, marginTop: '8px',
-                                width: '320px', maxHeight: '400px', overflowY: 'auto',
-                                background: 'var(--bg-panel)', border: '1px solid var(--bg-border)',
-                                borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-glass)',
-                                zIndex: 3000, display: 'flex', flexDirection: 'column'
-                            }}>
-                                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                    Historique des Notifications
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginRight: '4px', paddingRight: '10px', borderRight: '1px solid var(--bg-border)' }}>
+                    <button onClick={() => onToggleSidebar?.('right')} title="Marketplace & Ressources (Ctrl+M)"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: rightSidebarOpen ? 'var(--accent-transparent)' : 'var(--bg-surface)', border: '1px solid', borderColor: rightSidebarOpen ? 'var(--accent-default)' : 'var(--border-subtle)', borderRadius: 'var(--radius-main)', padding: isTablet ? '0 8px' : '0 12px', height: '28px', color: rightSidebarOpen ? 'var(--accent-hover)' : 'var(--text-primary)', fontSize: '11.5px', fontWeight: 500, cursor: 'pointer', transition: 'all 100ms ease', flexShrink: 0 }}
+                        onMouseEnter={e => { if (!rightSidebarOpen) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--border-strong)'; } }}
+                        onMouseLeave={e => { if (!rightSidebarOpen) { e.currentTarget.style.background = 'var(--bg-surface)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; } }}
+                    >
+                        <PanelRight size={13} color={rightSidebarOpen ? 'var(--accent-hover)' : 'var(--text-dim)'} />
+                        {!isTablet && <span>Marketplace</span>}
+                    </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', position: 'relative' }}>
+                    <button className="btn-icon btn-sm" title="Préférences (Ctrl+P)" onClick={onPreferencesOpen}><Settings size={17} strokeWidth={2.2} /></button>
+                    <button className="btn-icon btn-sm" title="Historique des notifications" onClick={() => { setShowNotifHistory(!showNotifHistory); setOpenMenu(null); }}>
+                        <Bell size={17} strokeWidth={2.2} />
+                        {state.notifications.length > 0 && <div style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', background: 'var(--semantic-red)', borderRadius: '50%' }} />}
+                    </button>
+                    {showNotifHistory && (
+                        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '8px', width: '320px', maxHeight: '400px', overflowY: 'auto', background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-glass)', zIndex: 3000, display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Historique des Notifications</div>
+                            {state.notifications.length === 0 ? (
+                                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '12px' }}>Aucune notification.</div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    {[...state.notifications].reverse().map(notif => (
+                                        <div key={notif.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', display: 'flex', gap: '12px', alignItems: 'flex-start', background: notif.type === 'error' ? 'rgba(239, 68, 68, 0.05)' : notif.type === 'warning' ? 'rgba(212, 145, 74, 0.05)' : 'transparent' }}>
+                                            <div style={{ color: notif.type === 'error' ? 'var(--semantic-red)' : notif.type === 'warning' ? 'var(--semantic-orange)' : 'var(--semantic-green)', marginTop: '2px' }}>•</div>
+                                            <div style={{ flex: 1 }}><div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.4 }}>{notif.message}</div></div>
+                                        </div>
+                                    ))}
                                 </div>
-                                {state.notifications.length === 0 ? (
-                                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '12px' }}>
-                                        Aucune notification.
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                        {[...state.notifications].reverse().map(notif => (
-                                            <div key={notif.id} style={{
-                                                padding: '12px 16px', borderBottom: '1px solid var(--glass-border)',
-                                                display: 'flex', gap: '12px', alignItems: 'flex-start',
-                                                background: notif.type === 'error' ? 'rgba(239, 68, 68, 0.05)' : notif.type === 'warning' ? 'rgba(212, 145, 74, 0.05)' : 'transparent'
-                                            }}>
-                                                <div style={{ color: notif.type === 'error' ? 'var(--semantic-red)' : notif.type === 'warning' ? 'var(--semantic-orange)' : 'var(--semantic-green)', marginTop: '2px' }}>
-                                                    •
-                                                </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                                                        {notif.message}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* USER PROFILE AVATAR CIRCLE (Tout à droite - Ouvre le Menu & Profil sur Mobile) */}
-                <div style={{ position: 'relative', marginLeft: '2px' }} ref={userMenuRef}>
-                    {!isGuest && user ? (
-                        <button
-                            onClick={() => isMobile ? setMobileMenuOpen(true) : setUserMenuOpen(prev => !prev)}
-                            title={isMobile ? `Menu & Profil : ${user.username}` : `Connecté : ${user.username} (PostgreSQL synchronisé)`}
-                            style={{
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                background: 'var(--bg-surface)',
-                                border: '1px solid var(--border-subtle)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                padding: 0,
-                                color: 'var(--text-primary)',
-                                transition: 'all 100ms ease'
-                            }}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.borderColor = 'var(--border-strong)';
-                                e.currentTarget.style.background = 'var(--bg-hover)';
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                                e.currentTarget.style.background = 'var(--bg-surface)';
-                            }}
-                        >
-                            <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                                {user.username ? user.username.charAt(0) : <User size={13} />}
-                            </span>
-                            {/* Status indicator dot */}
-                            <span style={{
-                                position: 'absolute',
-                                bottom: '-1px',
-                                right: '-1px',
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                background: cloudSyncStatus === 'saving' ? '#60A5FA' : cloudSyncStatus === 'error' ? 'var(--semantic-danger)' : 'var(--semantic-success)',
-                                border: '1.5px solid var(--bg-dark)'
-                            }} />
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => isMobile ? setMobileMenuOpen(true) : setAuthModalOpen(true)}
-                            title={isMobile ? "Menu & Connexion" : "Connexion au compte (Actuellement en mode Invité)"}
-                            style={{
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                background: 'var(--bg-surface)',
-                                border: '1px solid var(--border-subtle)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                padding: 0,
-                                color: 'var(--text-dim)',
-                                transition: 'all 100ms ease'
-                            }}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.borderColor = 'var(--border-strong)';
-                                e.currentTarget.style.color = 'var(--text-primary)';
-                                e.currentTarget.style.background = 'var(--bg-hover)';
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                                e.currentTarget.style.color = 'var(--text-dim)';
-                                e.currentTarget.style.background = 'var(--bg-surface)';
-                            }}
-                        >
-                            <User size={13} />
-                            {/* Amber guest dot */}
-                            <span style={{
-                                position: 'absolute',
-                                bottom: '-1px',
-                                right: '-1px',
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                background: 'var(--semantic-warning)',
-                                border: '1.5px solid var(--bg-dark)'
-                            }} />
-                        </button>
-                    )}
-
-                    {/* User dropdown menu */}
-                    {userMenuOpen && !isGuest && user && (
-                        <div style={{
-                            position: 'absolute',
-                            top: 'calc(100% + 6px)',
-                            right: 0,
-                            background: 'var(--bg-elevated)',
-                            border: '1px solid var(--border-subtle)',
-                            borderRadius: 'var(--radius-md)',
-                            boxShadow: 'var(--shadow-lg)',
-                            minWidth: '200px',
-                            padding: '4px 0',
-                            zIndex: 3500
-                        }}>
-                            <div style={{ padding: '6px 12px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: '11px', color: 'var(--text-dim)' }}>
-                                Connecté : <strong style={{ color: 'var(--text-primary)' }}>{user.username}</strong>
-                            </div>
-                            <div
-                                className="menu-item-hover"
-                                onClick={() => {
-                                    setProjectsModalOpen(true);
-                                    setUserMenuOpen(false);
-                                }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-primary)' }}
-                            >
-                                <FolderOpen size={13} color="var(--text-dim)" />
-                                <span>Mes documents cloud</span>
-                            </div>
-                            <div
-                                className="menu-item-hover"
-                                onClick={() => {
-                                    saveToCloudNow();
-                                    setUserMenuOpen(false);
-                                }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-primary)' }}
-                            >
-                                <Cloud size={13} color="var(--text-dim)" />
-                                <span>Enregistrer maintenant</span>
-                            </div>
-                            <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
-                            <div
-                                className="menu-item-hover"
-                                onClick={() => {
-                                    logout();
-                                    setUserMenuOpen(false);
-                                }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--semantic-danger)' }}
-                            >
-                                <LogOut size={13} />
-                                <span>Se déconnecter</span>
-                            </div>
+                            )}
                         </div>
                     )}
                 </div>
-                
+                <div style={{ position: 'relative', marginLeft: '2px' }} ref={userMenuRef}>
+                    {!isGuest && user ? (
+                        <button onClick={() => setUserMenuOpen(prev => !prev)} title={`Connecté : ${user.username} (PostgreSQL synchronisé)`}
+                            style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: 0, color: 'var(--text-primary)', transition: 'all 100ms ease' }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-surface)'; }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>{user.username ? user.username.charAt(0) : <User size={13} />}</span>
+                            <span style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '7px', height: '7px', borderRadius: '50%', background: cloudSyncStatus === 'saving' ? '#60A5FA' : cloudSyncStatus === 'error' ? 'var(--semantic-danger)' : 'var(--semantic-success)', border: '1.5px solid var(--bg-dark)' }} />
+                        </button>
+                    ) : (
+                        <button onClick={() => setAuthModalOpen(true)} title="Connexion au compte (Actuellement en mode Invité)"
+                            style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: 0, color: 'var(--text-dim)', transition: 'all 100ms ease' }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--text-dim)'; e.currentTarget.style.background = 'var(--bg-surface)'; }}>
+                            <User size={13} />
+                            <span style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '7px', height: '7px', borderRadius: '50%', background: 'var(--semantic-warning)', border: '1.5px solid var(--bg-dark)' }} />
+                        </button>
+                    )}
+                    {userMenuOpen && !isGuest && user && (
+                        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', minWidth: '200px', padding: '4px 0', zIndex: 3500 }}>
+                            <div style={{ padding: '6px 12px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: '11px', color: 'var(--text-dim)' }}>Connecté : <strong style={{ color: 'var(--text-primary)' }}>{user.username}</strong></div>
+                            <div className="menu-item-hover" onClick={() => { setProjectsModalOpen(true); setUserMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-primary)' }}><FolderOpen size={13} color="var(--text-dim)" /><span>Mes documents cloud</span></div>
+                            <div className="menu-item-hover" onClick={() => { saveToCloudNow(); setUserMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-primary)' }}><Cloud size={13} color="var(--text-dim)" /><span>Enregistrer maintenant</span></div>
+                            <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
+                            <div className="menu-item-hover" onClick={() => { logout(); setUserMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--semantic-danger)' }}><LogOut size={13} /><span>Se déconnecter</span></div>
+                        </div>
+                    )}
+                </div>
                 {(window as any).electronAPI && (
                     <>
                         <div style={{ width: '1px', height: '16px', background: 'var(--bg-border)', margin: '0 4px' }}></div>
@@ -1162,6 +801,8 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     </>
                 )}
             </div>
+                </>
+            )}
 
             {/* MOBILE MENU DRAWER / BOTTOM SHEET */}
             {isMobile && mobileMenuOpen && (
@@ -1353,7 +994,7 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                                         fontWeight: 700,
                                         cursor: 'pointer',
                                         marginBottom: '12px',
-                                        boxShadow: '0 2px 8px rgba(110, 201, 126, 0.35)'
+                                        boxShadow: 'none'
                                     }}
                                 >
                                     <Download size={15} strokeWidth={2.4} />
@@ -1364,11 +1005,11 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                             {/* VIEW MODE SWITCHER */}
                             <div style={{
                                 display: 'flex',
-                                gap: '6px',
+                                gap: '4px',
                                 marginBottom: '14px',
-                                background: 'var(--bg-surface)',
-                                padding: '4px',
-                                borderRadius: '10px',
+                                background: 'var(--bg-elevated)',
+                                padding: '3px',
+                                borderRadius: '14px',
                                 border: '1px solid var(--border-subtle)'
                             }}>
                                 <button
@@ -1383,16 +1024,17 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                                         justifyContent: 'center',
                                         gap: '6px',
                                         padding: '7px 4px',
-                                        borderRadius: '7px',
+                                        borderRadius: '10px',
                                         border: 'none',
                                         background: viewMode === 'map' ? 'var(--accent-default)' : 'transparent',
                                         color: viewMode === 'map' ? '#ffffff' : 'var(--text-dim)',
-                                        fontSize: '12px',
+                                        fontSize: '11.5px',
                                         fontWeight: 600,
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        boxShadow: 'none'
                                     }}
                                 >
-                                    <MapIcon size={14} />
+                                    <MapIcon size={13} strokeWidth={2.2} />
                                     <span>Carte Topo</span>
                                 </button>
                                 <button
@@ -1407,17 +1049,18 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                                         justifyContent: 'center',
                                         gap: '6px',
                                         padding: '7px 4px',
-                                        borderRadius: '7px',
+                                        borderRadius: '10px',
                                         border: 'none',
                                         background: viewMode === 'text' ? 'var(--accent-default)' : 'transparent',
                                         color: viewMode === 'text' ? '#ffffff' : 'var(--text-dim)',
-                                        fontSize: '12px',
+                                        fontSize: '11.5px',
                                         fontWeight: 600,
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        boxShadow: 'none'
                                     }}
                                 >
-                                    <FileText size={14} />
-                                    <span>Carnet Texte</span>
+                                    <FileText size={13} strokeWidth={2.2} />
+                                    <span>Carnet</span>
                                 </button>
                                 <button
                                     onClick={() => {
@@ -1431,16 +1074,17 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                                         justifyContent: 'center',
                                         gap: '6px',
                                         padding: '7px 4px',
-                                        borderRadius: '7px',
+                                        borderRadius: '10px',
                                         border: 'none',
                                         background: viewMode === 'split' ? 'var(--accent-default)' : 'transparent',
                                         color: viewMode === 'split' ? '#ffffff' : 'var(--text-dim)',
-                                        fontSize: '12px',
+                                        fontSize: '11.5px',
                                         fontWeight: 600,
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        boxShadow: 'none'
                                     }}
                                 >
-                                    <Columns size={14} />
+                                    <Columns size={13} strokeWidth={2.2} />
                                     <span>Scindée</span>
                                 </button>
                             </div>
@@ -1559,6 +1203,6 @@ function getViewBtnStyle(active: boolean, isCompact = false): React.CSSPropertie
         fontWeight: active ? 600 : 500,
         cursor: 'pointer',
         transition: 'all 100ms ease',
-        boxShadow: active ? '0 2px 8px rgba(37, 99, 235, 0.35)' : 'none',
+        boxShadow: 'none',
     };
 }

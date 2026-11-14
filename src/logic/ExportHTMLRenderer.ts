@@ -625,14 +625,28 @@ function renderStep(step: CarnetStep, stepNum: number, isSolution: boolean, expo
                 <span>EXTRAIT CARTOGRAPHIQUE (${formattedScale}${fromLabelClean ? ' — ' + fromLabelClean : ''})</span>
                 <span>Cap ${step.azimuth || 0}° &bull; ${step.distanceM || 0}m</span>
             </div>
-            <div style="width: 100%; max-width: 100%; overflow: hidden; display: flex; justify-content: center; margin: 4px 0;">
+            <div style="width: 100%; max-width: 100%; overflow: hidden; display: flex; justify-content: flex-start; margin: 4px 0;">
                 ${mapSvg}
             </div>
         </div>`;
     }
 
+function parseCustomCipherTags(text: string): string {
+    if (!text) return '';
+    return text
+        .replace(/\[morse\]([\s\S]*?)\[\/morse\]/gi, '<span class="font-morse">$1</span>')
+        .replace(/<morse>([\s\S]*?)<\/morse>/gi, '<span class="font-morse">$1</span>')
+        .replace(/\[templier\]([\s\S]*?)\[\/templier\]/gi, '<span class="font-templier">$1</span>')
+        .replace(/<templier>([\s\S]*?)<\/templier>/gi, '<span class="font-templier">$1</span>')
+        .replace(/\[maritime\]([\s\S]*?)\[\/maritime\]/gi, '<span class="font-maritime">$1</span>')
+        .replace(/<maritime>([\s\S]*?)<\/maritime>/gi, '<span class="font-maritime">$1</span>')
+        .replace(/\[code\]([\s\S]*?)\[\/code\]/gi, '<code class="font-mono">$1</code>')
+        .replace(/<code>([\s\S]*?)<\/code>/gi, '<code class="font-mono">$1</code>');
+}
+
     const fontClass = getModuleFontClass(step.moduleId);
-    const displayText = isSolution ? step.solutionText : step.encodedText;
+    const rawDisplayText = isSolution ? step.solutionText : step.encodedText;
+    const displayText = parseCustomCipherTags(rawDisplayText || '');
     const isEncoded = !isSolution && step.moduleId !== 'texte_clair' && displayText !== step.solutionText;
 
     let textContent = '';
@@ -640,7 +654,7 @@ function renderStep(step: CarnetStep, stepNum: number, isSolution: boolean, expo
         if (isEncoded) {
             textContent += `<div class="encoded ${fontClass}">${displayText.replace(/\n/g, '<br>')}</div>`;
             if (isSolution && step.solutionText) {
-                textContent += `<div class="solution-clair">${step.solutionText}</div>`;
+                textContent += `<div class="solution-clair">${parseCustomCipherTags(step.solutionText)}</div>`;
             }
         } else {
             textContent += `<div class="step-content">${displayText.replace(/\n/g, '<br>')}</div>`;

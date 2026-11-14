@@ -4,9 +4,10 @@ import MenuBar from './components/layout/MenuBar';
 import ProjectWorkspace from './components/layout/ProjectWorkspace';
 import RightSidebar from './components/layout/RightSidebar';
 import NotificationOverlay from './components/map/NotificationOverlay';
-import TextualHeader from './components/textual/TextualHeader';
 import ExportModal from './components/panels/ExportModal';
 import PreferencesModal from './components/panels/PreferencesModal';
+import MarketplaceModal from './components/panels/MarketplaceModal';
+import UnifiedResourceHub from './components/panels/UnifiedResourceHub';
 import AuthModal from './components/panels/AuthModal';
 import ProjectsDashboardModal from './components/panels/ProjectsDashboardModal';
 import ShareModal from './components/panels/ShareModal';
@@ -32,12 +33,14 @@ function App() {
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const isMobileOrTablet = windowWidth < 1024;
 
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [activeRightSection, setActiveRightSection] = useState<SectionId>('layers');
-  const [viewMode, setViewMode] = useState<ViewMode>('map');
+  const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [marketplaceModalOpen, setMarketplaceModalOpen] = useState(false);
+  const [mobileMarketplaceOpen, setMobileMarketplaceOpen] = useState(false);
   const { 
     authModalOpen, 
     setAuthModalOpen, 
@@ -49,7 +52,7 @@ function App() {
     clearAccessDenied
   } = useAuth();
 
-  const [rightWidth, setRightWidth] = useState(320);
+  const [rightWidth, setRightWidth] = useState(460);
   const rightResizing = useRef(false);
 
   useEffect(() => {
@@ -120,6 +123,19 @@ function App() {
       setRightSidebarOpen(!rightSidebarOpen);
     }
   };
+
+  // Global listener for marketplace trigger (mobile sheet or desktop modal)
+  useEffect(() => {
+    const handleOpenMarketplace = () => {
+      if (isMobileOrTablet) {
+        setMobileMarketplaceOpen(true);
+      } else {
+        setMarketplaceModalOpen(true);
+      }
+    };
+    window.addEventListener('scoutraider:open-marketplace', handleOpenMarketplace);
+    return () => window.removeEventListener('scoutraider:open-marketplace', handleOpenMarketplace);
+  }, [isMobileOrTablet]);
 
   const handleExportRequest = useCallback(() => {
     setExportModalOpen(true);
@@ -297,81 +313,30 @@ function App() {
     }}>
       <MenuBar 
         onToggleSidebar={toggleSidebar} 
+        rightSidebarOpen={rightSidebarOpen}
         viewMode={viewMode} 
         onViewModeChange={setViewMode} 
         onExport={handleExportRequest} 
         onPreferencesOpen={() => setPreferencesModalOpen(true)}
         onSetRightSection={setActiveRightSection}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-        onOpenMarketplace={() => navigate('/marketplace')}
+        onOpenMarketplace={() => toggleSidebar('right')}
       />
       
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
 
         {/* MAIN WORKSPACE */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', position: 'relative' }}>
-          
-          {isTextMode || isSplitMode ? (
-            <div style={{
-              display: 'flex', alignItems: 'center',
-              padding: isMobileOrTablet ? '0 8px' : '0 12px',
-              height: isMobileOrTablet ? '44px' : '46px',
-              background: 'var(--bg-dark)',
-              borderBottom: '1px solid var(--border-subtle)',
-              flexShrink: 0,
-              zIndex: 1000,
-              overflow: 'visible',
-              gap: '8px',
-              position: 'relative',
-            }}>
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'visible' }}>
-                <TextualHeader onExport={handleExportRequest} />
-              </div>
-
-              {!isMobileOrTablet && (
-                <button
-                  onClick={() => toggleSidebar('right')}
-                  title={`${rightSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'orchestration (Ctrl+])`}
-                  style={inlinePanelToggleStyle}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--bg-hover)';
-                    e.currentTarget.style.borderColor = 'var(--border-strong)';
-                    e.currentTarget.style.color = 'var(--text-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--bg-surface)';
-                    e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                    e.currentTarget.style.color = 'var(--text-dim)';
-                  }}
-                >
-                  {rightSidebarOpen ? <PanelRightClose size={15} strokeWidth={2} /> : <PanelRightOpen size={15} strokeWidth={2} />}
-                </button>
-              )}
-            </div>
-          ) : !isMobileOrTablet ? (
-            <button
-              onClick={() => toggleSidebar('right')}
-              title={`${rightSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'orchestration (Ctrl+])`}
-              style={{ ...mapPanelToggleStyle, right: '16px' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--bg-hover)';
-                e.currentTarget.style.borderColor = 'var(--border-strong)';
-                e.currentTarget.style.color = 'var(--text-primary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--bg-elevated)';
-                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                e.currentTarget.style.color = 'var(--text-dim)';
-              }}
-            >
-              {rightSidebarOpen ? <PanelRightClose size={18} strokeWidth={2} /> : <PanelRightOpen size={18} strokeWidth={2} />}
-            </button>
-          ) : null}
-
-          <ProjectWorkspace onExport={handleExportRequest} viewMode={viewMode} onToggleSidebar={toggleSidebar} />
+          <ProjectWorkspace 
+            onExport={handleExportRequest} 
+            viewMode={viewMode} 
+            onViewModeChange={setViewMode}
+            onToggleSidebar={toggleSidebar} 
+            rightSidebarOpen={rightSidebarOpen} 
+          />
         </div>
 
-        {/* DESKTOP RIGHT SIDEBAR: Libraries */}
+        {/* DESKTOP RIGHT SIDEBAR: Marketplace & Ressources */}
         {!isMobileOrTablet && rightSidebarOpen && (
           <>
             {/* Right Resizer */}
@@ -379,14 +344,17 @@ function App() {
               onMouseDown={(e) => { e.preventDefault(); rightResizing.current = true; document.body.style.cursor = 'col-resize'; }}
               style={{ width: '4px', cursor: 'col-resize', background: 'var(--bg-border)', zIndex: 10, marginLeft: '-2px', marginRight: '-2px' }}
             />
-            <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} onMarketplaceOpen={() => navigate('/marketplace')} width={rightWidth} />
+            <RightSidebar 
+              width={rightWidth} 
+              onClose={() => setRightSidebarOpen(false)}
+              onPreferencesOpen={() => setPreferencesModalOpen(true)}
+            />
           </>
         )}
 
       </div>
 
-      {/* MOBILE / TABLET RIGHT BOTTOM SHEET (CALQUES & CARTOGRAPHIE) (< 1024px) */}
-
+      {/* MOBILE / TABLET BOTTOM SHEET (CALQUES PURE: NO TITLES, NO BUTTONS, NO DIVIDERS ABOVE) */}
       {isMobileOrTablet && rightSidebarOpen && (
         <>
           <div className="bottom-sheet-backdrop" onClick={() => setRightSidebarOpen(false)} />
@@ -394,21 +362,30 @@ function App() {
             <div className="bottom-sheet-handle-zone" onClick={() => setRightSidebarOpen(false)} role="button" aria-label="Fermer le volet">
               <div className="bottom-sheet-handle-bar" />
             </div>
-            <div className="bottom-sheet-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                <Layers size={16} color="var(--accent-default)" />
-                <span>Calques & Cartographie</span>
-              </div>
-              <button
-                onClick={() => setRightSidebarOpen(false)}
-                aria-label="Fermer"
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: 'var(--radius-xs)' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              <RightSidebar activeSection={activeRightSection} onSectionChange={setActiveRightSection} onPreferencesOpen={() => setPreferencesModalOpen(true)} onMarketplaceOpen={() => navigate('/marketplace')} width="100%" />
+              <RightSidebar width="100%" />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* MOBILE MARKETPLACE BOTTOM SHEET (DÉROULANT DU BAS SUR MOBILE) */}
+      {isMobileOrTablet && mobileMarketplaceOpen && (
+        <>
+          <div className="bottom-sheet-backdrop" onClick={() => setMobileMarketplaceOpen(false)} />
+          <div className="bottom-sheet-panel" style={{ height: '80vh', maxHeight: '88vh' }}>
+            <div className="bottom-sheet-handle-zone" onClick={() => setMobileMarketplaceOpen(false)} role="button" aria-label="Fermer le volet">
+              <div className="bottom-sheet-handle-bar" />
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <UnifiedResourceHub
+                initialCategory="all"
+                isCompact={false}
+                onPreferencesOpen={() => {
+                  setMobileMarketplaceOpen(false);
+                  setPreferencesModalOpen(true);
+                }}
+              />
             </div>
           </div>
         </>
@@ -416,6 +393,9 @@ function App() {
 
       {/* Global Notifications */}
       <NotificationOverlay />
+
+      {/* Marketplace Modal (Desktop) */}
+      {marketplaceModalOpen && <MarketplaceModal onClose={() => setMarketplaceModalOpen(false)} />}
 
       {/* Export Modal */}
       {exportModalOpen && <ExportModal onClose={() => setExportModalOpen(false)} />}

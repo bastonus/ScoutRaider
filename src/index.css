@@ -18,6 +18,38 @@
   src: url('/fonts/TemplarsCipherPlus.ttf') format('truetype');
 }
 
+/* ── Balises personnalisées & polices de codage direct dans les textes ── */
+morse, .font-morse, [data-cipher="morse"] {
+  font-family: 'Morse', 'Courier New', monospace !important;
+  font-size: 1.2em !important;
+  letter-spacing: 0.12em;
+  display: inline-block;
+  line-height: 1.2;
+}
+
+templier, .font-templier, [data-cipher="templier"] {
+  font-family: 'TemplarsCipherPlus', 'Courier New', monospace !important;
+  font-size: 1.25em !important;
+  letter-spacing: 0.08em;
+  display: inline-block;
+  line-height: 1.2;
+}
+
+maritime, .font-maritime, [data-cipher="maritime"] {
+  font-family: 'Maritime', monospace !important;
+  font-size: 1.3em !important;
+  letter-spacing: 0.08em;
+  display: inline-block;
+  line-height: 1.2;
+}
+
+.font-mono-tag, [data-cipher="code"] {
+  font-family: var(--font-mono) !important;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
 :root {
     /* ═══════ DESIGN TOKENS (HIGH-DENSITY TECHNICAL CAD / SIG) ═══════ */
     /* Surfaces */
@@ -47,7 +79,7 @@
     --accent-muted:       #1D4ED8;
     --accent-pill:        #1D4ED8;
     --accent-transparent: rgba(37, 99, 235, 0.12);
-    --accent-glow:        rgba(37, 99, 235, 0.25);
+    --accent-glow:        transparent;
 
     /* Ambre technique de précision (outils secondaires / warnings) */
     --accent-secondary:             #F59E0B;
@@ -446,7 +478,7 @@ code, pre, .font-mono, .tabular-nums {
     border-color: var(--accent-default) !important;
     color: #FFFFFF !important;
     font-weight: 600;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    box-shadow: none !important;
 }
 
 .btn-primary:hover {

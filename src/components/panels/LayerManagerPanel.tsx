@@ -43,19 +43,61 @@ function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: (C
 
     return (
         <div ref={ref} onContextMenu={e => e.preventDefault()}
-            style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '4px', minWidth: '190px', boxShadow: 'var(--shadow-lg)' }}>
+            style={{
+                position: 'fixed',
+                left: pos.x,
+                top: pos.y,
+                zIndex: 9999,
+                background: 'var(--bg-elevated)',
+                backdropFilter: 'blur(16px)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '14px',
+                padding: '6px',
+                minWidth: '200px',
+                boxShadow: '0 16px 36px rgba(0, 0, 0, 0.55), 0 0 1px rgba(255, 255, 255, 0.1)'
+            }}>
             {items.map((item, i) => 'separator' in item
-                ? <div key={i} style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '3px 0' }} />
+                ? <div key={i} style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
                 : <button key={i} type="button" onClick={() => { item.onClick(); onClose(); }}
-                    onMouseEnter={e => { e.currentTarget.style.background = item.danger ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.07)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%', padding: '6px 8px', background: 'transparent', border: 'none', borderRadius: 'var(--radius-xs)', color: item.danger ? 'var(--semantic-danger)' : 'var(--text-bright)', fontSize: '12px', fontWeight: 500, cursor: 'pointer', textAlign: 'left', transition: 'all 100ms ease' }}>
+                    onMouseEnter={e => {
+                        e.currentTarget.style.background = item.danger ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-hover)';
+                        if (item.danger) e.currentTarget.style.color = '#f87171';
+                    }}
+                    onMouseLeave={e => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = item.danger ? 'var(--semantic-danger)' : 'var(--text-primary)';
+                    }}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        width: '100%',
+                        padding: '7px 10px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: item.danger ? 'var(--semantic-danger)' : 'var(--text-primary)',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 100ms ease'
+                    }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {item.icon && <span style={{ opacity: 0.7, flexShrink: 0 }}>{item.icon}</span>}
+                        {item.icon && <span style={{ opacity: 0.85, flexShrink: 0 }}>{item.icon}</span>}
                         {item.label}
                     </span>
                     {item.shortcut && (
-                        <span style={{ fontSize: '10px', color: 'var(--text-dim)', opacity: 0.65, fontFamily: 'monospace', marginLeft: 'auto', padding: '1px 5px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px' }}>
+                        <span style={{
+                            fontSize: '10px',
+                            color: 'var(--text-dim)',
+                            fontFamily: 'monospace',
+                            marginLeft: 'auto',
+                            padding: '2px 6px',
+                            background: 'rgba(255, 255, 255, 0.06)',
+                            borderRadius: '4px'
+                        }}>
                             {item.shortcut}
                         </span>
                     )}
@@ -75,10 +117,34 @@ function ColorPickerPopup({ x, y, currentColor, onPick, onClose }: { x: number; 
     }, [onClose]);
     return (
         <div ref={ref} onContextMenu={e => e.preventDefault()}
-            style={{ position: 'fixed', left: x, top: y, zIndex: 10000, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '8px', boxShadow: 'var(--shadow-lg)', display: 'flex', flexWrap: 'wrap', gap: '6px', maxWidth: '170px' }}>
+            style={{
+                position: 'fixed',
+                left: x,
+                top: y,
+                zIndex: 10000,
+                background: 'var(--bg-elevated)',
+                backdropFilter: 'blur(16px)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '14px',
+                padding: '10px',
+                boxShadow: '0 16px 36px rgba(0, 0, 0, 0.55)',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '8px',
+                maxWidth: '180px'
+            }}>
             {PRESET_COLORS.map(c => (
                 <div key={c.value} title={c.label} onClick={() => { onPick(c.value); onClose(); }}
-                    style={{ width: '18px', height: '18px', borderRadius: 'var(--radius-xs)', background: c.value, cursor: 'pointer', boxShadow: currentColor === c.value ? '0 0 0 2px var(--text-primary)' : 'none', transform: currentColor === c.value ? 'scale(1.1)' : 'scale(1)', transition: 'transform 100ms ease' }}
+                    style={{
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '6px',
+                        background: c.value,
+                        cursor: 'pointer',
+                        boxShadow: currentColor === c.value ? '0 0 0 2px #fff' : 'none',
+                        transform: currentColor === c.value ? 'scale(1.15)' : 'scale(1)',
+                        transition: 'transform 100ms ease, box-shadow 100ms ease'
+                    }}
                 />
             ))}
         </div>
@@ -94,73 +160,248 @@ function InlineRename({ value, onConfirm, onCancel }: { value: string; onConfirm
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }} onClick={e => e.stopPropagation()}>
             <input ref={ref} value={v} onChange={e => setV(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') onConfirm(v); if (e.key === 'Escape') onCancel(); }}
-                style={{ flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(110,201,126,0.4)', borderRadius: '5px', padding: '2px 6px', color: '#fff', fontSize: '11px', fontWeight: 600, outline: 'none' }}
+                style={{
+                    flex: 1,
+                    minWidth: 0,
+                    background: 'var(--bg-dark)',
+                    border: '1px solid var(--accent-default)',
+                    borderRadius: '6px',
+                    padding: '3px 8px',
+                    color: '#fff',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    outline: 'none',
+                    boxShadow: 'none'
+                }}
                 autoFocus />
-            <button type="button" onClick={() => onConfirm(v)} style={{ background: 'transparent', border: 'none', color: '#6ec97e', cursor: 'pointer', padding: '1px', display: 'flex' }}><Check size={12} /></button>
-            <button type="button" onClick={onCancel} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '1px', display: 'flex' }}><X size={12} /></button>
+            <button type="button" onClick={() => onConfirm(v)} style={{ background: 'var(--accent-transparent)', border: '1px solid var(--accent-default)', borderRadius: '6px', color: 'var(--accent-hover)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Check size={12} strokeWidth={2.5} />
+            </button>
+            <button type="button" onClick={onCancel} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={12} strokeWidth={2} />
+            </button>
         </div>
     );
 }
 
 // ─── Layer row ───────────────────────────────────────────────────────
-function LayerRow({ icon, label, sublabel, color, visible, isEditing, isSelected, onToggleVisible, onContextMenu, renameSlot, dragHandleProps, expandToggle }: {
-    icon: React.ReactNode; label: string; sublabel?: string; color: string;
-    visible: boolean; isEditing: boolean; isSelected?: boolean;
-    onToggleVisible: () => void; onContextMenu: (e: React.MouseEvent) => void;
+function LayerRow({
+    icon,
+    label,
+    sublabel,
+    color,
+    visible,
+    isEditing,
+    isSelected,
+    isActiveItin,
+    onToggleVisible,
+    onContextMenu,
+    renameSlot,
+    dragHandleProps,
+    expandToggle
+}: {
+    icon: React.ReactNode;
+    label: string;
+    sublabel?: string;
+    color: string;
+    visible: boolean;
+    isEditing: boolean;
+    isSelected?: boolean;
+    isActiveItin?: boolean;
+    onToggleVisible: () => void;
+    onContextMenu: (e: React.MouseEvent) => void;
     renameSlot?: React.ReactNode;
     dragHandleProps?: React.HTMLAttributes<HTMLSpanElement>;
     expandToggle?: React.ReactNode;
 }) {
-    const bg = isSelected ? 'rgba(110,201,126,0.12)' : 'transparent';
-    const borderL = isSelected ? '#6ec97e' : 'transparent';
+    const [isHovered, setIsHovered] = useState(false);
+
     return (
-        <div onContextMenu={onContextMenu}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px 6px 6px', background: bg, borderLeft: `2px solid ${borderL}`, cursor: 'pointer', transition: 'background 0.12s', outline: isSelected ? '1px solid rgba(110,201,126,0.22)' : 'none', outlineOffset: '-1px' }}
-            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-            onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+        <div
+            onContextMenu={onContextMenu}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '7px 10px',
+                borderRadius: '12px',
+                margin: '3px 8px',
+                background: isSelected
+                    ? 'var(--accent-transparent)'
+                    : isHovered
+                        ? 'var(--bg-hover)'
+                        : 'rgba(255, 255, 255, 0.02)',
+                border: isSelected
+                    ? '1px solid var(--accent-default)'
+                    : isHovered
+                        ? '1px solid rgba(255, 255, 255, 0.12)'
+                        : '1px solid var(--border-subtle)',
+                boxShadow: 'none',
+                cursor: 'pointer',
+                transition: 'all 120ms cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
         >
             {/* Expand / collapse chevron (for groups) or drag handle */}
             {expandToggle || (
-                <span {...dragHandleProps} onClick={e => e.stopPropagation()} style={{ color: 'rgba(255,255,255,0.2)', cursor: 'grab', display: 'flex', flexShrink: 0, touchAction: 'none', ...dragHandleProps?.style }}>
+                <span
+                    {...dragHandleProps}
+                    onClick={e => e.stopPropagation()}
+                    title="Glisser pour réorganiser"
+                    style={{
+                        color: isHovered ? 'var(--text-dim)' : 'rgba(255, 255, 255, 0.2)',
+                        cursor: 'grab',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '14px',
+                        flexShrink: 0,
+                        touchAction: 'none',
+                        transition: 'color 120ms ease',
+                        ...dragHandleProps?.style
+                    }}
+                >
                     <GripVertical size={13} />
                 </span>
             )}
 
-            {/* Eye */}
-            <button type="button" onClick={e => { e.stopPropagation(); onToggleVisible(); }}
-                style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: visible ? color : 'rgba(255,255,255,0.2)', display: 'flex', flexShrink: 0 }}>
-                {visible ? <Eye size={13} /> : <EyeOff size={13} />}
+            {/* Visibility Eye button */}
+            <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onToggleVisible(); }}
+                title={visible ? "Masquer ce calque" : "Afficher ce calque"}
+                style={{
+                    background: visible ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
+                    border: 'none',
+                    borderRadius: '7px',
+                    width: '24px',
+                    height: '24px',
+                    cursor: 'pointer',
+                    color: visible ? color : 'rgba(255, 255, 255, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    transition: 'all 120ms ease'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = visible ? 'rgba(255, 255, 255, 0.04)' : 'transparent'; }}
+            >
+                {visible ? <Eye size={13} strokeWidth={2.2} /> : <EyeOff size={13} strokeWidth={2} />}
             </button>
 
-            {/* Color dot */}
-            <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: color, flexShrink: 0 }} />
+            {/* Color Dot */}
+            <div
+                style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: color,
+                    flexShrink: 0,
+                    boxShadow: 'none',
+                    opacity: visible ? 1 : 0.4,
+                    transition: 'all 120ms ease'
+                }}
+            />
 
-            {/* Type icon */}
-            <span style={{ color: isSelected ? '#6ec97e' : 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{icon}</span>
+            {/* Type icon inside subtle pill */}
+            <div
+                style={{
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '6px',
+                    background: isSelected ? 'var(--accent-transparent)' : 'rgba(255, 255, 255, 0.04)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isSelected ? 'var(--accent-hover)' : 'var(--text-dim)',
+                    flexShrink: 0,
+                    transition: 'all 120ms ease'
+                }}
+            >
+                {icon}
+            </div>
 
             {/* Label or rename */}
-            {isEditing && renameSlot
-                ? renameSlot
-                : (
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '12px', fontWeight: isSelected ? 600 : 500, color: isSelected ? '#fff' : 'var(--text-bright)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {label}
+            {isEditing && renameSlot ? (
+                renameSlot
+            ) : (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                            fontSize: '12px',
+                            fontWeight: isSelected ? 600 : 500,
+                            color: isSelected ? '#fff' : 'var(--text-primary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}>
+                            {label}
+                        </span>
+                        {isActiveItin && (
+                            <span style={{
+                                fontSize: '9px',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                background: 'var(--accent-transparent)',
+                                color: 'var(--accent-hover)',
+                                border: '1px solid var(--accent-default)',
+                                flexShrink: 0
+                            }}>
+                                Actif
                             </span>
-                        </div>
-                        {sublabel && <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '1px' }}>{sublabel}</div>}
+                        )}
                     </div>
-                )}
+                    {sublabel && (
+                        <div style={{
+                            fontSize: '10.5px',
+                            color: 'var(--text-dim)',
+                            marginTop: '1px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}>
+                            {sublabel}
+                        </div>
+                    )}
+                </div>
+            )}
 
-            {/* ⋮ menu button */}
+            {/* Options button */}
             {!isEditing && (
-                <button type="button" onClick={e => { e.stopPropagation(); onContextMenu(e); }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
-                    style={{ background: 'transparent', border: 'none', padding: '2px 4px', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', display: 'flex', flexShrink: 0, borderRadius: '4px' }}
-                    title="Options (clic droit)">
+                <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); onContextMenu(e); }}
+                    onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                    }}
+                    onMouseLeave={e => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = isHovered ? 'var(--text-dim)' : 'rgba(255, 255, 255, 0.2)';
+                    }}
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: isHovered ? 'var(--text-dim)' : 'rgba(255, 255, 255, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        transition: 'all 120ms ease'
+                    }}
+                    title="Options (clic droit)"
+                >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+                        <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
                     </svg>
                 </button>
             )}
@@ -421,7 +662,7 @@ export default function LayerManagerPanel() {
         const isDraggingOver = dropOver === idx;
         const isSelected = selectedId === item.id;
         const wrapStyle: React.CSSProperties = {
-            borderTop: isDraggingOver ? '2px solid #6ec97e' : '2px solid transparent',
+            borderTop: isDraggingOver ? '2px solid var(--accent-default)' : '2px solid transparent',
             transition: 'border-color 0.1s',
         };
 
@@ -444,10 +685,11 @@ export default function LayerManagerPanel() {
             return (
                 <div key={item.id} style={wrapStyle} {...dragProps}
                     onClick={() => handleSelectRow(item)}>
-                    <LayerRow icon={<Route size={12} />} label={itin.name}
+                    <LayerRow icon={<Route size={13} strokeWidth={2.2} />} label={itin.name}
                         sublabel={`${km.toFixed(1)} km · ${stages} étape${stages !== 1 ? 's' : ''}`}
                         color={itin.color} visible={itin.visible !== false}
                         isEditing={isRenaming} isSelected={isSelected}
+                        isActiveItin={isActive}
                         onToggleVisible={() => dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: itin.id })}
                         onContextMenu={e => openItinCtx(e, itin)}
                         dragHandleProps={{}}
@@ -463,7 +705,7 @@ export default function LayerManagerPanel() {
             const isRenaming = renamingId === pt.id;
             return (
                 <div key={item.id} style={wrapStyle} {...dragProps}>
-                    <LayerRow icon={<MapPin size={12} />} label={pt.title}
+                    <LayerRow icon={<MapPin size={13} strokeWidth={2.2} />} label={pt.title}
                         sublabel={`${pt.coords[0].toFixed(4)}, ${pt.coords[1].toFixed(4)}`}
                         color={pt.color} visible={pt.visible}
                         isEditing={isRenaming} isSelected={isSelected}
@@ -484,7 +726,7 @@ export default function LayerManagerPanel() {
             const isRenaming = renamingId === area.id;
             return (
                 <div key={item.id} style={wrapStyle} {...dragProps}>
-                    <LayerRow icon={<PolygonIcon size={12} />} label={area.title}
+                    <LayerRow icon={<PolygonIcon size={13} />} label={area.title}
                         sublabel={isComplete ? surface : `${area.coords.length} sommet${area.coords.length > 1 ? 's' : ''} (en cours)`}
                         color={area.color} visible={area.visible}
                         isEditing={isRenaming} isSelected={isSelected}
@@ -516,7 +758,7 @@ export default function LayerManagerPanel() {
 
             return (
                 <div key={item.id} style={wrapStyle} {...dragProps}>
-                    <LayerRow icon={<Paintbrush size={12} />} label={draw.title}
+                    <LayerRow icon={<Paintbrush size={13} strokeWidth={2.2} />} label={draw.title}
                         sublabel={`${strokes.length} trait${strokes.length !== 1 ? 's' : ''}`}
                         color={draw.color} visible={draw.visible}
                         isEditing={isRenaming} isSelected={isSelected && !selectedSublayerId}
@@ -524,9 +766,9 @@ export default function LayerManagerPanel() {
                             <button
                                 type="button"
                                 onClick={toggleExpand}
-                                style={{ background: 'transparent', border: 'none', padding: '0 2px', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center' }}
+                                style={{ background: 'transparent', border: 'none', padding: '0 2px', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}
                             >
-                                {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                                {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                             </button>
                         ) : undefined}
                         onToggleVisible={() => dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: draw.id } as any)}
@@ -536,7 +778,16 @@ export default function LayerManagerPanel() {
                     />
                     {/* ── Sub-stroke list (Group Hierarchy like Figma/tldraw) ── */}
                     {isExpanded && strokes.length > 0 && (
-                        <div style={{ marginLeft: '22px', borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{
+                            marginLeft: '28px',
+                            marginRight: '8px',
+                            marginBottom: '4px',
+                            paddingLeft: '10px',
+                            borderLeft: '1px solid var(--border-subtle)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px'
+                        }}>
                             {strokes.map((stroke, sIdx) => {
                                 const isSubSelected = isSelected && selectedSublayerId === stroke.id;
                                 return (
@@ -549,14 +800,15 @@ export default function LayerManagerPanel() {
                                         style={{
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '7px',
-                                            padding: '4px 8px 4px 10px',
-                                            background: isSubSelected ? 'rgba(45,140,235,0.14)' : 'transparent',
-                                            borderLeft: isSubSelected ? '2px solid #2d8ceb' : '2px solid transparent',
+                                            gap: '8px',
+                                            padding: '5px 8px',
+                                            borderRadius: '8px',
+                                            background: isSubSelected ? 'var(--accent-transparent)' : 'transparent',
+                                            border: isSubSelected ? '1px solid var(--accent-default)' : '1px solid transparent',
                                             cursor: 'pointer',
-                                            transition: 'background 0.1s',
+                                            transition: 'all 100ms ease',
                                         }}
-                                        onMouseEnter={e => { if (!isSubSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                        onMouseEnter={e => { if (!isSubSelected) e.currentTarget.style.background = 'var(--bg-hover)'; }}
                                         onMouseLeave={e => { if (!isSubSelected) e.currentTarget.style.background = 'transparent'; }}
                                     >
                                         {/* Color dot (click triggers color picker) */}
@@ -570,13 +822,21 @@ export default function LayerManagerPanel() {
                                                     onPick: (c) => dispatch({ type: 'UPDATE_DRAW_STROKE', drawId: draw.id, strokeId: stroke.id, patch: { color: c } } as any)
                                                 });
                                             }}
-                                            style={{ width: '8px', height: '8px', borderRadius: '2px', background: stroke.color, flexShrink: 0, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.25)' }}
+                                            style={{
+                                                width: '8px',
+                                                height: '8px',
+                                                borderRadius: '50%',
+                                                background: stroke.color,
+                                                flexShrink: 0,
+                                                cursor: 'pointer',
+                                                boxShadow: `0 0 4px ${stroke.color}80`
+                                            }}
                                         />
-                                        <span style={{ fontSize: '11px', color: isSubSelected ? '#fff' : 'var(--text-bright)', flex: 1, fontWeight: isSubSelected ? 600 : 400 }}>
+                                        <span style={{ fontSize: '11px', color: isSubSelected ? '#fff' : 'var(--text-primary)', flex: 1, fontWeight: isSubSelected ? 600 : 400 }}>
                                             Trait {sIdx + 1}
                                         </span>
                                         {/* Stroke width badge */}
-                                        <span style={{ fontSize: '10px', color: 'var(--text-dim)', padding: '1px 4px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
+                                        <span style={{ fontSize: '9.5px', color: 'var(--text-dim)', padding: '2px 5px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', fontWeight: 600 }}>
                                             {stroke.strokeWidth}px
                                         </span>
                                         {/* Delete button */}
@@ -584,9 +844,9 @@ export default function LayerManagerPanel() {
                                             type="button"
                                             onClick={e => { e.stopPropagation(); dispatch({ type: 'REMOVE_DRAW_STROKE', drawId: draw.id, strokeId: stroke.id } as any); }}
                                             title="Supprimer ce trait"
-                                            style={{ background: 'transparent', border: 'none', padding: '1px 3px', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', borderRadius: '3px' }}
+                                            style={{ background: 'transparent', border: 'none', padding: '2px', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', borderRadius: '4px' }}
                                             onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                                            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+                                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-dim)'}
                                         >
                                             <Trash2 size={11} />
                                         </button>
@@ -617,7 +877,7 @@ export default function LayerManagerPanel() {
 
             return (
                 <div key={item.id} style={wrapStyle} {...dragProps}>
-                    <LayerRow icon={<Type size={12} />} label={text.title}
+                    <LayerRow icon={<Type size={13} strokeWidth={2.2} />} label={text.title}
                         sublabel={`${textItems.length} texte${textItems.length !== 1 ? 's' : ''}`}
                         color={text.color} visible={text.visible}
                         isEditing={isRenaming} isSelected={isSelected && !selectedSublayerId}
@@ -625,9 +885,9 @@ export default function LayerManagerPanel() {
                             <button
                                 type="button"
                                 onClick={toggleExpand}
-                                style={{ background: 'transparent', border: 'none', padding: '0 2px', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center' }}
+                                style={{ background: 'transparent', border: 'none', padding: '0 2px', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}
                             >
-                                {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                                {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                             </button>
                         ) : undefined}
                         onToggleVisible={() => dispatch({ type: 'TOGGLE_TEXT_VISIBILITY', id: text.id } as any)}
@@ -637,7 +897,16 @@ export default function LayerManagerPanel() {
                     />
                     {/* ── Sub-text item list ── */}
                     {isExpanded && textItems.length > 0 && (
-                        <div style={{ marginLeft: '22px', borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{
+                            marginLeft: '28px',
+                            marginRight: '8px',
+                            marginBottom: '4px',
+                            paddingLeft: '10px',
+                            borderLeft: '1px solid var(--border-subtle)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px'
+                        }}>
                             {textItems.map((tItem, tIdx) => {
                                 const isSubSelected = isSelected && selectedSublayerId === tItem.id;
                                 return (
@@ -650,14 +919,15 @@ export default function LayerManagerPanel() {
                                         style={{
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '7px',
-                                            padding: '4px 8px 4px 10px',
-                                            background: isSubSelected ? 'rgba(45,140,235,0.14)' : 'transparent',
-                                            borderLeft: isSubSelected ? '2px solid #2d8ceb' : '2px solid transparent',
+                                            gap: '8px',
+                                            padding: '5px 8px',
+                                            borderRadius: '8px',
+                                            background: isSubSelected ? 'var(--accent-transparent)' : 'transparent',
+                                            border: isSubSelected ? '1px solid var(--accent-default)' : '1px solid transparent',
                                             cursor: 'pointer',
-                                            transition: 'background 0.1s',
+                                            transition: 'all 100ms ease',
                                         }}
-                                        onMouseEnter={e => { if (!isSubSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                        onMouseEnter={e => { if (!isSubSelected) e.currentTarget.style.background = 'var(--bg-hover)'; }}
                                         onMouseLeave={e => { if (!isSubSelected) e.currentTarget.style.background = 'transparent'; }}
                                     >
                                         <div
@@ -670,21 +940,29 @@ export default function LayerManagerPanel() {
                                                     onPick: (c) => dispatch({ type: 'UPDATE_TEXT_ITEM', textId: text.id, itemId: tItem.id, patch: { color: c } } as any)
                                                 });
                                             }}
-                                            style={{ width: '8px', height: '8px', borderRadius: '2px', background: tItem.color, flexShrink: 0, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.25)' }}
+                                            style={{
+                                                width: '8px',
+                                                height: '8px',
+                                                borderRadius: '50%',
+                                                background: tItem.color,
+                                                flexShrink: 0,
+                                                cursor: 'pointer',
+                                                boxShadow: `0 0 4px ${tItem.color}80`
+                                            }}
                                         />
-                                        <span style={{ fontSize: '11px', color: isSubSelected ? '#fff' : 'var(--text-bright)', flex: 1, fontWeight: isSubSelected ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span style={{ fontSize: '11px', color: isSubSelected ? '#fff' : 'var(--text-primary)', flex: 1, fontWeight: isSubSelected ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {tItem.text || `Texte ${tIdx + 1}`}
                                         </span>
-                                        <span style={{ fontSize: '10px', color: 'var(--text-dim)', padding: '1px 4px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
+                                        <span style={{ fontSize: '9.5px', color: 'var(--text-dim)', padding: '2px 5px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', fontWeight: 600 }}>
                                             {tItem.fontSize}px
                                         </span>
                                         <button
                                             type="button"
                                             onClick={e => { e.stopPropagation(); dispatch({ type: 'REMOVE_TEXT_ITEM', textId: text.id, itemId: tItem.id } as any); }}
                                             title="Supprimer ce texte"
-                                            style={{ background: 'transparent', border: 'none', padding: '1px 3px', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', borderRadius: '3px' }}
+                                            style={{ background: 'transparent', border: 'none', padding: '2px', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', borderRadius: '4px' }}
                                             onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                                            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+                                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-dim)'}
                                         >
                                             <Trash2 size={11} />
                                         </button>
@@ -703,59 +981,268 @@ export default function LayerManagerPanel() {
     const isEmpty = itineraries.length === 0 && points.length === 0 && areas.length === 0 && draws.length === 0 && texts.length === 0;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-panel)', userSelect: 'none', fontSize: '12px', color: 'var(--text-primary)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', userSelect: 'none', fontSize: '12px', color: 'var(--text-primary)' }}>
 
             {/* ── Flat layer list ── */}
             <div ref={listRef} tabIndex={0}
                 title="Le premier calque de la liste est affiché au premier plan sur la carte."
-                style={{ flex: 1, overflowY: 'auto', outline: 'none' }}
+                style={{ flex: 1, overflowY: 'auto', outline: 'none', padding: '4px 0' }}
                 onKeyDown={handleKeyDown}>
                 {isEmpty ? (
-                    <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '11px' }}>
-                        Aucun calque.<br />
-                        <span style={{ opacity: 0.6 }}>Utilisez les boutons ci-dessous pour créer.</span>
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '36px 20px',
+                        textAlign: 'center',
+                        height: '100%'
+                    }}>
+                        <div style={{
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '14px',
+                            background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border-subtle)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: '12px',
+                            color: 'var(--text-dim)'
+                        }}>
+                            <Route size={20} strokeWidth={1.8} />
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                            Aucun calque sur la carte
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', lineHeight: 1.4, maxWidth: '220px' }}>
+                            Tracez un itinéraire ou ajoutez un repère avec la barre ci-dessous.
+                        </div>
                     </div>
                 ) : (
                     order.map((item, idx) => renderItem(item, idx))
                 )}
             </div>
 
-            {/* ── Bottom toolbar ── */}
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '8px 10px', display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.25)', flexShrink: 0 }}>
-                <button type="button"
-                    onClick={() => {
-                        dispatch({ type: 'ADD_ITINERARY' });
-                        dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
-                        dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouvel itinéraire créé.', notifType: 'info' });
-                    }}
-                    title="Créer un nouvel itinéraire"
-                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: (state.active_tool === 'route' && selectedId === state.active_itinerary_id) ? '#2d8ceb' : 'rgba(45,140,235,0.1)', border: `1px solid ${(state.active_tool === 'route' && selectedId === state.active_itinerary_id) ? '#2d8ceb' : 'rgba(45,140,235,0.22)'}`, color: (state.active_tool === 'route' && selectedId === state.active_itinerary_id) ? '#fff' : '#60a5fa', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
-                    <Route size={15} />Itinéraire
-                </button>
-                <button type="button"
-                    onClick={() => { dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_point' }); dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour placer un repère.', notifType: 'info' }); }}
-                    title="Activer l'outil Point"
-                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: state.active_tool === 'annotate_point' ? '#3b82f6' : 'rgba(59,130,246,0.1)', border: `1px solid ${state.active_tool === 'annotate_point' ? '#3b82f6' : 'rgba(59,130,246,0.22)'}`, color: state.active_tool === 'annotate_point' ? '#fff' : '#60a5fa', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
-                    <MapPin size={15} />Repère
-                </button>
-                <button type="button"
-                    onClick={() => { dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_area' }); dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour tracer les sommets.', notifType: 'info' }); }}
-                    title="Activer l'outil Zone"
-                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: (state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#10b981' : 'rgba(16,185,129,0.1)', border: `1px solid ${(state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#10b981' : 'rgba(16,185,129,0.22)'}`, color: (state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#fff' : '#6ee7b7', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
-                    <PolygonIcon size={15} color={(state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#fff' : '#6ee7b7'} />Zone
-                </button>
-                <button type="button"
-                    onClick={() => { dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_draw' }); dispatch({ type: 'ADD_NOTIFICATION', message: 'Dessinez librement sur la carte.', notifType: 'info' }); }}
-                    title="Activer l'outil Dessin (B)"
-                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: state.active_tool === 'annotate_draw' ? '#f59e0b' : 'rgba(245,158,11,0.1)', border: `1px solid ${state.active_tool === 'annotate_draw' ? '#f59e0b' : 'rgba(245,158,11,0.22)'}`, color: state.active_tool === 'annotate_draw' ? '#fff' : '#fcd34d', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
-                    <Paintbrush size={15} />Dessin
-                </button>
-                <button type="button"
-                    onClick={() => { dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_text' }); dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour placer un texte.', notifType: 'info' }); }}
-                    title="Activer l'outil Texte (T)"
-                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '7px 4px', borderRadius: '6px', background: state.active_tool === 'annotate_text' ? '#38bdf8' : 'rgba(56,189,248,0.1)', border: `1px solid ${state.active_tool === 'annotate_text' ? '#38bdf8' : 'rgba(56,189,248,0.22)'}`, color: state.active_tool === 'annotate_text' ? '#fff' : '#7dd3fc', cursor: 'pointer', fontSize: '9px', fontWeight: 700 }}>
-                    <Type size={15} />Texte
-                </button>
+            {/* ── Bottom toolbar (Island style matching FloatingToolbar) ── */}
+            <div style={{
+                padding: '8px 10px',
+                borderTop: '1px solid var(--border-subtle)',
+                background: 'var(--bg-dark)',
+                flexShrink: 0
+            }}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '12px',
+                    padding: '3px',
+                }}>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            dispatch({ type: 'ADD_ITINERARY' });
+                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
+                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouvel itinéraire créé.', notifType: 'info' });
+                        }}
+                        title="Créer un itinéraire (P)"
+                        style={{
+                            flex: 1,
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            border: (state.active_tool === 'route' && selectedId === state.active_itinerary_id)
+                                ? '1px solid var(--accent-default)'
+                                : '1px solid transparent',
+                            borderRadius: '8px',
+                            background: (state.active_tool === 'route' && selectedId === state.active_itinerary_id)
+                                ? 'var(--accent-transparent)'
+                                : 'transparent',
+                            color: (state.active_tool === 'route' && selectedId === state.active_itinerary_id)
+                                ? 'var(--accent-hover)'
+                                : 'var(--text-dim)',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            transition: 'all 120ms ease'
+                        }}
+                        onMouseEnter={e => {
+                            if (!(state.active_tool === 'route' && selectedId === state.active_itinerary_id)) {
+                                e.currentTarget.style.background = 'var(--bg-hover)';
+                                e.currentTarget.style.color = 'var(--text-primary)';
+                            }
+                        }}
+                        onMouseLeave={e => {
+                            if (!(state.active_tool === 'route' && selectedId === state.active_itinerary_id)) {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = 'var(--text-dim)';
+                            }
+                        }}
+                    >
+                        <Route size={13} strokeWidth={2.2} />
+                        <span>Tracé</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_point' });
+                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour placer un repère.', notifType: 'info' });
+                        }}
+                        title="Activer l'outil Repère"
+                        style={{
+                            flex: 1,
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            border: state.active_tool === 'annotate_point' ? '1px solid var(--accent-default)' : '1px solid transparent',
+                            borderRadius: '8px',
+                            background: state.active_tool === 'annotate_point' ? 'var(--accent-transparent)' : 'transparent',
+                            color: state.active_tool === 'annotate_point' ? 'var(--accent-hover)' : 'var(--text-dim)',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            transition: 'all 120ms ease'
+                        }}
+                        onMouseEnter={e => {
+                            if (state.active_tool !== 'annotate_point') {
+                                e.currentTarget.style.background = 'var(--bg-hover)';
+                                e.currentTarget.style.color = 'var(--text-primary)';
+                            }
+                        }}
+                        onMouseLeave={e => {
+                            if (state.active_tool !== 'annotate_point') {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = 'var(--text-dim)';
+                            }
+                        }}
+                    >
+                        <MapPin size={13} strokeWidth={2.2} />
+                        <span>Repère</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_area' });
+                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour tracer les sommets.', notifType: 'info' });
+                        }}
+                        title="Activer l'outil Zone"
+                        style={{
+                            flex: 1,
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            border: (state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '1px solid #10b981' : '1px solid transparent',
+                            borderRadius: '8px',
+                            background: (state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? 'rgba(16,185,129,0.15)' : 'transparent',
+                            color: (state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#34d399' : 'var(--text-dim)',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            transition: 'all 120ms ease'
+                        }}
+                        onMouseEnter={e => {
+                            if (!(state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed')) {
+                                e.currentTarget.style.background = 'var(--bg-hover)';
+                                e.currentTarget.style.color = 'var(--text-primary)';
+                            }
+                        }}
+                        onMouseLeave={e => {
+                            if (!(state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed')) {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = 'var(--text-dim)';
+                            }
+                        }}
+                    >
+                        <PolygonIcon size={13} color={(state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#34d399' : 'currentColor'} />
+                        <span>Zone</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_draw' });
+                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Dessinez librement sur la carte.', notifType: 'info' });
+                        }}
+                        title="Activer l'outil Dessin (B)"
+                        style={{
+                            flex: 1,
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            border: state.active_tool === 'annotate_draw' ? '1px solid #f59e0b' : '1px solid transparent',
+                            borderRadius: '8px',
+                            background: state.active_tool === 'annotate_draw' ? 'rgba(245,158,11,0.15)' : 'transparent',
+                            color: state.active_tool === 'annotate_draw' ? '#fbbf24' : 'var(--text-dim)',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            transition: 'all 120ms ease'
+                        }}
+                        onMouseEnter={e => {
+                            if (state.active_tool !== 'annotate_draw') {
+                                e.currentTarget.style.background = 'var(--bg-hover)';
+                                e.currentTarget.style.color = 'var(--text-primary)';
+                            }
+                        }}
+                        onMouseLeave={e => {
+                            if (state.active_tool !== 'annotate_draw') {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = 'var(--text-dim)';
+                            }
+                        }}
+                    >
+                        <Paintbrush size={13} strokeWidth={2.2} />
+                        <span>Dessin</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_text' });
+                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour placer un texte.', notifType: 'info' });
+                        }}
+                        title="Activer l'outil Texte (T)"
+                        style={{
+                            flex: 1,
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            border: state.active_tool === 'annotate_text' ? '1px solid #38bdf8' : '1px solid transparent',
+                            borderRadius: '8px',
+                            background: state.active_tool === 'annotate_text' ? 'rgba(56,189,248,0.15)' : 'transparent',
+                            color: state.active_tool === 'annotate_text' ? '#38bdf8' : 'var(--text-dim)',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            transition: 'all 120ms ease'
+                        }}
+                        onMouseEnter={e => {
+                            if (state.active_tool !== 'annotate_text') {
+                                e.currentTarget.style.background = 'var(--bg-hover)';
+                                e.currentTarget.style.color = 'var(--text-primary)';
+                            }
+                        }}
+                        onMouseLeave={e => {
+                            if (state.active_tool !== 'annotate_text') {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = 'var(--text-dim)';
+                            }
+                        }}
+                    >
+                        <Type size={13} strokeWidth={2.2} />
+                        <span>Texte</span>
+                    </button>
+                </div>
             </div>
 
             {/* Portals */}

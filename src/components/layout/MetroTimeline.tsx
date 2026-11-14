@@ -192,7 +192,7 @@ export default function MetroTimeline() {
                     position: 'relative',
                     transform: isDragOver ? 'scale(2.5)' : 'scale(1)',
                     zIndex: isDragOver ? 100 : 1,
-                    boxShadow: isDragOver ? `0 0 10px ${color}` : (isSelected ? `0 0 6px #f59e0b88` : 'none')
+                    boxShadow: 'none'
                 }}
             />
         );
@@ -382,7 +382,7 @@ export default function MetroTimeline() {
                                                             width: '16px', height: '16px',
                                                             background: color,
                                                             borderRadius: '3px',
-                                                            boxShadow: isDragOver ? `0 0 10px ${color}` : (isSelected ? `0 0 6px ${color}88` : 'none')
+                                                            boxShadow: 'none'
                                                         }} />
                                                         {/* Index */}
                                                         <span style={{ fontSize: '8px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>

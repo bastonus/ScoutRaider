@@ -121,41 +121,51 @@ export default function ExportModal({ onClose }: ExportModalProps) {
 
   const htmlPreviewSrc = useMemo(() => {
     if (activeFormat === 'csv' || activeFormat === 'tsv') return '';
-    return ExportHTMLRenderer.render(
-      state.carnet_steps || [],
-      themeManager.currentTheme,
-      {
-        title: docTitle,
-        subtitle: `${state.stages.length} étapes`,
-        date: new Date().toLocaleDateString('fr-FR'),
-        themeTitle: state.theme_id,
-        isSolution: version === 'solution',
-        includeGeneralMap: state.carnet_include_general_map,
-        includeElevationProfile: includeElevation,
-        elevationSvg: state.elevation_profile_svg,
-        elevationStats: state.elevation_profile_stats,
-        includeMapPagination: includeMapPagination,
-        includeAnnexes,
-        vigenereKey: themeManager.currentTheme.vigenere_key || 'SCOUT',
-        pointAnnotations: state.point_annotations,
-        areaAnnotations: state.area_annotations,
-        itineraries: state.itineraries,
-        paperSize: 'A4'
-      }
-    );
+    try {
+      return ExportHTMLRenderer.render(
+        state.carnet_steps || [],
+        themeManager.currentTheme || { id: 'default', name: 'Scout Standard', vigenere_key: 'SCOUT' } as any,
+        {
+          title: docTitle || 'Carnet de Route',
+          subtitle: `${state.stages?.length || 0} étapes`,
+          date: new Date().toLocaleDateString('fr-FR'),
+          themeTitle: state.theme_id || 'default',
+          isSolution: version === 'solution',
+          includeGeneralMap: !!state.carnet_include_general_map,
+          includeElevationProfile: includeElevation,
+          elevationSvg: state.elevation_profile_svg,
+          elevationStats: state.elevation_profile_stats,
+          includeMapPagination: includeMapPagination,
+          includeAnnexes,
+          vigenereKey: themeManager.currentTheme?.vigenere_key || 'SCOUT',
+          pointAnnotations: state.point_annotations || [],
+          areaAnnotations: state.area_annotations || [],
+          itineraries: state.itineraries || [],
+          paperSize: 'A4'
+        }
+      );
+    } catch (err) {
+      console.error('ExportHTMLRenderer error in preview:', err);
+      return `<div style="padding: 24px; color: #ef4444; font-family: sans-serif;"><h3>Aperçu indisponible</h3><p>${err instanceof Error ? err.message : 'Erreur de génération'}</p></div>`;
+    }
   }, [activeFormat, docTitle, version, includeAnnexes, includeElevation, includeMapPagination, state.carnet_steps, state.stages, state.theme_id, state.carnet_include_general_map, state.elevation_profile_svg, state.elevation_profile_stats, state.point_annotations, state.area_annotations, state.itineraries]);
 
   const csvRawText = useMemo(() => {
     if (activeFormat !== 'csv' && activeFormat !== 'tsv') return '';
-    const sep = activeFormat === 'tsv' ? '\t' : csvSeparator;
-    return ExportService.generateCSVString(state, {
-      title: docTitle,
-      version,
-      csvColumns,
-      csvSeparator: sep,
-      csvMaxPois,
-      enrichedAddresses,
-    });
+    try {
+      const sep = activeFormat === 'tsv' ? '\t' : csvSeparator;
+      return ExportService.generateCSVString(state, {
+        title: docTitle,
+        version,
+        csvColumns,
+        csvSeparator: sep,
+        csvMaxPois,
+        enrichedAddresses,
+      });
+    } catch (err) {
+      console.error('ExportService CSV error in preview:', err);
+      return '';
+    }
   }, [activeFormat, docTitle, version, csvColumns, csvSeparator, csvMaxPois, enrichedAddresses, state]);
 
   const tableData = useMemo(() => {
