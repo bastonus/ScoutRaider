@@ -58,7 +58,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Load shared document via permalink (?doc=... or ?share=...)
     const loadSharedDoc = useCallback(async (identifier: string) => {
-        dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Ouverture du document partagé...' });
+        // ── A. Try localStorage cache first (instant, no spinner) ──────────
+        const cacheKey = `scoutraider_doc_cache_${identifier}`;
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                const cachedState = StateManager.deserializeFromLoad(JSON.stringify({
+                    _scoutproj: true,
+                    _version: '5.0.0',
+                    state: parsed.state ?? parsed
+                }));
+                if (parsed.title) cachedState.document_title = parsed.title;
+                dispatch({ type: 'LOAD_PROJECT', state: cachedState });
+                if (parsed.id) setCloudProjectId(parsed.id);
+                // Show non-blocking sync indicator
+                dispatch({ type: 'ADD_NOTIFICATION', message: '🔄 Synchronisation...', notifType: 'info', duration: 2000 });
+            }
+        } catch (_) { /* ignore corrupt cache */ }
+
+        // ── B. Network fetch (silent if cache hit, full spinner if not) ────
+        const hasCacheHit = !!localStorage.getItem(cacheKey);
+        if (!hasCacheHit) {
+            dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Ouverture du document partagé...' });
+        }
         try {
             const data = await CloudAuthService.getSharedProject(identifier);
             const loaded = StateManager.deserializeFromLoad(JSON.stringify({
@@ -67,6 +90,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 state: data.state
             }));
             loaded.document_title = data.title;
+
+            // Update cache
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    id: data.id,
+                    title: data.title,
+                    state: data.state,
+                    updated_at: (data as any).updated_at || new Date().toISOString()
+                }));
+            } catch (_) { /* quota exceeded — skip cache */ }
+
             dispatch({ type: 'LOAD_PROJECT', state: loaded });
             setCloudProjectId(data.id);
             setCurrentProjectRole(data.role);
@@ -243,6 +277,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             setCloudSyncStatus('saved');
             setLastSavedTime(new Date());
+
+            // ── C. Update localStorage cache after successful save ──────────
+            try {
+                localStorage.setItem(`scoutraider_doc_cache_${saved.id}`, JSON.stringify({
+                    id: saved.id,
+                    title: docTitle,
+                    state: state,
+                    updated_at: new Date().toISOString()
+                }));
+            } catch (_) { /* quota exceeded — skip cache */ }
         } catch (e) {
             console.error('Cloud auto-save error:', e);
             setCloudSyncStatus('error');
@@ -250,7 +294,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [isGuest, user, state, cloudProjectId, currentProjectRole]);
 
     const loadFromCloud = async (projectId: string) => {
-        dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Chargement depuis le cloud...' });
+        // ── A. Try localStorage cache first (instant, no spinner) ──────────
+        const cacheKey = `scoutraider_doc_cache_${projectId}`;
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                const cachedState = StateManager.deserializeFromLoad(JSON.stringify({
+                    _scoutproj: true,
+                    _version: '5.0.0',
+                    state: parsed.state ?? parsed
+                }));
+                if (parsed.title) cachedState.document_title = parsed.title;
+                dispatch({ type: 'LOAD_PROJECT', state: cachedState });
+                if (parsed.id) setCloudProjectId(parsed.id);
+                // Show non-blocking sync indicator
+                dispatch({ type: 'ADD_NOTIFICATION', message: '🔄 Synchronisation...', notifType: 'info', duration: 2000 });
+            }
+        } catch (_) { /* ignore corrupt cache */ }
+
+        // ── B. Network fetch (silent if cache hit, full spinner if not) ────
+        const hasCacheHit = !!localStorage.getItem(cacheKey);
+        if (!hasCacheHit) {
+            dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Chargement depuis le cloud...' });
+        }
         try {
             const data: any = await CloudAuthService.getProject(projectId);
             const loaded = StateManager.deserializeFromLoad(JSON.stringify({
@@ -259,6 +326,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 state: data.state
             }));
             loaded.document_title = data.title;
+
+            // Update cache with fresh network data
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    id: data.id,
+                    title: data.title,
+                    state: data.state,
+                    updated_at: data.updated_at || new Date().toISOString()
+                }));
+            } catch (_) { /* quota exceeded — skip cache */ }
+
             dispatch({ type: 'LOAD_PROJECT', state: loaded });
             setCloudProjectId(data.id);
             setCurrentProjectRole(data.role || (data.owner_id === user?.id ? 'owner' : 'editor'));

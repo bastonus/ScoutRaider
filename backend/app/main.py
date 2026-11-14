@@ -31,6 +31,17 @@ from .diffraction.solver import DiffractionSolver
 from .renderer.models import CarnetRenderOptions, StepRenderBlock
 from .renderer.service import WeasyPrintRenderService
 from .renderer.inspector import PDFLayoutInspector
+from .ai import (
+    AIService,
+    GenerateNarrativeRequest,
+    GenerateNarrativeResponse,
+    GenerateRiddleRequest,
+    GenerateRiddleResponse,
+    SafetyAuditRequest,
+    SafetyAuditResponse,
+)
+from .mcp import ScoutRaiderMCPServer
+from .connectors import connector_registry
 
 logger = logging.getLogger("scoutraider")
 
@@ -43,6 +54,8 @@ if LEGACY_MODULES_DIR.exists():
     registry.load_from_base_dir(LEGACY_MODULES_DIR)
 
 render_service = WeasyPrintRenderService()
+ai_service = AIService()
+mcp_server = ScoutRaiderMCPServer(module_registry=registry, ai_service=ai_service)
 
 
 @asynccontextmanager
