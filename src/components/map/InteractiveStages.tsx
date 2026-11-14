@@ -103,8 +103,7 @@ const StageMarker = React.memo(function StageMarker({
             ref={(ref: any) => { markerRef.current = ref; }}
             position={stage.coords as [number, number]}
             icon={icon}
-            pane={pane}
-            zIndexOffset={1000}
+            zIndexOffset={isAnchored ? 15001 : 15000}
             draggable={isMovable}
             eventHandlers={eventHandlers}
         >

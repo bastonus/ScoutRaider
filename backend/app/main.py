@@ -238,9 +238,117 @@ async def get_shared_project(identifier: str, user_token: Optional[Dict[str, Any
     if not proj:
         raise HTTPException(
             status_code=404, 
-            detail="Document introuvable ou accès restreint. Demandez un accès au propriétaire ou connectez-vous."
+            detail="Document introuvable. Ce lien est invalide ou le document a été supprimé."
         )
+
+    if not proj.get("access_granted"):
+        # Project exists, but access is restricted!
+        # Return 401 if unauthenticated (needs login or access request)
+        # Return 403 if authenticated (needs access request from owner)
+        status_code = 401 if user_id is None else 403
+        raise HTTPException(
+            status_code=status_code,
+            detail={
+                "error": "access_denied",
+                "requires_auth": user_id is None,
+                "project_id": proj["id"],
+                "project_title": proj["title"],
+                "owner_username": proj["owner_username"],
+                "message": "Vous devez vous connecter pour accéder à ce document." if user_id is None else "Vous n'avez pas l'autorisation d'accéder à ce document."
+            }
+        )
+
     return proj
+
+
+class AccessRequestSubmit(BaseModel):
+    requester_name: Optional[str] = None
+    requester_email: Optional[str] = None
+    message: Optional[str] = None
+
+
+class AccessRequestResponse(BaseModel):
+    action: str  # 'approve' | 'reject'
+    role: str = "viewer"  # 'viewer' | 'editor'
+
+
+@app.post("/api/projects/{project_id}/request-access", tags=["Projects"])
+async def submit_access_request(
+    project_id: str, 
+    payload: AccessRequestSubmit, 
+    user_token: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional)
+):
+    """Submit an access request for a restricted project (Google Drive style)."""
+    user_id = user_token["sub"] if user_token else None
+    name = payload.requester_name
+    email = payload.requester_email
+
+    if user_token:
+        # Pre-fill from authenticated user
+        name = name or user_token.get("username")
+        email = email or user_token.get("email")
+
+    if not name:
+        name = "Utilisateur anonyme"
+
+    try:
+        req = await db.create_access_request(
+            project_id=project_id,
+            requester_name=name,
+            requester_email=email,
+            message=payload.message,
+            requester_user_id=user_id
+        )
+        return {
+            "success": True,
+            "message": "Votre demande d'accès a été transmise au propriétaire du document.",
+            "request": req
+        }
+    except Exception as e:
+        logger.error(f"Error submitting access request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/projects/{project_id}/access-requests", tags=["Projects"])
+async def list_project_access_requests(
+    project_id: str, 
+    user_token: Dict[str, Any] = Depends(auth.get_current_user)
+):
+    """List pending access requests (owner only)."""
+    try:
+        requests = await db.get_project_access_requests(project_id, user_token["sub"])
+        return requests
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error listing access requests: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/projects/{project_id}/access-requests/{request_id}/respond", tags=["Projects"])
+async def respond_access_request(
+    project_id: str,
+    request_id: str,
+    payload: AccessRequestResponse,
+    user_token: Dict[str, Any] = Depends(auth.get_current_user)
+):
+    """Approve or reject an access request (owner only)."""
+    try:
+        res = await db.respond_to_access_request(
+            project_id=project_id,
+            request_id=request_id,
+            owner_user_id=user_token["sub"],
+            action=payload.action,
+            role=payload.role
+        )
+        return res
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error responding to access request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class ShareInviteRequest(BaseModel):

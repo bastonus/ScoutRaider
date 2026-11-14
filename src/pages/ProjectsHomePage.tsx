@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { CloudAuthService, type CloudProjectSummary } from '../logic/CloudAuthService';
+import { CloudAuthService, type CloudProjectSummary, generateDocId } from '../logic/CloudAuthService';
 import FleurDeLysLogo from '../components/layout/FleurDeLysLogo';
 import { version } from '../../package.json';
 import {
@@ -60,7 +60,7 @@ function formatRelativeDate(dateStr: string): string {
 export default function ProjectsHomePage() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, isGuest, isLoading, isAuthenticated, logout } = useAuth();
+    const { user, isGuest, isLoading, isAuthenticated, logout, newProject } = useAuth();
 
     const [projects, setProjects] = useState<CloudProjectSummary[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(false);
@@ -134,9 +134,10 @@ export default function ProjectsHomePage() {
     });
 
     const handleNewProject = () => {
-        // Navigate directly to editor — the editor will start with a blank state
-        // and auto-save to cloud when the user makes their first edit
-        navigate('/d/new');
+        // Generate a new document identifier directly and navigate to it immediately
+        const newDocId = generateDocId();
+        newProject(newDocId);
+        navigate(`/d/${newDocId}`);
     };
 
     const handleOpen = (p: CloudProjectSummary) => {
@@ -234,7 +235,7 @@ export default function ProjectsHomePage() {
                                 title="Actualiser"
                                 disabled={loadingProjects}
                             >
-                                <RefreshCw size={14} style={loadingProjects ? { animation: 'spin 0.8s linear infinite' } : {}} />
+                                <RefreshCw size={14} className={loadingProjects ? "spin" : ""} />
                             </button>
                         )}
                     </div>
@@ -296,7 +297,7 @@ export default function ProjectsHomePage() {
                 {/* Loading */}
                 {loadingProjects && (
                     <div style={s.loadingRow}>
-                        <Loader2 size={20} style={{ animation: 'spin 0.8s linear infinite', color: '#2563EB' }} />
+                        <Loader2 size={20} className="spin" style={{ color: '#2563EB' }} />
                         <span style={{ color: '#52525B', fontSize: '13px' }}>Chargement…</span>
                     </div>
                 )}

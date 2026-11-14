@@ -104,6 +104,17 @@ async def init_db():
                     UNIQUE(project_id, user_id)
                 );
 
+                CREATE TABLE IF NOT EXISTS project_access_requests (
+                    id TEXT PRIMARY KEY,
+                    project_id VARCHAR(64) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                    requester_user_id TEXT,
+                    requester_name VARCHAR(100) NOT NULL,
+                    requester_email VARCHAR(255),
+                    message TEXT,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+
                 CREATE TABLE IF NOT EXISTS marketplace_modules (
                     id VARCHAR(64) PRIMARY KEY,
                     name VARCHAR(128) NOT NULL,
@@ -203,6 +214,18 @@ def _init_sqlite():
                 role TEXT NOT NULL DEFAULT 'viewer',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(project_id, user_id)
+            );
+        """)
+        _sqlite_conn.execute("""
+            CREATE TABLE IF NOT EXISTS project_access_requests (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                requester_user_id TEXT,
+                requester_name TEXT NOT NULL,
+                requester_email TEXT,
+                message TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
         """)
         _sqlite_conn.execute("""
@@ -458,9 +481,18 @@ async def get_project_with_access(identifier: str, user_id: Optional[str] = None
     elif res.get("is_public"):
         effective_role = res.get("public_role") or "viewer"
     else:
-        # User not authorized
-        return None
+        # User not authorized - document exists but access is restricted
+        return {
+            "access_granted": False,
+            "id": res["id"],
+            "title": res["title"],
+            "owner_id": res["owner_id"],
+            "owner_username": res["owner_username"],
+            "is_public": bool(res.get("is_public")),
+            "share_token": res.get("share_token")
+        }
 
+    res["access_granted"] = True
     res["is_owner"] = is_owner
     res["role"] = effective_role
     if isinstance(res["state"], str):
@@ -488,7 +520,7 @@ async def upsert_project(user_id: str, project_id: Optional[str], title: str, st
     else:
         pid = f"proj_{uuid.uuid4().hex[:12]}"
 
-    share_token = f"doc_{uuid.uuid4().hex[:14]}"
+    share_token = pid if pid.startswith("doc_") else f"doc_{uuid.uuid4().hex[:14]}"
 
     if not _use_sqlite and _pg_pool:
         async with _pg_pool.acquire() as conn:
@@ -571,6 +603,13 @@ async def get_project_sharing_details(project_id: str, user_id: str) -> Dict[str
         """, (project["id"],))
         collab_list = [dict(c) for c in cur.fetchall()]
 
+    requests_list = []
+    if project.get("is_owner"):
+        try:
+            requests_list = await get_project_access_requests(project["id"], user_id)
+        except Exception:
+            pass
+
     return {
         "project_id": project["id"],
         "title": project["title"],
@@ -582,7 +621,8 @@ async def get_project_sharing_details(project_id: str, user_id: str) -> Dict[str
             "id": project["owner_id"],
             "username": project["owner_username"]
         },
-        "collaborators": collab_list
+        "collaborators": collab_list,
+        "access_requests": requests_list
     }
 
 
@@ -682,6 +722,118 @@ async def update_public_access(user_id: str, project_id: str, is_public: bool, p
         "is_public": is_public,
         "public_role": clean_role
     }
+
+
+# ─── Access Requests (Google Drive style) ─────────────────────────────────────
+
+async def create_access_request(
+    project_id: str,
+    requester_name: str,
+    requester_email: Optional[str] = None,
+    message: Optional[str] = None,
+    requester_user_id: Optional[str] = None
+) -> Dict[str, Any]:
+    await _ensure_init()
+    req_id = f"req_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc)
+    clean_name = (requester_name or "Utilisateur anonyme").strip()
+    clean_email = (requester_email or "").strip() or None
+    clean_msg = (message or "").strip() or None
+
+    if not _use_sqlite and _pg_pool:
+        async with _pg_pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO project_access_requests (id, project_id, requester_user_id, requester_name, requester_email, message, status, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
+            """, req_id, project_id, requester_user_id, clean_name, clean_email, clean_msg, now)
+    else:
+        with _sqlite_conn:
+            _sqlite_conn.execute("""
+                INSERT INTO project_access_requests (id, project_id, requester_user_id, requester_name, requester_email, message, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+            """, (req_id, project_id, requester_user_id, clean_name, clean_email, clean_msg, now.isoformat()))
+
+    return {
+        "id": req_id,
+        "project_id": project_id,
+        "requester_name": clean_name,
+        "requester_email": clean_email,
+        "message": clean_msg,
+        "status": "pending"
+    }
+
+
+async def get_project_access_requests(project_id: str, owner_user_id: str) -> List[Dict[str, Any]]:
+    await _ensure_init()
+    project = await get_project_with_access(project_id, owner_user_id)
+    if not project or not project.get("is_owner"):
+        raise PermissionError("Seul le propriétaire peut consulter les demandes d'accès.")
+
+    if not _use_sqlite and _pg_pool:
+        async with _pg_pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT id, project_id, requester_user_id, requester_name, requester_email, message, status, created_at
+                FROM project_access_requests
+                WHERE project_id = $1 AND status = 'pending'
+                ORDER BY created_at DESC
+            """, project_id)
+            return [dict(r) for r in rows]
+    else:
+        cur = _sqlite_conn.cursor()
+        cur.execute("""
+            SELECT id, project_id, requester_user_id, requester_name, requester_email, message, status, created_at
+            FROM project_access_requests
+            WHERE project_id = ? AND status = 'pending'
+            ORDER BY created_at DESC
+        """, (project_id,))
+        return [dict(r) for r in cur.fetchall()]
+
+
+async def respond_to_access_request(project_id: str, request_id: str, owner_user_id: str, action: str, role: str = "viewer") -> Dict[str, Any]:
+    await _ensure_init()
+    project = await get_project_with_access(project_id, owner_user_id)
+    if not project or not project.get("is_owner"):
+        raise PermissionError("Seul le propriétaire peut répondre aux demandes d'accès.")
+
+    req = None
+    if not _use_sqlite and _pg_pool:
+        async with _pg_pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM project_access_requests WHERE id = $1 AND project_id = $2", request_id, project_id)
+            if row:
+                req = dict(row)
+    else:
+        cur = _sqlite_conn.cursor()
+        cur.execute("SELECT * FROM project_access_requests WHERE id = ? AND project_id = ?", (request_id, project_id))
+        row = cur.fetchone()
+        if row:
+            req = dict(row)
+
+    if not req:
+        raise ValueError("Demande d'accès introuvable.")
+
+    new_status = "approved" if action == "approve" else "rejected"
+
+    # If approved, add collaborator share
+    if action == "approve":
+        target = req.get("requester_user_id")
+        if target:
+            user = await get_user_by_id(target)
+            if user:
+                await add_or_update_share(owner_user_id, project_id, user["username"], role)
+        elif req.get("requester_email"):
+            user = await get_user_by_email(req["requester_email"])
+            if user:
+                await add_or_update_share(owner_user_id, project_id, user["username"], role)
+
+    # Update request status
+    if not _use_sqlite and _pg_pool:
+        async with _pg_pool.acquire() as conn:
+            await conn.execute("UPDATE project_access_requests SET status = $1 WHERE id = $2", new_status, request_id)
+    else:
+        with _sqlite_conn:
+            _sqlite_conn.execute("UPDATE project_access_requests SET status = ? WHERE id = ?", (new_status, request_id))
+
+    return {"id": request_id, "status": new_status}
 
 
 # ─── Marketplace & Community Modules ──────────────────────────────────────────

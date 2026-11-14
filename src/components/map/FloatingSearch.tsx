@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { mapRef } from './MapComponent';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
@@ -59,6 +59,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [showResults, setShowResults] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const [isSatellite, setIsSatellite] = useState(false);
     const [geoState, setGeoState] = useState<GeoState>('idle');
 
@@ -117,13 +118,19 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         if (!query.trim() || query.length < 3) {
             setResults([]);
             setShowResults(false);
+            setIsSearching(false);
             return;
         }
+        setIsSearching(true);
         clearTimeout(searchTimeout.current);
         searchTimeout.current = setTimeout(async () => {
-            const r = await searchIGN(query);
-            setResults(r);
-            setShowResults(r.length > 0);
+            try {
+                const r = await searchIGN(query);
+                setResults(r);
+                setShowResults(r.length > 0);
+            } finally {
+                setIsSearching(false);
+            }
         }, 220);
         return () => clearTimeout(searchTimeout.current);
     }, [query]);
@@ -148,7 +155,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         if (geoState === 'loading') {
             return (
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                    style={{ animation: 'spin 1s linear infinite', transformOrigin: 'center' }}>
+                    className="spin" style={{ transformOrigin: 'center' }}>
                     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                 </svg>
             );
@@ -240,7 +247,11 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                     boxShadow: 'none',
                     transition: 'border-color 100ms ease',
                 }}>
-                    <Search size={15} color="var(--text-dim)" strokeWidth={2} />
+                    {isSearching ? (
+                        <Loader2 size={15} className="spin" color="var(--accent-default)" />
+                    ) : (
+                        <Search size={15} color="var(--text-dim)" strokeWidth={2} />
+                    )}
                     <input
                         type="text"
                         placeholder="Rechercher..."

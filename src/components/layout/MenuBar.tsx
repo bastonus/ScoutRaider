@@ -27,7 +27,8 @@ import {
     Menu,
     ChevronDown,
     ChevronRight,
-    Download
+    Download,
+    FileText
 } from 'lucide-react';
 import FleurDeLysLogo from './FleurDeLysLogo';
 import AICopilotModal from '../panels/AICopilotModal';
@@ -565,30 +566,8 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                         </div>
                     </div>
 
-                    {/* Bottom Row: Menus on Desktop OR Menu Trigger on Mobile */}
-                    {isMobile ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                            <button
-                                onClick={() => setMobileMenuOpen(true)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    padding: '3px 8px',
-                                    borderRadius: '6px',
-                                    background: 'var(--bg-surface)',
-                                    border: '1px solid var(--border-subtle)',
-                                    color: 'var(--text-primary)',
-                                    fontSize: '11px',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                }}
-                            >
-                                <Menu size={13} color="var(--accent-default)" />
-                                <span>Menu</span>
-                            </button>
-                        </div>
-                    ) : (
+                    {/* Bottom Row: Menus on Desktop Only (Hidden on Mobile, accessed via profile button) */}
+                    {!isMobile && (
                         <nav style={{ display: 'flex', gap: '2px', fontSize: '11.5px', fontWeight: 500, color: 'var(--text-dim)', marginLeft: '-4px' }}>
                         {Object.entries(menus).map(([name, items]) => (
                             <div key={name} style={{ position: 'relative' }}>
@@ -840,12 +819,177 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     </button>
                 )}
 
-                {/* USER PROFILE AVATAR CIRCLE */}
-                <div style={{ position: 'relative' }} ref={userMenuRef}>
+                {/* UPDATE STATUS PILL */}
+                {updateStatus !== 'idle' && (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        background: 'rgba(110, 201, 126, 0.1)',
+                        border: '1px solid rgba(110, 201, 126, 0.2)',
+                        marginRight: '8px'
+                    }}>
+                        {updateStatus === 'checking' && (
+                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Recherche...</span>
+                        )}
+                        {updateStatus === 'available' && (
+                            <span style={{ fontSize: '11px', color: 'var(--accent-default)', fontWeight: 700 }}>Mise à jour disponible</span>
+                        )}
+                        {updateStatus === 'downloading' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${updateProgress}%`, height: '100%', background: 'var(--accent-default)', transition: 'width 0.3s' }} />
+                                </div>
+                                <span style={{ fontSize: '10px', color: 'var(--accent-default)', fontWeight: 800 }}>{updateProgress}%</span>
+                            </div>
+                        )}
+                        {updateStatus === 'downloaded' && (
+                            <button 
+                                onClick={() => (window as any).electronAPI?.quitAndInstall()}
+                                style={{
+                                    background: 'var(--accent-default)',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    padding: '2px 10px',
+                                    fontSize: '10.5px',
+                                    fontWeight: 800,
+                                    color: '#0a100d',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
+                                }}
+                            >
+                                Redémarrer pour mettre à jour
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* SIDEBAR TOGGLES (Desktop only - mobile uses bottom sheets accessed via bottom toolbar) */}
+                {!isMobile && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginRight: '4px', paddingRight: '10px', borderRight: '1px solid var(--bg-border)' }}>
+                        <button 
+                            className="btn-icon btn-sm" 
+                            onClick={() => onToggleSidebar?.('left')}
+                            title="Basculer la barre latérale gauche"
+                        >
+                            <PanelLeft size={17} strokeWidth={2.2} />
+                        </button>
+                        <button 
+                            className="btn-icon btn-sm" 
+                            onClick={() => onToggleSidebar?.('right')}
+                            title="Basculer la barre latérale droite"
+                        >
+                            <PanelRight size={17} strokeWidth={2.2} />
+                        </button>
+                    </div>
+                )}
+
+                {/* MOBILE QUICK VIEW TOGGLE (Carte / Carnet Textuel) */}
+                {isMobile && (
+                    <button
+                        onClick={() => onViewModeChange?.(viewMode === 'map' ? 'text' : 'map')}
+                        title={viewMode === 'map' ? "Afficher le carnet textuel" : "Afficher la carte"}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            borderRadius: 'var(--radius-pill)',
+                            border: `1px solid ${viewMode === 'text' ? 'var(--accent-default)' : 'var(--border-subtle)'}`,
+                            background: viewMode === 'text' ? 'var(--accent-default)' : 'var(--bg-surface)',
+                            color: viewMode === 'text' ? '#ffffff' : 'var(--text-primary)',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            marginRight: '3px',
+                        }}
+                    >
+                        {viewMode === 'map' ? (
+                            <>
+                                <FileText size={13} />
+                                <span>Carnet</span>
+                            </>
+                        ) : (
+                            <>
+                                <MapIcon size={13} />
+                                <span>Carte</span>
+                            </>
+                        )}
+                    </button>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', position: 'relative' }}>
+                    <button 
+                        className="btn-icon btn-sm" 
+                        title="Préférences (Ctrl+P)"
+                        onClick={onPreferencesOpen}
+                    >
+                        <Settings size={17} strokeWidth={2.2} />
+                    </button>
+
+                    <button 
+                        className="btn-icon btn-sm" 
+                        title="Historique des notifications"
+                        onClick={() => {
+                            setShowNotifHistory(!showNotifHistory);
+                            setOpenMenu(null);
+                        }}
+                    >
+                        <Bell size={17} strokeWidth={2.2} />
+                        {state.notifications.length > 0 && (
+                            <div style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', background: 'var(--semantic-red)', borderRadius: '50%' }} />
+                        )}
+                    </button>
+                    
+                    {showNotifHistory && (
+                        <div style={{
+                            position: 'absolute', top: '100%', right: 0, marginTop: '8px',
+                            width: '320px', maxHeight: '400px', overflowY: 'auto',
+                            background: 'var(--bg-panel)', border: '1px solid var(--bg-border)',
+                            borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-glass)',
+                            zIndex: 3000, display: 'flex', flexDirection: 'column'
+                        }}>
+                            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                Historique des Notifications
+                            </div>
+                            {state.notifications.length === 0 ? (
+                                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '12px' }}>
+                                    Aucune notification.
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    {[...state.notifications].reverse().map(notif => (
+                                        <div key={notif.id} style={{
+                                            padding: '12px 16px', borderBottom: '1px solid var(--glass-border)',
+                                            display: 'flex', gap: '12px', alignItems: 'flex-start',
+                                            background: notif.type === 'error' ? 'rgba(239, 68, 68, 0.05)' : notif.type === 'warning' ? 'rgba(212, 145, 74, 0.05)' : 'transparent'
+                                        }}>
+                                            <div style={{ color: notif.type === 'error' ? 'var(--semantic-red)' : notif.type === 'warning' ? 'var(--semantic-orange)' : 'var(--semantic-green)', marginTop: '2px' }}>
+                                                •
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                                                    {notif.message}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* USER PROFILE AVATAR CIRCLE (Tout à droite - Ouvre le Menu & Profil sur Mobile) */}
+                <div style={{ position: 'relative', marginLeft: '2px' }} ref={userMenuRef}>
                     {!isGuest && user ? (
                         <button
-                            onClick={() => setUserMenuOpen(prev => !prev)}
-                            title={`Connecté : ${user.username} (PostgreSQL synchronisé)`}
+                            onClick={() => isMobile ? setMobileMenuOpen(true) : setUserMenuOpen(prev => !prev)}
+                            title={isMobile ? `Menu & Profil : ${user.username}` : `Connecté : ${user.username} (PostgreSQL synchronisé)`}
                             style={{
                                 width: '28px',
                                 height: '28px',
@@ -887,8 +1031,8 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                         </button>
                     ) : (
                         <button
-                            onClick={() => setAuthModalOpen(true)}
-                            title="Connexion au compte (Actuellement en mode Invité)"
+                            onClick={() => isMobile ? setMobileMenuOpen(true) : setAuthModalOpen(true)}
+                            title={isMobile ? "Menu & Connexion" : "Connexion au compte (Actuellement en mode Invité)"}
                             style={{
                                 width: '28px',
                                 height: '28px',
@@ -981,135 +1125,6 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                                 <LogOut size={13} />
                                 <span>Se déconnecter</span>
                             </div>
-                        </div>
-                    )}
-                </div>
-                
-                {/* UPDATE STATUS PILL */}
-                {updateStatus !== 'idle' && (
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        background: 'rgba(110, 201, 126, 0.1)',
-                        border: '1px solid rgba(110, 201, 126, 0.2)',
-                        marginRight: '8px'
-                    }}>
-                        {updateStatus === 'checking' && (
-                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Recherche...</span>
-                        )}
-                        {updateStatus === 'available' && (
-                            <span style={{ fontSize: '11px', color: 'var(--accent-default)', fontWeight: 700 }}>Mise à jour disponible</span>
-                        )}
-                        {updateStatus === 'downloading' && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                                    <div style={{ width: `${updateProgress}%`, height: '100%', background: 'var(--accent-default)', transition: 'width 0.3s' }} />
-                                </div>
-                                <span style={{ fontSize: '10px', color: 'var(--accent-default)', fontWeight: 800 }}>{updateProgress}%</span>
-                            </div>
-                        )}
-                        {updateStatus === 'downloaded' && (
-                            <button 
-                                onClick={() => (window as any).electronAPI?.quitAndInstall()}
-                                style={{
-                                    background: 'var(--accent-default)',
-                                    border: 'none',
-                                    borderRadius: '12px',
-                                    padding: '2px 10px',
-                                    fontSize: '10.5px',
-                                    fontWeight: 800,
-                                    color: '#0a100d',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '5px'
-                                }}
-                            >
-                                Redémarrer pour mettre à jour
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* SIDEBAR TOGGLES */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginRight: '4px', paddingRight: '10px', borderRight: '1px solid var(--bg-border)' }}>
-                    <button 
-                        className="btn-icon btn-sm" 
-                        onClick={() => onToggleSidebar?.('left')}
-                        title="Basculer la barre latérale gauche"
-                    >
-                        <PanelLeft size={17} strokeWidth={2.2} />
-                    </button>
-                    <button 
-                        className="btn-icon btn-sm" 
-                        onClick={() => onToggleSidebar?.('right')}
-                        title="Basculer la barre latérale droite"
-                    >
-                        <PanelRight size={17} strokeWidth={2.2} />
-                    </button>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', position: 'relative' }}>
-                    <button 
-                        className="btn-icon btn-sm" 
-                        title="Préférences (Ctrl+P)"
-                        onClick={onPreferencesOpen}
-                    >
-                        <Settings size={17} strokeWidth={2.2} />
-                    </button>
-
-                    <button 
-                        className="btn-icon btn-sm" 
-                        title="Historique des notifications"
-                        onClick={() => {
-                            setShowNotifHistory(!showNotifHistory);
-                            setOpenMenu(null);
-                        }}
-                    >
-                        <Bell size={17} strokeWidth={2.2} />
-                        {state.notifications.length > 0 && (
-                            <div style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', background: 'var(--semantic-red)', borderRadius: '50%' }} />
-                        )}
-                    </button>
-                    
-                    {showNotifHistory && (
-                        <div style={{
-                            position: 'absolute', top: '100%', right: 0, marginTop: '8px',
-                            width: '320px', maxHeight: '400px', overflowY: 'auto',
-                            background: 'var(--bg-panel)', border: '1px solid var(--bg-border)',
-                            borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-glass)',
-                            zIndex: 3000, display: 'flex', flexDirection: 'column'
-                        }}>
-                            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                Historique des Notifications
-                            </div>
-                            {state.notifications.length === 0 ? (
-                                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '12px' }}>
-                                    Aucune notification.
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    {[...state.notifications].reverse().map(notif => (
-                                        <div key={notif.id} style={{
-                                            padding: '12px 16px', borderBottom: '1px solid var(--glass-border)',
-                                            display: 'flex', gap: '12px', alignItems: 'flex-start',
-                                            background: notif.type === 'error' ? 'rgba(239, 68, 68, 0.05)' : notif.type === 'warning' ? 'rgba(212, 145, 74, 0.05)' : 'transparent'
-                                        }}>
-                                            <div style={{ color: notif.type === 'error' ? 'var(--semantic-red)' : notif.type === 'warning' ? 'var(--semantic-orange)' : 'var(--semantic-green)', marginTop: '2px' }}>
-                                                •
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                                                    {notif.message}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>

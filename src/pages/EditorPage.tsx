@@ -10,6 +10,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { generateDocId } from '../logic/CloudAuthService';
 import App from '../App';
 
 export default function EditorPage() {
@@ -29,11 +30,13 @@ export default function EditorPage() {
     // Track which identifier has already been loaded to avoid double-loads
     const loadedIdentifier = useRef<string | null>(null);
 
-    // ── Instant /d/new: call newProject() synchronously, skip isLoading gate ──
+    // ── Instant /d/new: NEVER stay on /d/new, generate doc id and redirect immediately ──
     useEffect(() => {
-        if (identifier === 'new' && loadedIdentifier.current !== 'new') {
-            loadedIdentifier.current = 'new';
-            newProject();
+        if (identifier === 'new') {
+            const newDocId = generateDocId();
+            loadedIdentifier.current = newDocId;
+            newProject(newDocId);
+            navigate(`/d/${newDocId}`, { replace: true });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [identifier]);
@@ -42,7 +45,7 @@ export default function EditorPage() {
     useEffect(() => {
         if (isLoading) return;
         if (!identifier) return;
-        if (identifier === 'new') return; // already handled above
+        if (identifier === 'new') return; // already redirected above
         if (loadedIdentifier.current === identifier) return;
 
         loadedIdentifier.current = identifier;

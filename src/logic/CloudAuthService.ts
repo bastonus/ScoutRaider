@@ -34,6 +34,34 @@ export interface Collaborator {
     created_at: string;
 }
 
+export interface ProjectAccessRequest {
+    id: string;
+    project_id: string;
+    requester_user_id?: string | null;
+    requester_name: string;
+    requester_email?: string | null;
+    message?: string | null;
+    status: 'pending' | 'approved' | 'rejected';
+    created_at: string;
+}
+
+export function generateDocId(): string {
+    const chars = '0123456789abcdef';
+    let rand = '';
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const array = new Uint8Array(14);
+        crypto.getRandomValues(array);
+        for (let i = 0; i < 14; i++) {
+            rand += chars[array[i] % 16];
+        }
+    } else {
+        for (let i = 0; i < 14; i++) {
+            rand += chars[Math.floor(Math.random() * 16)];
+        }
+    }
+    return `doc_${rand}`;
+}
+
 export interface ProjectSharingDetails {
     project_id: string;
     title: string;
@@ -46,6 +74,23 @@ export interface ProjectSharingDetails {
         username: string;
     };
     collaborators: Collaborator[];
+    access_requests?: ProjectAccessRequest[];
+}
+
+export class AccessDeniedError extends Error {
+    projectId: string;
+    projectTitle: string;
+    ownerUsername: string;
+    requiresAuth: boolean;
+
+    constructor(data: { project_id: string; project_title: string; owner_username: string; requires_auth: boolean; message?: string }) {
+        super(data.message || "Accès restreint au document.");
+        this.name = "AccessDeniedError";
+        this.projectId = data.project_id;
+        this.projectTitle = data.project_title;
+        this.ownerUsername = data.owner_username;
+        this.requiresAuth = data.requires_auth;
+    }
 }
 
 export interface MarketplaceModule {
@@ -351,7 +396,40 @@ export class CloudAuthService {
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({ detail: 'Document inaccessible ou introuvable' }));
-            throw new Error(err.detail || 'Document inaccessible ou introuvable');
+            if (err && err.detail && typeof err.detail === 'object' && err.detail.error === 'access_denied') {
+                throw new AccessDeniedError(err.detail);
+            }
+            throw new Error(typeof err.detail === 'string' ? err.detail : 'Document inaccessible ou introuvable');
+        }
+        return await res.json();
+    }
+
+    static async requestAccess(projectId: string, requesterName?: string, requesterEmail?: string, message?: string): Promise<{ success: boolean; message: string }> {
+        const res = await fetch(`${this.getBaseUrl()}/api/projects/${projectId}/request-access`, {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: JSON.stringify({
+                requester_name: requesterName,
+                requester_email: requesterEmail,
+                message: message
+            })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: 'Échec de l\'envoi de la demande d\'accès.' }));
+            throw new Error(typeof err.detail === 'string' ? err.detail : 'Échec de l\'envoi de la demande d\'accès.');
+        }
+        return await res.json();
+    }
+
+    static async respondAccessRequest(projectId: string, requestId: string, action: 'approve' | 'reject', role: 'viewer' | 'editor' = 'viewer'): Promise<{ id: string; status: string }> {
+        const res = await fetch(`${this.getBaseUrl()}/api/projects/${projectId}/access-requests/${requestId}/respond`, {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: JSON.stringify({ action, role })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: 'Échec du traitement de la demande.' }));
+            throw new Error(typeof err.detail === 'string' ? err.detail : 'Échec du traitement de la demande.');
         }
         return await res.json();
     }

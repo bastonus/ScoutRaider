@@ -3,13 +3,20 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { CloudAuthService, type UserProfile, type CloudProjectSummary } from './logic/CloudAuthService';
+import { CloudAuthService, AccessDeniedError, type UserProfile, type CloudProjectSummary } from './logic/CloudAuthService';
 import { useApp } from './AppContext';
 import { StateManager } from './logic/StateManager';
 
 export type CloudSyncStatus = 'idle' | 'saving' | 'saved' | 'error' | 'guest';
 
 export type DocumentRole = 'owner' | 'editor' | 'viewer' | null;
+
+export interface AccessDeniedInfo {
+    projectId: string;
+    projectTitle: string;
+    ownerUsername: string;
+    requiresAuth: boolean;
+}
 
 interface AuthContextType {
     user: UserProfile | null;
@@ -21,6 +28,8 @@ interface AuthContextType {
     cloudProjectId: string | null;
     currentProjectRole: DocumentRole;
     shareToken: string | null;
+    accessDenied: AccessDeniedInfo | null;
+    clearAccessDenied: () => void;
     authModalOpen: boolean;
     projectsModalOpen: boolean;
     shareModalOpen: boolean;
@@ -35,7 +44,7 @@ interface AuthContextType {
     loadFromCloud: (projectId: string) => Promise<void>;
     loadSharedDoc: (identifier: string) => Promise<void>;
     makeEditableCopy: () => Promise<void>;
-    newProject: () => void;
+    newProject: (presetId?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,6 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [cloudProjectId, setCloudProjectId] = useState<string | null>(null);
     const [currentProjectRole, setCurrentProjectRole] = useState<DocumentRole>(null);
     const [shareToken, setShareToken] = useState<string | null>(null);
+    const [accessDenied, setAccessDenied] = useState<AccessDeniedInfo | null>(null);
+
+    const clearAccessDenied = useCallback(() => setAccessDenied(null), []);
 
     const [authModalOpen, setAuthModalOpen] = useState(false);
     const [projectsModalOpen, setProjectsModalOpen] = useState(false);
@@ -107,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setShareToken(data.share_token);
             setCloudSyncStatus(data.role === 'viewer' ? 'idle' : 'saved');
             setLastSavedTime(new Date());
+            setAccessDenied(null);
 
             if (data.role === 'viewer') {
                 dispatch({ 
@@ -122,7 +135,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 });
             }
         } catch (err: any) {
-            dispatch({ type: 'ADD_NOTIFICATION', message: `Erreur d'accès : ${err.message}`, notifType: 'error' });
+            if (err instanceof AccessDeniedError) {
+                setAccessDenied({
+                    projectId: err.projectId,
+                    projectTitle: err.projectTitle,
+                    ownerUsername: err.ownerUsername,
+                    requiresAuth: err.requiresAuth
+                });
+            } else {
+                dispatch({ type: 'ADD_NOTIFICATION', message: `Erreur d'accès : ${err.message}`, notifType: 'error' });
+            }
         } finally {
             dispatch({ type: 'SET_LOADING', isLoading: false });
         }
@@ -202,13 +224,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // ─── Actions ──────────────────────────────────────────────────────────────
 
-    const newProject = () => {
+    const newProject = (presetId?: string) => {
         dispatch({ type: 'NEW_PROJECT' });
-        setCloudProjectId(null);
+        setCloudProjectId(presetId || null);
         setCurrentProjectRole('owner');
-        setShareToken(null);
+        setShareToken(presetId && presetId.startsWith('doc_') ? presetId : null);
         setCloudSyncStatus('idle');
         setLastSavedTime(null);
+        setAccessDenied(null);
     };
 
     const login = async (username: string, password: string) => {
@@ -414,6 +437,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             cloudProjectId,
             currentProjectRole,
             shareToken,
+            accessDenied,
+            clearAccessDenied,
             authModalOpen,
             projectsModalOpen,
             shareModalOpen,

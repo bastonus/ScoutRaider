@@ -11,6 +11,7 @@ import AuthModal from './components/panels/AuthModal';
 import ProjectsDashboardModal from './components/panels/ProjectsDashboardModal';
 import ShareModal from './components/panels/ShareModal';
 import MarketplaceModal from './components/panels/MarketplaceModal';
+import DocAccessDeniedModal from './components/panels/DocAccessDeniedModal';
 import CommandPalette from './components/layout/CommandPalette';
 import { 
   PanelLeftClose, 
@@ -46,7 +47,9 @@ function App() {
     projectsModalOpen, 
     setProjectsModalOpen,
     shareModalOpen,
-    setShareModalOpen
+    setShareModalOpen,
+    accessDenied,
+    clearAccessDenied
   } = useAuth();
 
   const [leftWidth, setLeftWidth] = useState(280);
@@ -530,11 +533,20 @@ function App() {
         onPreferencesOpen={() => setPreferencesModalOpen(true)}
       />
 
-      {/* Cloud Auth, Workspace & Share Modals */}
+      {/* Cloud Auth, Workspace, Access Control & Share Modals */}
       {authModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} />}
       {projectsModalOpen && <ProjectsDashboardModal onClose={() => setProjectsModalOpen(false)} />}
       {shareModalOpen && <ShareModal onClose={() => setShareModalOpen(false)} />}
       {marketplaceModalOpen && <MarketplaceModal onClose={() => setMarketplaceModalOpen(false)} />}
+      {accessDenied && (
+        <DocAccessDeniedModal
+          projectId={accessDenied.projectId}
+          projectTitle={accessDenied.projectTitle}
+          ownerUsername={accessDenied.ownerUsername}
+          requiresAuth={accessDenied.requiresAuth}
+          onClose={clearAccessDenied}
+        />
+      )}
     </div>
   );
 }

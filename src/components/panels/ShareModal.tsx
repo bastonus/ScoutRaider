@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Link, Copy, Check, Users, Shield, Globe, Lock, Trash2, ShieldCheck, Eye, Edit3 } from 'lucide-react';
+import { X, UserPlus, Link, Copy, Check, Users, Shield, Globe, Lock, Trash2, ShieldCheck, Eye, Edit3, Inbox } from 'lucide-react';
 import { CloudAuthService, type ProjectSharingDetails } from '../../logic/CloudAuthService';
 import { useAuth } from '../../AuthContext';
 import { useApp } from '../../AppContext';
@@ -24,6 +24,7 @@ export default function ShareModal({ projectId: propProjectId, projectTitle: pro
     const [submittingInvite, setSubmittingInvite] = useState(false);
     const [copied, setCopied] = useState(false);
     const [updatingGeneralAccess, setUpdatingGeneralAccess] = useState(false);
+    const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     const loadDetails = async () => {
@@ -52,7 +53,7 @@ export default function ShareModal({ projectId: propProjectId, projectTitle: pro
         const base = typeof window !== 'undefined' && window.location.origin && !window.location.origin.startsWith('file:')
             ? window.location.origin
             : 'https://scoutraider.silverhorse.fr';
-        return `${base}/?doc=${sharingDetails.share_token}`;
+        return `${base}/#/d/${sharingDetails.share_token}`;
     };
 
     const handleCopyLink = async () => {
@@ -109,6 +110,26 @@ export default function ShareModal({ projectId: propProjectId, projectTitle: pro
             setErrorMsg(err.message || 'Erreur lors de la mise à jour.');
         } finally {
             setUpdatingGeneralAccess(false);
+        }
+    };
+
+    const handleRespondRequest = async (requestId: string, action: 'approve' | 'reject', role: 'viewer' | 'editor' = 'viewer') => {
+        if (!activeProjectId) return;
+        setRespondingRequestId(requestId);
+        try {
+            await CloudAuthService.respondAccessRequest(activeProjectId, requestId, action, role);
+            await loadDetails();
+            dispatch({
+                type: 'ADD_NOTIFICATION',
+                message: action === 'approve'
+                    ? `Demande approuvée (rôle : ${role === 'editor' ? 'Éditeur' : 'Lecteur'}).`
+                    : 'Demande d\'accès refusée.',
+                notifType: 'info'
+            });
+        } catch (err: any) {
+            setErrorMsg(err.message || 'Impossible de traiter la demande d\'accès.');
+        } finally {
+            setRespondingRequestId(null);
         }
     };
 
@@ -290,6 +311,115 @@ export default function ShareModal({ projectId: propProjectId, projectTitle: pro
                                     {submittingInvite ? 'Ajout...' : 'Envoyer'}
                                 </button>
                             </form>
+
+                            {/* Pending Access Requests (Owner only) */}
+                            {sharingDetails?.is_owner && sharingDetails.access_requests && sharingDetails.access_requests.filter(r => r.status === 'pending').length > 0 && (
+                                <div style={{
+                                    background: 'rgba(234, 179, 8, 0.08)',
+                                    border: '1px solid rgba(234, 179, 8, 0.25)',
+                                    borderRadius: '10px',
+                                    padding: '12px 14px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#FACC15', fontSize: '13px', fontWeight: 600, marginBottom: '10px' }}>
+                                        <Inbox size={16} />
+                                        <span>Demandes d'accès en attente ({sharingDetails.access_requests.filter(r => r.status === 'pending').length})</span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        {sharingDetails.access_requests.filter(r => r.status === 'pending').map(req => (
+                                            <div key={req.id} style={{
+                                                background: '#0E1611',
+                                                border: '1px solid #1F2E25',
+                                                borderRadius: '8px',
+                                                padding: '10px 12px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '8px'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                                                    <div>
+                                                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#F0F6F2' }}>
+                                                            {req.requester_name}
+                                                        </div>
+                                                        {req.requester_email && (
+                                                            <div style={{ fontSize: '11px', color: '#8BA594' }}>
+                                                                {req.requester_email}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <button
+                                                            type="button"
+                                                            disabled={respondingRequestId === req.id}
+                                                            onClick={() => handleRespondRequest(req.id, 'approve', 'viewer')}
+                                                            style={{
+                                                                background: 'rgba(34, 197, 94, 0.15)',
+                                                                color: '#4ADE80',
+                                                                border: '1px solid rgba(34, 197, 94, 0.3)',
+                                                                borderRadius: '6px',
+                                                                padding: '4px 8px',
+                                                                fontSize: '11px',
+                                                                fontWeight: 600,
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        >
+                                                            Accepter (Lecteur)
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={respondingRequestId === req.id}
+                                                            onClick={() => handleRespondRequest(req.id, 'approve', 'editor')}
+                                                            style={{
+                                                                background: 'rgba(59, 130, 246, 0.15)',
+                                                                color: '#60A5FA',
+                                                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                                                borderRadius: '6px',
+                                                                padding: '4px 8px',
+                                                                fontSize: '11px',
+                                                                fontWeight: 600,
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        >
+                                                            Accepter (Éditeur)
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={respondingRequestId === req.id}
+                                                            onClick={() => handleRespondRequest(req.id, 'reject')}
+                                                            style={{
+                                                                background: 'rgba(239, 68, 68, 0.12)',
+                                                                color: '#F87171',
+                                                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                                                borderRadius: '6px',
+                                                                padding: '4px 8px',
+                                                                fontSize: '11px',
+                                                                fontWeight: 600,
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        >
+                                                            Refuser
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {req.message && (
+                                                    <div style={{
+                                                        fontSize: '12px',
+                                                        color: '#C5D6CC',
+                                                        background: '#16221A',
+                                                        padding: '6px 10px',
+                                                        borderRadius: '6px',
+                                                        fontStyle: 'italic',
+                                                        borderLeft: '3px solid #6EC97E'
+                                                    }}>
+                                                        « {req.message} »
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Collaborators List */}
                             <div>

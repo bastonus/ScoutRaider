@@ -8,6 +8,10 @@ export default function ControlToolbar() {
     const [helpOpen, setHelpOpen] = useState(false);
     const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
 
+    // Sur mobile, le pinch-to-zoom tactile natif de Leaflet remplace le zoom bouton,
+    // et le guide est accessible via le menu pour dégager 100% de la carte.
+    if (isMobile) return null;
+
     const zoomIn = () => mapRef.current?.zoomIn();
     const zoomOut = () => mapRef.current?.zoomOut();
 
