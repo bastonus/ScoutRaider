@@ -122,9 +122,21 @@ body {
     min-height: 100dvh;
     font-size: 13px;
     line-height: 1.45;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+body:has(.app-shell) {
+    overflow: hidden !important;
+}
+
+#root {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Typographie technique */
