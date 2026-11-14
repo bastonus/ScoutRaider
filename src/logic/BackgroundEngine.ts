@@ -157,7 +157,21 @@ export class BackgroundEngine {
 
         try {
             const handler = this.handlers[job.type];
-            const result  = handler ? await handler(job.data) : undefined;
+            const maxRetries = job.type === 'route_leg' ? 3 : 1;
+            let attempt = 0;
+            let result: any;
+            while (attempt <= maxRetries) {
+                try {
+                    result = handler ? await handler(job.data) : undefined;
+                    break;
+                } catch (e: any) {
+                    attempt++;
+                    if (attempt > maxRetries) throw e;
+                    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000); // 1s, 2s, 4s max 8s
+                    Logger.warn(`[Queue] Retry ${attempt}/${maxRetries} for ${job.type} in ${delay}ms`, e?.message ?? e);
+                    await new Promise(r => setTimeout(r, delay));
+                }
+            }
             const ms = (performance.now() - t0).toFixed(0);
             Logger.info(`[Queue] ✓ ${label}  ${ms}ms`);
             this.onJobFinished?.(job.id, job.type, result);

@@ -29,19 +29,23 @@ export default function EditorPage() {
     // Track which identifier has already been loaded to avoid double-loads
     const loadedIdentifier = useRef<string | null>(null);
 
+    // ── Instant /d/new: call newProject() synchronously, skip isLoading gate ──
+    useEffect(() => {
+        if (identifier === 'new' && loadedIdentifier.current !== 'new') {
+            loadedIdentifier.current = 'new';
+            newProject();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [identifier]);
+
     // ── Load document when identifier changes ────────────────────────────────
     useEffect(() => {
         if (isLoading) return;
         if (!identifier) return;
+        if (identifier === 'new') return; // already handled above
         if (loadedIdentifier.current === identifier) return;
 
         loadedIdentifier.current = identifier;
-
-        if (identifier === 'new') {
-            // Reset to blank state
-            newProject();
-            return;
-        }
 
         const isToken = identifier.startsWith('doc_');
 

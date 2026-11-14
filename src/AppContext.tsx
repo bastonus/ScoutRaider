@@ -2207,6 +2207,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
     }, []);
 
+    // ── Resume interrupted pipeline after LOAD_PROJECT ─────────────────
+    // Detects incoherent state: routes present but azimuts missing → re-trigger azimut
+    const prevIsLoadingRef = useRef(state.is_loading);
+    useEffect(() => {
+        // We detect a "just-loaded" state: loading just went from true → false
+        // while there are routes but no azimuts
+        const wasLoading = prevIsLoadingRef.current;
+        prevIsLoadingRef.current = state.is_loading;
+
+        if (wasLoading && !state.is_loading) {
+            const hasRoutes = state.routes && state.routes.some((r: any) => r && r.geojson);
+            const missingAzimuts = !state.polygonal_steps || state.polygonal_steps.length === 0;
+            if (hasRoutes && missingAzimuts) {
+                console.log('[Pipeline] 🔄 Reprise du calcul interrompu: routes présentes, azimuts absents');
+                setTimeout(() => {
+                    const allCoords = state.routes.flatMap((r: any) =>
+                        r?.geojson?.geometry?.coordinates || r?.geojson?.coordinates || []
+                    );
+                    if (allCoords.length >= 2) {
+                        dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Reprise du calcul interrompu...' });
+                        backgroundEngine.enqueue(
+                            'azimut_leg',
+                            1,
+                            `job-azimut-resume-${Date.now()}`,
+                            {
+                                geojson: {
+                                    type: 'FeatureCollection',
+                                    features: [{
+                                        type: 'Feature',
+                                        geometry: { type: 'LineString', coordinates: allCoords }
+                                    }]
+                                },
+                                forceIntersections: false,
+                                settings: state.polygonalization_settings
+                            },
+                            'azimut-global'
+                        );
+                    }
+                }, 500);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.is_loading, state.routes, state.polygonal_steps]);
+
     // ── BackgroundEngine listener (global — not tied to any panel) ──────
     // Per-leg pipeline: ① BRouter → ② Azimut → ③ POI → ④ Carnet
     // ⑤ Danger check runs inside ① using BRouter WayTags.
@@ -2374,7 +2418,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             (jobId, type, error) => {
                 dispatch({ type: 'SET_LOADING', isLoading: false });
                 console.error('[Pipeline] Job failed:', jobId, type, error);
-                dispatch({ type: 'ADD_NOTIFICATION', message: 'Erreur calcul : ' + error, notifType: 'error' });
+                const msgs: Record<string, string> = {
+                    route_leg: '🗺️ Calcul d\'itinéraire échoué (BRouter) — le serveur est peut-être indisponible.',
+                    azimut_leg: '📐 Calcul des azimuts échoué — les données de route sont peut-être invalides.',
+                    poi_search: '📍 Recherche de points d\'intérêt échouée (Overpass) — continuez normalement.',
+                    carnet_update: '📒 Mise à jour du carnet échouée.',
+                };
+                const msg = msgs[type] || `Erreur calcul : ${error}`;
+                dispatch({ type: 'ADD_NOTIFICATION', message: msg, notifType: type === 'poi_search' ? 'warning' : 'error', duration: 6000 });
             }
         );
     }, [dispatch]);
