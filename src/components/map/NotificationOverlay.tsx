@@ -43,7 +43,9 @@ export default function NotificationOverlay() {
       flexDirection: 'column',
       gap: '12px',
       alignItems: 'center',
-      pointerEvents: 'none'
+      pointerEvents: 'none',
+      maxWidth: 'calc(100vw - 32px)',
+      width: 'max-content'
     }}>
       {activeNotifs.map(notif => {
         const isError = notif.type === 'error';
@@ -56,7 +58,8 @@ export default function NotificationOverlay() {
             display: 'flex',
             alignItems: 'flex-start',
             gap: '12px',
-            width: '320px',
+            maxWidth: 'calc(100vw - 32px)',
+            width: 'clamp(260px, 90vw, 360px)',
             pointerEvents: 'all',
             background: isError ? 'rgba(50, 15, 15, 0.92)' : isWarn ? 'rgba(30, 20, 10, 0.92)' : 'var(--glass-bg)',
             borderColor: isError ? 'var(--semantic-red)' : isWarn ? 'var(--semantic-orange-bg)' : 'rgba(110, 201, 126, 0.08)',

@@ -46,9 +46,9 @@ const modColors: Record<string, string> = {
 
 const nodeIcon = L.divIcon({
     className: 'node-marker-icon',
-    html: '<div style="width:10px;height:10px;background:#fff;border:2px solid #555;border-radius:1px;cursor:pointer;box-sizing:border-box;box-shadow:0 1px 2px rgba(0,0,0,0.5)"></div>',
-    iconSize: [10, 10], 
-    iconAnchor: [5, 5]
+    html: '<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><div style="width:11px;height:11px;background:#fff;border:2px solid #555;border-radius:2px;box-sizing:border-box;box-shadow:0 1px 3px rgba(0,0,0,0.6)"></div></div>',
+    iconSize: [24, 24], 
+    iconAnchor: [12, 12]
 });
 
 // ── Isolated Azimut Handle to ensure imperative drag persists ──
@@ -73,8 +73,8 @@ const AzimutHandle = React.memo(({ idx, position, azimut, onDrag, onDragEnd }: {
             zIndexOffset={2000}
             icon={L.divIcon({
                 className: 'azi-handle',
-                html: '<div style="width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #2d8ceb;cursor:move;box-shadow:0 1px 6px rgba(0,0,0,0.5);pointer-events:all;"></div>',
-                iconSize: [18, 18], iconAnchor: [9, 9]
+                html: '<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:move;pointer-events:all;"><div style="width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #2d8ceb;box-shadow:0 1px 6px rgba(0,0,0,0.5);"></div></div>',
+                iconSize: [28, 28], iconAnchor: [14, 14]
             })}
             eventHandlers={{
                 dragstart: (e) => {

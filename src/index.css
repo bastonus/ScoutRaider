@@ -1128,6 +1128,8 @@ path.leaflet-interactive:focus {
     padding-bottom: var(--sab);
     transform: translateY(100%);
     animation: slideUpSheet 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
 }
 
 @keyframes slideUpSheet {
@@ -1145,13 +1147,28 @@ path.leaflet-interactive:focus {
     background: var(--bg-dark);
 }
 
+.bottom-sheet-handle-zone {
+    width: 100%;
+    padding: 10px 0 6px;
+    display: flex;
+    justify-content: center;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
 .bottom-sheet-handle-bar {
-    width: 40px;
-    height: 4px;
+    width: 44px;
+    height: 5px;
     background: var(--border-strong);
     border-radius: var(--radius-pill);
-    margin: 8px auto 4px;
     flex-shrink: 0;
+    transition: background 150ms ease;
+}
+
+.bottom-sheet-handle-zone:hover .bottom-sheet-handle-bar,
+.bottom-sheet-handle-zone:active .bottom-sheet-handle-bar {
+    background: var(--text-dim);
 }
 
 /* Mobile responsive adjustments */

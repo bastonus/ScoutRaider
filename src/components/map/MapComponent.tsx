@@ -136,10 +136,10 @@ function CustomAttribution() {
     return (
         <div style={{
             position: 'absolute', bottom: '8px', left: '8px', zIndex: 1100,
-            background: 'rgba(14, 22, 17, 0.65)', backdropFilter: 'blur(10px)',
+            background: 'var(--bg-elevated)',
             padding: '3px 10px', borderRadius: 'var(--radius-pill)',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-            fontSize: '9px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.45)',
+            border: '1px solid var(--border-subtle)',
+            fontSize: '9px', fontWeight: 600, color: 'var(--text-dim)',
             pointerEvents: 'none', letterSpacing: '0.02em',
             display: 'flex', alignItems: 'center', gap: '6px'
         }}>

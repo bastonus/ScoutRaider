@@ -46,14 +46,14 @@ const StageMarker = React.memo(function StageMarker({
     const cursorStyle = isMovable ? 'grab' : 'pointer';
 
     const markerHtml = isAnchored
-        ? `<div style="width:32px;height:32px;border-radius:8px;background:#fff;border:3px solid #2d8ceb;color:#2d8ceb;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(45,140,235,0.35),0 3px 8px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;cursor:${cursorStyle};">${stage.label}</div>`
-        : `<div style="width:28px;height:28px;border-radius:8px;background:#fff;border:2px solid ${dotColor};color:${dotColor};font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;cursor:${cursorStyle};">${stage.label}</div>`;
+        ? `<div style="width:36px;height:36px;border-radius:10px;background:#fff;border:3px solid #2d8ceb;color:#2d8ceb;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(45,140,235,0.35),0 3px 8px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;cursor:${cursorStyle};">${stage.label}</div>`
+        : `<div style="width:32px;height:32px;border-radius:10px;background:#fff;border:2.5px solid ${dotColor};color:${dotColor};font-weight:900;font-size:13.5px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;cursor:${cursorStyle};">${stage.label}</div>`;
 
     const icon = L.divIcon({
         className: 'custom-stage-marker',
         html: markerHtml,
-        iconSize: isAnchored ? [32, 32] : [28, 28],
-        iconAnchor: isAnchored ? [16, 16] : [14, 14],
+        iconSize: isAnchored ? [36, 36] : [32, 32],
+        iconAnchor: isAnchored ? [18, 18] : [16, 16],
     });
 
     // Stable handlers via useCallback — dependencies are primitive/stable
