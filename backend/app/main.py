@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from . import db, auth
 from .modules.schema import ModuleMetadata, EncodedOutput
 from .modules.registry import ModuleRegistry, SecurityError
+from .modules.preview_generator import compile_and_generate_preview
 from .diffraction.models import ItinerarySegment, PresetConfig, DiffractionResult
 from .diffraction.presets import BUILTIN_PRESETS
 from .diffraction.solver import DiffractionSolver
@@ -357,6 +358,307 @@ def execute_module(module_id: str, payload: ModuleTransformRequest):
         segments=payload.segments,
         options=payload.options
     )
+
+
+# ─── Marketplace & Community Modules Endpoints ───────────────────────────────
+
+class MarketplaceModuleUpsert(BaseModel):
+    id: Optional[str] = None
+    name: str
+    category: str = "code"  # 'code', 'orchestration', 'theme'
+    description: Optional[str] = ""
+    version: str = "1.0.0"
+    is_public: bool = True
+    code: Optional[str] = None
+    config: Optional[Dict[str, Any]] = None
+    forked_from_id: Optional[str] = None
+
+
+class MarketplaceVisibilityUpdate(BaseModel):
+    is_public: bool
+
+
+class PreviewGenerateRequest(BaseModel):
+    name: str = "Aperçu de Module"
+    category: str = "code"
+    code: Optional[str] = None
+    version: str = "1.0.0"
+    author: Optional[str] = "Auteur"
+
+
+@app.post("/api/marketplace/preview", tags=["Marketplace"])
+async def generate_module_preview(payload: PreviewGenerateRequest):
+    """
+    Server-side compilation of module code into an image preview (PNG data URI).
+    Runs Python transformation safely or generates graphic card.
+    """
+    try:
+        preview_uri = compile_and_generate_preview(
+            module_id="preview",
+            name=payload.name,
+            category=payload.category,
+            code=payload.code or "",
+            author=payload.author or "Auteur",
+            version=payload.version
+        )
+        return {"preview_image": preview_uri}
+    except Exception as e:
+        logger.error(f"Error compiling module preview: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur de compilation du prévisualiseur: {str(e)}")
+
+
+@app.get("/api/marketplace/modules", tags=["Marketplace"])
+async def list_marketplace_items(
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    user_token: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional)
+):
+    """List modules in the community marketplace with category filter and search."""
+    user_id = user_token["sub"] if user_token else None
+    items = await db.list_marketplace_modules(
+        category=category,
+        search=search,
+        user_id=user_id,
+        include_private=True
+    )
+    return items
+
+
+@app.get("/api/marketplace/modules/{module_id}", tags=["Marketplace"])
+async def get_marketplace_item(module_id: str):
+    """Get module by ID from marketplace."""
+    item = await db.get_marketplace_module(module_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Module introuvable dans la marketplace.")
+    return item
+
+
+@app.post("/api/marketplace/modules", tags=["Marketplace"])
+async def create_or_upload_module(
+    payload: MarketplaceModuleUpsert,
+    user_token: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional)
+):
+    """
+    Upload or publish a new module to the community marketplace.
+    Compiles code into server image preview automatically.
+    """
+    author_id = user_token["sub"] if user_token else "anonymous"
+    author_username = user_token.get("username", "Anonyme") if user_token else "Communauté"
+    
+    clean_id = (payload.id or payload.name.lower().replace(" ", "_").replace("-", "_")).strip()
+    if not clean_id:
+        clean_id = f"mod_{os.urandom(4).hex()}"
+
+    # Server-side compilation of preview image
+    preview_uri = compile_and_generate_preview(
+        module_id=clean_id,
+        name=payload.name,
+        category=payload.category,
+        code=payload.code or "",
+        author=author_username,
+        version=payload.version
+    )
+
+    saved = await db.upsert_marketplace_module(
+        module_id=clean_id,
+        name=payload.name,
+        category=payload.category,
+        description=payload.description or "",
+        author_id=author_id,
+        author_username=author_username,
+        version=payload.version,
+        is_public=payload.is_public,
+        code=payload.code,
+        config=payload.config,
+        preview_image=preview_uri,
+        forked_from_id=payload.forked_from_id
+    )
+
+    # Automatically add author's own created module to their synced library
+    if user_token and user_token.get("sub"):
+        await db.add_to_user_library(user_token["sub"], clean_id, payload.name, payload.category)
+
+    return saved
+
+
+@app.put("/api/marketplace/modules/{module_id}", tags=["Marketplace"])
+async def update_marketplace_module(
+    module_id: str,
+    payload: MarketplaceModuleUpsert,
+    user_token: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional)
+):
+    """
+    Modify an existing community module.
+    Recompiles preview image on server.
+    """
+    existing = await db.get_marketplace_module(module_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Module non trouvé.")
+
+    author_username = existing.get("author_username") or "Communauté"
+    if user_token and user_token.get("username"):
+        author_username = f"{author_username} & {user_token['username']}"
+
+    # Server-side recompilation of preview
+    preview_uri = compile_and_generate_preview(
+        module_id=module_id,
+        name=payload.name,
+        category=payload.category,
+        code=payload.code or existing.get("code") or "",
+        author=author_username,
+        version=payload.version
+    )
+
+    saved = await db.upsert_marketplace_module(
+        module_id=module_id,
+        name=payload.name,
+        category=payload.category,
+        description=payload.description or existing.get("description", ""),
+        author_id=existing.get("author_id"),
+        author_username=author_username,
+        version=payload.version,
+        is_public=payload.is_public,
+        code=payload.code,
+        config=payload.config or existing.get("config"),
+        preview_image=preview_uri,
+        forked_from_id=payload.forked_from_id or existing.get("forked_from_id")
+    )
+    return saved
+
+
+@app.patch("/api/marketplace/modules/{module_id}/visibility", tags=["Marketplace"])
+async def toggle_module_visibility(
+    module_id: str,
+    payload: MarketplaceVisibilityUpdate,
+    user_token: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional)
+):
+    """Rendre le module visible (Public) ou masqué (Privé)."""
+    ok = await db.update_marketplace_visibility(module_id, payload.is_public)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Module introuvable.")
+    return {"module_id": module_id, "is_public": payload.is_public}
+
+
+@app.post("/api/marketplace/modules/{module_id}/fork", tags=["Marketplace"])
+async def fork_module(
+    module_id: str,
+    user_token: Dict[str, Any] = Depends(auth.get_current_user)
+):
+    """Fork a community module into a new personal community module."""
+    existing = await db.get_marketplace_module(module_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Module original introuvable.")
+
+    new_id = f"{existing['id']}_fork_{os.urandom(3).hex()}"
+    new_name = f"{existing['name']} (Fork)"
+    author_id = user_token["sub"]
+    author_username = user_token.get("username", "Forker")
+
+    preview_uri = compile_and_generate_preview(
+        module_id=new_id,
+        name=new_name,
+        category=existing["category"],
+        code=existing.get("code") or "",
+        author=author_username,
+        version="1.0.0"
+    )
+
+    forked = await db.upsert_marketplace_module(
+        module_id=new_id,
+        name=new_name,
+        category=existing["category"],
+        description=f"Forké depuis {existing['name']}. {existing.get('description', '')}",
+        author_id=author_id,
+        author_username=author_username,
+        version="1.0.0",
+        is_public=True,
+        code=existing.get("code"),
+        config=existing.get("config"),
+        preview_image=preview_uri,
+        forked_from_id=module_id
+    )
+
+    # Add to user library
+    await db.add_to_user_library(author_id, new_id, new_name, existing["category"])
+    return forked
+
+
+@app.delete("/api/marketplace/modules/{module_id}", tags=["Marketplace"])
+async def delete_marketplace_item(
+    module_id: str,
+    user_token: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional)
+):
+    """Delete a module from marketplace."""
+    user_id = user_token["sub"] if user_token else None
+    try:
+        ok = await db.delete_marketplace_module(module_id, user_id)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Module non trouvé.")
+        return {"success": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+# ─── Synchronized User Library Endpoints ─────────────────────────────────────
+
+class UserLibraryAddPayload(BaseModel):
+    custom_name: Optional[str] = None
+    category: str = "code"
+    local_overrides: Optional[Dict[str, Any]] = None
+
+
+class UserLibrarySyncPayload(BaseModel):
+    module_ids: List[str]
+
+
+@app.get("/api/library", tags=["User Library"])
+async def get_my_library(user_token: Dict[str, Any] = Depends(auth.get_current_user)):
+    """Retrieve the current user's synchronized personal library."""
+    items = await db.list_user_library(user_token["sub"])
+    return items
+
+
+@app.post("/api/library/add/{module_id}", tags=["User Library"])
+async def add_module_to_library(
+    module_id: str,
+    payload: Optional[UserLibraryAddPayload] = None,
+    user_token: Dict[str, Any] = Depends(auth.get_current_user)
+):
+    """Add a module to user's synchronized cloud library."""
+    custom_name = payload.custom_name if payload else None
+    cat = payload.category if payload else "code"
+    overrides = payload.local_overrides if payload else None
+
+    res = await db.add_to_user_library(
+        user_id=user_token["sub"],
+        module_id=module_id,
+        custom_name=custom_name,
+        category=cat,
+        local_overrides=overrides
+    )
+    return res
+
+
+@app.delete("/api/library/{module_id}", tags=["User Library"])
+async def remove_module_from_library(
+    module_id: str,
+    user_token: Dict[str, Any] = Depends(auth.get_current_user)
+):
+    """Remove a module from user's synchronized cloud library."""
+    ok = await db.remove_from_user_library(user_token["sub"], module_id)
+    return {"success": ok}
+
+
+@app.post("/api/library/sync", tags=["User Library"])
+async def sync_library_batch(
+    payload: UserLibrarySyncPayload,
+    user_token: Dict[str, Any] = Depends(auth.get_current_user)
+):
+    """Batch synchronizes a list of module IDs with user account."""
+    for mid in payload.module_ids:
+        await db.add_to_user_library(user_token["sub"], mid)
+    updated = await db.list_user_library(user_token["sub"])
+    return updated
 
 
 # ─── Diffraction Endpoints ───────────────────────────────────────────────────
