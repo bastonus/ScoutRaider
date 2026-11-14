@@ -24,11 +24,12 @@ _sqlite_path = os.path.join(_data_dir, "scoutraider.db")
 _pg_pool = None
 _use_sqlite = False
 _sqlite_conn = None
+_pg_error = None
 
 
 async def init_db():
     """Initialize DB connection and run migrations."""
-    global _pg_pool, _use_sqlite
+    global _pg_pool, _use_sqlite, _pg_error
 
     # Force SQLite mode via env var — useful when PostgreSQL has no persistent volume
     if os.getenv("USE_SQLITE", "").lower() in ("1", "true", "yes"):
@@ -38,22 +39,38 @@ async def init_db():
         return
 
     pg_url = DATABASE_URL
+    logger.info("Attempting connection to PostgreSQL database...")
+
+    # Retry connection up to 4 times (total ~15s) in case internal DNS or PG container is warming up
+    max_attempts = 4
+    for attempt in range(1, max_attempts + 1):
+        try:
+            import asyncpg
+            _pg_pool = await asyncio.wait_for(
+                asyncpg.create_pool(
+                    dsn=pg_url,
+                    min_size=1,
+                    max_size=10,
+                    command_timeout=60
+                ),
+                timeout=6.0
+            )
+            logger.info("Successfully connected to PostgreSQL database.")
+            _use_sqlite = False
+            _pg_error = None
+            break
+        except Exception as e:
+            _pg_error = str(e)
+            logger.warning(f"PostgreSQL connection attempt {attempt}/{max_attempts} failed: {e}")
+            if attempt < max_attempts:
+                await asyncio.sleep(attempt * 1.5)
+            else:
+                logger.error(f"All PostgreSQL connection attempts failed ({_pg_error}). Falling back to local SQLite.")
+                _use_sqlite = True
+                _init_sqlite()
+                return
 
     try:
-        import asyncpg
-        logger.info("Connecting to PostgreSQL database...")
-        _pg_pool = await asyncio.wait_for(
-            asyncpg.create_pool(
-                dsn=pg_url,
-                min_size=1,
-                max_size=10,
-                command_timeout=60
-            ),
-            timeout=8.0
-        )
-        logger.info("Successfully connected to PostgreSQL database.")
-        _use_sqlite = False
-
         # Create tables and run schema migrations in PostgreSQL
         async with _pg_pool.acquire() as conn:
             await conn.execute("""
@@ -141,7 +158,8 @@ async def init_db():
         await seed_initial_marketplace()
         return
     except Exception as e:
-        logger.warning(f"Could not connect to PostgreSQL ({e}). Falling back to local SQLite for development.")
+        _pg_error = f"Migration failed: {e}"
+        logger.error(f"PostgreSQL migration failed ({e}). Falling back to local SQLite.")
         _use_sqlite = True
         _init_sqlite()
 

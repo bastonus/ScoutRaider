@@ -6,6 +6,7 @@ import { useApp } from '../../AppContext';
 export default function ControlToolbar() {
     const { state, dispatch } = useApp();
     const [helpOpen, setHelpOpen] = useState(false);
+    const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
 
     const zoomIn = () => mapRef.current?.zoomIn();
     const zoomOut = () => mapRef.current?.zoomOut();
@@ -42,7 +43,9 @@ export default function ControlToolbar() {
         <>
             <div id="bottom-right-container" style={{
                 position: 'absolute',
-                bottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
+                bottom: isMobile 
+                    ? 'calc(max(16px, env(safe-area-inset-bottom, 16px)) + 58px)' 
+                    : 'max(16px, env(safe-area-inset-bottom, 16px))',
                 right: 'max(12px, env(safe-area-inset-right, 12px))',
                 zIndex: 1100,
                 pointerEvents: 'none',

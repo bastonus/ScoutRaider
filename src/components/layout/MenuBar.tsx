@@ -27,7 +27,8 @@ import {
     Menu,
     ChevronDown,
     ChevronRight,
-    Sparkles
+    Sparkles,
+    Store
 } from 'lucide-react';
 import FleurDeLysLogo from './FleurDeLysLogo';
 import AICopilotModal from '../panels/AICopilotModal';
@@ -45,9 +46,10 @@ interface MenuBarProps {
     onPreferencesOpen?: () => void;
     onSetRightSection?: (id: SectionId) => void;
     onOpenCommandPalette?: () => void;
+    onOpenMarketplace?: () => void;
 }
 
-export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeChange, onExport, onPreferencesOpen, onSetRightSection, onOpenCommandPalette }: MenuBarProps) {
+export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeChange, onExport, onPreferencesOpen, onSetRightSection, onOpenCommandPalette, onOpenMarketplace }: MenuBarProps) {
     const { state, dispatch } = useApp();
     const { 
         user, 
@@ -349,6 +351,14 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
             { label: 'Connecteurs & Serveur MCP...', action: () => { setAiModalTab('mcp'); setAiModalOpen(true); } },
             { label: 'Configuration Fournisseurs IA...', action: () => { setAiModalTab('config'); setAiModalOpen(true); } },
         ],
+        'Marketplace': [
+            { label: 'Ouvrir la Marketplace...', shortcut: 'Ctrl+M', action: () => onOpenMarketplace?.() },
+            { label: 'Codes & Énigmes communautaires...', action: () => onOpenMarketplace?.() },
+            { label: 'Orchestrations & Presets partagés...', action: () => onOpenMarketplace?.() },
+            { label: 'Thèmes & Feuilles de style...', action: () => onOpenMarketplace?.() },
+            { divider: true },
+            { label: 'Ma Bibliothèque synchronisée...', action: () => onOpenMarketplace?.() },
+        ],
         'Aide': [
             { label: 'Vérifier les mises à jour...', action: async () => {
                 if ((window as any).electronAPI) {
@@ -644,116 +654,122 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                 </div>
             </div>
 
-            {/* CENTER: View Mode Toggle & Command Palette */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isTablet ? '6px' : '10px', WebkitAppRegion: 'drag' } as any}>
-                {/* View Mode Switcher */}
-                <div style={{
-                    display: 'flex',
-                    background: 'var(--bg-surface)',
-                    borderRadius: 'var(--radius-pill)',
-                    padding: '3px',
-                    border: '1px solid var(--border-subtle)',
-                    WebkitAppRegion: 'no-drag',
-                    gap: '3px'
-                } as any}>
-                    <button
-                        onClick={() => onViewModeChange?.('map')}
-                        style={getViewBtnStyle(viewMode === 'map', isMobile)}
-                        title="Vue Carte Topographique (Ctrl+1)"
-                    >
-                        <MapIcon size={13} />
-                        {!isMobile && <span>Carte</span>}
-                        {!isMobile && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: '2px', padding: '0 3px', borderRadius: '2px', background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)' }}>Ctrl+1</span>}
-                    </button>
-                    <button
-                        onClick={() => onViewModeChange?.('text')}
-                        style={getViewBtnStyle(viewMode === 'text', isMobile)}
-                        title="Vue Carnet Textuel (Ctrl+2)"
-                    >
-                        <Type size={13} />
-                        {!isMobile && <span>Texte</span>}
-                        {!isMobile && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: '2px', padding: '0 3px', borderRadius: '2px', background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)' }}>Ctrl+2</span>}
-                    </button>
-                    <button
-                        onClick={() => onViewModeChange?.(viewMode === 'split' ? 'map' : 'split')}
-                        style={getViewBtnStyle(viewMode === 'split', isMobile)}
-                        title="Vue scindée Carte + Texte (Ctrl+3)"
-                    >
-                        <Columns size={13} />
-                        {!isMobile && <span>Side-by-side</span>}
-                        {!isMobile && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: '2px', padding: '0 3px', borderRadius: '2px', background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)' }}>Ctrl+3</span>}
-                    </button>
-                </div>
-
-                {/* Quick Command Trigger */}
-                <button
-                    onClick={onOpenCommandPalette}
-                    style={{
+            {/* CENTER: View Mode Toggle & Command Palette (Hidden on Mobile < 768px) */}
+            {!isMobile && (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isTablet ? '6px' : '10px', WebkitAppRegion: 'drag' } as any}>
+                    {/* View Mode Switcher */}
+                    <div style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        padding: isTablet ? '0 8px' : '0 10px',
-                        height: '28px',
                         background: 'var(--bg-surface)',
+                        borderRadius: 'var(--radius-pill)',
+                        padding: '3px',
                         border: '1px solid var(--border-subtle)',
-                        borderRadius: 'var(--radius-pill)',
-                        color: 'var(--text-dim)',
-                        fontSize: '11px',
-                        fontWeight: 400,
-                        cursor: 'pointer',
-                        transition: 'all 100ms ease',
                         WebkitAppRegion: 'no-drag',
-                    } as any}
-                    onMouseEnter={e => {
-                        e.currentTarget.style.borderColor = 'var(--border-strong)';
-                        e.currentTarget.style.color = 'var(--text-primary)';
-                    }}
-                    onMouseLeave={e => {
-                        e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                        e.currentTarget.style.color = 'var(--text-dim)';
-                    }}
-                    title="Ouvrir la palette de commandes (Ctrl+K)"
-                >
-                    <Search size={12} color="var(--text-dim)" />
-                    {!isTablet && <span>Commandes</span>}
-                    {!isTablet && <kbd style={{ fontSize: '9px', padding: '0 4px', height: '16px', borderRadius: '4px' }}>Ctrl K</kbd>}
-                </button>
+                        gap: '3px'
+                    } as any}>
+                        <button
+                            onClick={() => onViewModeChange?.('map')}
+                            style={getViewBtnStyle(viewMode === 'map', false)}
+                            title="Vue Carte Topographique (Ctrl+1)"
+                        >
+                            <MapIcon size={13} />
+                            {!isTablet && <span>Carte</span>}
+                            {!isTablet && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: '2px', padding: '0 3px', borderRadius: '2px', background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)' }}>Ctrl+1</span>}
+                        </button>
+                        <button
+                            onClick={() => onViewModeChange?.('text')}
+                            style={getViewBtnStyle(viewMode === 'text', false)}
+                            title="Vue Carnet Textuel (Ctrl+2)"
+                        >
+                            <Type size={13} />
+                            {!isTablet && <span>Texte</span>}
+                            {!isTablet && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: '2px', padding: '0 3px', borderRadius: '2px', background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)' }}>Ctrl+2</span>}
+                        </button>
+                        <button
+                            onClick={() => onViewModeChange?.(viewMode === 'split' ? 'map' : 'split')}
+                            style={getViewBtnStyle(viewMode === 'split', false)}
+                            title="Vue scindée Carte + Texte (Ctrl+3)"
+                        >
+                            <Columns size={13} />
+                            {!isTablet && <span>Side-by-side</span>}
+                            {!isTablet && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: '2px', padding: '0 3px', borderRadius: '2px', background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)' }}>Ctrl+3</span>}
+                        </button>
+                    </div>
 
-                {/* AI Copilot & MCP Trigger */}
-                <button
-                    onClick={() => { setAiModalTab('narrative'); setAiModalOpen(true); }}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        padding: isTablet ? '0 8px' : '0 10px',
-                        height: '28px',
-                        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.1) 100%)',
-                        border: '1px solid rgba(16, 185, 129, 0.3)',
-                        borderRadius: 'var(--radius-pill)',
-                        color: '#34d399',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 100ms ease',
-                        WebkitAppRegion: 'no-drag',
-                    } as any}
-                    onMouseEnter={e => {
-                        e.currentTarget.style.borderColor = '#10b981';
-                        e.currentTarget.style.color = '#fff';
-                    }}
-                    onMouseLeave={e => {
-                        e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-                        e.currentTarget.style.color = '#34d399';
-                    }}
-                    title="Copilote IA & Hub MCP (Ctrl+I)"
-                >
-                    <Sparkles size={12} color="#10b981" />
-                    {!isTablet && <span>IA & MCP</span>}
-                </button>
-            </div>
+                    {/* Quick Command Trigger */}
+                    {!isTablet && (
+                        <button
+                            onClick={onOpenCommandPalette}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                padding: '0 10px',
+                                height: '28px',
+                                background: 'var(--bg-surface)',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 'var(--radius-pill)',
+                                color: 'var(--text-dim)',
+                                fontSize: '11px',
+                                fontWeight: 400,
+                                cursor: 'pointer',
+                                transition: 'all 100ms ease',
+                                WebkitAppRegion: 'no-drag',
+                            } as any}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.borderColor = 'var(--border-strong)';
+                                e.currentTarget.style.color = 'var(--text-primary)';
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                                e.currentTarget.style.color = 'var(--text-dim)';
+                            }}
+                            title="Ouvrir la palette de commandes (Ctrl+K)"
+                        >
+                            <Search size={12} color="var(--text-dim)" />
+                            <span>Commandes</span>
+                            <kbd style={{ fontSize: '9px', padding: '0 4px', height: '16px', borderRadius: '4px' }}>Ctrl K</kbd>
+                        </button>
+                    )}
+
+                    {/* AI Copilot & MCP Trigger */}
+                    {!isTablet && (
+                        <button
+                            onClick={() => { setAiModalTab('narrative'); setAiModalOpen(true); }}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                padding: '0 10px',
+                                height: '28px',
+                                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                borderRadius: 'var(--radius-pill)',
+                                color: '#34d399',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 100ms ease',
+                                WebkitAppRegion: 'no-drag',
+                            } as any}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.borderColor = '#10b981';
+                                e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                                e.currentTarget.style.color = '#34d399';
+                            }}
+                            title="Copilote IA & Hub MCP (Ctrl+I)"
+                        >
+                            <Sparkles size={12} color="#10b981" />
+                            <span>IA & MCP</span>
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* RIGHT: CONTROLS & WINDOWS */}
             <div style={{ display: 'flex', alignItems: 'center', gap: isTablet ? '4px' : '8px', WebkitAppRegion: 'no-drag' } as any}>
@@ -794,77 +810,143 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                     </div>
                 )}
 
-                {/* ESPACE DOCUMENTS BUTTON */}
-                <button
-                    onClick={() => {
-                        if (isGuest) setAuthModalOpen(true);
-                        else setProjectsModalOpen(true);
-                    }}
-                    title="Ouvrir l'Espace Documents Cloud"
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: 'var(--radius-main)',
-                        padding: isTablet ? '0 8px' : '0 12px',
-                        height: '28px',
-                        color: 'var(--text-primary)',
-                        fontSize: '11.5px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        transition: 'all 100ms ease'
-                    }}
-                    onMouseEnter={e => {
-                        e.currentTarget.style.background = 'var(--bg-hover)';
-                        e.currentTarget.style.borderColor = 'var(--border-strong)';
-                    }}
-                    onMouseLeave={e => {
-                        e.currentTarget.style.background = 'var(--bg-surface)';
-                        e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                    }}
-                >
-                    <FolderOpen size={13} color="var(--text-dim)" />
-                    {!isTablet && <span>Documents</span>}
-                </button>
+                {/* MARKETPLACE BUTTON (Desktop & Tablet) */}
+                {!isMobile && (
+                    <button
+                        onClick={onOpenMarketplace}
+                        title="Marketplace : codes, énigmes, orchestrations & communauté"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            background: 'rgba(110, 201, 126, 0.12)',
+                            border: '1px solid rgba(110, 201, 126, 0.3)',
+                            borderRadius: 'var(--radius-main)',
+                            padding: isTablet ? '0 8px' : '0 12px',
+                            height: '28px',
+                            color: '#6EC97E',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 100ms ease'
+                        }}
+                        onMouseEnter={e => {
+                            e.currentTarget.style.background = 'rgba(110, 201, 126, 0.22)';
+                            e.currentTarget.style.borderColor = '#6EC97E';
+                        }}
+                        onMouseLeave={e => {
+                            e.currentTarget.style.background = 'rgba(110, 201, 126, 0.12)';
+                            e.currentTarget.style.borderColor = 'rgba(110, 201, 126, 0.3)';
+                        }}
+                    >
+                        <Store size={13} color="#6EC97E" />
+                        {!isTablet && <span>Marketplace</span>}
+                    </button>
+                )}
 
-                {/* SHARE BUTTON */}
-                <button
-                    onClick={() => {
-                        if (isGuest) setAuthModalOpen(true);
-                        else setShareModalOpen(true);
-                    }}
-                    title="Partager ce document"
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: 'var(--radius-main)',
-                        padding: isTablet ? '0 8px' : '0 12px',
-                        height: '28px',
-                        color: 'var(--text-primary)',
-                        fontSize: '11.5px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        transition: 'all 100ms ease'
-                    }}
-                    onMouseEnter={e => {
-                        e.currentTarget.style.background = 'var(--bg-hover)';
-                        e.currentTarget.style.borderColor = 'var(--border-strong)';
-                    }}
-                    onMouseLeave={e => {
-                        e.currentTarget.style.background = 'var(--bg-surface)';
-                        e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                    }}
-                >
-                    <Share2 size={13} color="var(--text-dim)" />
-                    {!isTablet && <span>Partager</span>}
-                </button>
+                {/* ESPACE DOCUMENTS BUTTON (Desktop & Tablet) */}
+                {!isMobile && (
+                    <button
+                        onClick={() => {
+                            if (isGuest) setAuthModalOpen(true);
+                            else setProjectsModalOpen(true);
+                        }}
+                        title="Ouvrir l'Espace Documents Cloud"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 'var(--radius-main)',
+                            padding: isTablet ? '0 8px' : '0 12px',
+                            height: '28px',
+                            color: 'var(--text-primary)',
+                            fontSize: '11.5px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 100ms ease'
+                        }}
+                        onMouseEnter={e => {
+                            e.currentTarget.style.background = 'var(--bg-hover)';
+                            e.currentTarget.style.borderColor = 'var(--border-strong)';
+                        }}
+                        onMouseLeave={e => {
+                            e.currentTarget.style.background = 'var(--bg-surface)';
+                            e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                        }}
+                    >
+                        <FolderOpen size={13} color="var(--text-dim)" />
+                        {!isTablet && <span>Documents</span>}
+                    </button>
+                )}
+
+                {/* SHARE BUTTON (Desktop & Tablet) */}
+                {!isMobile && (
+                    <button
+                        onClick={() => {
+                            if (isGuest) setAuthModalOpen(true);
+                            else setShareModalOpen(true);
+                        }}
+                        title="Partager ce document"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 'var(--radius-main)',
+                            padding: isTablet ? '0 8px' : '0 12px',
+                            height: '28px',
+                            color: 'var(--text-primary)',
+                            fontSize: '11.5px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 100ms ease'
+                        }}
+                        onMouseEnter={e => {
+                            e.currentTarget.style.background = 'var(--bg-hover)';
+                            e.currentTarget.style.borderColor = 'var(--border-strong)';
+                        }}
+                        onMouseLeave={e => {
+                            e.currentTarget.style.background = 'var(--bg-surface)';
+                            e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                        }}
+                    >
+                        <Share2 size={13} color="var(--text-dim)" />
+                        {!isTablet && <span>Partager</span>}
+                    </button>
+                )}
+
+                {/* EXPORT BUTTON — ALWAYS VISIBLE & TOUCH-FRIENDLY ON MOBILE */}
+                {isMobile && (
+                    <button
+                        onClick={onExport}
+                        title="Exporter le carnet de raid"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            background: 'var(--accent-default)',
+                            border: '1px solid var(--accent-default)',
+                            borderRadius: 'var(--radius-xs)',
+                            padding: '0 10px',
+                            height: '28px',
+                            color: '#ffffff',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            flexShrink: 0
+                        }}
+                    >
+                        <Download size={13} strokeWidth={2.5} />
+                        <span>Export</span>
+                    </button>
+                )}
 
                 {/* USER PROFILE AVATAR CIRCLE */}
                 <div style={{ position: 'relative' }} ref={userMenuRef}>

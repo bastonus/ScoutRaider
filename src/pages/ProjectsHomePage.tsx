@@ -26,7 +26,9 @@ import {
     FileText,
     Loader2,
     Eye,
+    Store
 } from 'lucide-react';
+import MarketplaceModal from '../components/panels/MarketplaceModal';
 
 type TabFilter = 'all' | 'mine' | 'shared';
 
@@ -68,6 +70,7 @@ export default function ProjectsHomePage() {
     const [creating, setCreating] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [marketplaceOpen, setMarketplaceOpen] = useState(false);
     const loadingRef = useRef(false);
 
     // Load projects from cloud — silently refreshes without showing spinner if already has data
@@ -235,6 +238,19 @@ export default function ProjectsHomePage() {
                             </button>
                         )}
                     </div>
+                    <button 
+                        style={{
+                            ...s.newBtn,
+                            background: 'linear-gradient(135deg, rgba(110,201,126,0.18), rgba(14,165,233,0.18))',
+                            border: '1px solid rgba(110,201,126,0.35)',
+                            color: '#6EC97E'
+                        }} 
+                        onClick={() => setMarketplaceOpen(true)}
+                        title="Ouvrir la Marketplace des Modules de code & Orchestrations"
+                    >
+                        <Store size={15} />
+                        <span>Marketplace</span>
+                    </button>
                     <button style={s.newBtn} onClick={handleNewProject}>
                         <Plus size={15} />
                         <span>Nouveau projet</span>
@@ -337,6 +353,9 @@ export default function ProjectsHomePage() {
                 .delete-btn:hover { background: rgba(239,68,68,0.1) !important; color: #FCA5A5 !important; }
                 .fab-btn:hover { transform: scale(1.06) !important; box-shadow: 0 8px 24px rgba(37,99,235,0.4) !important; }
             `}</style>
+
+            {/* Marketplace Modal */}
+            {marketplaceOpen && <MarketplaceModal onClose={() => setMarketplaceOpen(false)} />}
         </div>
     );
 }
