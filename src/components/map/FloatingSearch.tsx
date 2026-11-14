@@ -268,13 +268,14 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                 position: 'absolute',
                 top: '16px',
                 left: '16px',
+                right: isMobile ? '16px' : 'auto',
                 zIndex: 1100,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '8px',
                 pointerEvents: 'none',
-                maxWidth: isMobile ? 'calc(100vw - 32px)' : '440px',
-                width: isRouteExpanded ? (isMobile ? 'calc(100vw - 32px)' : '380px') : 'auto',
+                maxWidth: isMobile ? 'none' : '440px',
+                width: isMobile ? 'auto' : (isRouteExpanded ? '380px' : 'auto'),
                 transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}>
                 {/* ── TOP BAR (SEARCH + ITINÉRAIRE + SATELLITE/GEO) ── */}

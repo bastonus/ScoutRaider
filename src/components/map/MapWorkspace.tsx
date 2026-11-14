@@ -37,28 +37,25 @@ export default function MapWorkspace({ isSplitMode = false, onToggleSidebar }: M
             
             {!showMetro && <FloatingSearch isSplitMode={isSplitMode} />}
 
-            {/* BOUTON FLOTTANT DU VOLET CALQUES & CARTOGRAPHIE SUR MOBILE */}
+            {/* BOUTON FLOTTANT DU VOLET CALQUES & CARTOGRAPHIE SUR MOBILE (EN BAS À DROITE) */}
             {isMobile && onToggleSidebar && (
                 <div style={{
                     position: 'absolute',
-                    top: '16px',
-                    right: '16px',
-                    zIndex: 1000,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
+                    bottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
+                    right: 'max(14px, env(safe-area-inset-right, 14px))',
+                    zIndex: 1100,
                     pointerEvents: 'all'
                 }}>
                     <button
                         onClick={() => onToggleSidebar('right')}
                         title="Calques & Cartographie"
                         style={{
-                            width: '38px',
-                            height: '38px',
-                            borderRadius: '12px',
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '14px',
                             background: 'var(--bg-elevated)',
                             border: '1px solid var(--border-subtle)',
-                            boxShadow: 'var(--shadow-sm)',
+                            boxShadow: 'var(--shadow-md)',
                             color: 'var(--text-dim)',
                             display: 'flex',
                             alignItems: 'center',
@@ -75,7 +72,7 @@ export default function MapWorkspace({ isSplitMode = false, onToggleSidebar }: M
                             e.currentTarget.style.color = 'var(--text-dim)';
                         }}
                     >
-                        <Layers size={18} strokeWidth={2.1} />
+                        <Layers size={19} strokeWidth={2.2} />
                     </button>
                 </div>
             )}
