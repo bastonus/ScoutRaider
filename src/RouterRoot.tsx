@@ -9,6 +9,7 @@ import { useAuth } from './AuthContext';
 import LoginPage from './pages/LoginPage';
 import ProjectsHomePage from './pages/ProjectsHomePage';
 import EditorPage from './pages/EditorPage';
+import MarketplacePage from './pages/MarketplacePage';
 
 export default function RouterRoot() {
     const { isAuthenticated, isGuest, isLoading } = useAuth();
@@ -53,6 +54,9 @@ export default function RouterRoot() {
 
             {/* Projects home — accessible to both authenticated and guests */}
             <Route path="/projects" element={<ProjectsHomePage />} />
+
+            {/* Marketplace — standalone community modules page */}
+            <Route path="/marketplace" element={<MarketplacePage />} />
 
             {/* Document editor — unique URL per document */}
             <Route path="/d/:identifier" element={<EditorPage />} />

@@ -10,9 +10,10 @@ import MetroTimeline from '../layout/MetroTimeline';
 
 interface MapWorkspaceProps {
     isSplitMode?: boolean;
+    onToggleSidebar?: (side: 'left' | 'right') => void;
 }
 
-export default function MapWorkspace({ isSplitMode = false }: MapWorkspaceProps) {
+export default function MapWorkspace({ isSplitMode = false, onToggleSidebar }: MapWorkspaceProps) {
     const { state, dispatch } = useApp();
     const activeTool = state.active_tool;
 
@@ -30,7 +31,7 @@ export default function MapWorkspace({ isSplitMode = false }: MapWorkspaceProps)
             
             <InfoPills />
             
-            <FloatingToolbar activeTool={activeTool} onToolChange={setActiveTool} />
+            <FloatingToolbar activeTool={activeTool} onToolChange={setActiveTool} onToggleSidebar={onToggleSidebar} />
             
             {!showMetro && <ControlToolbar />}
             

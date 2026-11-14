@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MoreHorizontal, Layers, Sparkles, X } from 'lucide-react';
+import { MoreHorizontal, Layers, Sparkles, X, FileText } from 'lucide-react';
 
 interface FloatingToolbarProps {
   activeTool: string;
   onToolChange: (toolId: string) => void;
+  onToggleSidebar?: (side: 'left' | 'right') => void;
 }
 
 // ── Shared island cell style ──────────────────────────────────────────────────
@@ -23,7 +24,7 @@ const CELL: React.CSSProperties = {
   flexShrink: 0,
 };
 
-export default function FloatingToolbar({ activeTool, onToolChange }: FloatingToolbarProps) {
+export default function FloatingToolbar({ activeTool, onToolChange, onToggleSidebar }: FloatingToolbarProps) {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [moreToolsOpen, setMoreToolsOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -135,6 +136,69 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
           padding: '2px',
         }}
       >
+        {/* Volets mobiles (Itinéraire & Calques) */}
+        {onToggleSidebar && (
+          <div style={CELL}>
+            <button
+              onClick={() => onToggleSidebar('left')}
+              title="Carnet & Itinéraire"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '34px',
+                height: '34px',
+                border: '1px solid transparent',
+                background: 'transparent',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                color: 'var(--text-dim)',
+                transition: 'all 100ms ease',
+                flexShrink: 0,
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'var(--bg-hover)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = 'var(--text-dim)';
+              }}
+            >
+              <FileText size={18} strokeWidth={2.1} />
+            </button>
+            <button
+              onClick={() => onToggleSidebar('right')}
+              title="Calques & Cartographie"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '34px',
+                height: '34px',
+                border: '1px solid transparent',
+                background: 'transparent',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                color: 'var(--text-dim)',
+                transition: 'all 100ms ease',
+                flexShrink: 0,
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'var(--bg-hover)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = 'var(--text-dim)';
+              }}
+            >
+              <Layers size={18} strokeWidth={2.1} />
+            </button>
+          </div>
+        )}
+
+        {/* Outils de création mobile */}
         <div style={CELL}>
           {/* Tracé pédestre principal */}
           {btn('route', (

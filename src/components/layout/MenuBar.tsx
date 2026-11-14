@@ -1151,12 +1151,12 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                             setExpandedMobileMenu(null);
                         }} 
                     />
-                    <div className="bottom-sheet-panel" style={{ height: '70dvh', zIndex: 3500 }}>
+                    <div className="bottom-sheet-panel" style={{ height: '78dvh', zIndex: 3500 }}>
                         <div className="bottom-sheet-handle-bar" />
                         <div className="bottom-sheet-header">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                <Menu size={16} color="var(--accent-default)" />
-                                <span>Menu Principal</span>
+                                <User size={16} color="var(--accent-default)" />
+                                <span>Menu & Profil</span>
                             </div>
                             <button
                                 onClick={() => {
@@ -1170,6 +1170,230 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                             </button>
                         </div>
                         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 14px' }}>
+                            {/* USER PROFILE & CLOUD CARD */}
+                            <div style={{
+                                background: 'var(--bg-surface)',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '12px',
+                                marginBottom: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{
+                                            width: '32px',
+                                            height: '32px',
+                                            borderRadius: '50%',
+                                            background: 'var(--bg-elevated)',
+                                            border: '1px solid var(--border-subtle)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: 'var(--text-primary)',
+                                            fontWeight: 600,
+                                            fontSize: '13px',
+                                            textTransform: 'uppercase'
+                                        }}>
+                                            {!isGuest && user?.username ? user.username.charAt(0) : <User size={15} />}
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                                {!isGuest && user ? user.username : 'Mode Invité'}
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <span style={{
+                                                    width: '6px',
+                                                    height: '6px',
+                                                    borderRadius: '50%',
+                                                    background: isGuest ? 'var(--semantic-warning)' : cloudSyncStatus === 'saving' ? '#60A5FA' : cloudSyncStatus === 'error' ? 'var(--semantic-danger)' : 'var(--semantic-success)'
+                                                }} />
+                                                <span>{isGuest ? 'Non synchronisé au cloud' : cloudSyncStatus === 'saving' ? 'Enregistrement...' : 'Synchronisé PostgreSQL'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {isGuest ? (
+                                        <button
+                                            onClick={() => {
+                                                setMobileMenuOpen(false);
+                                                setAuthModalOpen(true);
+                                            }}
+                                            style={{
+                                                padding: '6px 12px',
+                                                borderRadius: '6px',
+                                                background: 'var(--accent-default)',
+                                                border: 'none',
+                                                color: '#ffffff',
+                                                fontSize: '11.5px',
+                                                fontWeight: 600,
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Connexion
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                logout();
+                                                setMobileMenuOpen(false);
+                                            }}
+                                            style={{
+                                                padding: '5px 10px',
+                                                borderRadius: '6px',
+                                                background: 'transparent',
+                                                border: '1px solid var(--border-subtle)',
+                                                color: 'var(--semantic-danger)',
+                                                fontSize: '11.5px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                        >
+                                            <LogOut size={12} />
+                                            <span>Déconnexion</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {!isGuest && (
+                                    <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px' }}>
+                                        <button
+                                            onClick={() => {
+                                                setMobileMenuOpen(false);
+                                                setProjectsModalOpen(true);
+                                            }}
+                                            style={{
+                                                flex: 1,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '6px',
+                                                padding: '6px 8px',
+                                                borderRadius: '6px',
+                                                background: 'var(--bg-elevated)',
+                                                border: '1px solid var(--border-subtle)',
+                                                color: 'var(--text-primary)',
+                                                fontSize: '11.5px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <FolderOpen size={13} color="var(--text-dim)" />
+                                            <span>Mes documents</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                saveToCloudNow();
+                                            }}
+                                            style={{
+                                                flex: 1,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '6px',
+                                                padding: '6px 8px',
+                                                borderRadius: '6px',
+                                                background: 'var(--bg-elevated)',
+                                                border: '1px solid var(--border-subtle)',
+                                                color: 'var(--text-primary)',
+                                                fontSize: '11.5px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <Cloud size={13} color="var(--accent-default)" />
+                                            <span>Sauvegarder</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* VIEW MODE SWITCHER */}
+                            <div style={{
+                                display: 'flex',
+                                gap: '6px',
+                                marginBottom: '14px',
+                                background: 'var(--bg-surface)',
+                                padding: '4px',
+                                borderRadius: '10px',
+                                border: '1px solid var(--border-subtle)'
+                            }}>
+                                <button
+                                    onClick={() => {
+                                        onViewModeChange?.('map');
+                                        setMobileMenuOpen(false);
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '6px',
+                                        padding: '7px 4px',
+                                        borderRadius: '7px',
+                                        border: 'none',
+                                        background: viewMode === 'map' ? 'var(--accent-default)' : 'transparent',
+                                        color: viewMode === 'map' ? '#ffffff' : 'var(--text-dim)',
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <MapIcon size={14} />
+                                    <span>Carte Topo</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onViewModeChange?.('text');
+                                        setMobileMenuOpen(false);
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '6px',
+                                        padding: '7px 4px',
+                                        borderRadius: '7px',
+                                        border: 'none',
+                                        background: viewMode === 'text' ? 'var(--accent-default)' : 'transparent',
+                                        color: viewMode === 'text' ? '#ffffff' : 'var(--text-dim)',
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <FileText size={14} />
+                                    <span>Carnet Texte</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onViewModeChange?.('split');
+                                        setMobileMenuOpen(false);
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '6px',
+                                        padding: '7px 4px',
+                                        borderRadius: '7px',
+                                        border: 'none',
+                                        background: viewMode === 'split' ? 'var(--accent-default)' : 'transparent',
+                                        color: viewMode === 'split' ? '#ffffff' : 'var(--text-dim)',
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <Columns size={14} />
+                                    <span>Scindée</span>
+                                </button>
+                            </div>
+
+                            {/* MENUS ACCORDION */}
                             {Object.entries(menus).map(([name, items]) => {
                                 const isExp = expandedMobileMenu === name;
                                 return (
@@ -1225,6 +1449,34 @@ export default function MenuBar({ onToggleSidebar, viewMode = 'map', onViewModeC
                                     </div>
                                 );
                             })}
+
+                            {/* PREFERENCES SHORTCUT */}
+                            <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                                <button
+                                    onClick={() => {
+                                        setMobileMenuOpen(false);
+                                        onPreferencesOpen?.();
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        padding: '10px',
+                                        borderRadius: '8px',
+                                        background: 'var(--bg-surface)',
+                                        border: '1px solid var(--border-subtle)',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '12.5px',
+                                        fontWeight: 500,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <Settings size={15} />
+                                    <span>Préférences de l'application</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </>

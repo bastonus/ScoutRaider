@@ -28,7 +28,6 @@ import {
     Eye,
     Store
 } from 'lucide-react';
-import MarketplaceModal from '../components/panels/MarketplaceModal';
 
 type TabFilter = 'all' | 'mine' | 'shared';
 
@@ -70,7 +69,6 @@ export default function ProjectsHomePage() {
     const [creating, setCreating] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
-    const [marketplaceOpen, setMarketplaceOpen] = useState(false);
     const loadingRef = useRef(false);
 
     // Load projects from cloud — silently refreshes without showing spinner if already has data
@@ -246,7 +244,7 @@ export default function ProjectsHomePage() {
                             border: '1px solid rgba(110,201,126,0.35)',
                             color: '#6EC97E'
                         }} 
-                        onClick={() => setMarketplaceOpen(true)}
+                        onClick={() => navigate('/marketplace')}
                         title="Ouvrir la Marketplace des Modules de code & Orchestrations"
                     >
                         <Store size={15} />
@@ -353,9 +351,6 @@ export default function ProjectsHomePage() {
                 .action-btn:hover { background: #27272A !important; color: #FAFAFA !important; }
                 .delete-btn:hover { background: rgba(239,68,68,0.1) !important; color: #FCA5A5 !important; }
             `}</style>
-
-            {/* Marketplace Modal */}
-            {marketplaceOpen && <MarketplaceModal onClose={() => setMarketplaceOpen(false)} />}
         </div>
     );
 }

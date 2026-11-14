@@ -6,9 +6,10 @@ import type { ViewMode } from '../../App';
 interface ProjectWorkspaceProps {
     onExport?: () => void;
     viewMode?: ViewMode;
+    onToggleSidebar?: (side: 'left' | 'right') => void;
 }
 
-export default function ProjectWorkspace({ onExport, viewMode = 'map' }: ProjectWorkspaceProps) {
+export default function ProjectWorkspace({ onExport, viewMode = 'map', onToggleSidebar }: ProjectWorkspaceProps) {
     const [mapWidthRatio, setMapWidthRatio] = useState(50);
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const resizing = useRef(false);
@@ -70,7 +71,7 @@ export default function ProjectWorkspace({ onExport, viewMode = 'map' }: Project
                         position: 'relative', 
                         flexShrink: 0 
                     }}>
-                        <MapWorkspace isSplitMode={viewMode === 'split'} />
+                        <MapWorkspace isSplitMode={viewMode === 'split'} onToggleSidebar={onToggleSidebar} />
                     </div>
                 )}
                 

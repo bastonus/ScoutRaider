@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { mapRef } from './MapComponent';
 import HelpModal from './HelpModal';
 import { useApp } from '../../AppContext';
@@ -6,7 +6,13 @@ import { useApp } from '../../AppContext';
 export default function ControlToolbar() {
     const { state, dispatch } = useApp();
     const [helpOpen, setHelpOpen] = useState(false);
-    const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Sur mobile, le pinch-to-zoom tactile natif de Leaflet remplace le zoom bouton,
     // et le guide est accessible via le menu pour dégager 100% de la carte.

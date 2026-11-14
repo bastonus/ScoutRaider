@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom';
 import MenuBar from './components/layout/MenuBar';
 import ProjectWorkspace from './components/layout/ProjectWorkspace';
 import LeftSidebarPanel from './components/panels/LeftSidebarPanel';
@@ -10,7 +11,6 @@ import PreferencesModal from './components/panels/PreferencesModal';
 import AuthModal from './components/panels/AuthModal';
 import ProjectsDashboardModal from './components/panels/ProjectsDashboardModal';
 import ShareModal from './components/panels/ShareModal';
-import MarketplaceModal from './components/panels/MarketplaceModal';
 import DocAccessDeniedModal from './components/panels/DocAccessDeniedModal';
 import CommandPalette from './components/layout/CommandPalette';
 import { 
@@ -20,6 +20,8 @@ import {
   PanelRightOpen,
   PanelLeft,
   PanelRight,
+  FileText,
+  Layers,
   X
 } from 'lucide-react';
 import { useApp } from './AppContext';
@@ -363,45 +365,49 @@ function App() {
               gap: '8px',
               position: 'relative',
             }}>
-              <button
-                onClick={() => toggleSidebar('left')}
-                title={`${leftSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'itinéraire (Ctrl+[)`}
-                style={inlinePanelToggleStyle}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-hover)';
-                  e.currentTarget.style.borderColor = 'var(--border-strong)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-surface)';
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                  e.currentTarget.style.color = 'var(--text-dim)';
-                }}
-              >
-                {leftSidebarOpen ? <PanelLeftClose size={15} strokeWidth={2} /> : <PanelLeftOpen size={15} strokeWidth={2} />}
-              </button>
+              {!isMobileOrTablet && (
+                <button
+                  onClick={() => toggleSidebar('left')}
+                  title={`${leftSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'itinéraire (Ctrl+[)`}
+                  style={inlinePanelToggleStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-hover)';
+                    e.currentTarget.style.borderColor = 'var(--border-strong)';
+                    e.currentTarget.style.color = 'var(--text-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-surface)';
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                    e.currentTarget.style.color = 'var(--text-dim)';
+                  }}
+                >
+                  {leftSidebarOpen ? <PanelLeftClose size={15} strokeWidth={2} /> : <PanelLeftOpen size={15} strokeWidth={2} />}
+                </button>
+              )}
               
               <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'visible' }}>
                 <TextualHeader onExport={handleExportRequest} />
               </div>
 
-              <button
-                onClick={() => toggleSidebar('right')}
-                title={`${rightSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'orchestration (Ctrl+])`}
-                style={inlinePanelToggleStyle}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-hover)';
-                  e.currentTarget.style.borderColor = 'var(--border-strong)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-surface)';
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                  e.currentTarget.style.color = 'var(--text-dim)';
-                }}
-              >
-                {rightSidebarOpen ? <PanelRightClose size={15} strokeWidth={2} /> : <PanelRightOpen size={15} strokeWidth={2} />}
-              </button>
+              {!isMobileOrTablet && (
+                <button
+                  onClick={() => toggleSidebar('right')}
+                  title={`${rightSidebarOpen ? 'Réduire' : 'Ouvrir'} le panneau d'orchestration (Ctrl+])`}
+                  style={inlinePanelToggleStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-hover)';
+                    e.currentTarget.style.borderColor = 'var(--border-strong)';
+                    e.currentTarget.style.color = 'var(--text-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-surface)';
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                    e.currentTarget.style.color = 'var(--text-dim)';
+                  }}
+                >
+                  {rightSidebarOpen ? <PanelRightClose size={15} strokeWidth={2} /> : <PanelRightOpen size={15} strokeWidth={2} />}
+                </button>
+              )}
             </div>
           ) : !isMobileOrTablet ? (
             <>
@@ -443,7 +449,7 @@ function App() {
             </>
           ) : null}
 
-          <ProjectWorkspace onExport={handleExportRequest} viewMode={viewMode} />
+          <ProjectWorkspace onExport={handleExportRequest} viewMode={viewMode} onToggleSidebar={toggleSidebar} />
         </div>
 
         {/* DESKTOP RIGHT SIDEBAR: Libraries */}
@@ -470,16 +476,37 @@ function App() {
             </div>
             <div className="bottom-sheet-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                <PanelLeft size={16} color="var(--accent-default)" />
-                <span>Itinéraire & Calque actif</span>
+                <FileText size={16} color="var(--accent-default)" />
+                <span>Carnet & Itinéraire</span>
               </div>
-              <button
-                onClick={() => setLeftSidebarOpen(false)}
-                aria-label="Fermer"
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: 'var(--radius-xs)' }}
-              >
-                <X size={18} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  onClick={() => {
+                    setViewMode('text');
+                    setLeftSidebarOpen(false);
+                  }}
+                  title="Ouvrir le mode Carnet en plein écran"
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-primary)',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Plein écran
+                </button>
+                <button
+                  onClick={() => setLeftSidebarOpen(false)}
+                  aria-label="Fermer"
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: 'var(--radius-xs)' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               <LeftSidebarPanel />
@@ -497,8 +524,8 @@ function App() {
             </div>
             <div className="bottom-sheet-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                <PanelRight size={16} color="var(--accent-default)" />
-                <span>Calques & Orchestration</span>
+                <Layers size={16} color="var(--accent-default)" />
+                <span>Calques & Cartographie</span>
               </div>
               <button
                 onClick={() => setRightSidebarOpen(false)}
