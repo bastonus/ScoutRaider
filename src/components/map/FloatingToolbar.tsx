@@ -1,5 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MoreHorizontal, Layers, Sparkles, X, FileText } from 'lucide-react';
+import { 
+  Footprints, 
+  Spline, 
+  Waypoints, 
+  Compass, 
+  PencilRuler, 
+  MapPin, 
+  Pentagon, 
+  Pencil, 
+  Type, 
+  ArrowLeft, 
+  ChevronUp, 
+  FileText, 
+  Layers,
+  KeyRound
+} from 'lucide-react';
 
 interface FloatingToolbarProps {
   activeTool: string;
@@ -24,30 +39,73 @@ const CELL: React.CSSProperties = {
   flexShrink: 0,
 };
 
+function RouteSentiersAreaIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m12.828 4.813 5.344 2.375"/>
+      <path d="m15.769 18.153 3.461-8.306"/>
+      <path d="m5.687 14.074 7.625 4.852"/>
+      <circle cx="11" cy="4" r="2"/>
+      <circle cx="15" cy="20" r="2"/>
+      <circle cx="20" cy="8" r="2"/>
+      <circle cx="4" cy="13" r="2"/>
+      <path d="M6 13 Q9 10 12 13 Q15 16 18 13" strokeWidth="1.5" strokeDasharray="2 1.5" opacity="0.85"/>
+    </svg>
+  );
+}
+
+const ANNOTATION_TOOLS = ['annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw', 'annotate_text'];
+
 export default function FloatingToolbar({ activeTool, onToolChange, onToggleSidebar }: FloatingToolbarProps) {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-  const [moreToolsOpen, setMoreToolsOpen] = useState(false);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
+  
+  // 'main' = Tracé, Nœud, Azimut, Encodage, Panneau d'annotations
+  // 'annotations' = Retour, Repère, Zone Poly, Zone Sentiers, Pinceau, Texte
+  const [toolbarMode, setToolbarMode] = useState<'main' | 'annotations'>(() => {
+    return ANNOTATION_TOOLS.includes(activeTool) ? 'annotations' : 'main';
+  });
 
+  const [lastRouteMode, setLastRouteMode] = useState<'route' | 'route_direct'>('route');
+  const [routeMenuOpen, setRouteMenuOpen] = useState(false);
+  const routeMenuRef = useRef<HTMLDivElement>(null);
+
+  // Resize listener
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Sync toolbar mode when activeTool changes externally
+  useEffect(() => {
+    if (ANNOTATION_TOOLS.includes(activeTool)) {
+      setToolbarMode('annotations');
+    } else if (activeTool === 'route') {
+      setLastRouteMode('route');
+      setToolbarMode('main');
+    } else if (activeTool === 'route_direct') {
+      setLastRouteMode('route_direct');
+      setToolbarMode('main');
+    } else if (['node', 'azimut', 'encodage'].includes(activeTool)) {
+      setToolbarMode('main');
+    }
+  }, [activeTool]);
+
+  // Click outside to close route dropdown
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
-        setMoreToolsOpen(false);
+      if (routeMenuRef.current && !routeMenuRef.current.contains(e.target as Node)) {
+        setRouteMenuOpen(false);
       }
     };
-    if (moreToolsOpen) {
+    if (routeMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [moreToolsOpen]);
+  }, [routeMenuOpen]);
 
-  React.useEffect(() => {
+  // Keyboard shortcuts
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (
@@ -58,21 +116,71 @@ export default function FloatingToolbar({ activeTool, onToolChange, onToggleSide
       ) return;
       const key = e.key.toLowerCase();
       switch (key) {
-        case 'p': onToolChange('route'); break;
-        case 'h': onToolChange('route_direct'); break;
-        case 'n': onToolChange('node'); break;
-        case 'a': onToolChange('azimut'); break;
-        case 'e': onToolChange('encodage'); break;
-        case 'r': onToolChange('annotate_point'); break;
-        case 't': onToolChange('annotate_text'); break;
-        case 'z': onToolChange('annotate_area'); break;
-        case 'x': onToolChange('annotate_area_routed'); break;
-        case 'b': onToolChange('annotate_draw'); break;
+        case 'p':
+          onToolChange('route');
+          setLastRouteMode('route');
+          setToolbarMode('main');
+          setRouteMenuOpen(false);
+          break;
+        case 'h':
+          onToolChange('route_direct');
+          setLastRouteMode('route_direct');
+          setToolbarMode('main');
+          setRouteMenuOpen(false);
+          break;
+        case 'n':
+          onToolChange('node');
+          setToolbarMode('main');
+          setRouteMenuOpen(false);
+          break;
+        case 'a':
+          onToolChange('azimut');
+          setToolbarMode('main');
+          setRouteMenuOpen(false);
+          break;
+        case 'e':
+          onToolChange('encodage');
+          setToolbarMode('main');
+          setRouteMenuOpen(false);
+          break;
+        case 'r':
+          onToolChange('annotate_point');
+          setToolbarMode('annotations');
+          setRouteMenuOpen(false);
+          break;
+        case 'z':
+          onToolChange('annotate_area');
+          setToolbarMode('annotations');
+          setRouteMenuOpen(false);
+          break;
+        case 'x':
+          onToolChange('annotate_area_routed');
+          setToolbarMode('annotations');
+          setRouteMenuOpen(false);
+          break;
+        case 'b':
+          onToolChange('annotate_draw');
+          setToolbarMode('annotations');
+          setRouteMenuOpen(false);
+          break;
+        case 't':
+          onToolChange('annotate_text');
+          setToolbarMode('annotations');
+          setRouteMenuOpen(false);
+          break;
+        case 'escape':
+          if (routeMenuOpen) {
+            setRouteMenuOpen(false);
+          } else if (toolbarMode === 'annotations') {
+            setToolbarMode('main');
+            onToolChange(lastRouteMode);
+          }
+          break;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onToolChange]);
+  }, [onToolChange, routeMenuOpen, toolbarMode, lastRouteMode]);
 
   const btn = (id: string, icon: React.ReactNode, label: string) => {
     const isActive = activeTool === id;
@@ -114,11 +222,34 @@ export default function FloatingToolbar({ activeTool, onToolChange, onToggleSide
     );
   };
 
-  // ── Mode Mobile épuré : 4 outils majeurs + menu "Plus" ───────────────────
-  if (isMobile) {
-    const isAdvancedToolActive = ['route_direct', 'node', 'azimut', 'annotate_area_routed', 'annotate_draw', 'annotate_text', 'encodage'].includes(activeTool);
+  const isRouteActive = activeTool === 'route' || activeTool === 'route_direct';
+  const isAnnotationActive = ANNOTATION_TOOLS.includes(activeTool);
 
-    return (
+  return (
+    <>
+      <style>{`
+        @keyframes toolbarSwapIn {
+          0% {
+            opacity: 0;
+            transform: translateY(4px) scale(0.97);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        @keyframes routePopoverIn {
+          0% {
+            opacity: 0;
+            transform: translateY(6px) scale(0.95);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
+
       <div
         id="toolbar-container"
         style={{
@@ -132,12 +263,14 @@ export default function FloatingToolbar({ activeTool, onToolChange, onToggleSide
           gap: '6px',
           pointerEvents: 'none',
           background: 'transparent',
-          maxWidth: 'calc(100% - 24px)',
-          padding: '2px',
+          maxWidth: 'calc(100% - 20px)',
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+          padding: '4px',
         }}
       >
-        {/* Volets mobiles (Itinéraire & Calques) */}
-        {onToggleSidebar && (
+        {/* Cellule Volets mobiles (Itinéraire & Calques) sur petit écran */}
+        {isMobile && onToggleSidebar && (
           <div style={CELL}>
             <button
               onClick={() => onToggleSidebar('left')}
@@ -198,298 +331,271 @@ export default function FloatingToolbar({ activeTool, onToolChange, onToggleSide
           </div>
         )}
 
-        {/* Outils de création mobile */}
-        <div style={CELL}>
-          {/* Tracé pédestre principal */}
-          {btn('route', (
-            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17.97 9.304A8 8 0 0 0 2 10c0 4.69 4.887 9.562 7.022 11.468" />
-              <path d="M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" />
-              <circle cx="10" cy="10" r="3" />
-            </svg>
-          ), 'Tracé pédestre BRouter (P)')}
+        {/* ── MODE 1 : OUTILS PRINCIPAUX (Tracé regroupé, Nœud, Azimut, Annotations) ── */}
+        {toolbarMode === 'main' ? (
+          <div
+            key="main-toolbar"
+            style={{
+              ...CELL,
+              animation: 'toolbarSwapIn 160ms cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {/* Tracé avec sélecteur développant */}
+            <div style={{ position: 'relative' }} ref={routeMenuRef}>
+              <button
+                onClick={() => {
+                  if (!isRouteActive) {
+                    onToolChange(lastRouteMode);
+                  }
+                  setRouteMenuOpen(prev => !prev);
+                }}
+                title={lastRouteMode === 'route' ? "Tracé pédestre BRouter (P) — Cliquer pour changer de mode" : "Tracé polygonal hors piste (H) — Cliquer pour changer de mode"}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '34px',
+                  height: '34px',
+                  border: isRouteActive ? '1px solid var(--accent-default)' : '1px solid transparent',
+                  background: isRouteActive ? 'var(--accent-default)' : 'transparent',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  color: isRouteActive ? '#ffffff' : 'var(--text-dim)',
+                  transition: 'all 100ms ease',
+                  position: 'relative',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={e => {
+                  if (!isRouteActive) {
+                    e.currentTarget.style.background = 'var(--bg-hover)';
+                    e.currentTarget.style.color = 'var(--text-primary)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isRouteActive) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = 'var(--text-dim)';
+                  }
+                }}
+              >
+                {lastRouteMode === 'route' ? (
+                  <Footprints size={18} strokeWidth={2.1} />
+                ) : (
+                  <Spline size={18} strokeWidth={2.1} />
+                )}
+                {/* Micro chevron indicatif du panneau déroulant */}
+                <ChevronUp 
+                  size={9} 
+                  style={{ 
+                    position: 'absolute', 
+                    bottom: '2px', 
+                    right: '2px', 
+                    opacity: isRouteActive ? 0.95 : 0.5 
+                  }} 
+                />
+              </button>
 
-          {/* Repère */}
-          {btn('annotate_point', (
-            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z" />
-              <circle cx="12" cy="9" r="2.5" />
-            </svg>
-          ), 'Repère (R)')}
+              {/* Panneau déroulant de choix de tracé */}
+              {routeMenuOpen && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '44px',
+                  left: isMobile ? '-8px' : '0',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-strong)',
+                  borderRadius: '12px',
+                  boxShadow: 'var(--shadow-lg)',
+                  padding: '5px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  minWidth: '210px',
+                  zIndex: 2500,
+                  animation: 'routePopoverIn 140ms cubic-bezier(0.16, 1, 0.3, 1)',
+                }}>
+                  <div style={{ padding: '6px 8px 3px', fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Type de tracé
+                  </div>
+                  <button
+                    onClick={() => {
+                      onToolChange('route');
+                      setLastRouteMode('route');
+                      setRouteMenuOpen(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      background: activeTool === 'route' ? 'var(--accent-default)' : 'transparent',
+                      color: activeTool === 'route' ? '#ffffff' : 'var(--text-primary)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: activeTool === 'route' ? 600 : 500,
+                      textAlign: 'left',
+                      transition: 'all 80ms ease',
+                    }}
+                  >
+                    <Footprints size={17} style={{ flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Pédestre (BRouter)</span>
+                        <span style={{ fontSize: '10px', opacity: 0.6, fontFamily: 'var(--font-mono)' }}>P</span>
+                      </div>
+                      <div style={{ fontSize: '10px', opacity: 0.75, marginTop: '1px' }}>Suit chemins & sentiers</div>
+                    </div>
+                  </button>
 
-          {/* Zone libre */}
-          {btn('annotate_area', (
-            <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m12.828 4.813 5.344 2.375"/>
-              <path d="m15.769 18.153 3.461-8.306"/>
-              <path d="m5.687 14.074 7.625 4.852"/>
-              <path d="M9.772 5.579 5.228 11.42"/>
-              <circle cx="11" cy="4" r="2"/>
-              <circle cx="15" cy="20" r="2"/>
-              <circle cx="20" cy="8" r="2"/>
-              <circle cx="4" cy="13" r="2"/>
-            </svg>
-          ), 'Zone libre (Z)')}
+                  <button
+                    onClick={() => {
+                      onToolChange('route_direct');
+                      setLastRouteMode('route_direct');
+                      setRouteMenuOpen(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      background: activeTool === 'route_direct' ? 'var(--accent-default)' : 'transparent',
+                      color: activeTool === 'route_direct' ? '#ffffff' : 'var(--text-primary)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: activeTool === 'route_direct' ? 600 : 500,
+                      textAlign: 'left',
+                      transition: 'all 80ms ease',
+                    }}
+                  >
+                    <Spline size={17} style={{ flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Polygonal direct</span>
+                        <span style={{ fontSize: '10px', opacity: 0.6, fontFamily: 'var(--font-mono)' }}>H</span>
+                      </div>
+                      <div style={{ fontSize: '10px', opacity: 0.75, marginTop: '1px' }}>Lignes droites hors piste</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
 
-          {/* Bouton Autres outils (...) */}
-          <div style={{ position: 'relative' }} ref={moreMenuRef}>
+            {/* Nœud */}
+            {btn('node', <Waypoints size={18} strokeWidth={2} />, 'Édition des nœuds : ajouter, déplacer, supprimer (N)')}
+
+            {/* Azimut */}
+            {btn('azimut', <Compass size={18} strokeWidth={2} />, "Visée & Calcul d'azimut (A)")}
+
+            {/* Encodage Topo */}
+            {btn('encodage', <KeyRound size={17} strokeWidth={2} />, "Encodage cryptographique du raid (E)")}
+
+            {/* Déclencheur du panneau d'annotations */}
             <button
-              onClick={() => setMoreToolsOpen(!moreToolsOpen)}
-              title="Plus d'outils cartographiques"
+              onClick={() => {
+                setToolbarMode('annotations');
+                if (!ANNOTATION_TOOLS.includes(activeTool)) {
+                  onToolChange('annotate_point');
+                }
+              }}
+              title="Ouvrir la palette d'annotations (Repères, Zones, Dessin, Texte)"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 width: '34px',
                 height: '34px',
-                border: isAdvancedToolActive ? '1px solid var(--accent-default)' : '1px solid transparent',
-                background: isAdvancedToolActive ? 'var(--accent-default)' : moreToolsOpen ? 'var(--bg-hover)' : 'transparent',
+                border: isAnnotationActive ? '1px solid var(--accent-default)' : '1px solid transparent',
+                background: isAnnotationActive ? 'var(--accent-default)' : 'transparent',
                 borderRadius: '10px',
                 cursor: 'pointer',
-                color: isAdvancedToolActive ? '#ffffff' : 'var(--text-dim)',
+                color: isAnnotationActive ? '#ffffff' : 'var(--text-dim)',
                 transition: 'all 100ms ease',
                 flexShrink: 0,
               }}
+              onMouseEnter={e => {
+                if (!isAnnotationActive) {
+                  e.currentTarget.style.background = 'var(--bg-hover)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isAnnotationActive) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-dim)';
+                }
+              }}
             >
-              <MoreHorizontal size={19} />
+              <PencilRuler size={18} strokeWidth={2} />
+            </button>
+          </div>
+        ) : (
+          /* ── MODE 2 : PANNEAU D'ANNOTATION (Déploiement avec bouton retour) ── */
+          <div
+            key="annotations-toolbar"
+            style={{
+              ...CELL,
+              animation: 'toolbarSwapIn 160ms cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {/* Bouton retour vers les outils de tracé */}
+            <button
+              onClick={() => {
+                setToolbarMode('main');
+                onToolChange(lastRouteMode);
+              }}
+              title="Retour aux outils de tracé (Échap)"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                height: '34px',
+                padding: isMobile ? '0 8px' : '0 10px',
+                border: '1px solid var(--border-subtle)',
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                color: 'var(--text-primary)',
+                fontSize: '11px',
+                fontWeight: 600,
+                transition: 'all 100ms ease',
+                flexShrink: 0,
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'var(--bg-hover)';
+                e.currentTarget.style.borderColor = 'var(--border-strong)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+              }}
+            >
+              <ArrowLeft size={15} strokeWidth={2.4} />
+              <span>Tracé</span>
             </button>
 
-            {/* Popover des outils secondaires */}
-            {moreToolsOpen && (
-              <div style={{
-                position: 'absolute',
-                bottom: '44px',
-                right: 0,
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-strong)',
-                borderRadius: '14px',
-                boxShadow: 'var(--shadow-lg)',
-                padding: '6px',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '4px',
-                zIndex: 2000,
-                width: '136px',
-              }}>
-                {btn('route_direct', (
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m10.586 5.414-5.172 5.172" />
-                    <path d="m18.586 13.414-5.172 5.172" />
-                    <path d="M6 12h12" />
-                    <circle cx="12" cy="20" r="2" />
-                    <circle cx="12" cy="4" r="2" />
-                    <circle cx="20" cy="12" r="2" />
-                    <circle cx="4" cy="12" r="2" />
-                  </svg>
-                ), 'Hors piste (H)')}
+            <div style={{ width: '1px', height: '18px', background: 'var(--border-subtle)', margin: '0 2px' }} />
 
-                {btn('node', (
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12.034 12.681a.498.498 0 0 1 .647-.647l9 3.5a.5.5 0 0 1-.033.943l-3.444 1.068a1 1 0 0 0-.66.66l-1.067 3.443a.5.5 0 0 1-.943.033z"/>
-                    <path d="M5 17A12 12 0 0 1 17 5"/>
-                    <circle cx="19" cy="5" r="2"/>
-                    <circle cx="5" cy="19" r="2"/>
-                  </svg>
-                ), 'Nœuds (N)')}
+            {/* Repère */}
+            {btn('annotate_point', <MapPin size={18} strokeWidth={2} />, 'Repère (R)')}
 
-                {btn('azimut', (
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m12.99 6.74 1.93 3.44" />
-                    <path d="M19.136 12a10 10 0 0 1-14.271 0" />
-                    <path d="m21 21-2.16-3.84" />
-                    <path d="m3 21 8.02-14.26" />
-                    <circle cx="12" cy="5" r="2" />
-                  </svg>
-                ), 'Azimut (A)')}
+            {/* Zone libre poly */}
+            {btn('annotate_area', <Pentagon size={18} strokeWidth={2} />, 'Zone libre polygonale (Z)')}
 
-                {btn('annotate_area_routed', (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m12.828 4.813 5.344 2.375"/>
-                    <path d="m15.769 18.153 3.461-8.306"/>
-                    <path d="m5.687 14.074 7.625 4.852"/>
-                    <circle cx="11" cy="4" r="2"/>
-                    <circle cx="15" cy="20" r="2"/>
-                    <circle cx="20" cy="8" r="2"/>
-                    <circle cx="4" cy="13" r="2"/>
-                    <path d="M6 13 Q9 10 12 13 Q15 16 18 13" strokeWidth="1.5" strokeDasharray="2 1.5" opacity="0.85"/>
-                  </svg>
-                ), 'Zone sentiers (X)')}
+            {/* Zone sentiers BRouter */}
+            {btn('annotate_area_routed', <RouteSentiersAreaIcon size={18} />, 'Zone sur sentiers BRouter (X)')}
 
-                {btn('annotate_draw', (
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 22a1 1 0 0 1-1-1v-4l14-14 5 5L7 22z"/>
-                    <path d="M6 17 3 20"/>
-                    <path d="m16 7 1-1"/>
-                  </svg>
-                ), 'Pinceau (B)')}
+            {/* Dessin libre au pinceau */}
+            {btn('annotate_draw', <Pencil size={18} strokeWidth={2} />, 'Dessin libre au pinceau (B)')}
 
-                {btn('annotate_text', (
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="4 7 4 4 20 4 20 7" />
-                    <line x1="9" y1="20" x2="15" y2="20" />
-                    <line x1="12" y1="4" x2="12" y2="20" />
-                  </svg>
-                ), 'Texte (T)')}
-
-                <div style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'center', marginTop: '2px', borderTop: '1px solid var(--border-subtle)', paddingTop: '4px' }}>
-                  {btn('encodage', (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M22 8.5V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v16.286a.71.71 0 0 0 1.212.502l2.202-2.202A2 2 0 0 1 6.828 19H10" />
-                      <path d="M20 15v-2a2 2 0 0 0-4 0v2" />
-                      <rect x="14" y="15" width="8" height="5" rx="1" />
-                    </svg>
-                  ), 'Encodage (E)')}
-                </div>
-              </div>
-            )}
+            {/* Texte libre */}
+            {btn('annotate_text', <Type size={18} strokeWidth={2} />, 'Texte libre sur carte (T)')}
           </div>
-        </div>
+        )}
       </div>
-    );
-  }
-
-  // ── Mode Desktop & Tablette (> 768px) : barre complète ───────────────────
-  return (
-    <div
-      id="toolbar-container"
-      style={{
-        position: 'absolute',
-        bottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 1100,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        pointerEvents: 'none',
-        background: 'transparent',
-        maxWidth: 'calc(100% - 20px)',
-        overflowX: 'auto',
-        scrollbarWidth: 'none',
-        padding: '4px',
-      }}
-    >
-
-      {/* ── Cellule 1 : Tracés ──────────────────────────────────────────────── */}
-      <div style={CELL}>
-        {/* Tracé pédestre */}
-        {btn('route', (
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17.97 9.304A8 8 0 0 0 2 10c0 4.69 4.887 9.562 7.022 11.468" />
-            <path d="M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" />
-            <circle cx="10" cy="10" r="3" />
-          </svg>
-        ), 'Tracé pédestre BRouter (P)')}
-
-        {/* Tracé hors piste */}
-        {btn('route_direct', (
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m10.586 5.414-5.172 5.172" />
-            <path d="m18.586 13.414-5.172 5.172" />
-            <path d="M6 12h12" />
-            <circle cx="12" cy="20" r="2" />
-            <circle cx="12" cy="4" r="2" />
-            <circle cx="20" cy="12" r="2" />
-            <circle cx="4" cy="12" r="2" />
-          </svg>
-        ), 'Tracé hors piste direct (H)')}
-      </div>
-
-      {/* ── Cellule 2 : Nœud + Azimut ──────────────────────────────────────── */}
-      <div style={CELL}>
-        {/* Nœud */}
-        {btn('node', (
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12.034 12.681a.498.498 0 0 1 .647-.647l9 3.5a.5.5 0 0 1-.033.943l-3.444 1.068a1 1 0 0 0-.66.66l-1.067 3.443a.5.5 0 0 1-.943.033z"/>
-            <path d="M5 17A12 12 0 0 1 17 5"/>
-            <circle cx="19" cy="5" r="2"/>
-            <circle cx="5" cy="19" r="2"/>
-          </svg>
-        ), 'Édition des nœuds : ajouter, déplacer, supprimer (N)')}
-
-        {/* Azimut */}
-        {btn('azimut', (
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12.99 6.74 1.93 3.44" />
-            <path d="M19.136 12a10 10 0 0 1-14.271 0" />
-            <path d="m21 21-2.16-3.84" />
-            <path d="m3 21 8.02-14.26" />
-            <circle cx="12" cy="5" r="2" />
-          </svg>
-        ), "Ajuster l'azimut (A)")}
-      </div>
-
-      {/* ── Cellule 3 : Repère ──────────────────────────────────────────────── */}
-      <div style={CELL}>
-        {btn('annotate_point', (
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z" />
-            <circle cx="12" cy="9" r="2.5" />
-          </svg>
-        ), 'Repère (R)')}
-      </div>
-
-      {/* ── Cellule 4 : Zones ───────────────────────────────────────────────── */}
-      <div style={CELL}>
-        {/* Zone libre — VectorPolygon icon */}
-        {btn('annotate_area', (
-          <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12.828 4.813 5.344 2.375"/>
-            <path d="m15.769 18.153 3.461-8.306"/>
-            <path d="m5.687 14.074 7.625 4.852"/>
-            <path d="M9.772 5.579 5.228 11.42"/>
-            <circle cx="11" cy="4" r="2"/>
-            <circle cx="15" cy="20" r="2"/>
-            <circle cx="20" cy="8" r="2"/>
-            <circle cx="4" cy="13" r="2"/>
-          </svg>
-        ), 'Zone libre polygonale (Z)')}
-
-        {/* Zone BRouter */}
-        {btn('annotate_area_routed', (
-          <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12.828 4.813 5.344 2.375"/>
-            <path d="m15.769 18.153 3.461-8.306"/>
-            <path d="m5.687 14.074 7.625 4.852"/>
-            <path d="M9.772 5.579 5.228 11.42"/>
-            <circle cx="11" cy="4" r="2"/>
-            <circle cx="15" cy="20" r="2"/>
-            <circle cx="20" cy="8" r="2"/>
-            <circle cx="4" cy="13" r="2"/>
-            <path d="M6 13 Q9 10 12 13 Q15 16 18 13" strokeWidth="1.5" strokeDasharray="2 1.5" opacity="0.85"/>
-          </svg>
-        ), 'Zone sur sentiers BRouter (X)')}
-
-        {/* Pinceau libre (B) */}
-        {btn('annotate_draw', (
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 22a1 1 0 0 1-1-1v-4l14-14 5 5L7 22z"/>
-            <path d="M6 17 3 20"/>
-            <path d="m16 7 1-1"/>
-          </svg>
-        ), 'Dessin libre au pinceau (B)')}
-
-        {/* Texte libre (T) */}
-        {btn('annotate_text', (
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="4 7 4 4 20 4 20 7" />
-            <line x1="9" y1="20" x2="15" y2="20" />
-            <line x1="12" y1="4" x2="12" y2="20" />
-          </svg>
-        ), 'Texte libre sur carte (T)')}
-      </div>
-
-      {/* ── Cellule 5 : Encodage ────────────────────────────────────────────── */}
-      <div style={CELL}>
-        {btn('encodage', (
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 8.5V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v16.286a.71.71 0 0 0 1.212.502l2.202-2.202A2 2 0 0 1 6.828 19H10" />
-            <path d="M20 15v-2a2 2 0 0 0-4 0v2" />
-            <rect x="14" y="15" width="8" height="5" rx="1" />
-          </svg>
-        ), "Encodage cryptographique du raid (E)")}
-      </div>
-
-    </div>
+    </>
   );
 }
