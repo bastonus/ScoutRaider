@@ -447,7 +447,9 @@ function App() {
         <>
           <div className="bottom-sheet-backdrop" onClick={() => setLeftSidebarOpen(false)} />
           <div className="bottom-sheet-panel">
-            <div className="bottom-sheet-handle-bar" />
+            <div className="bottom-sheet-handle-zone" onClick={() => setLeftSidebarOpen(false)} role="button" aria-label="Fermer le volet">
+              <div className="bottom-sheet-handle-bar" />
+            </div>
             <div className="bottom-sheet-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
                 <PanelLeft size={16} color="var(--accent-default)" />
@@ -472,7 +474,9 @@ function App() {
         <>
           <div className="bottom-sheet-backdrop" onClick={() => setRightSidebarOpen(false)} />
           <div className="bottom-sheet-panel">
-            <div className="bottom-sheet-handle-bar" />
+            <div className="bottom-sheet-handle-zone" onClick={() => setRightSidebarOpen(false)} role="button" aria-label="Fermer le volet">
+              <div className="bottom-sheet-handle-bar" />
+            </div>
             <div className="bottom-sheet-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
                 <PanelRight size={16} color="var(--accent-default)" />

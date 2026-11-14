@@ -204,7 +204,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         alignItems: 'center',
         justifyContent: 'center',
         transition: 'all 100ms ease',
-        boxShadow: active ? '0 2px 8px rgba(37, 99, 235, 0.4)' : 'none',
+        boxShadow: 'none',
     });
 
     return (
