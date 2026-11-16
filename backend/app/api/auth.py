@@ -39,7 +39,7 @@ async def get_current_user_dependency(
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     """Inscription d'un nouvel utilisateur."""
     # Vérifier si username/email existe déjà
-    from app.services.auth import get_user_by_username, get_user_by_email
+    from app.services.auth import get_user_by_username, get_user_by_email, create_user
     existing = await get_user_by_username(db, user_data.username)
     if existing:
         raise HTTPException(status_code=400, detail="Nom d'utilisateur déjà pris")
@@ -47,8 +47,13 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Email déjà utilisé")
 
-    user = await create_user(db, user_data.model_dump())
-    return user
+    try:
+        user = await create_user(db, user_data.model_dump())
+        return user
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 
 @router.post("/login", response_model=Token)
