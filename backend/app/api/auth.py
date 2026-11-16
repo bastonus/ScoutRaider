@@ -52,8 +52,16 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         return user
     except Exception as e:
         import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+        import sys
+        traceback.print_exc(file=sys.stderr)
+        raise HTTPException(status_code=500, detail=f"Registration failed: {type(e).__name__}: {str(e)}")
+
+@router.get("/debug/test-db")
+async def debug_test_db(db: AsyncSession = Depends(get_db)):
+    """Test database connection."""
+    from sqlalchemy import text
+    result = await db.execute(text("SELECT 1"))
+    return {"result": result.scalar()}
 
 
 @router.post("/login", response_model=Token)
