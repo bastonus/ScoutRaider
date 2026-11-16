@@ -2,9 +2,8 @@
 import zipfile
 import json
 from io import BytesIO
-from typing import Dict, Any, BinaryIO
+from typing import Dict, Any
 import structlog
-import fflate
 
 logger = structlog.get_logger()
 
@@ -27,25 +26,23 @@ class ArchiveService:
         Returns:
             Bytes de l'archive ZIP
         """
-        # Utiliser fflate pour la compression (plus rapide que zipfile)
-        files = {}
+        buffer = BytesIO()
 
-        # 1. Manifest JSON
-        files["manifest.json"] = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+            # 1. Manifest JSON
+            zf.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
 
-        # 2. Assets binaires
-        for asset_id, asset_data in assets.items():
-            # Trouver le chemin d'archive depuis le manifest
-            archive_path = ArchiveService._find_asset_path(manifest, asset_id)
-            if archive_path:
-                files[f"assets/{archive_path}"] = asset_data
-            else:
-                # Fallback: utiliser l'asset_id comme nom
-                files[f"assets/{asset_id}"] = asset_data
+            # 2. Assets binaires
+            for asset_id, asset_data in assets.items():
+                # Trouver le chemin d'archive depuis le manifest
+                archive_path = ArchiveService._find_asset_path(manifest, asset_id)
+                if archive_path:
+                    zf.writestr(f"assets/{archive_path}", asset_data)
+                else:
+                    # Fallback: utiliser l'asset_id comme nom
+                    zf.writestr(f"assets/{asset_id}", asset_data)
 
-        # Compresser avec fflate (niveau 6 = bon compromis vitesse/ratio)
-        zip_data = fflate.zip_sync(files, level=6)
-
+        zip_data = buffer.getvalue()
         logger.info("srproj_created", size=len(zip_data), asset_count=len(assets))
         return zip_data
 
