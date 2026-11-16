@@ -99,9 +99,13 @@ async def health_check():
     }
 
 
+from fastapi import HTTPException
+
 # Gestionnaire d'erreurs global
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        raise exc
     logger.error("unhandled_exception", path=request.url.path, error=str(exc), exc_info=True)
     return JSONResponse(
         status_code=500,
