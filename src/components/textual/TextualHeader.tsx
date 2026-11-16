@@ -7,6 +7,7 @@
  * que leur déclencheur soit dans la barre principale OU dans l'overflow.
  */
 import React, { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Check, ChevronDown, KeyRound, MoreHorizontal,
     AlertTriangle, ArrowRight, Lightbulb, Palette,
@@ -535,6 +536,7 @@ function CipherDropdown({ triggerRef, onClose, selectedCipher, onSelect }: {
     onSelect: (id: string) => void;
 }) {
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -544,9 +546,25 @@ function CipherDropdown({ triggerRef, onClose, selectedCipher, onSelect }: {
             }
         };
         document.addEventListener('click', handleClickOutside);
-        // Positionner au premier render
-        requestAnimationFrame(() => { /* position gérée par CSS */ });
-        return () => document.removeEventListener('click', handleClickOutside);
+
+        // Calculer position initiale
+        const updatePosition = () => {
+            const trigger = triggerRef.current;
+            if (trigger) {
+                const rect = trigger.getBoundingClientRect();
+                setPosition({ top: rect.bottom + 8, left: rect.left });
+            }
+        };
+        updatePosition();
+        window.addEventListener('scroll', updatePosition, true);
+        window.addEventListener('resize', updatePosition);
+        requestAnimationFrame(updatePosition);
+
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+            window.removeEventListener('scroll', updatePosition, true);
+            window.removeEventListener('resize', updatePosition);
+        };
     }, [triggerRef, onClose]);
 
     if (!triggerRef.current) return null;
@@ -555,8 +573,12 @@ function CipherDropdown({ triggerRef, onClose, selectedCipher, onSelect }: {
         <div
             ref={dropdownRef}
             style={{
-                position: 'fixed', // fixed pour sortir du conteneur toolbar
-                zIndex: 1700,
+                position: 'fixed',
+                zIndex: 9999,
+                top: position.top,
+                left: position.left,
+                transform: 'none',
+                isolation: 'isolate',
                 background: 'var(--bg-elevated)',
                 border: '1px solid var(--border-strong)',
                 borderRadius: '12px',
@@ -611,6 +633,7 @@ function ThemeDropdown({ triggerRef, onClose, themeId, currentAccent, currentThe
     onSelect: (id: string) => void;
 }) {
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -620,7 +643,24 @@ function ThemeDropdown({ triggerRef, onClose, themeId, currentAccent, currentThe
             }
         };
         document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
+
+        const updatePosition = () => {
+            const trigger = triggerRef.current;
+            if (trigger) {
+                const rect = trigger.getBoundingClientRect();
+                setPosition({ top: rect.bottom + 8, left: rect.left });
+            }
+        };
+        updatePosition();
+        window.addEventListener('scroll', updatePosition, true);
+        window.addEventListener('resize', updatePosition);
+        requestAnimationFrame(updatePosition);
+
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+            window.removeEventListener('scroll', updatePosition, true);
+            window.removeEventListener('resize', updatePosition);
+        };
     }, [triggerRef, onClose]);
 
     if (!triggerRef.current) return null;
@@ -630,7 +670,11 @@ function ThemeDropdown({ triggerRef, onClose, themeId, currentAccent, currentThe
             ref={dropdownRef}
             style={{
                 position: 'fixed',
-                zIndex: 1700,
+                zIndex: 9999,
+                top: position.top,
+                left: position.left,
+                transform: 'none',
+                isolation: 'isolate',
                 background: 'var(--bg-elevated)',
                 border: '1px solid var(--border-strong)',
                 borderRadius: '12px',

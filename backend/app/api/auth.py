@@ -1,7 +1,7 @@
 # app/api/auth.py - Routes d'authentification
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import timedelta
+from typing import Annotated
 
 from app.database import get_db
 from app.services.auth import (
@@ -10,8 +10,29 @@ from app.services.auth import (
 )
 from app.schemas.auth import UserCreate, UserLogin, UserResponse, Token, TokenPayload
 from app.config import settings
+from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+# Dependency pour récupérer l'utilisateur courant
+async def get_current_user_dependency(
+    authorization: Annotated[str | None, Header()] = None,
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token manquant")
+
+    token = authorization.split(" ")[1]
+    payload = decode_token(token)
+    if not payload or payload.type != "access":
+        raise HTTPException(status_code=401, detail="Token invalide ou expiré")
+
+    user = await get_user_by_id(db, payload.sub)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Utilisateur inactif")
+
+    return user
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -112,26 +133,3 @@ async def get_current_user(
 ):
     """Récupère le profil de l'utilisateur connecté."""
     return current_user
-
-
-# Dependency pour récupérer l'utilisateur courant
-async def get_current_user_dependency(
-    authorization: str = None,
-    db: AsyncSession = Depends(get_db)
-) -> User:
-    from fastapi import Header
-    from app.services.auth import decode_token, get_user_by_id
-
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Token manquant")
-
-    token = authorization.split(" ")[1]
-    payload = decode_token(token)
-    if not payload or payload.type != "access":
-        raise HTTPException(status_code=401, detail="Token invalide ou expiré")
-
-    user = await get_user_by_id(db, payload.sub)
-    if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="Utilisateur inactif")
-
-    return user

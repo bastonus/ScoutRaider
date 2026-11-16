@@ -254,6 +254,8 @@ def build_export_html(document: Document, version: str = "participant") -> str:
     assets = manifest.get("assets", {})
     page_layout = manifest.get("pageLayout", document.page_layout)
 
+    logger.info(f"build_export_html: document_id={document.id}, blocks={len(blocks)}, assets.images keys={list(assets.get('images', {}).keys())}")
+
     # CSS inline pour l'export
     css = build_export_css(document)
 
@@ -428,6 +430,7 @@ def render_block_for_export(block: dict, assets: dict, version: str) -> str:
     elif block_type == "map_snippet":
         # Rendre la carte : essayer d'abord l'asset image, sinon générer un SVG vectoriel
         asset_id = config.get("assetId")
+        logger.info(f"map_snippet block: block_id={block.get('id')}, assetId from config={asset_id}")
         asset_data_uri = get_asset_image_data_uri(assets, asset_id) if asset_id else None
 
         if asset_data_uri:
