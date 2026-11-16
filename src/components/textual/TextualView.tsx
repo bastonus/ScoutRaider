@@ -767,15 +767,14 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [selectedKeys.size]);
 
-    // Garantir qu'au moins un bloc de commentaire titre existe par défaut si le carnet est vide
+    // Garantir qu'au moins un bloc de commentaire existe par défaut si le carnet est vide
     useEffect(() => {
         if (steps.length === 0) {
             dispatch({
                 type: 'INSERT_MANUAL_STEP_TYPED',
                 afterStepId: '',
-                content: '# ',
-                manualType: 'html',
-                isTitleStep: true
+                content: '# Document sans titre',
+                manualType: 'html'
             });
         }
     }, [steps.length, dispatch]);

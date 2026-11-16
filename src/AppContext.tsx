@@ -130,7 +130,7 @@ export type AppAction =
     | { type: 'UPDATE_MANUAL_TEXT'; stepId: string; text: string }
     | { type: 'INSERT_MANUAL_STEP'; afterStepId: string; content: string }
     /** New 2-button separator: insert a typed manual block (html or code) */
-    | { type: 'INSERT_MANUAL_STEP_TYPED'; afterStepId: string; content: string; manualType: 'html' | 'code'; moduleId?: string; anchorSegmentIdx?: number; isTitleStep?: boolean }
+    | { type: 'INSERT_MANUAL_STEP_TYPED'; afterStepId: string; content: string; manualType: 'html' | 'code'; moduleId?: string; anchorSegmentIdx?: number }
     | { type: 'CONVERT_MANUAL_STEP_TYPE'; stepId: string; targetType: 'html' | 'code'; moduleId?: ModuleId }
     | { type: 'LOCK_DOCUMENT_TITLE' }
     | { type: 'REMOVE_MANUAL_STEP'; stepId: string }
@@ -1527,7 +1527,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             const _theme1 = themeManager.getTheme();
 
             // Synchronisation du titre du document :
-            // Le premier texte commenté devient le titre du document une seule fois.
+            // Le premier bloc manuel édité devient le titre du document une seule fois.
+            // On nettoie le markdown (#, **, *, _, etc.) pour ne garder que le texte.
             let newDocTitle = state.document_title;
             const titleAlreadySynced = state.document_title_synced ?? false;
 
@@ -1542,7 +1543,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
                     if (cleanText.length > 0) {
                         const firstLine = cleanText.split('\n')[0].trim().slice(0, 60);
                         if (firstLine.length > 0) {
-                            newDocTitle = firstLine;
+                            // Retirer la syntaxe markdown : # ## ### ** * _ ` ~
+                            const titleText = firstLine
+                                .replace(/^#+\s*/, '')           // # ## ### au début
+                                .replace(/\*\*(.*?)\*\*/g, '$1') // **gras**
+                                .replace(/\*(.*?)\*/g, '$1')     // *italique*
+                                .replace(/__(.*?)__/g, '$1')     // __gras__
+                                .replace(/_(.*?)_/g, '$1')       // _italique_
+                                .replace(/`(.*?)`/g, '$1')       // `code`
+                                .replace(/~~(.*?)~~/g, '$1')     // ~~barré~~
+                                .trim();
+                            if (titleText.length > 0) {
+                                newDocTitle = titleText;
+                            }
                         }
                     }
                 }
@@ -1670,7 +1683,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 isManual: true,
                 manualType: action.manualType,
                 anchorSegmentIdx: anchorSegmentIdxT,
-                isTitleStep: action.isTitleStep,
             };
             const stepsT = [...state.carnet_steps];
             stepsT.splice(afterIdxT + 1, 0, typedStep);

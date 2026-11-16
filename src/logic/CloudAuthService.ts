@@ -201,11 +201,11 @@ export class CloudAuthService {
 
     // ─── Authentication ───────────────────────────────────────────────────────
 
-    static async register(username: string, password: string, email?: string): Promise<{ user: UserProfile; token: string }> {
+    static async register(username: string, password: string, email: string): Promise<{ user: UserProfile; token: string }> {
         const res = await fetch(`${this.getBaseUrl()}/api/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, email: email || null })
+            body: JSON.stringify({ username, password, email })
         });
 
         if (!res.ok) {

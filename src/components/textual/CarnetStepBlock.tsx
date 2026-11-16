@@ -332,7 +332,6 @@ function ManualStepHtml({
 
     const rawContent: string = step.solutionText || '';
     const isEmpty = !rawContent || rawContent === '<p>&nbsp;</p>' || rawContent.trim() === '' || rawContent === '<p></p>';
-    const isTitle = step.isTitleStep || step.id === 'manual-title' || (stepIndex === 0 && step.isManual);
 
     // Sync editValue when step changes externally
     useEffect(() => {
@@ -639,7 +638,7 @@ function ManualCodeBlock({
                     value={step.solutionText || ''}
                     onChange={e => onManualContentChange?.(step.id, e.target.value)}
                     onBlur={() => dispatch({ type: 'LOCK_DOCUMENT_TITLE' })}
-                    placeholder={step.isTitleStep || stepIndex === 0 ? "Titre du raid / document…" : "Tapez le texte à encoder…"}
+                    placeholder="Tapez le texte à encoder…"
                     style={{
                         width: '100%', background: 'var(--bg-base)',
                         border: `1px solid ${hovered ? accentColor + '60' : 'var(--border-subtle)'}`,

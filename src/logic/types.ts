@@ -225,8 +225,6 @@ export interface CarnetStep {
      * Only relevant when isManual === true.
      */
     manualType?: 'html' | 'code';
-    /** If true, this is the initial title comment step that can auto-name the document */
-    isTitleStep?: boolean;
     /**
      * If true, this computed step's text has been manually edited by the user.
      * When set, constraint warnings are suppressed for this step.
