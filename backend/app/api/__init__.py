@@ -5,6 +5,7 @@ from app.api.assets import router as assets_router
 from app.api.export import router as export_router
 from app.api.share import router as share_router
 from app.api.import_export import router as import_export_router
+from app.api.health import router as health_router
 
 __all__ = [
     "auth_router",
@@ -13,4 +14,5 @@ __all__ = [
     "export_router",
     "share_router",
     "import_export_router",
+    "health_router",
 ]

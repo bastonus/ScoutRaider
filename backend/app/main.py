@@ -14,7 +14,8 @@ from app.api import (
     assets_router,
     export_router,
     share_router,
-    import_export_router
+    import_export_router,
+    health_router
 )
 
 
@@ -114,6 +115,7 @@ app.include_router(assets_router, prefix=settings.API_PREFIX)
 app.include_router(export_router, prefix=settings.API_PREFIX)
 app.include_router(share_router, prefix=settings.API_PREFIX)
 app.include_router(import_export_router, prefix=settings.API_PREFIX)
+app.include_router(health_router)  # /health, /health/db, /health/s3, /health/full
 
 
 if __name__ == "__main__":
