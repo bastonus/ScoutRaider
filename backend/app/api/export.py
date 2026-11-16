@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 import uuid
 import json
 import math
+import logging
 
 from app.database import get_db
 from app.models.document import Document, Asset
@@ -15,6 +16,8 @@ from app.services.archive import archive_service
 from app.api.auth import get_current_user_dependency
 from app.schemas.document import ExportOptions
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["export"])
 
@@ -230,12 +233,15 @@ def get_asset_image_data_uri(assets: dict, asset_id: str) -> str | None:
     if not asset_id:
         return None
     images = assets.get("images", {})
+    logger.info(f"get_asset_image_data_uri: looking for asset_id={asset_id}, available image keys={list(images.keys())}")
     asset = images.get(asset_id)
     if not asset:
+        logger.warning(f"asset_not_found: asset_id={asset_id}, available_keys={list(images.keys())}")
         return None
     # L'asset peut avoir les données en base64 ou un chemin
     b64 = asset.get("base64") or asset.get("data")
     mime = asset.get("mimeType", "image/png")
+    logger.info(f"asset_found: asset_id={asset_id}, has_base64={bool(asset.get('base64'))}, has_data={bool(asset.get('data'))}, mime={mime}, keys={list(asset.keys())}")
     if b64:
         return f"data:{mime};base64,{b64}"
     return None

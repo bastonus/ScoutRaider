@@ -182,7 +182,11 @@ export class CloudSyncService {
       mapy: state.mapy_api_key
     };
 
+    console.log('[CloudSync] generateMapAssets - API keys:', { ign: !!apiKeys.ign, mapy: !!apiKeys.mapy });
+    console.log('[CloudSync] generateMapAssets - carnet_steps count:', state.carnet_steps?.length || 0);
+
     for (const step of state.carnet_steps || []) {
+      console.log('[CloudSync] Checking step:', step.id, 'moduleId:', step.moduleId, 'has coords:', !!step.coords?.length);
       if (!['carte_ign', 'carte_simple', 'drapeaux'].includes(step.moduleId)) continue;
       if (!step.coords?.length) continue;
 
@@ -199,6 +203,8 @@ export class CloudSyncService {
       const showRoute = step.mapPersist?.showRoute ?? true;
       const showEndpoints = step.mapPersist?.showEndpoints ?? true;
       const showAnnotations = step.mapPersist?.showAnnotations ?? true;
+
+      console.log('[CloudSync] Generating map for step:', step.id, { center, zoom, width, height, layerId, latLngsCount: latLngs.length });
 
       try {
         // Générer le SVG autonome avec tuiles en base64
@@ -233,9 +239,9 @@ export class CloudSyncService {
           formattedScale
         };
 
-        console.log(`[CloudSync] Carte pré-rendue pour ${step.id}: ${formattedScale}, ${svg.length} chars`);
+        console.log(`[CloudSync] ✓ Carte pré-rendue pour ${step.id}: ${formattedScale}, ${svg.length} chars, assetKey: ${imgKey}`);
       } catch (err) {
-        console.warn(`[CloudSync] Échec pré-rendu carte pour ${step.id}:`, err);
+        console.error(`[CloudSync] ✗ Échec pré-rendu carte pour ${step.id}:`, err);
         // Fallback: asset sans données (le backend fera un placeholder)
         mapAssets[imgKey] = {
           assetId,
@@ -247,6 +253,7 @@ export class CloudSyncService {
       }
     }
 
+    console.log('[CloudSync] generateMapAssets result keys:', Object.keys(mapAssets));
     return mapAssets;
   }
 
