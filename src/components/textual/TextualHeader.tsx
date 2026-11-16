@@ -1,23 +1,21 @@
 /**
- * TextualHeader.tsx — Barre d'outils flottante supérieure alignée avec la barre de recherche des cartes (40px).
- * VRAIMENT RESPONSIVE : utilise ResizeObserver pour adapter les outils à la largeur RÉELLE du conteneur.
+ * TextualHeader.tsx — Barre d'outils flottante VRAIMENT RESPONSIVE.
+ * Affiche TOUS les icônes côte à côte tant qu'ils rentrent.
+ * Ne regroupe dans le menu "Plus" (≡) que l'excédent qui déborde.
  *
- * Contient (de gauche à droite, avec regroupement progressif) :
- *  - [1. Historique] : Annuler, Rétablir (toujours visibles, ou dans menu Édition si ultra compact)
- *  - [2. Style base] : Gras, Italique (toujours visibles)
- *  - [3. Format avancé] : Souligné, Code, Titre, Listes, Citation → menu "Format" (SlidersHorizontal)
- *  - [4. Cryptographie] : Badge tag + menu Morse/Templiers/Maritime/Monospace
- *  - [5. Thème] : Palette + nom thème tronqué + menu thèmes
+ * Ordre de priorité (derniers à être masqués) :
+ *  1. Undo/Redo (historique) — TOUJOURS visibles
+ *  2. Bold/Italic (style base) — TOUJOURS visibles
+ *  3. Underline/Code (style étendu)
+ *  4. Heading/Lists/Quote (structure)
+ *  5. Cipher (cryptographie)
+ *  6. Theme (thème narratif) — premier à aller dans "Plus"
  *
- * Comportement responsive :
- *  - Largeur >= 720px : tous les outils principaux visibles
- *  - 520-720px : Format dans menu, Cryptographie badge seul
- *  - 420-520px : Historique dans menu Édition, Thème tronqué
- *  - < 420px : Ultra compact - tout dans menus
+ * Utilise ResizeObserver + mesure des largeurs réelles pour décider dynamiquement.
  */
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
 import {
-    Check, ChevronDown, KeyRound,
+    Check, ChevronDown, KeyRound, MoreHorizontal,
     AlertTriangle, ArrowRight, Lightbulb, Palette,
     Globe, Crosshair, Swords, Crown, Shield,
     Flame, Medal, Radio, Sparkles, Award,
@@ -144,31 +142,40 @@ function handleFormat(format: string, arg?: string) {
     } catch {}
 }
 
+// ─── Types internes ──────────────────────────────────────────────────────────
+
+interface ToolbarItem {
+    id: string;
+    priority: number; // plus bas = plus important (reste visible plus longtemps)
+    render: (isInOverflow: boolean) => React.ReactNode;
+    minWidth: number; // largeur approximative en px
+}
+
 interface TextualHeaderProps {
     onExport?: () => void;
 }
+
+// ─── Composant principal ────────────────────────────────────────────────────
 
 export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
     const { state, dispatch } = useApp();
     const [themePickerOpen, setThemePickerOpen] = useState(false);
     const [cipherMenuOpen, setCipherMenuOpen] = useState(false);
-    const [formatMenuOpen, setFormatMenuOpen] = useState(false);
-    const [editMenuOpen, setEditMenuOpen] = useState(false);
+    const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
     const [allThemeIds, setAllThemeIds] = useState<string[]>([]);
     const [selectedCipher, setSelectedCipher] = useState<string>('morse');
-    const [containerWidth, setContainerWidth] = useState<number>(720); // largeur par défaut
 
+    const toolbarRef = useRef<HTMLDivElement>(null);
+    const overflowRef = useRef<HTMLDivElement>(null);
     const themePickerRef = useRef<HTMLDivElement>(null);
     const cipherMenuRef = useRef<HTMLDivElement>(null);
-    const formatMenuRef = useRef<HTMLDivElement>(null);
-    const editMenuRef = useRef<HTMLDivElement>(null);
-    const toolbarRef = useRef<HTMLDivElement>(null);
+    const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
     const currentAccent = getAccent(state.theme_id);
     const currentTheme = themeManager.getTheme(state.theme_id);
     const isSolution = state.carnet_view === 'solution';
 
-    // Rassemblement erreurs pour le bouton bas-gauche (exposé via window pour TextualView)
+    // Erreurs pour exposition globale
     const errorItems = useMemo(() => {
         const items: { stepId: string; stepLabel: string; message: string; severity: 'error' | 'warning' }[] = [];
         for (const step of (state.carnet_steps || [])) {
@@ -188,61 +195,303 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         return items;
     }, [state.carnet_steps]);
 
-    const hasErrors = errorItems.some(i => i.severity === 'error');
-
-    // Exposer les données d'erreurs globalement pour la barre bas-gauche
     useEffect(() => {
-        (window as any).__textualErrors = { items: errorItems, hasErrors };
+        (window as any).__textualErrors = { items: errorItems, hasErrors: errorItems.some(i => i.severity === 'error') };
         return () => { delete (window as any).__textualErrors; };
-    }, [errorItems, hasErrors]);
+    }, [errorItems]);
 
-    // ResizeObserver pour adapter la barre à la largeur RÉELLE du conteneur
-    useEffect(() => {
-        const el = toolbarRef.current;
-        if (!el) return;
-        const ro = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                setContainerWidth(entry.contentRect.width);
-            }
-        });
-        ro.observe(el);
-        // Mesure initiale
-        setContainerWidth(el.clientWidth);
-        return () => ro.disconnect();
+    // ─── Construction de la liste des items (ordre de priorité) ─────────────
+    const toolbarItems = useMemo<ToolbarItem[]>(() => {
+        const items: ToolbarItem[] = [
+            // Priorité 0 : Historique — TOUJOURS visible
+            { id: 'undo', priority: 0, minWidth: 32, render: () => renderToolBtn('undo', 'Annuler (Ctrl+Z)', <Undo2 size={13} strokeWidth={2.2} />) },
+            { id: 'redo', priority: 0, minWidth: 32, render: () => renderToolBtn('redo', 'Rétablir (Ctrl+Y)', <Redo2 size={13} strokeWidth={2.2} />) },
+
+            // Priorité 1 : Style base — TOUJOURS visible
+            { id: 'bold', priority: 1, minWidth: 32, render: () => renderToolBtn('bold', 'Gras (Ctrl+B)', <Bold size={13} strokeWidth={2.4} />) },
+            { id: 'italic', priority: 1, minWidth: 32, render: () => renderToolBtn('italic', 'Italique (Ctrl+I)', <Italic size={13} strokeWidth={2.4} />) },
+
+            // Priorité 2 : Style étendu
+            { id: 'underline', priority: 2, minWidth: 32, render: () => renderToolBtn('underline', 'Souligné (Ctrl+U)', <Underline size={13} strokeWidth={2.4} />) },
+            { id: 'code', priority: 2, minWidth: 32, render: () => renderToolBtn('code', 'Code en ligne', <Code size={13} strokeWidth={2.2} />) },
+
+            // Priorité 3 : Structure
+            { id: 'h1', priority: 3, minWidth: 32, render: () => renderToolBtn('h1', 'Titre de section', <Heading size={13} strokeWidth={2.2} />) },
+            { id: 'list', priority: 3, minWidth: 32, render: () => renderToolBtn('list', 'Liste à puces', <List size={13} strokeWidth={2.2} />) },
+            { id: 'list-ordered', priority: 3, minWidth: 32, render: () => renderToolBtn('list-ordered', 'Liste numérotée', <ListOrdered size={13} strokeWidth={2.2} />) },
+            { id: 'quote', priority: 3, minWidth: 32, render: () => renderToolBtn('quote', 'Citation', <Quote size={13} strokeWidth={2.2} />) },
+
+            // Priorité 4 : Cryptographie
+            {
+                id: 'cipher',
+                priority: 4,
+                minWidth: 70, // icône + badge tag
+                render: (inOverflow) => (
+                    <div style={{ position: 'relative' }} ref={cipherMenuRef}>
+                        <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); setCipherMenuOpen(v => !v); }}
+                            title="Appliquer un codage cryptographique (Morse, Templiers, Maritime...)"
+                            style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                height: '32px', padding: inOverflow ? '0 8px' : '0 10px',
+                                borderRadius: '8px',
+                                border: cipherMenuOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
+                                background: cipherMenuOpen ? 'var(--bg-hover)' : 'transparent',
+                                color: cipherMenuOpen ? 'var(--accent-hover)' : 'var(--text-secondary)',
+                                fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                                transition: 'all 90ms ease', flexShrink: 0
+                            }}
+                            onMouseEnter={e => { if (!cipherMenuOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                            onMouseLeave={e => { if (!cipherMenuOpen) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                            <Type size={13} strokeWidth={2.4} color="var(--accent-hover)" />
+                            {!inOverflow && (
+                                <span style={{
+                                    fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700,
+                                    color: 'var(--accent-hover)', background: 'rgba(37, 99, 235, 0.1)',
+                                    border: '1px solid var(--border-subtle)', borderRadius: '4px',
+                                    padding: '1px 5px', letterSpacing: '0.04em'
+                                }}>
+                                    {CIPHER_FONT_OPTIONS.find(o => o.id === selectedCipher)?.tag || '[morse]'}
+                                </span>
+                            )}
+                            <ChevronDown size={10} style={{ opacity: 0.6, transform: cipherMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
+                        </button>
+                        {cipherMenuOpen && (
+                            <div style={{
+                                position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 1600,
+                                background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
+                                borderRadius: '12px', boxShadow: 'var(--shadow-lg)', padding: '6px',
+                                minWidth: '220px', animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
+                            }}>
+                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Choisir un codage cryptographique</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    {CIPHER_FONT_OPTIONS.map(opt => (
+                                        <button
+                                            key={opt.id} type="button"
+                                            onClick={e => { e.preventDefault(); handleFormat('cipher', opt.id); setSelectedCipher(opt.id); setCipherMenuOpen(false); }}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+                                                padding: '6px 8px', borderRadius: '7px', border: 'none',
+                                                background: selectedCipher === opt.id ? 'var(--accent-transparent)' : 'transparent',
+                                                color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 600,
+                                                cursor: 'pointer', textAlign: 'left', transition: 'background 80ms'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = selectedCipher === opt.id ? 'var(--accent-transparent)' : 'transparent'}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
+                                                <div><div>{opt.label}</div><div style={{ fontSize: '9.5px', color: 'var(--text-dim)', fontWeight: 400 }}>{opt.tag}</div></div>
+                                            </div>
+                                            <span className={opt.fontClass} style={{ color: opt.color, fontSize: '13px' }}>{opt.sample}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )
+            },
+
+            // Priorité 5 : Thème (premier à aller dans l'overflow)
+            {
+                id: 'theme',
+                priority: 5,
+                minWidth: 140, // icône + nom thème tronqué
+                render: (inOverflow) => (
+                    <div style={{ position: 'relative', flexShrink: inOverflow ? 0 : 1, minWidth: inOverflow ? 0 : 80 }} ref={themePickerRef}>
+                        <button
+                            onClick={() => setThemePickerOpen(v => !v)}
+                            title={`Thème narratif actif : ${state.theme_id}`}
+                            style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                padding: inOverflow ? '0 7px' : '0 9px', height: '32px',
+                                borderRadius: '9px',
+                                border: themePickerOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
+                                background: themePickerOpen ? 'var(--bg-hover)' : 'transparent',
+                                color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 500,
+                                cursor: 'pointer', transition: 'all 100ms ease',
+                                maxWidth: inOverflow ? '34px' : '180px', minWidth: inOverflow ? '34px' : 0,
+                                boxShadow: 'none', overflow: 'hidden',
+                            }}
+                            onMouseEnter={e => { if (!themePickerOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                            onMouseLeave={e => { if (!themePickerOpen) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                            <Palette size={13} color={currentAccent.color} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                            {!inOverflow && (
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px', display: 'inline-block' }}>
+                                    {state.theme_id}
+                                </span>
+                            )}
+                            <ChevronDown size={11} style={{ opacity: 0.6, flexShrink: 0, transform: themePickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
+                        </button>
+                        {themePickerOpen && (
+                            <div style={{
+                                position: 'absolute', top: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1500,
+                                background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
+                                borderRadius: '12px', boxShadow: 'var(--shadow-lg)', padding: '6px',
+                                minWidth: '240px', maxHeight: '360px', overflowY: 'auto',
+                                animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(37, 99, 235, 0.08)', border: '1px solid rgba(37, 99, 235, 0.2)', borderRadius: '8px', marginBottom: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <KeyRound size={12} color="var(--accent-default)" />
+                                        <span style={{ fontSize: '10.5px', color: 'var(--text-dim)', fontWeight: 600 }}>Clé Vigenère :</span>
+                                    </div>
+                                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '11px', color: 'var(--accent-hover)', letterSpacing: '0.08em' }}>{currentTheme.vigenere_key || 'AUCUNE'}</span>
+                                </div>
+                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Sélectionner un thème</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    {allThemeIds.map(tId => {
+                                        const accent = getAccent(tId);
+                                        const isCurrent = tId === state.theme_id;
+                                        const IconComp = accent.Icon;
+                                        return (
+                                            <button
+                                                key={tId}
+                                                onClick={() => { dispatch({ type: 'SET_THEME', themeId: tId }); setThemePickerOpen(false); }}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 8px', borderRadius: '8px', border: 'none', background: isCurrent ? 'var(--bg-hover)' : 'transparent', color: isCurrent ? 'var(--text-primary)' : 'var(--text-default)', cursor: 'pointer', fontSize: '12px', fontWeight: isCurrent ? 700 : 400, textAlign: 'left', width: '100%', transition: 'all 80ms ease' }}
+                                                onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                                onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}
+                                            >
+                                                <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: `${accent.color}20`, border: `1px solid ${accent.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IconComp size={11} color={accent.color} /></div>
+                                                <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tId}</span>
+                                                {isCurrent && <Check size={13} color="var(--accent-default)" strokeWidth={2.6} />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )
+            },
+        ];
+        return items.sort((a, b) => a.priority - b.priority);
+    }, [state.theme_id, currentAccent, currentTheme, isSolution, cipherMenuOpen, themePickerOpen, selectedCipher, allThemeIds]);
+
+    // Handler pour les items du menu overflow
+    const handleOverflowItem = useCallback((item: ToolbarItem) => {
+        switch (item.id) {
+            case 'undo': handleFormat('undo'); break;
+            case 'redo': handleFormat('redo'); break;
+            case 'bold': handleFormat('bold'); break;
+            case 'italic': handleFormat('italic'); break;
+            case 'underline': handleFormat('underline'); break;
+            case 'code': handleFormat('code'); break;
+            case 'h1': handleFormat('h1'); break;
+            case 'list': handleFormat('list'); break;
+            case 'list-ordered': handleFormat('list-ordered'); break;
+            case 'quote': handleFormat('quote'); break;
+            case 'cipher': setCipherMenuOpen(true); break; // ouvre le sous-menu
+            case 'theme': setThemePickerOpen(true); break; // ouvre le sous-menu
+        }
     }, []);
 
-    // Breakpoints basés sur la largeur RÉELLE du conteneur (pas window.innerWidth)
-    const showHistoryDirect = containerWidth >= 480;
-    const showFormatDirect = containerWidth >= 720; // false = dans menu Format
-    const showCipherLabel = containerWidth >= 560;  // false = badge seul
-    const showThemeLabel = containerWidth >= 500;
-    const isUltraCompact = containerWidth < 420;
+    // ─── Mesure dynamique de l'overflow ──────────────────────────────────────
+    const [visibleItems, setVisibleItems] = useState<Set<string>>(new Set());
+    const [containerWidth, setContainerWidth] = useState(800);
+
+    useLayoutEffect(() => {
+        const toolbar = toolbarRef.current;
+        const overflowBtn = overflowRef.current;
+        if (!toolbar) return;
+
+        const measure = () => {
+            const containerRect = toolbar.parentElement?.getBoundingClientRect();
+            const availableWidth = containerRect ? containerRect.width - 32 : toolbar.clientWidth; // -32 pour padding/marges
+            setContainerWidth(availableWidth);
+
+            // Mesurer largeurs réelles de chaque item
+            let usedWidth = 0;
+            const gap = 2; // gap entre items
+            const overflowBtnWidth = overflowBtn?.offsetWidth || 40; // bouton "≡"
+            const visible = new Set<string>();
+
+            for (const item of toolbarItems) {
+                const el = itemRefs.current.get(item.id);
+                const itemWidth = el?.offsetWidth || item.minWidth;
+                const neededWidth = usedWidth === 0 ? itemWidth : usedWidth + gap + itemWidth;
+
+                // Réserver place pour le bouton overflow s'il y a encore des items après
+                const remainingItems = toolbarItems.filter(i => i.priority > item.priority || (i.priority === item.priority && i.id !== item.id));
+                const willNeedOverflow = remainingItems.length > 0;
+                const maxAllowed = availableWidth - (willNeedOverflow ? overflowBtnWidth + gap : 0);
+
+                if (neededWidth <= maxAllowed) {
+                    visible.add(item.id);
+                    usedWidth = neededWidth;
+                } else {
+                    break; // les suivants (priorité inférieure) iront aussi dans l'overflow
+                }
+            }
+
+            setVisibleItems(visible);
+        };
+
+        // Mesure initiale + ResizeObserver
+        measure();
+        const ro = new ResizeObserver(() => measure());
+        ro.observe(toolbar);
+        if (toolbar.parentElement) ro.observe(toolbar.parentElement);
+
+        // Re-mesurer au prochain tick (après rendu)
+        requestAnimationFrame(measure);
+
+        return () => ro.disconnect();
+    }, [toolbarItems]);
+
+    // ─── Helpers ────────────────────────────────────────────────────────────
+
+    const renderToolBtn = useCallback((format: string, title: string, icon: React.ReactNode, arg?: string) => {
+        const refKey = format;
+        return (
+            <button
+                key={refKey}
+                ref={(el) => { if (el) itemRefs.current.set(refKey, el); else itemRefs.current.delete(refKey); }}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); handleFormat(format, arg); }}
+                title={title}
+                style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: '28px', height: '32px', borderRadius: '8px',
+                    border: 'none', background: 'transparent', color: 'var(--text-secondary)',
+                    cursor: 'pointer', transition: 'all 90ms ease', flexShrink: 0
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+            >
+                {icon}
+            </button>
+        );
+    }, []);
+
+    const isItemVisible = (id: string) => visibleItems.has(id);
+    const overflowItems = toolbarItems.filter(item => !isItemVisible(item.id));
+
+    // ─── Effets divers ──────────────────────────────────────────────────────
 
     useEffect(() => {
         const tryLoad = () => {
-            if (themeManager.isLoaded) {
-                setAllThemeIds(themeManager.getThemeIds());
-            } else {
-                setTimeout(tryLoad, 150);
-            }
+            if (themeManager.isLoaded) setAllThemeIds(themeManager.getThemeIds());
+            else setTimeout(tryLoad, 150);
         };
         tryLoad();
     }, []);
 
     useEffect(() => {
-        // Utiliser 'click' au lieu de 'mousedown' pour laisser les onClick des items s'exécuter d'abord
         const handler = (e: MouseEvent) => {
             const target = e.target as Node;
             if (themePickerRef.current && !themePickerRef.current.contains(target)) setThemePickerOpen(false);
             if (cipherMenuRef.current && !cipherMenuRef.current.contains(target)) setCipherMenuOpen(false);
-            if (formatMenuRef.current && !formatMenuRef.current.contains(target)) setFormatMenuOpen(false);
-            if (editMenuRef.current && !editMenuRef.current.contains(target)) setEditMenuOpen(false);
+            if (overflowRef.current && !overflowRef.current.contains(target)) setOverflowMenuOpen(false);
         };
         document.addEventListener('click', handler);
         return () => document.removeEventListener('click', handler);
     }, []);
 
-    // Raccourci clavier Alt+S pour basculer les solutions (global, marche même si bouton masqué)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.altKey && (e.key === 's' || e.key === 'S')) {
@@ -254,40 +503,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [dispatch, isSolution]);
 
-    const renderToolBtn = useCallback((format: string, title: string, icon: React.ReactNode, arg?: string) => (
-        <button
-            type="button"
-            onMouseDown={(e) => {
-                e.preventDefault();
-                handleFormat(format, arg);
-            }}
-            title={title}
-            style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '28px',
-                height: '32px',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'transparent',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                transition: 'all 90ms ease',
-                flexShrink: 0
-            }}
-            onMouseEnter={e => {
-                e.currentTarget.style.background = 'var(--bg-hover)';
-                e.currentTarget.style.color = 'var(--text-primary)';
-            }}
-            onMouseLeave={e => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = 'var(--text-secondary)';
-            }}
-        >
-            {icon}
-        </button>
-    ), []);
+    // ─── Rendu ──────────────────────────────────────────────────────────────
 
     return (
         <>
@@ -296,287 +512,98 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                     0% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.97); }
                     100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
                 }
-                @keyframes islandPopoverInTopRight {
-                    0% { opacity: 0; transform: translateY(-6px) scale(0.97); }
-                    100% { opacity: 1; transform: translateY(0) scale(1); }
-                }
             `}</style>
 
             <div
                 ref={toolbarRef}
                 style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '2px',
-                    height: '40px',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '14px',
-                    padding: '3px 4px',
-                    boxShadow: 'var(--shadow-md)',
-                    userSelect: 'none',
-                    position: 'relative',
-                    boxSizing: 'border-box',
-                    pointerEvents: 'all',
-                    // fit-content : la barre ne prend que la place nécessaire aux icônes
-                    // le conteneur parent (TextualView) gère la contrainte max-width
+                    display: 'flex', alignItems: 'center', gap: '2px',
+                    height: '40px', background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)', borderRadius: '14px',
+                    padding: '3px 4px', boxShadow: 'var(--shadow-md)',
+                    userSelect: 'none', position: 'relative',
+                    boxSizing: 'border-box', pointerEvents: 'all',
+                    // fit-content : largeur = somme items visibles
                 }}
             >
-                {/* ═══ SECTION 1: HISTORIQUE (Annuler/Rétablir) ═══ */}
-                {isUltraCompact ? (
-                    <div style={{ position: 'relative' }} ref={editMenuRef}>
+                {/* Items visibles dans l'ordre de priorité */}
+                {toolbarItems.map(item =>
+                    isItemVisible(item.id) ? (
+                        <span key={item.id} style={{ display: 'flex', alignItems: 'center' }}>
+                            {item.render(false)}
+                            {item.id !== toolbarItems[toolbarItems.length - 1]?.id &&
+                             <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)', margin: '0 2px', flexShrink: 0 }} />
+                            }
+                        </span>
+                    ) : null
+                )}
+
+                {/* Bouton overflow "≡" — seulement s'il y a des items masqués */}
+                {overflowItems.length > 0 && (
+                    <div style={{ position: 'relative' }} ref={overflowRef}>
                         <button
                             type="button"
-                            onClick={e => { e.stopPropagation(); setEditMenuOpen(v => !v); }}
-                            title="Outils d'édition"
+                            onClick={e => { e.stopPropagation(); setOverflowMenuOpen(v => !v); }}
+                            title={`${overflowItems.length} outil${overflowItems.length > 1 ? 's' : ''} supplémentaire${overflowItems.length > 1 ? 's' : ''}`}
                             style={{
-                                display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                height: '32px', padding: '0 7px', borderRadius: '8px',
-                                border: editMenuOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
-                                background: editMenuOpen ? 'var(--bg-hover)' : 'transparent',
-                                color: editMenuOpen ? 'var(--accent-hover)' : 'var(--text-secondary)',
-                                fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                                transition: 'all 90ms ease', flexShrink: 0
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: '32px', height: '32px', borderRadius: '8px',
+                                border: overflowMenuOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
+                                background: overflowMenuOpen ? 'var(--bg-hover)' : 'transparent',
+                                color: overflowMenuOpen ? 'var(--accent-hover)' : 'var(--text-secondary)',
+                                cursor: 'pointer', transition: 'all 90ms ease', flexShrink: 0
                             }}
+                            onMouseEnter={e => { if (!overflowMenuOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                            onMouseLeave={e => { if (!overflowMenuOpen) e.currentTarget.style.background = 'transparent'; }}
                         >
-                            <Edit3 size={13} strokeWidth={2.2} />
-                            <ChevronDown size={10} style={{ opacity: 0.6, transform: editMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
+                            <MoreHorizontal size={16} strokeWidth={2.2} />
                         </button>
-                        {editMenuOpen && (
+                        {overflowMenuOpen && (
                             <div style={{
-                                position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 1600,
+                                position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 1600,
                                 background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
                                 borderRadius: '12px', boxShadow: 'var(--shadow-lg)', padding: '6px',
-                                minWidth: '190px', animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
+                                minWidth: '200px', animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
                             }}>
-                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Historique</div>
-                                <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
-                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('undo'); setEditMenuOpen(false); }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '11px', cursor: 'pointer' }}><Undo2 size={12} /> <span>Annuler</span></button>
-                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('redo'); setEditMenuOpen(false); }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '11px', cursor: 'pointer' }}><Redo2 size={12} /> <span>Rétablir</span></button>
+                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>
+                                    Outils supplémentaires
                                 </div>
-                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Style de texte</div>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '6px' }}>
-                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('bold'); setEditMenuOpen(false); }} title="Gras" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Bold size={12} /></button>
-                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('italic'); setEditMenuOpen(false); }} title="Italique" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Italic size={12} /></button>
-                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('underline'); setEditMenuOpen(false); }} title="Souligné" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Underline size={12} /></button>
-                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('code'); setEditMenuOpen(false); }} title="Code" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Code size={12} /></button>
-                                </div>
-                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Structure</div>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
-                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('h1'); setEditMenuOpen(false); }} title="Titre" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Heading size={12} /></button>
-                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('list'); setEditMenuOpen(false); }} title="Puces" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><List size={12} /></button>
-                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('list-ordered'); setEditMenuOpen(false); }} title="Numéroté" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><ListOrdered size={12} /></button>
-                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('quote'); setEditMenuOpen(false); }} title="Citation" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Quote size={12} /></button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    {overflowItems.map(item => (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={e => { e.preventDefault(); setOverflowMenuOpen(false); handleOverflowItem(item); }}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                padding: '8px 10px', borderRadius: '7px', border: 'none',
+                                                background: 'transparent', color: 'var(--text-primary)',
+                                                fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                                                textAlign: 'left', width: '100%', transition: 'background 80ms'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                        >
+                                            {/* Icône indicative selon l'item */}
+                                            {item.id === 'theme' && <Palette size={14} color={currentAccent.color} />}
+                                            {item.id === 'cipher' && <Type size={14} color="var(--accent-hover)" />}
+                                            {['underline','code','h1','list','list-ordered','quote'].includes(item.id) && <SlidersHorizontal size={14} />}
+                                            {['undo','redo'].includes(item.id) && <Edit3 size={14} />}
+                                            <span>{item.id === 'theme' ? `Thème : ${state.theme_id}` :
+                                                  item.id === 'cipher' ? `Cryptographie : ${CIPHER_FONT_OPTIONS.find(o => o.id === selectedCipher)?.label}` :
+                                                  item.id === 'underline' ? 'Souligné' :
+                                                  item.id === 'code' ? 'Code en ligne' :
+                                                  item.id === 'h1' ? 'Titre' :
+                                                  item.id === 'list' ? 'Liste à puces' :
+                                                  item.id === 'list-ordered' ? 'Liste numérotée' :
+                                                  item.id === 'quote' ? 'Citation' :
+                                                  item.id === 'undo' ? 'Annuler' : 'Rétablir'}</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         )}
                     </div>
-                ) : (
-                    <>
-                        {showHistoryDirect && (
-                            <>
-                                {renderToolBtn('undo', 'Annuler (Ctrl+Z)', <Undo2 size={13} strokeWidth={2.2} />)}
-                                {renderToolBtn('redo', 'Rétablir (Ctrl+Y)', <Redo2 size={13} strokeWidth={2.2} />)}
-                            </>
-                        )}
-
-                        <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)', margin: '0 2px', flexShrink: 0 }} />
-
-                        {/* ═══ SECTION 2: STYLE BASE (Gras, Italique - TOUJOURS VISIBLES) ═══ */}
-                        {renderToolBtn('bold', 'Gras (Ctrl+B)', <Bold size={13} strokeWidth={2.4} />)}
-                        {renderToolBtn('italic', 'Italique (Ctrl+I)', <Italic size={13} strokeWidth={2.4} />)}
-
-                        {/* ═══ SECTION 3: FORMAT AVANCÉ (menu si espace insuffisant) ═══ */}
-                        {showFormatDirect ? (
-                            <>
-                                <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)', margin: '0 2px', flexShrink: 0 }} />
-                                {renderToolBtn('underline', 'Souligné (Ctrl+U)', <Underline size={13} strokeWidth={2.4} />)}
-                                {renderToolBtn('code', 'Code en ligne', <Code size={13} strokeWidth={2.2} />)}
-                                <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)', margin: '0 2px', flexShrink: 0 }} />
-                                {renderToolBtn('h1', 'Titre de section', <Heading size={13} strokeWidth={2.2} />)}
-                                {renderToolBtn('list', 'Liste à puces', <List size={13} strokeWidth={2.2} />)}
-                                {renderToolBtn('list-ordered', 'Liste numérotée', <ListOrdered size={13} strokeWidth={2.2} />)}
-                                {renderToolBtn('quote', 'Citation', <Quote size={13} strokeWidth={2.2} />)}
-                            </>
-                        ) : (
-                            <>
-                                <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)', margin: '0 2px', flexShrink: 0 }} />
-                                <div style={{ position: 'relative' }} ref={formatMenuRef}>
-                                    <button
-                                        type="button"
-                                        onClick={e => { e.stopPropagation(); setFormatMenuOpen(v => !v); }}
-                                        title="Formatage avancé : Souligné, Code, Titre, Listes, Citation"
-                                        style={{
-                                            display: 'inline-flex', alignItems: 'center', gap: '2px',
-                                            height: '32px', padding: '0 6px', borderRadius: '8px',
-                                            border: formatMenuOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
-                                            background: formatMenuOpen ? 'var(--bg-hover)' : 'transparent',
-                                            color: formatMenuOpen ? 'var(--accent-hover)' : 'var(--text-secondary)',
-                                            cursor: 'pointer', transition: 'all 90ms ease', flexShrink: 0
-                                        }}
-                                    >
-                                        <SlidersHorizontal size={12} strokeWidth={2.2} />
-                                        <ChevronDown size={10} style={{ opacity: 0.6, transform: formatMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
-                                    </button>
-                                    {formatMenuOpen && (
-                                        <div style={{
-                                            position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 1600,
-                                            background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
-                                            borderRadius: '12px', boxShadow: 'var(--shadow-lg)', padding: '6px',
-                                            minWidth: '160px', display: 'flex', flexDirection: 'column', gap: '2px',
-                                            animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
-                                        }}>
-                                            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Style de texte</div>
-                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('underline'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Underline size={13} /> <span>Souligné (Ctrl+U)</span></button>
-                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('code'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Code size={13} /> <span>Code en ligne</span></button>
-                                            <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '2px 0' }} />
-                                            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Structure</div>
-                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('h1'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Heading size={13} /> <span>Titre de section</span></button>
-                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('list'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><List size={13} /> <span>Liste à puces</span></button>
-                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('list-ordered'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><ListOrdered size={13} /> <span>Liste numérotée</span></button>
-                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('quote'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Quote size={13} /> <span>Citation</span></button>
-                                        </div>
-                                    )}
-                                </div>
-                            </>
-                        )}
-
-                        {/* ═══ SECTION 4: CRYPTOGRAPHIE ═══ */}
-                        <div style={{ width: '1px', height: '20px', background: 'var(--border-default)', margin: '0 4px', flexShrink: 0 }} />
-                        <div style={{ position: 'relative' }} ref={cipherMenuRef}>
-                            <button
-                                type="button"
-                                onClick={e => { e.stopPropagation(); setCipherMenuOpen(v => !v); }}
-                                title="Appliquer un codage cryptographique (Morse, Templiers, Maritime...)"
-                                style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                    height: '32px', padding: showCipherLabel ? '0 8px' : '0 6px',
-                                    borderRadius: '8px',
-                                    border: cipherMenuOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
-                                    background: cipherMenuOpen ? 'var(--bg-hover)' : 'transparent',
-                                    color: cipherMenuOpen ? 'var(--accent-hover)' : 'var(--text-secondary)',
-                                    fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                                    transition: 'all 90ms ease', flexShrink: 0
-                                }}
-                                onMouseEnter={e => { if (!cipherMenuOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                                onMouseLeave={e => { if (!cipherMenuOpen) e.currentTarget.style.background = 'transparent'; }}
-                            >
-                                <Type size={13} strokeWidth={2.4} color="var(--accent-hover)" />
-                                {showCipherLabel && (
-                                    <span style={{
-                                        fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700,
-                                        color: 'var(--accent-hover)', background: 'rgba(37, 99, 235, 0.1)',
-                                        border: '1px solid var(--border-subtle)', borderRadius: '4px',
-                                        padding: '1px 5px', letterSpacing: '0.04em'
-                                    }}>
-                                        {CIPHER_FONT_OPTIONS.find(o => o.id === selectedCipher)?.tag || '[morse]'}
-                                    </span>
-                                )}
-                                <ChevronDown size={10} style={{ opacity: 0.6, transform: cipherMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
-                            </button>
-                            {cipherMenuOpen && (
-                                <div style={{
-                                    position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 1600,
-                                    background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
-                                    borderRadius: '12px', boxShadow: 'var(--shadow-lg)', padding: '6px',
-                                    minWidth: '220px', animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
-                                }}>
-                                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Choisir un codage cryptographique</div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                        {CIPHER_FONT_OPTIONS.map(opt => (
-                                            <button
-                                                key={opt.id} type="button"
-                                                onClick={e => { e.preventDefault(); handleFormat('cipher', opt.id); setSelectedCipher(opt.id); setCipherMenuOpen(false); }}
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                                                    padding: '6px 8px', borderRadius: '7px', border: 'none',
-                                                    background: selectedCipher === opt.id ? 'var(--accent-transparent)' : 'transparent',
-                                                    color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 600,
-                                                    cursor: 'pointer', textAlign: 'left', transition: 'background 80ms'
-                                                }}
-                                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                                                onMouseLeave={e => e.currentTarget.style.background = selectedCipher === opt.id ? 'var(--accent-transparent)' : 'transparent'}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
-                                                    <div><div>{opt.label}</div><div style={{ fontSize: '9.5px', color: 'var(--text-dim)', fontWeight: 400 }}>{opt.tag}</div></div>
-                                                </div>
-                                                <span className={opt.fontClass} style={{ color: opt.color, fontSize: '13px' }}>{opt.sample}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* ═══ SECTION 5: THÈME NARRATIF ═══ */}
-                        <div style={{ width: '1px', height: '20px', background: 'var(--border-default)', margin: '0 4px', flexShrink: 0 }} />
-                        <div style={{ position: 'relative', flexShrink: 1, minWidth: 0 }} ref={themePickerRef}>
-                            <button
-                                onClick={() => setThemePickerOpen(v => !v)}
-                                title={`Thème narratif actif : ${state.theme_id}`}
-                                style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: '5px',
-                                    padding: isUltraCompact ? '0 7px' : '0 9px', height: '32px',
-                                    borderRadius: '9px',
-                                    border: themePickerOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
-                                    background: themePickerOpen ? 'var(--bg-hover)' : 'transparent',
-                                    color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 500,
-                                    cursor: 'pointer', transition: 'all 100ms ease',
-                                    maxWidth: isUltraCompact ? '34px' : (showThemeLabel ? '160px' : '110px'),
-                                    boxShadow: 'none',
-                                }}
-                                onMouseEnter={e => { if (!themePickerOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                                onMouseLeave={e => { if (!themePickerOpen) e.currentTarget.style.background = 'transparent'; }}
-                            >
-                                <Palette size={13} color={currentAccent.color} strokeWidth={2.2} style={{ flexShrink: 0 }} />
-                                {showThemeLabel && !isUltraCompact && (
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px', display: 'inline-block' }}>
-                                        {state.theme_id}
-                                    </span>
-                                )}
-                                <ChevronDown size={11} style={{ opacity: 0.6, flexShrink: 0, transform: themePickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
-                            </button>
-                            {themePickerOpen && (
-                                <div style={{
-                                    position: 'absolute', top: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1500,
-                                    background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
-                                    borderRadius: '12px', boxShadow: 'var(--shadow-lg)', padding: '6px',
-                                    minWidth: '240px', maxHeight: '360px', overflowY: 'auto',
-                                    animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(37, 99, 235, 0.08)', border: '1px solid rgba(37, 99, 235, 0.2)', borderRadius: '8px', marginBottom: '6px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <KeyRound size={12} color="var(--accent-default)" />
-                                            <span style={{ fontSize: '10.5px', color: 'var(--text-dim)', fontWeight: 600 }}>Clé Vigenère :</span>
-                                        </div>
-                                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '11px', color: 'var(--accent-hover)', letterSpacing: '0.08em' }}>{currentTheme.vigenere_key || 'AUCUNE'}</span>
-                                    </div>
-                                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Sélectionner un thème</div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                        {allThemeIds.map(tId => {
-                                            const accent = getAccent(tId);
-                                            const isCurrent = tId === state.theme_id;
-                                            const IconComp = accent.Icon;
-                                            return (
-                                                <button
-                                                    key={tId}
-                                                    onClick={() => { dispatch({ type: 'SET_THEME', themeId: tId }); setThemePickerOpen(false); }}
-                                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 8px', borderRadius: '8px', border: 'none', background: isCurrent ? 'var(--bg-hover)' : 'transparent', color: isCurrent ? 'var(--text-primary)' : 'var(--text-default)', cursor: 'pointer', fontSize: '12px', fontWeight: isCurrent ? 700 : 400, textAlign: 'left', width: '100%', transition: 'all 80ms ease' }}
-                                                    onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                                                    onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}
-                                                >
-                                                    <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: `${accent.color}20`, border: `1px solid ${accent.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IconComp size={11} color={accent.color} /></div>
-                                                    <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tId}</span>
-                                                    {isCurrent && <Check size={13} color="var(--accent-default)" strokeWidth={2.6} />}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </>
                 )}
             </div>
         </>
