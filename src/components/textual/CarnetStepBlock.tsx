@@ -397,10 +397,10 @@ function ManualStepHtml({
         >
             {/* Gutter unifié : indicateur + label étape + menu 3 points */}
             <BlockGutter
-                blockType={isTitle ? 'title' : 'html'}
+                blockType="html"
                 blockData={step}
-                stepLabel={isTitle ? undefined : undefined} // Pas de label A,B,C pour les commentaires
-                isTitle={isTitle}
+                stepLabel={undefined} // Pas de label A,B,C pour les commentaires
+                isTitle={false}
                 isSelected={false}
                 onEdit={startEditing}
                 onDelete={() => onRemoveStep?.(step.id)}
@@ -434,7 +434,7 @@ function ManualStepHtml({
                             onKeyDown={handleKeyDown}
                             onInput={handleTextareaInput}
                             rows={1}
-                            placeholder={isTitle ? 'Titre du raid / document…' : 'Écrivez en Markdown… (# titre, **gras**, *italique*, $latex$, ```code```, [morse]...[/morse])'}
+                            placeholder="Écrivez en Markdown… (# titre, **gras**, *italique*, $latex$, ```code```, [morse]...[/morse])"
                             style={{
                                 flex: 1,
                                 background: 'transparent',
@@ -442,8 +442,8 @@ function ManualStepHtml({
                                 borderBottom: '1.5px solid var(--accent-default)',
                                 borderRadius: 0,
                                 color: 'var(--text-primary)',
-                                fontSize: isTitle ? '17px' : '13px',
-                                fontWeight: isTitle ? 700 : 400,
+                                fontSize: '13px',
+                                fontWeight: 400,
                                 fontFamily: 'var(--font-ui)',
                                 lineHeight: 1.5,
                                 padding: '2px 4px',
@@ -488,13 +488,13 @@ function ManualStepHtml({
                         {isEmpty && (
                             <div style={{
                                 color: 'rgba(255,255,255,0.28)',
-                                fontSize: isTitle ? '17px' : '13px',
-                                fontWeight: isTitle ? 700 : 400,
-                                fontStyle: isTitle ? 'normal' : 'italic',
-                                paddingTop: isTitle ? '2px' : '4px',
-                                letterSpacing: isTitle ? '0.02em' : 'normal',
+                                fontSize: '13px',
+                                fontWeight: 400,
+                                fontStyle: 'italic',
+                                paddingTop: '4px',
+                                letterSpacing: 'normal',
                             }}>
-                                {isTitle ? 'Titre du raid / document…' : 'Écrivez en Markdown… (# titre, **gras**, *italique*, $latex$, ```code```, [morse]...[/morse])'}
+                                {'Écrivez en Markdown… (# titre, **gras**, *italique*, $latex$, ```code```, [morse]...[/morse])'}
                             </div>
                         )}
                         <MarkdownRenderer
@@ -505,8 +505,8 @@ function ManualStepHtml({
                             blockId={step.id}
                             className="manual-html-view ck-content"
                             style={{
-                                fontSize: isTitle ? '17px' : '13px',
-                                fontWeight: isTitle ? 700 : 400,
+                                fontSize: '13px',
+                                fontWeight: 400,
                                 color: 'var(--text-primary)',
                                 lineHeight: 1.6,
                                 padding: '2px 0',
@@ -521,7 +521,7 @@ function ManualStepHtml({
 
             {/* Menu contextuel unifié (3 points) - clic gauche */}
             <UnifiedContextMenu
-                blockType={isTitle ? 'title' : 'html'}
+                blockType={'html'}
                 blockId={step.id}
                 blockData={step}
                 availableCiphers={['morse', 'vigenere', 'polybe', 'templier', 'maritime', 'avocat', 'cassis', 'texte_clair']}

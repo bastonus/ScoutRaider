@@ -53,8 +53,9 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 async def login(response: Response, credentials: UserLogin, db: AsyncSession = Depends(get_db)):
-    """Connexion - retourne access + refresh tokens."""
-    user = await authenticate_user(db, credentials.username, credentials.password)
+    """Connexion - retourne access + refresh tokens. Accepte username OU email."""
+    identifier = credentials.username or credentials.email
+    user = await authenticate_user(db, identifier, credentials.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
