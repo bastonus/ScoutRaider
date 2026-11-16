@@ -41,6 +41,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy Backend and Legacy Modules
 COPY backend/app /app/app
+COPY backend/alembic.ini /app/alembic.ini
+COPY backend/alembic /app/alembic
 COPY legacy/modules /app/legacy/modules
 
 # Copy pre-built frontend directly (no Node/npm needed in Docker)
