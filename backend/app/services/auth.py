@@ -1,7 +1,7 @@
 # app/services/auth.py - Authentication service
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
@@ -10,15 +10,40 @@ from app.config import settings
 from app.models.user import User
 from app.schemas.auth import Token, TokenPayload
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
+# NOTE: on utilise la lib `bcrypt` directement et non passlib.
+# passlib 1.7.4 est incompatible avec bcrypt >= 4.1 : son auto-test du backend
+# hashe un mot de passe de 255 octets pour detecter le wraparound bug, et bcrypt
+# >= 4.1 leve "ValueError: password cannot be longer than 72 bytes" au lieu de
+# tronquer silencieusement -> l'echec survient au premier hash/verify.
+BCRYPT_ROUNDS = 12
+# bcrypt n'utilise que les 72 premiers octets du mot de passe.
+BCRYPT_MAX_PASSWORD_BYTES = 72
+
+
+def _encode_password(password: str) -> bytes:
+    """Encode un mot de passe pour bcrypt (max 72 octets, comme bcrypt le fait)."""
+    encoded = password.encode("utf-8")
+    if b"\x00" in encoded:
+        raise ValueError("Le mot de passe ne peut pas contenir de caractère nul")
+    return encoded[:BCRYPT_MAX_PASSWORD_BYTES]
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(
+            _encode_password(plain_password),
+            hashed_password.encode("utf-8"),
+        )
+    except (ValueError, TypeError):
+        # hash invalide ou mot de passe refuse par bcrypt
+        return False
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(
+        _encode_password(password),
+        bcrypt.gensalt(rounds=BCRYPT_ROUNDS),
+    ).decode("utf-8")
 
 
 def create_access_token(user_id: uuid.UUID, expires_delta: timedelta | None = None) -> str:
@@ -96,5 +121,8 @@ async def create_user(db: AsyncSession, user_data: dict) -> User:
 
 
 async def update_last_login(db: AsyncSession, user: User) -> None:
-    user.last_login = datetime.now(timezone.utc)
+    # Les colonnes DateTime du modele sont naives (TIMESTAMP WITHOUT TIME ZONE) :
+    # on stocke donc de l'UTC naive, sinon Postgres refuse le melange
+    # ("can't subtract offset-naive and offset-aware datetimes") et le login echoue.
+    user.last_login = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()

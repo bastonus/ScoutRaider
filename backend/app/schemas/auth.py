@@ -26,6 +26,11 @@ class UserLogin(BaseModel):
         return self
 
 
+class RefreshRequest(BaseModel):
+    """Corps de la requête de rafraîchissement de token."""
+    refresh_token: str | None = None
+
+
 class UserResponse(UserBase):
     id: uuid.UUID
     is_active: bool

@@ -1,5 +1,5 @@
 # app/api/auth.py - Routes d'authentification
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Header, Body, Query, Cookie
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
 
@@ -8,7 +8,7 @@ from app.services.auth import (
     authenticate_user, create_user, create_access_token, create_refresh_token,
     decode_token, update_last_login, get_user_by_id
 )
-from app.schemas.auth import UserCreate, UserLogin, UserResponse, Token, TokenPayload
+from app.schemas.auth import UserCreate, UserLogin, UserResponse, Token, TokenPayload, RefreshRequest
 from app.config import settings
 from app.models.user import User
 
@@ -50,11 +50,16 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     try:
         user = await create_user(db, user_data.model_dump())
         return user
+    except ValueError as e:
+        # Mot de passe refuse par bcrypt (ex: caractere nul)
+        raise HTTPException(status_code=400, detail=f"Mot de passe invalide: {e}")
     except Exception as e:
         import traceback
         import sys
         traceback.print_exc(file=sys.stderr)
-        raise HTTPException(status_code=500, detail=f"Registration failed: {type(e).__name__}: {str(e)}")
+        if settings.DEBUG:
+            raise HTTPException(status_code=500, detail=f"Registration failed: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur")
 
 @router.get("/debug/test-db")
 async def debug_test_db(db: AsyncSession = Depends(get_db)):
@@ -100,17 +105,30 @@ async def login(response: Response, credentials: UserLogin, db: AsyncSession = D
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(response: Response, refresh_token: str = None, db: AsyncSession = Depends(get_db)):
-    """Rafraîchir l'access token via le refresh token (cookie ou body)."""
-    # Essayer de lire depuis le cookie
-    if not refresh_token:
+async def refresh_token(
+    response: Response,
+    payload: RefreshRequest | None = Body(default=None),
+    refresh_token: str | None = Query(default=None, description="Refresh token (query param, legacy)"),
+    refresh_cookie: str | None = Cookie(default=None, alias="refresh_token"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Rafraîchir l'access token via le body JSON, le cookie ou le query param."""
+    token = None
+    if payload and payload.refresh_token:
+        token = payload.refresh_token
+    elif refresh_cookie:
+        token = refresh_cookie
+    elif refresh_token:
+        token = refresh_token
+
+    if not token:
         raise HTTPException(status_code=401, detail="Refresh token manquant")
 
-    payload = decode_token(refresh_token)
-    if not payload or payload.type != "refresh":
+    payload_data = decode_token(token)
+    if not payload_data or payload_data.type != "refresh":
         raise HTTPException(status_code=401, detail="Refresh token invalide ou expiré")
 
-    user = await get_user_by_id(db, payload.sub)
+    user = await get_user_by_id(db, payload_data.sub)
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Utilisateur inactif")
 
