@@ -583,4 +583,11 @@ export interface AppState {
 
     // Persisted layer display order (array of { kind, id } objects)
     layer_order: Array<{ kind: 'itin' | 'point' | 'area' | 'draw' | 'text'; id: string }>;
+
+    // ☁️ Cloud Sync
+    cloud_sync_status: 'synced' | 'pending' | 'offline' | 'error';
+    cloud_last_synced: number | null;
+    cloud_project_id: string | null;
+    cloud_share_token: string | null;
+    autosave_enabled: boolean;
 }

@@ -11,11 +11,14 @@ import React, { useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { generateDocId } from '../logic/CloudAuthService';
+import { useApp } from '../AppContext';
+import { cloudSync } from '../services/cloudSync';
 import App from '../App';
 
 export default function EditorPage() {
     const { identifier } = useParams<{ identifier: string }>();
     const navigate = useNavigate();
+    const { state, dispatch } = useApp();
     const {
         isLoading,
         isAuthenticated,
@@ -29,6 +32,7 @@ export default function EditorPage() {
 
     // Track which identifier has already been loaded to avoid double-loads
     const loadedIdentifier = useRef<string | null>(null);
+    const syncInitialized = useRef<string | null>(null);
 
     // ── Instant /d/new: NEVER stay on /d/new, generate doc id and redirect immediately ──
     useEffect(() => {
@@ -60,6 +64,21 @@ export default function EditorPage() {
             loadSharedDoc(identifier);
         }
     }, [isLoading, identifier, isAuthenticated, isGuest, loadSharedDoc, loadFromCloud, newProject]);
+
+    // ── Initialize Cloud Sync when document loads ───────────────────────────
+    useEffect(() => {
+        const docId = state.cloud_project_id || state.current_filepath || identifier;
+        if (docId && docId !== 'new' && syncInitialized.current !== docId) {
+            syncInitialized.current = docId;
+            cloudSync.initialize({
+                documentId: docId,
+                getState: () => state,
+                dispatch,
+                autosaveInterval: 5000
+            });
+            console.log('[EditorPage] CloudSync initialisé pour:', docId);
+        }
+    }, [state.cloud_project_id, state.current_filepath, identifier, state]);
 
     // ── After first save on /d/new: redirect to /d/<projectId> ───────────────
     useEffect(() => {

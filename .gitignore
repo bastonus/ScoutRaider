@@ -23,3 +23,17 @@ backend/app/storage/*.sqlite
 # Cartes raster IGN (fichiers volumineux)
 *.rmap
 France IGN*/
+
+# ─── Donnees locales / brouillons (hors depot) ───
+inbox/
+pinned/
+capture/
+investigation.cany/
+gilwell-extracted/
+ressources*/
+feed.json
+usage.json
+craft.json
+build-activity.log
+.opencode/
+

@@ -184,6 +184,13 @@ export type AppAction =
     | { type: 'LOAD_PROJECT'; state: AppState }
     | { type: 'NEW_PROJECT' }
 
+    // ☁️ Cloud Sync
+    | { type: 'SET_CLOUD_SYNC_STATUS'; status: 'synced' | 'pending' | 'offline' | 'error'; lastSynced?: number }
+    | { type: 'SET_CLOUD_PROJECT_ID'; projectId: string | null }
+    | { type: 'SET_CLOUD_SHARE_TOKEN'; token: string | null }
+    | { type: 'TRIGGER_AUTOSAVE' }
+    | { type: 'SET_AUTOSAVE_ENABLED'; enabled: boolean }
+
     // UI transient
     | { type: 'SET_LOADING'; isLoading: boolean; text?: string }
     | { type: 'ADD_NOTIFICATION'; message: string; notifType: 'info' | 'warning' | 'error'; duration?: number }
@@ -200,6 +207,12 @@ const initialState: AppState = {
     notifications: [],
     selected_layer_id: 'itin-1',
     selected_sublayer_id: null,
+    // ☁️ Cloud Sync state
+    cloud_sync_status: 'offline' as const,
+    cloud_last_synced: null,
+    cloud_project_id: null,
+    cloud_share_token: null,
+    autosave_enabled: true,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1960,6 +1973,27 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
         case 'SET_AUTO_CHECK_UPDATES':
             return { ...state, auto_check_updates: action.enabled };
+
+        // ☁️ Cloud Sync
+        case 'SET_CLOUD_SYNC_STATUS':
+            return {
+                ...state,
+                cloud_sync_status: action.status,
+                cloud_last_synced: action.lastSynced ?? state.cloud_last_synced
+            };
+
+        case 'SET_CLOUD_PROJECT_ID':
+            return { ...state, cloud_project_id: action.projectId };
+
+        case 'SET_CLOUD_SHARE_TOKEN':
+            return { ...state, cloud_share_token: action.token };
+
+        case 'TRIGGER_AUTOSAVE':
+            // L'autosave est géré par le service de sync (debounce)
+            return state;
+
+        case 'SET_AUTOSAVE_ENABLED':
+            return { ...state, autosave_enabled: action.enabled };
 
         default:
             return state;

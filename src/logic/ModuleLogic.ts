@@ -5,6 +5,8 @@
  * Each encoder is called LIVE during editing.
  */
 import type { PolySegment } from './types';
+import { GilwellEngine } from '../modules/gilwell/logic/GilwellEngine';
+import type { GilwellConfig } from '../modules/gilwell/logic/types';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -225,63 +227,16 @@ export class ModuleLogic {
 
     // ── Gilwell SVG diagram ──────────────────────────────────────────────────
 
-    static generateGilwellSVG(segments: PolySegment[]): string {
-        const W = 300, H = 400;
-        const cx = W / 2;
-        const margin = 30;
-        const usableH = H - 2 * margin;
+    /** Generate Gilwell SVG from ScoutRaider PolySegments using the new WYSIWYG engine */
+    static generateGilwellSVG(segments: PolySegment[], config?: Partial<GilwellConfig>): string {
+        return GilwellEngine.generateScoutRaiderSVG(segments, config);
+    }
 
-        // Simplify: merge close azimuths
-        const simplified: [number, number][] = [];
-        for (const s of segments) {
-            const az = s.azimut || 0;
-            const dist = s.distance || 0;
-            if (simplified.length > 0 && Math.abs(simplified[simplified.length - 1][0] - az) <= 10) {
-                simplified[simplified.length - 1][1] += dist;
-            } else {
-                simplified.push([az, dist]);
-            }
-        }
-
-        if (!simplified.length) {
-            return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><text x="150" y="200" text-anchor="middle" fill="#666">Aucun segment</text></svg>`;
-        }
-
-        const n = simplified.length;
-        const dy = usableH / (n + 1);
-        const scale = 40;
-
-        const lines: string[] = [];
-        lines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="background:#fff;border:1px solid #ddd;">`);
-        // Nord axis
-        lines.push(`<line x1="${cx}" y1="${margin}" x2="${cx}" y2="${H - margin}" stroke="#999" stroke-width="1" stroke-dasharray="4,2"/>`);
-        lines.push(`<text x="${cx}" y="${margin - 6}" text-anchor="middle" font-size="11" fill="#666">NORD</text>`);
-        // Arrow marker
-        lines.push(`<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#2d5a8e"/></marker></defs>`);
-
-        let curX = cx, curY = margin;
-        for (const [az, dist] of simplified) {
-            const rad = (az * Math.PI) / 180;
-            const dx = Math.sin(rad);
-            const endX = Math.round(curX + dx * scale);
-            const endY = Math.round(curY + dy);
-
-            const color = '#2d5a8e';
-            lines.push(`<circle cx="${curX}" cy="${curY}" r="4" fill="${color}"/>`);
-            lines.push(`<line x1="${curX}" y1="${curY}" x2="${endX}" y2="${endY}" stroke="${color}" stroke-width="2" marker-end="url(#arrow)"/>`);
-
-            const lx = endX + (dx >= 0 ? 8 : -8);
-            const anchor = dx >= 0 ? 'start' : 'end';
-            lines.push(`<text x="${lx}" y="${endY - 4}" font-size="10" fill="#333" text-anchor="${anchor}">${Math.round(az)}° — ${Math.round(dist)}m</text>`);
-
-            curX = endX;
-            curY = endY;
-        }
-
-        lines.push(`<circle cx="${curX}" cy="${curY}" r="5" fill="#e74c3c"/>`);
-        lines.push('</svg>');
-
-        return lines.join('\n');
+    /** Generate multi-page Gilwell SVG for print/export (returns array of SVG strings, one per page) */
+    static generateGilwellSVGPages(segments: PolySegment[], config?: Partial<GilwellConfig>): string[] {
+        const steps = GilwellEngine.fromPolySegments(segments);
+        const pages = GilwellEngine.computePages(steps, config);
+        return pages.map(page => GilwellEngine.renderPageToSvgString(page, config));
     }
 
     // ── Universal encoder ────────────────────────────────────────────────────

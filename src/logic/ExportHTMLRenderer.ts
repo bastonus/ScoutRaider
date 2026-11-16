@@ -419,14 +419,14 @@ function generateStaticMapSvg(params: {
             const py = Math.round(ty * 256 - originY);
             let url = '';
             if (layerId === 'OSM') {
-                url = `https://tile.openstreetmap.org/${z}/${tx}/${ty}.png`;
+                url = `https://tile.openstreetmap.org/${zTile}/${tx}/${ty}.png`;
             } else if (layerId === 'CYCLOSM') {
-                url = `https://tile-cyclosm.openstreetmap.fr/cyclosm/${z}/${tx}/${ty}.png`;
+                url = `https://tile-cyclosm.openstreetmap.fr/cyclosm/${zTile}/${tx}/${ty}.png`;
             } else if (layerId === 'SAT.IGN') {
-                url = `https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${ty}&TILECOL=${tx}`;
+                url = `https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX=${zTile}&TILEROW=${ty}&TILECOL=${tx}`;
             } else {
                 // Défaut Plan IGN v2
-                url = `https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${ty}&TILECOL=${tx}`;
+                url = `https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX=${zTile}&TILEROW=${ty}&TILECOL=${tx}`;
             }
             tilesSvg += `    <image href="${url}" x="${px}" y="${py}" width="256" height="256" preserveAspectRatio="none" />
 `;
@@ -437,7 +437,7 @@ function generateStaticMapSvg(params: {
     let routeSvg = '';
     if (showRoute !== false && latLngs.length >= 2) {
         const pts = latLngs.map(p => {
-            const pos = latLngToWorldPixel(p[0], p[1], z);
+            const pos = latLngToWorldPixel(p[0], p[1], zProj);
             return `${Math.round(pos.x - originX)},${Math.round(pos.y - originY)}`;
         }).join(' ');
         routeSvg = `    <polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95" />

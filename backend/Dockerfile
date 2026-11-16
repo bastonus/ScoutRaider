@@ -1,49 +1,52 @@
-# ─────────────────────────────────────────────────────────────
-# ScoutRaider Suite — Backend Core Engine Dockerfile
-# Production-ready Debian image calibrated for WeasyPrint 68
-# Compatible with Coolify, Docker Compose, Traefik
-# ─────────────────────────────────────────────────────────────
+# Dockerfile pour le backend ScoutRaider
+FROM python:3.12-slim
 
-FROM python:3.12-slim-bookworm
-
+# Variables d'environnement
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install WeasyPrint system dependencies (Cairo, Pango, GdkPixbuf) and fonts
+# Installer dépendances système pour WeasyPrint + Pillow
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+    # WeasyPrint dependencies
     libcairo2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
     libgdk-pixbuf-2.0-0 \
     libffi-dev \
     shared-mime-info \
-    fonts-dejavu-core \
-    fonts-liberation \
-    fontconfig \
-    curl \
+    # Pillow dependencies
+    libjpeg-dev \
+    libpng-dev \
+    libwebp-dev \
+    zlib1g-dev \
+    # Build tools pour wheels
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Créer utilisateur non-root
+RUN useradd --create-home --shell /bin/bash appuser
+WORKDIR /home/appuser
 
-# Copy dependency requirements
-COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Copier requirements et installer
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
 
-# Copy backend application source
-COPY backend /app/backend
-COPY legacy/modules /app/legacy/modules
+# Copier le code
+COPY --chown=appuser:appuser app/ ./app/
 
-# Set Python path so `backend.app` resolves seamlessly
-ENV PYTHONPATH=/app
+# Changer vers utilisateur non-root
+USER appuser
 
+# Exposer le port
 EXPOSE 8000
 
-# Health check for container orchestrators (Coolify / Docker)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5)"
 
-# Start FastAPI server via Uvicorn
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Commande de démarrage
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

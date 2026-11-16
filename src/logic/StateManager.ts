@@ -156,7 +156,13 @@ export class StateManager {
             loading_text: '',
             notifications: [],
             selected_layer_id: null,
-            selected_sublayer_id: null
+            selected_sublayer_id: null,
+            // ☁️ Cloud Sync
+            cloud_sync_status: 'offline',
+            cloud_last_synced: null,
+            cloud_project_id: null,
+            cloud_share_token: null,
+            autosave_enabled: true,
         };
     }
 
@@ -175,6 +181,11 @@ export class StateManager {
         delete persistable.mapy_api_key;
         delete persistable.ign_api_key;
         delete persistable.current_filepath;
+        // Cloud sync transient fields (not persisted)
+        delete persistable.cloud_sync_status;
+        delete persistable.cloud_last_synced;
+        // cloud_project_id et cloud_share_token SONT persistés pour retrouver le projet cloud
+        // autosave_enabled est persisté
 
         const envelope = {
             _scoutproj: true,
@@ -204,8 +215,346 @@ export class StateManager {
     }
 
     /**
+     * Détecte si un état est au format legacy (v5.x) vs nouveau (v2.0+ avec champs cloud)
+     */
+    static isLegacyFormat(state: any): boolean {
+        // L'ancien format n'a pas les champs cloud sync
+        return state.cloud_sync_status === undefined &&
+               state.cloud_project_id === undefined &&
+               state.autosave_enabled === undefined;
+    }
+
+    /**
+     * Convertit un ancien état v5.x vers le nouveau format v2.0 (avec enveloppe)
+     * Appelé automatiquement à l'ouverture d'un fichier .srdoc legacy
+     */
+    static convertLegacyToV2(legacyState: any): AppState {
+        console.log('[StateManager] Conversion legacy v5 → v2.0 détectée, migration en cours...');
+
+        const defaults = StateManager.getInitialState();
+
+        // Construire le document V2 depuis l'ancien carnet_steps
+        const documentV2 = this.buildDocumentV2FromLegacy(legacyState);
+
+        // Fusionner avec les defaults pour avoir tous les champs cloud
+        const migrated: AppState = {
+            ...defaults,
+            ...legacyState,
+            // Écraser carnet_steps par la version convertie si nécessaire
+            carnet_steps: this.convertLegacyCarnetSteps(legacyState.carnet_steps || []),
+            // Champs cloud ajoutés
+            cloud_sync_status: 'offline',
+            cloud_last_synced: null,
+            cloud_project_id: null,
+            cloud_share_token: null,
+            autosave_enabled: true,
+            // Garder les préférences UI
+            active_mode: legacyState.active_mode || 'map',
+            active_tool: legacyState.active_tool || 'route',
+            theme_id: legacyState.theme_id || 'Neutre',
+        };
+
+        // Sauvegarder l'ancien project_name comme document_title si pas de titre
+        if (!migrated.document_title && (legacyState as any).project_name) {
+            migrated.document_title = (legacyState as any).project_name;
+        }
+
+        console.log('[StateManager] Migration terminée avec succès');
+        return migrated;
+    }
+
+    /**
+     * Construit un DocumentV2 complet depuis l'état legacy pour export/sauvegarde
+     */
+    static buildDocumentV2FromLegacy(state: any) {
+        const now = new Date().toISOString();
+        const docId = `doc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
+        return {
+            schemaVersion: '2.0',
+            id: docId,
+            title: state.document_title || (state as any).project_name || 'Document sans titre',
+            createdAt: now,
+            updatedAt: now,
+            version: 1,
+            assets: this.extractAssetsFromLegacyState(state),
+            pageLayout: this.getDefaultPageLayout(),
+            blocks: this.convertLegacyCarnetStepsToBlocks(state.carnet_steps || [], state),
+            settings: this.getDefaultSettings()
+        };
+    }
+
+    /**
+     * Extrait les assets (polices, images) depuis l'état legacy
+     */
+    static extractAssetsFromLegacyState(state: any): { fonts: any[]; images: Record<string, any> } {
+        const fonts: any[] = [];
+        const images: Record<string, any> = {};
+
+        // Polices utilisées par les modules de chiffrement dans carnet_steps
+        const usedModules = new Set(
+            (state.carnet_steps || [])
+                .map((s: any) => s.moduleId)
+                .filter(Boolean)
+        );
+
+        const moduleFonts: Record<string, { family: string; weight: number }> = {
+            morse: { family: 'Morse', weight: 400 },
+            templier: { family: 'TemplarsCipherPlus', weight: 400 },
+            maritime: { family: 'Maritime', weight: 400 },
+        };
+
+        usedModules.forEach(mod => {
+            if (moduleFonts[mod]) {
+                fonts.push({
+                    id: `font_${mod}`,
+                    family: moduleFonts[mod].family,
+                    weight: moduleFonts[mod].weight,
+                    assetId: `fonts/${mod}.woff2`,
+                    path: `assets/fonts/${mod}.woff2`,
+                    mimeType: 'font/woff2'
+                });
+            }
+        });
+
+        // Police par défaut
+        fonts.unshift({
+            id: 'font_default',
+            family: 'system-ui',
+            weight: 400,
+            assetId: '',
+            path: '',
+            mimeType: ''
+        });
+
+        // Images des cartes (étapes carte_ign, carte_simple, drapeaux)
+        let imgCounter = 0;
+        (state.carnet_steps || []).forEach((step: any) => {
+            if (['carte_ign', 'carte_simple', 'drapeaux'].includes(step.moduleId) && step.coords?.length) {
+                const assetId = `map_${step.id}`;
+                const imgKey = `img_${++imgCounter}`;
+                images[imgKey] = {
+                    assetId,
+                    path: `assets/images/${assetId}.webp`,
+                    width: step.mapPersist?.width || 800,
+                    height: step.mapPersist?.height || 600,
+                    mimeType: 'image/webp',
+                    originalName: `carte-${step.fromLabel}-${step.toLabel}.webp`
+                };
+            }
+        });
+
+        return { fonts, images };
+    }
+
+    /**
+     * Convertit les anciens carnet_steps en blocs V2
+     */
+    static convertLegacyCarnetStepsToBlocks(steps: any[], state: any): any[] {
+        const blocks: any[] = [];
+        let order = 0;
+
+        // Page de garde (toujours en premier)
+        const titleStep = steps.find((s: any) => s.isTitleStep);
+        if (titleStep) {
+            blocks.push({
+                id: `blk_title_${Date.now()}`,
+                type: 'title_page',
+                locked: false,
+                autoUpdate: false,
+                dependsOn: [],
+                order: order++,
+                config: {
+                    title: titleStep.solutionText?.replace(/<[^>]+>/g, '').trim() || 'Carnet de Raid',
+                    subtitle: `Raid du ${new Date().toLocaleDateString('fr-FR')}`,
+                    author: 'ScoutRaider',
+                    date: new Date().toISOString().split('T')[0]
+                }
+            });
+        } else {
+            // Page de garde par défaut si pas de titre
+            blocks.push({
+                id: `blk_title_${Date.now()}`,
+                type: 'title_page',
+                locked: false,
+                autoUpdate: false,
+                dependsOn: [],
+                order: order++,
+                config: {
+                    title: 'Carnet de Raid',
+                    subtitle: `Raid du ${new Date().toLocaleDateString('fr-FR')}`,
+                    author: 'ScoutRaider',
+                    date: new Date().toISOString().split('T')[0]
+                }
+            });
+        }
+
+        // Étapes du carnet
+        steps.forEach((step: any) => {
+            if (step.isTitleStep) return;
+
+            if (step.isManual) {
+                // Bloc manuel (commentaire ou code saisi à la main)
+                if (step.manualType === 'html') {
+                    blocks.push({
+                        id: step.id || `blk_manual_${Date.now()}_${order}`,
+                        type: 'rich_text',
+                        locked: false,
+                        autoUpdate: false,
+                        dependsOn: [],
+                        order: order++,
+                        content: [{ type: 'paragraph', text: step.solutionText || '' }]
+                    });
+                } else if (step.manualType === 'code') {
+                    blocks.push({
+                        id: step.id || `blk_manual_${Date.now()}_${order}`,
+                        type: 'crypto_block',
+                        locked: false,
+                        autoUpdate: false,
+                        dependsOn: [],
+                        order: order++,
+                        config: {
+                            cipher: step.moduleId as any,
+                            key: step.moduleId === 'vigenere' ? require('../ThemeManager').themeManager.getTheme(state.theme_id || 'Neutre').vigenere_key : undefined,
+                            sourceText: step.solutionText || '',
+                            renderedText: step.encodedText || step.solutionText || '',
+                            autoRegenerate: false
+                        }
+                    });
+                }
+            } else {
+                // Bloc calculé (généré depuis l'itinéraire)
+                if (['morse', 'vigenere', 'polybe', 'templier', 'maritime', 'avocat', 'cassis'].includes(step.moduleId)) {
+                    blocks.push({
+                        id: step.id || `blk_crypto_${Date.now()}_${order}`,
+                        type: 'crypto_block',
+                        locked: true,           // Protégé : généré automatiquement
+                        autoUpdate: true,       // Recalculé si l'itinéraire change
+                        dependsOn: step.segmentIndices?.map((i: number) => `segment_${i}`) || [],
+                        order: order++,
+                        config: {
+                            cipher: step.moduleId as any,
+                            key: step.moduleId === 'vigenere' ? require('../ThemeManager').themeManager.getTheme(state.theme_id || 'Neutre').vigenere_key : undefined,
+                            sourceText: step.solutionText || '',
+                            renderedText: step.encodedText || step.solutionText || '',
+                            autoRegenerate: true
+                        }
+                    });
+                } else if (['carte_ign', 'carte_simple', 'drapeaux'].includes(step.moduleId)) {
+                    blocks.push({
+                        id: step.id || `blk_map_${Date.now()}_${order}`,
+                        type: 'map_snippet',
+                        locked: true,
+                        autoUpdate: !step.mapPersist?.isLocked,
+                        dependsOn: step.segmentIndices?.map((i: number) => `segment_${i}`) || [],
+                        order: order++,
+                        config: {
+                            center: step.mapPersist?.center || step.mapCenter || [48.85, 2.35],
+                            zoom: step.mapPersist?.zoom || step.mapZoom || 15,
+                            width: step.mapPersist?.width || 800,
+                            height: step.mapPersist?.height || 600,
+                            scaleName: step.mapPersist?.scaleName || '1:25000',
+                            layerId: step.mapPersist?.layerId || 'PLAN.IGN',
+                            showRoute: step.mapPersist?.showRoute ?? true,
+                            showEndpoints: step.mapPersist?.showEndpoints ?? true,
+                            showAnnotations: step.mapPersist?.showAnnotations ?? true,
+                            routeCoords: step.coords?.map((c: any) => [c[1], c[0]])
+                        }
+                    });
+                } else if (step.moduleId === 'gilwell' && step.gilwellSvg) {
+                    blocks.push({
+                        id: step.id || `blk_gilwell_${Date.now()}_${order}`,
+                        type: 'rich_text',
+                        locked: true,
+                        autoUpdate: true,
+                        dependsOn: step.segmentIndices?.map((i: number) => `segment_${i}`) || [],
+                        order: order++,
+                        content: [{ type: 'code_block', text: step.gilwellSvg, language: 'svg' }]
+                    });
+                } else {
+                    // Texte clair ou autre
+                    blocks.push({
+                        id: step.id || `blk_text_${Date.now()}_${order}`,
+                        type: 'rich_text',
+                        locked: true,
+                        autoUpdate: true,
+                        dependsOn: step.segmentIndices?.map((i: number) => `segment_${i}`) || [],
+                        order: order++,
+                        content: [{ type: 'paragraph', text: step.solutionText || '' }]
+                    });
+                }
+            }
+        });
+
+        // Ajouter les annexes si modules utilisés
+        const usedModules = new Set(steps.map((s: any) => s.moduleId).filter(Boolean));
+        const moduleToAnnexe: Record<string, any> = {
+            morse: { type: 'morse', title: 'Table Morse International', content: '' },
+            polybe: { type: 'polybe', title: 'Carré de Polybe', content: '' },
+            vigenere: { type: 'vigenere', title: 'Table de Vigenère', content: '' },
+            maritime: { type: 'maritime', title: 'Code Maritime & Pavillons NATO', content: '' },
+            templier: { type: 'templier', title: 'Croix Templière', content: '' },
+            avocat: { type: 'avocat', title: 'Méthode Avocat (A=K / Décalage +10)', content: '' }
+        };
+
+        usedModules.forEach(mod => {
+            if (moduleToAnnexe[mod]) {
+                blocks.push({
+                    id: `blk_annexe_${mod}_${Date.now()}`,
+                    type: 'annexe',
+                    locked: true,
+                    autoUpdate: false,
+                    dependsOn: [],
+                    order: 1000 + order++,
+                    config: moduleToAnnexe[mod]
+                });
+            }
+        });
+
+        return blocks;
+    }
+
+    /**
+     * Convertit les carnet_steps legacy en format compatible (garde la structure existante pour l'éditeur)
+     */
+    static convertLegacyCarnetSteps(steps: any[]): any[] {
+        return (steps || []).map(step => ({
+            ...step,
+            // S'assurer que les champs requis existent
+            id: step.id || `step_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            warnings: step.warnings || [],
+            isEdited: step.isEdited || false,
+            anchorSegmentIdx: step.anchorSegmentIdx ?? -1
+        }));
+    }
+
+    static getDefaultPageLayout() {
+        return {
+            format: 'A4' as const,
+            orientation: 'portrait' as const,
+            margins: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' },
+            header: { enabled: true, left: 'Troupe 1ère Port-Marly', right: '{{document.title}}', fontSize: '8pt', color: '#666666' },
+            footer: { enabled: true, center: 'Page {{page}} / {{pages}}', fontSize: '8pt', color: '#999999' },
+            backgroundColor: '#ffffff'
+        };
+    }
+
+    static getDefaultSettings() {
+        return {
+            autoSave: true,
+            autoSaveInterval: 1000,
+            spellCheck: true,
+            showInvisibles: false,
+            defaultFontFamily: 'system-ui',
+            defaultFontSize: '11pt',
+            theme: 'system' as const
+        };
+    }
+
+    /**
      * Deserialize a .srdoc JSON string back into AppState.
      * Handles schema migration for older versions.
+     * AUTO-CONVERTIT le format legacy v5 → v2.0 automatiquement
      */
     static deserializeFromLoad(json: string): AppState {
         const data = JSON.parse(json);
@@ -213,15 +562,20 @@ export class StateManager {
         let loadedState: AppState;
 
         if (data._scoutproj) {
-            // New format with envelope
+            // Nouveau format avec enveloppe (v2.0+)
             loadedState = data.state as AppState;
             loadedState.version = data._version || CURRENT_SCHEMA_VERSION;
         } else {
-            // Legacy format: raw state object
+            // Format legacy v5.x (objet brut sans enveloppe)
             loadedState = data as AppState;
         }
 
-        // Migrate missing fields from defaults
+        // 🔄 AUTO-CONVERSION : Si format legacy, convertir vers v2.0
+        if (this.isLegacyFormat(loadedState)) {
+            return this.convertLegacyToV2(loadedState);
+        }
+
+        // Migration des champs manquants pour format v2.0+
         const defaults = StateManager.getInitialState();
         const migrated: AppState = { ...defaults, ...loadedState };
 
@@ -317,6 +671,13 @@ export class StateManager {
 
         if (!Array.isArray(migrated.polygonalization_settings.masked_nodes)) migrated.polygonalization_settings.masked_nodes = [];
         if (!Array.isArray(migrated.polygonalization_settings.forced_nodes)) migrated.polygonalization_settings.forced_nodes = [];
+
+        // ☁️ Cloud Sync - valeurs par défaut pour compatibilité
+        if (migrated.cloud_sync_status === undefined) migrated.cloud_sync_status = 'offline';
+        if (migrated.cloud_last_synced === undefined) migrated.cloud_last_synced = null;
+        if (migrated.cloud_project_id === undefined) migrated.cloud_project_id = null;
+        if (migrated.cloud_share_token === undefined) migrated.cloud_share_token = null;
+        if (migrated.autosave_enabled === undefined) migrated.autosave_enabled = true;
 
         return migrated;
     }

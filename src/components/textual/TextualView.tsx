@@ -18,6 +18,7 @@ import CodeBlockPicker from './CodeBlockPicker';
 import CarnetElevationBlock from './CarnetElevationBlock';
 import StepInsertSeparator from './StepInsertSeparator';
 import TextualHeader from './TextualHeader';
+import SlashCommandPalette from './SlashCommandPalette';
 import { mapRef } from '../map/MapComponent';
 import L from 'leaflet';
 import type { ViewMode } from '../../App';
@@ -25,7 +26,8 @@ import {
     Compass, AlertTriangle, Sparkles, Binary,
     LayoutGrid, KeyRound, Flag, Shield, Scale, Table,
     CheckSquare, X, ChevronDown, Globe, Code2, SlidersHorizontal,
-    Maximize2, Minimize2, FileText
+    Maximize2, Minimize2, FileText,
+    Lightbulb, ArrowRight
 } from 'lucide-react';
 
 function AnnexeSwitch({ isChecked, onToggle }: { isChecked: boolean; onToggle: () => void }) {
@@ -360,6 +362,247 @@ function MultiSelectBatchBar({
     );
 }
 
+// ─── Cloud Sync Status Component ──────────────────────────────────────────
+function CloudSyncStatus() {
+    const { state } = useApp();
+
+    const getStatusConfig = () => {
+        switch (state.cloud_sync_status) {
+            case 'synced':
+                return { icon: Cloud, color: 'var(--semantic-success)', label: 'Synchronisé', tooltip: state.cloud_last_synced ? `Dernière sync: ${new Date(state.cloud_last_synced).toLocaleTimeString()}` : 'Synchronisé' };
+            case 'pending':
+                return { icon: RefreshCw, color: 'var(--semantic-warning)', label: 'En attente', tooltip: 'Sauvegarde en attente...' };
+            case 'offline':
+                return { icon: CloudOff, color: 'var(--text-dim)', label: 'Hors ligne', tooltip: 'Mode hors ligne - les changements seront synchronisés à la reconnexion' };
+            case 'error':
+                return { icon: AlertCircle, color: 'var(--semantic-danger)', label: 'Erreur', tooltip: 'Erreur de synchronisation - cliquez pour réessayer' };
+            default:
+                return { icon: CloudOff, color: 'var(--text-dim)', label: 'Inconnu', tooltip: 'Statut inconnu' };
+        }
+    };
+
+    const config = getStatusConfig();
+    const Icon = config.icon;
+
+    return (
+        <div
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '10px',
+                background: `${config.color}15`,
+                border: `1px solid ${config.color}40`,
+                color: config.color,
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
+                position: 'relative',
+            }}
+            title={config.tooltip}
+        >
+            <Icon size={16} strokeWidth={2.2} />
+            {state.cloud_sync_status === 'pending' && (
+                <span style={{
+                    position: 'absolute',
+                    top: '-2px',
+                    right: '-2px',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: 'var(--semantic-warning)',
+                    animation: 'pulse 1.5s infinite'
+                }} />
+            )}
+            {state.cloud_sync_status === 'error' && (
+                <span style={{
+                    position: 'absolute',
+                    top: '-2px',
+                    right: '-2px',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: 'var(--semantic-danger)'
+                }} />
+            )}
+        </div>
+    );
+}
+
+// ─── Barre bas-gauche : Solutions (ampoule) + Erreurs ─────────────────────────
+function TextualBottomBar({ isSolution, onToggleSolution }: { isSolution: boolean; onToggleSolution: () => void }) {
+    const { state } = useApp();
+
+    // Récupérer les erreurs exposées par TextualHeader via window
+    const errorData = (window as any).__textualErrors || { items: [], hasErrors: false };
+    const errorItems = errorData.items || [];
+    const hasErrors = errorData.hasErrors || false;
+    const errorCount = errorItems.length;
+
+    return (
+        <div style={{
+            pointerEvents: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+        }}>
+            {/* BOUTON SOLUTIONS (ampoule) */}
+            <button
+                type="button"
+                role="switch"
+                aria-checked={isSolution}
+                onClick={onToggleSolution}
+                title={isSolution ? "Masquer les solutions (Vue participant)" : "Afficher les solutions (Vue animateur) — Raccourci : Alt+S"}
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '0 10px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    border: isSolution ? '1px solid var(--semantic-orange)' : '1px solid var(--border-subtle)',
+                    background: isSolution ? 'var(--semantic-orange)' : 'var(--bg-elevated)',
+                    color: isSolution ? '#09090b' : 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: isSolution ? 700 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 100ms ease',
+                    boxShadow: 'var(--shadow-sm)',
+                    userSelect: 'none',
+                    whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={e => { if (!isSolution) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { if (!isSolution) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+            >
+                <Lightbulb size={14} strokeWidth={isSolution ? 2.5 : 2} color={isSolution ? '#09090b' : 'var(--text-dim)'} fill={isSolution ? '#09090b' : 'none'} />
+                <span>Solutions</span>
+                <kbd style={{
+                    fontSize: '8.5px', padding: '0 4px', height: '16px', borderRadius: '4px',
+                    background: isSolution ? 'rgba(0, 0, 0, 0.15)' : 'var(--bg-surface)',
+                    color: isSolution ? '#09090b' : 'var(--text-dim)',
+                    border: isSolution ? 'none' : '1px solid var(--border-subtle)',
+                    fontFamily: 'var(--font-mono)', display: 'inline-flex', alignItems: 'center'
+                }} title="Raccourci clavier : Alt+S">Alt S</kbd>
+            </button>
+
+            {/* BOUTON ERREURS (si des anomalies existent) */}
+            {errorCount > 0 && (
+                <div style={{ position: 'relative' }}>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const evt = new CustomEvent('textual:open-errors');
+                            window.dispatchEvent(evt);
+                        }}
+                        title={`${errorCount} anomalie${errorCount > 1 ? 's' : ''} détectée${errorCount > 1 ? 's' : ''} dans le carnet — Cliquer pour voir la liste`}
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '5px',
+                            height: '36px', padding: '0 10px', borderRadius: '10px',
+                            border: `1px solid ${hasErrors ? '#dc2626' : '#d97706'}`,
+                            background: hasErrors ? '#ef4444' : '#f59e0b', color: '#ffffff',
+                            cursor: 'pointer', fontSize: '11px', fontWeight: 700,
+                            transition: 'all 100ms ease', boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = hasErrors ? '#dc2626' : '#d97706'}
+                        onMouseLeave={e => e.currentTarget.style.background = hasErrors ? '#ef4444' : '#f59e0b'}
+                    >
+                        <AlertTriangle size={13} strokeWidth={2.6} color="#ffffff" />
+                        <span>{errorCount}</span>
+                    </button>
+
+                    <ErrorBottomSheet
+                        errorItems={errorItems}
+                        hasErrors={hasErrors}
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Bottom sheet pour les erreurs (s'ouvre vers le haut depuis le bas)
+function ErrorBottomSheet({ errorItems, hasErrors }: { errorItems: any[]; hasErrors: boolean }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const sheetRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleOpen = () => setIsOpen(true);
+        window.addEventListener('textual:open-errors', handleOpen);
+        const handleClickOutside = (e: MouseEvent) => {
+            if (sheetRef.current && !sheetRef.current.contains(e.target as Node)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => { window.removeEventListener('textual:open-errors', handleOpen); document.removeEventListener('mousedown', handleClickOutside); };
+    }, []);
+
+    const handleJumpToError = (stepId: string) => {
+        setIsOpen(false);
+        const el = document.getElementById(`carnet-step-${stepId}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.style.transition = 'box-shadow 0.2s';
+            el.style.boxShadow = '0 0 0 2px #ef4444';
+            setTimeout(() => { el.style.boxShadow = 'none'; }, 2000);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div
+            ref={sheetRef}
+            style={{
+                position: 'absolute',
+                bottom: 'calc(100% + 8px)',
+                right: 0,
+                zIndex: 1600,
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-strong)',
+                borderRadius: '12px',
+                boxShadow: 'var(--shadow-lg)',
+                padding: '6px',
+                minWidth: '260px',
+                maxWidth: '340px',
+                maxHeight: '380px',
+                overflowY: 'auto',
+                animation: 'islandPopoverInTopRight 140ms cubic-bezier(0.16, 1, 0.3, 1)',
+                transformOrigin: 'bottom right',
+            }}
+        >
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '4px 8px 6px', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--border-subtle)', marginBottom: '4px' }}>
+                Anomalies & Contraintes ({errorItems.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {errorItems.map((item, idx) => (
+                    <div
+                        key={idx}
+                        onClick={() => handleJumpToError(item.stepId)}
+                        style={{
+                            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px',
+                            padding: '6px 8px', borderRadius: '8px', background: 'transparent', cursor: 'pointer',
+                            transition: 'all 80ms ease'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: item.severity === 'error' ? '#ef4444' : '#f59e0b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.severity === 'error' ? '#ef4444' : '#f59e0b' }} />
+                                {item.stepLabel}
+                            </span>
+                            <span style={{ fontSize: '10.5px', color: 'var(--text-default)', lineHeight: 1.3, marginTop: '2px' }}>
+                                {item.message}
+                            </span>
+                        </div>
+                        <ArrowRight size={12} color="var(--text-dim)" style={{ marginTop: '3px', flexShrink: 0 }} />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export interface TextualViewProps {
     onExport?: () => void;
     viewMode?: ViewMode;
@@ -382,6 +625,9 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
     const [pickingCodeFor, setPickingCodeFor] = useState<{ stepId: string, anchorSegmentIdx?: number } | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
     const [lastSelectedKey, setLastSelectedKey] = useState<string | null>(null);
+    const [slashPaletteOpen, setSlashPaletteOpen] = useState(false);
+    const [slashPaletteTrigger, setSlashPaletteTrigger] = useState<{ x: number; y: number } | null>(null);
+    const slashPaletteAnchorRef = useRef<HTMLDivElement>(null);
 
     // Liste aplatie de tous les éléments sélectionnables pour la sélection de plage (Shift+Click)
     const flatItems = useMemo(() => {
@@ -509,6 +755,13 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
             if (e.key === 'Escape' && selectedKeys.size > 0) {
                 setSelectedKeys(new Set());
             }
+            // Ctrl+/ pour ouvrir la palette de commandes slash
+            if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+                e.preventDefault();
+                // Positionner la palette au centre de l'écran
+                setSlashPaletteTrigger({ x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 150 });
+                setSlashPaletteOpen(true);
+            }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
@@ -520,7 +773,7 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
             dispatch({
                 type: 'INSERT_MANUAL_STEP_TYPED',
                 afterStepId: '',
-                content: '',
+                content: '# ',
                 manualType: 'html',
                 isTitleStep: true
             });
@@ -588,6 +841,60 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
         dispatch({ type: 'TOGGLE_POI', stepId, poiId });
     }, [dispatch]);
 
+    // Nouvelles actions pour les blocs
+    const handleDuplicateStep = useCallback((stepId: string) => {
+        // Trouver l'étape et la dupliquer après elle
+        const stepIdx = steps.findIndex(s => s.id === stepId);
+        if (stepIdx >= 0) {
+            const step = steps[stepIdx];
+            if (step.isManual) {
+                dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId: stepId, content: step.solutionText, manualType: step.manualType || 'html', moduleId: step.moduleId });
+            }
+        }
+    }, [dispatch, steps]);
+
+    const handleMoveStepUp = useCallback((stepId: string) => {
+        const stepIdx = steps.findIndex(s => s.id === stepId);
+        if (stepIdx > 0) {
+            // Échanger avec l'étape précédente
+            const newSteps = [...steps];
+            [newSteps[stepIdx - 1], newSteps[stepIdx]] = [newSteps[stepIdx], newSteps[stepIdx - 1]];
+            // Note: This would need a proper REORDER action in the reducer
+            // For now, we'll need to implement this in the reducer
+        }
+    }, [dispatch, steps]);
+
+    const handleMoveStepDown = useCallback((stepId: string) => {
+        const stepIdx = steps.findIndex(s => s.id === stepId);
+        if (stepIdx >= 0 && stepIdx < steps.length - 1) {
+            const newSteps = [...steps];
+            [newSteps[stepIdx], newSteps[stepIdx + 1]] = [newSteps[stepIdx + 1], newSteps[stepIdx]];
+        }
+    }, [dispatch, steps]);
+
+    const handleCopyStep = useCallback((stepId: string) => {
+        const step = steps.find(s => s.id === stepId);
+        if (step) {
+            navigator.clipboard.writeText(JSON.stringify(step, null, 2));
+        }
+    }, [steps]);
+
+    const handleLinkReference = useCallback((stepId: string) => {
+        // Copier une référence markdown vers ce bloc
+        const ref = `[@block:${stepId}]`;
+        navigator.clipboard.writeText(ref);
+    }, []);
+
+    const handleOpenFontSelector = useCallback((stepId: string) => {
+        // Ouvrir le sélecteur de polices pour ce bloc
+        console.log('Open font selector for:', stepId);
+    }, []);
+
+    const handleOpenSettings = useCallback((stepId: string) => {
+        // Ouvrir les paramètres avancés pour ce bloc
+        console.log('Open settings for:', stepId);
+    }, []);
+
     const handleLineClick = useCallback((step: any, segIdx?: number) => {
         if (viewMode === 'split' && mapRef.current) {
             if (segIdx !== undefined) {
@@ -629,6 +936,7 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
     const isAnnexeActive = (id: AnnexeId) => !(state.disabled_annexes || []).includes(id);
 
     const accentColor = state.carnet_view === 'solution' ? 'var(--semantic-orange)' : 'var(--accent-hover)';
+    const isSolution = state.carnet_view === 'solution';
 
     return (
         <div style={{
@@ -716,6 +1024,13 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                                         selectedKeys={selectedKeys}
                                         onItemSelect={handleItemSelect}
                                         stageLabelMap={stageLabelMap}
+                                        onDuplicateStep={handleDuplicateStep}
+                                        onMoveStepUp={handleMoveStepUp}
+                                        onMoveStepDown={handleMoveStepDown}
+                                        onCopyStep={handleCopyStep}
+                                        onLinkReference={handleLinkReference}
+                                        onOpenFontSelector={handleOpenFontSelector}
+                                        onOpenSettings={handleOpenSettings}
                                     />
                                     {pickingCodeFor?.stepId === step.id && (
                                         <CodeBlockPicker
@@ -1108,19 +1423,19 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
             </div>
 
             {/* ── Floating Toolbar globale en HAUT du carnet (Alignée avec la barre de recherche des cartes, 40px) ── */}
+            {/* Conteneur responsive : marge gauche 16px, barre prend tout l'espace, marge droite 16px + bouton maximize (~60px) */}
             <div
                 id="textual-floating-bar-container"
                 style={{
                     position: 'absolute',
                     top: '16px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
+                    left: '16px',
+                    right: onViewModeChange && !isMobile ? '88px' : '16px', // 16px marge + ~72px maximize+sync
                     zIndex: 1100,
                     pointerEvents: 'none',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    maxWidth: isMobile ? 'calc(100% - 24px)' : 'calc(100% - 100px)',
+                    justifyContent: 'flex-start', // barre alignée à gauche, utilise toute la largeur
                 }}
             >
                 {selectedKeys.size > 1 ? (
@@ -1137,7 +1452,7 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                 )}
             </div>
 
-            {/* BOUTON HAUT DROITE ALIGNÉ : MAXIMIZE / MINIMIZE (DESKTOP SEULEMENT) */}
+            {/* BOUTON HAUT DROITE ALIGNÉ : SYNC STATUS + MAXIMIZE / MINIMIZE (DESKTOP SEULEMENT) */}
             {onViewModeChange && !isMobile && (
                 <div style={{
                     position: 'absolute',
@@ -1146,6 +1461,7 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                     height: '40px',
                     display: 'flex',
                     alignItems: 'center',
+                    gap: '8px',
                     background: 'var(--bg-elevated)',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: '14px',
@@ -1192,6 +1508,86 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                     </button>
                 </div>
             )}
+
+            {/* ── BARRE FLOTTANTE BAS-DROITE : Solutions (ampoule) + Erreurs ── */}
+            <div
+                id="textual-bottom-bar"
+                style={{
+                    position: 'absolute',
+                    bottom: '16px',
+                    right: '16px',
+                    zIndex: 1100,
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                }}
+            >
+                <TextualBottomBar
+                    isSolution={isSolution}
+                    onToggleSolution={() => dispatch({ type: 'SET_CARNET_VIEW', view: isSolution ? 'participant' : 'solution' })}
+                />
+            </div>
+
+            {/* ── Palette de commandes slash (/) ── */}
+            <SlashCommandPalette
+                isOpen={slashPaletteOpen}
+                onClose={() => setSlashPaletteOpen(false)}
+                onInsertBlock={(blockType, config) => {
+                    // Gérer l'insertion de blocs via la palette
+                    const afterStepId = steps.length > 0 ? steps[steps.length - 1].id : '';
+                    switch (blockType) {
+                        case 'heading':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '# '.repeat(config?.level || 1) + ' ', manualType: 'html' });
+                            break;
+                        case 'paragraph':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '', manualType: 'html' });
+                            break;
+                        case 'bullet_list':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '- ', manualType: 'html' });
+                            break;
+                        case 'numbered_list':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '1. ', manualType: 'html' });
+                            break;
+                        case 'check_list':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '- [ ] ', manualType: 'html' });
+                            break;
+                        case 'blockquote':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '> ', manualType: 'html' });
+                            break;
+                        case 'divider':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '\n---\n', manualType: 'html' });
+                            break;
+                        case 'image':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '![]()', manualType: 'html' });
+                            break;
+                        case 'file':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '[Fichier]()', manualType: 'html' });
+                            break;
+                        case 'crypto_block':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '', manualType: 'code', moduleId: config?.cipher });
+                            break;
+                        case 'code_block':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '\n```\n\n```\n', manualType: 'html' });
+                            break;
+                        case 'annexe':
+                            // Insérer une annexe
+                            break;
+                        case 'latex':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '$$\n\n$$\n', manualType: 'html' });
+                            break;
+                        case 'toc':
+                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '[[TOC]]', manualType: 'html' });
+                            break;
+                    }
+                }}
+                onSearchReference={(query) => {
+                    // Gérer la recherche de références
+                    console.log('Search reference:', query);
+                }}
+                anchorRef={slashPaletteAnchorRef}
+                triggerPosition={slashPaletteTrigger}
+            />
         </div>
     );
 }
