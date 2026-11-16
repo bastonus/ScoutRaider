@@ -132,8 +132,59 @@ async def revoke_share_link(
     await db.commit()
 
 
-# Route publique pour accéder via token de partage
+# Route publique pour accéder via token de partage (documents router)
 @router.get("/shared/{token}")
+async def access_shared_document_documents(
+    token: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Accède à un document partagé via son token (sans authentification requise)."""
+    result = await db.execute(
+        select(ShareLink).where(ShareLink.token == token, ShareLink.is_revoked == False)
+    )
+    link = result.scalar_one_or_none()
+
+    if not link:
+        raise HTTPException(status_code=404, detail="Lien de partage invalide ou révoqué")
+
+    # Vérifier expiration
+    if link.expires_at:
+        from datetime import datetime
+        if datetime.utcnow() > link.expires_at:
+            raise HTTPException(status_code=410, detail="Lien de partage expiré")
+
+    # Incrémenter compteur d'accès
+    link.access_count += 1
+    from datetime import datetime
+    link.last_accessed_at = datetime.utcnow()
+    await db.commit()
+
+    # Récupérer le document
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(
+        select(Document).options(selectinload(Document.assets))
+        .where(Document.id == link.document_id, Document.is_deleted == False)
+    )
+    document = result.scalar_one_or_none()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document non trouvé")
+
+    return {
+        "document": document,
+        "permissions": link.permissions,
+        "share_token": token
+    }
+
+
+# Alias pour compatibilité frontend: /api/projects/shared/{identifier}
+@router.get("/../projects/shared/{identifier}")
+async def access_shared_projects(
+    identifier: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Alias for /documents/shared/{token} - frontend calls /projects/shared/"""
+    return await access_shared_document_documents(identifier, db)
 async def access_shared_document(
     token: str,
     db: AsyncSession = Depends(get_db)
