@@ -16,8 +16,8 @@ from app.models import User, Document, Asset, ShareLink  # noqa: F401
 
 config = context.config
 
-# Override sqlalchemy.url depuis settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("asyncpg", "psycopg2"))
+# Override sqlalchemy.url depuis settings - keep asyncpg for async engine
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
