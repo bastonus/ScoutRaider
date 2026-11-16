@@ -40,7 +40,7 @@ COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy Backend and Legacy Modules
-COPY backend /app/backend
+COPY backend/app /app/app
 COPY legacy/modules /app/legacy/modules
 
 # Copy pre-built frontend directly (no Node/npm needed in Docker)

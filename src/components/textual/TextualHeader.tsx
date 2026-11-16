@@ -230,6 +230,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
     }, []);
 
     useEffect(() => {
+        // Utiliser 'click' au lieu de 'mousedown' pour laisser les onClick des items s'exécuter d'abord
         const handler = (e: MouseEvent) => {
             const target = e.target as Node;
             if (themePickerRef.current && !themePickerRef.current.contains(target)) setThemePickerOpen(false);
@@ -237,8 +238,8 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
             if (formatMenuRef.current && !formatMenuRef.current.contains(target)) setFormatMenuOpen(false);
             if (editMenuRef.current && !editMenuRef.current.contains(target)) setEditMenuOpen(false);
         };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
+        document.addEventListener('click', handler);
+        return () => document.removeEventListener('click', handler);
     }, []);
 
     // Raccourci clavier Alt+S pour basculer les solutions (global, marche même si bouton masqué)
@@ -317,9 +318,8 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                     position: 'relative',
                     boxSizing: 'border-box',
                     pointerEvents: 'all',
-                    width: '100%', // prend toute la largeur du conteneur
-                    maxWidth: '100%',
-                    overflow: 'hidden',
+                    // fit-content : la barre ne prend que la place nécessaire aux icônes
+                    // le conteneur parent (TextualView) gère la contrainte max-width
                 }}
             >
                 {/* ═══ SECTION 1: HISTORIQUE (Annuler/Rétablir) ═══ */}
@@ -327,7 +327,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                     <div style={{ position: 'relative' }} ref={editMenuRef}>
                         <button
                             type="button"
-                            onMouseDown={e => { e.preventDefault(); setEditMenuOpen(v => !v); }}
+                            onClick={e => { e.stopPropagation(); setEditMenuOpen(v => !v); }}
                             title="Outils d'édition"
                             style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '3px',
@@ -351,22 +351,22 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                             }}>
                                 <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Historique</div>
                                 <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
-                                    <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('undo'); setEditMenuOpen(false); }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '11px', cursor: 'pointer' }}><Undo2 size={12} /> <span>Annuler</span></button>
-                                    <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('redo'); setEditMenuOpen(false); }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '11px', cursor: 'pointer' }}><Redo2 size={12} /> <span>Rétablir</span></button>
+                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('undo'); setEditMenuOpen(false); }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '11px', cursor: 'pointer' }}><Undo2 size={12} /> <span>Annuler</span></button>
+                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('redo'); setEditMenuOpen(false); }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '11px', cursor: 'pointer' }}><Redo2 size={12} /> <span>Rétablir</span></button>
                                 </div>
                                 <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Style de texte</div>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '6px' }}>
-                                    <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('bold'); setEditMenuOpen(false); }} title="Gras" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Bold size={12} /></button>
-                                    <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('italic'); setEditMenuOpen(false); }} title="Italique" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Italic size={12} /></button>
-                                    <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('underline'); setEditMenuOpen(false); }} title="Souligné" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Underline size={12} /></button>
-                                    <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('code'); setEditMenuOpen(false); }} title="Code" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Code size={12} /></button>
+                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('bold'); setEditMenuOpen(false); }} title="Gras" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Bold size={12} /></button>
+                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('italic'); setEditMenuOpen(false); }} title="Italique" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Italic size={12} /></button>
+                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('underline'); setEditMenuOpen(false); }} title="Souligné" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Underline size={12} /></button>
+                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('code'); setEditMenuOpen(false); }} title="Code" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Code size={12} /></button>
                                 </div>
                                 <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Structure</div>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
-                                    <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('h1'); setEditMenuOpen(false); }} title="Titre" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Heading size={12} /></button>
-                                    <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('list'); setEditMenuOpen(false); }} title="Puces" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><List size={12} /></button>
-                                    <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('list-ordered'); setEditMenuOpen(false); }} title="Numéroté" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><ListOrdered size={12} /></button>
-                                    <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('quote'); setEditMenuOpen(false); }} title="Citation" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Quote size={12} /></button>
+                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('h1'); setEditMenuOpen(false); }} title="Titre" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Heading size={12} /></button>
+                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('list'); setEditMenuOpen(false); }} title="Puces" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><List size={12} /></button>
+                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('list-ordered'); setEditMenuOpen(false); }} title="Numéroté" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><ListOrdered size={12} /></button>
+                                    <button type="button" onClick={e => { e.preventDefault(); handleFormat('quote'); setEditMenuOpen(false); }} title="Citation" style={{ padding: '6px', borderRadius: '7px', border: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Quote size={12} /></button>
                                 </div>
                             </div>
                         )}
@@ -404,7 +404,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                                 <div style={{ position: 'relative' }} ref={formatMenuRef}>
                                     <button
                                         type="button"
-                                        onMouseDown={e => { e.preventDefault(); setFormatMenuOpen(v => !v); }}
+                                        onClick={e => { e.stopPropagation(); setFormatMenuOpen(v => !v); }}
                                         title="Formatage avancé : Souligné, Code, Titre, Listes, Citation"
                                         style={{
                                             display: 'inline-flex', alignItems: 'center', gap: '2px',
@@ -427,14 +427,14 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                                             animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
                                         }}>
                                             <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Style de texte</div>
-                                            <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('underline'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Underline size={13} /> <span>Souligné (Ctrl+U)</span></button>
-                                            <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('code'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Code size={13} /> <span>Code en ligne</span></button>
+                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('underline'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Underline size={13} /> <span>Souligné (Ctrl+U)</span></button>
+                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('code'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Code size={13} /> <span>Code en ligne</span></button>
                                             <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '2px 0' }} />
                                             <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Structure</div>
-                                            <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('h1'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Heading size={13} /> <span>Titre de section</span></button>
-                                            <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('list'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><List size={13} /> <span>Liste à puces</span></button>
-                                            <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('list-ordered'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><ListOrdered size={13} /> <span>Liste numérotée</span></button>
-                                            <button type="button" onMouseDown={e => { e.preventDefault(); handleFormat('quote'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Quote size={13} /> <span>Citation</span></button>
+                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('h1'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Heading size={13} /> <span>Titre de section</span></button>
+                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('list'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><List size={13} /> <span>Liste à puces</span></button>
+                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('list-ordered'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><ListOrdered size={13} /> <span>Liste numérotée</span></button>
+                                            <button type="button" onClick={e => { e.preventDefault(); handleFormat('quote'); setFormatMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '7px', border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer', textAlign: 'left' }}><Quote size={13} /> <span>Citation</span></button>
                                         </div>
                                     )}
                                 </div>
@@ -446,7 +446,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                         <div style={{ position: 'relative' }} ref={cipherMenuRef}>
                             <button
                                 type="button"
-                                onMouseDown={e => { e.preventDefault(); setCipherMenuOpen(v => !v); }}
+                                onClick={e => { e.stopPropagation(); setCipherMenuOpen(v => !v); }}
                                 title="Appliquer un codage cryptographique (Morse, Templiers, Maritime...)"
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: '4px',
@@ -486,7 +486,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                                         {CIPHER_FONT_OPTIONS.map(opt => (
                                             <button
                                                 key={opt.id} type="button"
-                                                onMouseDown={e => { e.preventDefault(); handleFormat('cipher', opt.id); setSelectedCipher(opt.id); setCipherMenuOpen(false); }}
+                                                onClick={e => { e.preventDefault(); handleFormat('cipher', opt.id); setSelectedCipher(opt.id); setCipherMenuOpen(false); }}
                                                 style={{
                                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
                                                     padding: '6px 8px', borderRadius: '7px', border: 'none',

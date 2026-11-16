@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from fastapi.responses import StreamingResponse
 import uuid
 import json
+import math
 
 from app.database import get_db
 from app.models.document import Document, Asset
@@ -123,6 +124,121 @@ async def export_srproj(
 
 # Import garage_client pour l'export
 from app.services.s3_client import garage_client
+
+
+# ─── Génération SVG de carte statique (sans tuiles, pour backend) ─────────────
+
+def lat_lng_to_world_pixel(lat: float, lng: float, zoom: float) -> tuple:
+    """Projette une coordonnée (lat, lng) en pixels monde Web Mercator (EPSG:3857)."""
+    lat_rad = math.radians(lat)
+    n = 2 ** zoom
+    x = ((lng + 180) / 360) * n * 256
+    y = ((1 - math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi) / 2) * n * 256
+    return (x, y)
+
+
+def generate_static_map_svg(
+    lat_lngs: list,
+    center: tuple,
+    zoom: float,
+    width: int,
+    height: int,
+    show_route: bool = True,
+    show_endpoints: bool = True,
+    route_color: str = "#2563eb"
+) -> tuple:
+    """
+    Génère un SVG de carte statique avec tracé vectoriel, points de départ/arrivée et échelle.
+    Sans tuiles de fond (pas de clés API côté backend).
+    Retourne (svg_string, formatted_scale).
+    """
+    W = int(width)
+    H = int(height)
+
+    # Projection au zoom fractionnaire exact pour l'échelle précise
+    z_proj = min(18, max(8, zoom))
+
+    # Pixel monde du centre
+    c_px = lat_lng_to_world_pixel(center[0], center[1], z_proj)
+    origin_x = c_px[0] - W / 2
+    origin_y = c_px[1] - H / 2
+
+    # Tracé de la route
+    route_svg = ""
+    if show_route and len(lat_lngs) >= 2:
+        pts = []
+        for p in lat_lngs:
+            pos = lat_lng_to_world_pixel(p[0], p[1], z_proj)
+            pts.append(f"{pos[0] - origin_x:.1f},{pos[1] - origin_y:.1f}")
+        route_svg = f'    <polyline points="{" ".join(pts)}" fill="none" stroke="{route_color}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95" />\n'
+
+    # Points de départ (vert) et d'arrivée (rouge)
+    endpoints_svg = ""
+    if show_endpoints and len(lat_lngs) > 0:
+        p_start = lat_lng_to_world_pixel(lat_lngs[0][0], lat_lngs[0][1], z_proj)
+        p_end = lat_lng_to_world_pixel(lat_lngs[-1][0], lat_lngs[-1][1], z_proj)
+        endpoints_svg += f'    <circle cx="{p_start[0] - origin_x:.1f}" cy="{p_start[1] - origin_y:.1f}" r="6" fill="#22c55e" stroke="#ffffff" stroke-width="2" />\n'
+        endpoints_svg += f'    <circle cx="{p_end[0] - origin_x:.1f}" cy="{p_end[1] - origin_y:.1f}" r="6" fill="#ef4444" stroke="#ffffff" stroke-width="2" />\n'
+
+    # ─── Échelle réelle et barre métrique dynamique ─────────────────────────
+    lat_rad = math.radians(center[0])
+    mpp = (156543.03392 * math.cos(lat_rad)) / (2 ** z_proj)
+
+    # Dénominateur de l'échelle réelle à 96 DPI standard
+    scale_denominator = mpp * (96 / 0.0254)
+    rounded_scale = round(scale_denominator / 1000) * 1000
+    formatted_scale = f"1:{rounded_scale:,}".replace(",", " ")
+
+    # Choix automatique d'une graduation métrique esthétique (entre 60px et 140px)
+    distance_candidates = [50, 100, 200, 250, 500, 1000, 2000, 5000, 10000]
+    bar_distance_m = 500
+    for cand in distance_candidates:
+        px = cand / mpp
+        if 60 <= px <= 140:
+            bar_distance_m = cand
+            break
+
+    bar_width_px = round(bar_distance_m / mpp)
+    half_bar_width_px = round(bar_width_px / 2)
+    bar_label = f"{bar_distance_m / 1000} km" if bar_distance_m >= 1000 else f"{bar_distance_m} m"
+
+    scale_bar_svg = f"""
+    <g transform="translate(10, {H - 24})">
+        <rect x="0" y="0" width="{bar_width_px + 16}" height="18" fill="rgba(255,255,255,0.85)" stroke="#1e293b" stroke-width="0.75" />
+        <rect x="8" y="5" width="{half_bar_width_px}" height="3.5" fill="#0f172a" />
+        <rect x="{8 + half_bar_width_px}" y="5" width="{bar_width_px - half_bar_width_px}" height="3.5" fill="#ffffff" stroke="#0f172a" stroke-width="0.5" />
+        <text x="{8 + bar_width_px / 2}" y="15" font-family="monospace" font-size="7.5px" font-weight="bold" fill="#0f172a" text-anchor="middle">{bar_label}</text>
+    </g>
+    <g transform="translate({W - 100}, {H - 12})">
+        <rect x="-4" y="-8" width="100" height="12" fill="rgba(255,255,255,0.75)" />
+        <text x="46" y="1" font-family="monospace" font-size="6.5px" fill="#475569" text-anchor="middle">Carte &bull; {formatted_scale}</text>
+    </g>"""
+
+    # Fond gris clair pour indiquer l'emprise
+    bg_rect = f'<rect x="0" y="0" width="{W}" height="{H}" fill="#e2e8f0" />'
+
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="display: block; width: 100%; max-width: {W}px; height: auto; border: 1.5px solid #0f172a; background: #e2e8f0; overflow: hidden; margin: 0 auto;">
+{bg_rect}
+{route_svg}{endpoints_svg}{scale_bar_svg}
+</svg>'''
+
+    return svg, formatted_scale
+
+
+def get_asset_image_data_uri(assets: dict, asset_id: str) -> str | None:
+    """Récupère une image depuis les assets et retourne une data URI base64."""
+    if not asset_id:
+        return None
+    images = assets.get("images", {})
+    asset = images.get(asset_id)
+    if not asset:
+        return None
+    # L'asset peut avoir les données en base64 ou un chemin
+    b64 = asset.get("base64") or asset.get("data")
+    mime = asset.get("mimeType", "image/png")
+    if b64:
+        return f"data:{mime};base64,{b64}"
+    return None
 
 
 def build_export_html(document: Document, version: str = "participant") -> str:
@@ -304,12 +420,52 @@ def render_block_for_export(block: dict, assets: dict, version: str) -> str:
         """
 
     elif block_type == "map_snippet":
-        # Placeholder pour la carte (le frontend injecte le SVG)
+        # Rendre la carte : essayer d'abord l'asset image, sinon générer un SVG vectoriel
+        asset_id = config.get("assetId")
+        asset_data_uri = get_asset_image_data_uri(assets, asset_id) if asset_id else None
+
+        if asset_data_uri:
+            # Utiliser l'image pré-générée
+            map_html = f'<img src="{asset_data_uri}" alt="Carte" style="max-width:100%;height:auto;border:2px solid #1e293b;border-radius:4px;">'
+        else:
+            # Générer un SVG vectoriel depuis la config
+            lat_lngs = config.get("routeCoords") or []
+            center = config.get("center", [48.85, 2.35])
+            zoom = config.get("zoom", 13)
+            width = config.get("width", 720)
+            height = config.get("height", 300)
+            scale_name = config.get("scaleName", "1:25000")
+            layer_id = config.get("layerId", "PLAN.IGN")
+            show_route = config.get("showRoute", True)
+            show_endpoints = config.get("showEndpoints", True)
+
+            # Couleur selon le module/calque
+            route_color = "#2563eb"  # bleu par défaut
+            if "SAT" in layer_id:
+                route_color = "#ffffff"
+            elif "CADASTRAL" in layer_id:
+                route_color = "#ef4444"
+
+            if lat_lngs and len(lat_lngs) >= 2:
+                map_svg, formatted_scale = generate_static_map_svg(
+                    lat_lngs=lat_lngs,
+                    center=center,
+                    zoom=zoom,
+                    width=width,
+                    height=height,
+                    show_route=show_route,
+                    show_endpoints=show_endpoints,
+                    route_color=route_color
+                )
+                map_html = map_svg
+            else:
+                map_html = f'<div style="background:#e2e8f0;border:2px solid #1e293b;border-radius:4px;min-height:{height}px;display:flex;align-items:center;justify-content:center;color:#666;font-family:monospace;">Carte: {scale_name} (pas de tracé)</div>'
+
         return f"""
         <div class="block block-map_snippet" data-block-id="{block.get('id')}">
             <div class="map-label">EXTRAIT CARTOGRAPHIQUE ({config.get('scaleName', '1:25000')})</div>
-            <div class="map-placeholder" data-asset-id="{config.get('assetId', '')}" style="background:#e2e8f0;border:2px solid #1e293b;border-radius:4px;min-height:300px;display:flex;align-items:center;justify-content:center;color:#666;font-family:monospace;">
-                Carte: {config.get('scaleName', '1:25000')}
+            <div style="width:100%;max-width:100%;overflow:hidden;display:flex;justify-content:flex-start;margin:4px 0;">
+                {map_html}
             </div>
         </div>
         """

@@ -2,7 +2,7 @@
 set -e
 
 echo "==> Starting ScoutRaider FastAPI Backend Engine..."
-uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 &
+uvicorn app.main:app --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 
 echo "==> Starting Nginx HTTP Gateway on port 80..."
