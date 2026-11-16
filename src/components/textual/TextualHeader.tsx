@@ -528,7 +528,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
     );
 }
 
-// ─── Dropdown Cipher (composant séparé) ─────────────────────────────────────
+// ─── Dropdown Cipher (composant séparé) — rendu via Portal dans document.body ─────
 function CipherDropdown({ triggerRef, onClose, selectedCipher, onSelect }: {
     triggerRef: React.RefObject<HTMLButtonElement>;
     onClose: () => void;
@@ -537,8 +537,10 @@ function CipherDropdown({ triggerRef, onClose, selectedCipher, onSelect }: {
 }) {
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
+        setIsMounted(true);
         const handleClickOutside = (e: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
                 triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
@@ -547,7 +549,6 @@ function CipherDropdown({ triggerRef, onClose, selectedCipher, onSelect }: {
         };
         document.addEventListener('click', handleClickOutside);
 
-        // Calculer position initiale
         const updatePosition = () => {
             const trigger = triggerRef.current;
             if (trigger) {
@@ -564,12 +565,13 @@ function CipherDropdown({ triggerRef, onClose, selectedCipher, onSelect }: {
             document.removeEventListener('click', handleClickOutside);
             window.removeEventListener('scroll', updatePosition, true);
             window.removeEventListener('resize', updatePosition);
+            setIsMounted(false);
         };
     }, [triggerRef, onClose]);
 
-    if (!triggerRef.current) return null;
+    if (!triggerRef.current || !isMounted) return null;
 
-    return (
+    const content = (
         <div
             ref={dropdownRef}
             style={{
@@ -620,9 +622,12 @@ function CipherDropdown({ triggerRef, onClose, selectedCipher, onSelect }: {
             </div>
         </div>
     );
+
+    // Portal vers document.body pour échapper à tout containing block
+    return createPortal(content, document.body);
 }
 
-// ─── Dropdown Theme (composant séparé) ──────────────────────────────────────
+// ─── Dropdown Theme (composant séparé) — rendu via Portal dans document.body ─────
 function ThemeDropdown({ triggerRef, onClose, themeId, currentAccent, currentTheme, allThemeIds, onSelect }: {
     triggerRef: React.RefObject<HTMLButtonElement>;
     onClose: () => void;
@@ -634,8 +639,10 @@ function ThemeDropdown({ triggerRef, onClose, themeId, currentAccent, currentThe
 }) {
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
+        setIsMounted(true);
         const handleClickOutside = (e: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
                 triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
@@ -660,12 +667,13 @@ function ThemeDropdown({ triggerRef, onClose, themeId, currentAccent, currentThe
             document.removeEventListener('click', handleClickOutside);
             window.removeEventListener('scroll', updatePosition, true);
             window.removeEventListener('resize', updatePosition);
+            setIsMounted(false);
         };
     }, [triggerRef, onClose]);
 
-    if (!triggerRef.current) return null;
+    if (!triggerRef.current || !isMounted) return null;
 
-    return (
+    const content = (
         <div
             ref={dropdownRef}
             style={{
@@ -716,4 +724,7 @@ function ThemeDropdown({ triggerRef, onClose, themeId, currentAccent, currentThe
             </div>
         </div>
     );
+
+    // Portal vers document.body pour échapper à tout containing block
+    return createPortal(content, document.body);
 }

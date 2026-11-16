@@ -2,6 +2,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import NullPool
+from sqlalchemy import inspect
 from app.config import settings
 import structlog
 
@@ -39,9 +40,20 @@ async def get_db() -> AsyncSession:
 
 
 async def init_db() -> None:
-    """Initialize database tables."""
+    """Initialize database tables. Drop and recreate if schema mismatch."""
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        # Check if users table exists and has correct UUID type for id
+        def check_and_fix_sync(sync_conn):
+            inspector = inspect(sync_conn)
+            if inspector.has_table("users"):
+                columns = {col["name"]: col for col in inspector.get_columns("users")}
+                # If id column is not UUID type, drop all tables
+                if "id" in columns and "UUID" not in str(columns["id"]["type"]).upper():
+                    logger.warning("Schema mismatch detected, dropping all tables")
+                    Base.metadata.drop_all(sync_conn)
+            Base.metadata.create_all(sync_conn)
+
+        await conn.run_sync(check_and_fix_sync)
     logger.info("Database initialized")
 
 
