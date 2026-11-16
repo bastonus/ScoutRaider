@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../AppContext';
 import { themeManager } from '../../logic/ThemeManager';
+import { ModuleLogic } from '../../logic/ModuleLogic';
 
 const THEME_ACCENTS: Record<string, { color: string; Icon: React.ComponentType<{ size?: number; color?: string; style?: React.CSSProperties; strokeWidth?: number }> }> = {
     'Neutre':                              { color: '#94a3b8', Icon: Globe },
@@ -30,14 +31,75 @@ const THEME_ACCENTS: Record<string, { color: string; Icon: React.ComponentType<{
 };
 
 export const CIPHER_FONT_OPTIONS = [
-    { id: 'morse', label: 'Morse', tag: '[morse]', desc: 'Points & traits', sample: 'MORSE', fontClass: 'font-morse', color: '#06b6d4' },
-    { id: 'templier', label: 'Croix des Templiers', tag: '[templier]', desc: 'Symboles maçonniques', sample: 'TEMPLIER', fontClass: 'font-templier', color: '#ef4444' },
+    { id: 'morse', label: 'Morse', tag: '[morse]', desc: 'Points & traits sonores', sample: 'MORSE', fontClass: 'font-morse', color: '#06b6d4' },
+    { id: 'vigenere', label: 'Vigenère', tag: '[vigenere]', desc: 'Chiffre polyalphabétique', sample: 'VIGENÈRE', fontClass: 'font-vigenere', color: '#8b5cf6' },
+    { id: 'avocat', label: 'Avocat', tag: '[avocat]', desc: 'Décalage César A=K', sample: 'AVOCAT', fontClass: 'font-avocat', color: '#f59e0b' },
+    { id: 'cassis', label: 'Cassis', tag: '[cassis]', desc: 'Décalage César K=6', sample: 'CASSIS', fontClass: 'font-cassis', color: '#ec4899' },
+    { id: 'polybe', label: 'Carré de Polybe', tag: '[polybe]', desc: 'Grille de substitution 6×6', sample: 'POLYBE', fontClass: 'font-polybe', color: '#10b981' },
+    { id: 'templier', label: 'Templier', tag: '[templier]', desc: 'Chiffre maçonnique / pigpen', sample: 'TEMPLIER', fontClass: 'font-templier', color: '#ef4444' },
+    { id: 'plain', label: 'Texte clair', tag: '[plain]', desc: 'Texte lisible en clair', sample: 'CLAIR', fontClass: 'font-plain', color: '#6b7280' },
     { id: 'maritime', label: 'Pavillons Maritimes', tag: '[maritime]', desc: 'Drapeaux navals', sample: 'NAVAL', fontClass: 'font-maritime', color: '#3b82f6' },
     { id: 'code', label: 'Monospace / Code', tag: '[code]', desc: 'Police à chasse fixe', sample: 'code', fontClass: 'font-mono-tag', color: '#a855f7' },
 ];
 
 function getAccent(id: string) {
     return THEME_ACCENTS[id] || { color: '#94a3b8', Icon: Globe };
+}
+
+// ─── Mapping cipher → annexes ────────────────────────────────────────────────
+const CIPHER_MODULE_MAP: Record<string, string> = {
+    morse: 'morse',
+    vigenere: 'vigenere',
+    avocat: 'avocat',
+    cassis: 'cassis',
+    polybe: 'polybe',
+    templier: 'templier',
+    plain: 'texte_clair',
+    maritime: 'maritime',
+    code: 'texte_clair',
+};
+
+const CIPHER_TO_ANNEXE: Record<string, string | undefined> = {
+    morse: 'alphabet_morse',
+    vigenere: 'tableau_vigenere',
+    avocat: 'methode_avocat',
+    cassis: 'methode_avocat',
+    polybe: 'grille_polybe',
+    templier: 'code_templier',
+    maritime: 'index_drapeaux',
+    plain: undefined,
+    code: undefined,
+};
+
+// ─── Helpers encode/decode via ModuleLogic ──────────────────────────────────
+function applyCipher(text: string, cipherId: string): string {
+    const moduleId = CIPHER_MODULE_MAP[cipherId] || 'texte_clair';
+
+    // Pour Vigenère, on a besoin de la clé du thème actuel
+    const options: { key?: string; offset?: number } = {};
+    if (cipherId === 'vigenere') {
+        const currentTheme = themeManager.getTheme(state.theme_id);
+        options.key = currentTheme?.vigenere_key || 'MOUSTACHE';
+    }
+
+    // Détection auto encode/decode
+    const looksEncoded = (() => {
+        switch (cipherId) {
+            case 'morse': return /^[.\-\s/]+$/.test(text.trim());
+            case 'polybe': return /^([1-6][1-6]\s*)+$/.test(text.trim());
+            case 'templier': return /[\u{1F700}-\u{1F719}\u{24EB}-\u{24F3}]/u.test(text);
+            case 'maritime': return /🚩/.test(text);
+            case 'vigenere':
+            case 'avocat':
+            case 'cassis': return /^[A-Z\s]+$/.test(text) && text.length > 3;
+            default: return false;
+        }
+    })();
+
+    if (looksEncoded && cipherId === 'vigenere') {
+        return ModuleLogic.vigenere(text, options.key || 'MOUSTACHE', true);
+    }
+    return ModuleLogic.encode(moduleId, text, options);
 }
 
 function handleFormat(format: string, arg?: string) {
@@ -66,7 +128,8 @@ function handleFormat(format: string, arg?: string) {
                             if (item.data) selectedText += item.data;
                         }
                     }
-                    const insertStr = selectedText ? `[${cipher}]${selectedText}[/${cipher}]` : `[${cipher}]texte[/${cipher}]`;
+                    const encoded = selectedText ? applyCipher(selectedText, cipher) : '';
+                    const insertStr = selectedText ? `[${cipher}]${encoded}[/${cipher}]` : `[${cipher}]texte[/${cipher}]`;
                     model.change((writer: any) => {
                         model.insertContent(writer.createText(insertStr), selection);
                     });
@@ -87,7 +150,8 @@ function handleFormat(format: string, arg?: string) {
 
         if (format === 'cipher') {
             const cipher = arg || 'morse';
-            replacement = `[${cipher}]${selected || 'texte'}[/${cipher}]`;
+            const encoded = selected ? applyCipher(selected, cipher) : '';
+            replacement = `[${cipher}]${encoded || 'texte'}[/${cipher}]`;
         } else {
             switch (format) {
                 case 'bold': replacement = `**${selected || 'texte'}**`; break;
@@ -115,7 +179,8 @@ function handleFormat(format: string, arg?: string) {
             const cipher = arg || 'morse';
             const sel = window.getSelection();
             const selectedText = sel ? sel.toString() : '';
-            document.execCommand('insertText', false, `[${cipher}]${selectedText || 'texte'}[/${cipher}]`);
+            const encoded = selectedText ? applyCipher(selectedText, cipher) : '';
+            document.execCommand('insertText', false, `[${cipher}]${encoded || 'texte'}[/${cipher}]`);
             return;
         }
         switch (format) {
@@ -146,6 +211,19 @@ interface TextualHeaderProps {
 
 export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
     const { state, dispatch } = useApp();
+
+    // ─── Action combinée : cipher + annexe + solution view ──────────────────────
+    const applyCipherWithExtras = useCallback((cipherId: string) => {
+        // 1. Activer l'annexe correspondante
+        const annexeId = CIPHER_TO_ANNEXE[cipherId];
+        if (annexeId) {
+            dispatch({ type: 'TOGGLE_ANNEXE', annexeId: annexeId as any });
+        }
+        // 2. Passer en vue solution (active les traductions au hover)
+        dispatch({ type: 'SET_CARNET_VIEW', view: 'solution' });
+        // 3. Appliquer le format cipher
+        handleFormat('cipher', cipherId);
+    }, [dispatch]);
 
     // ─── États UI ────────────────────────────────────────────────────────────
     const [cipherMenuOpen, setCipherMenuOpen] = useState(false);
@@ -183,67 +261,51 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         return () => { delete (window as any).__textualErrors; };
     }, [errorItems]);
 
-    // ─── Items barre (ordre de priorité croissante = masqués en premier) ────
-    const toolbarItems = useMemo<ToolbarItem[]>(() => {
-        const items: ToolbarItem[] = [
-            { id: 'undo', priority: 0, minWidth: 32, render: () => toolBtn('undo', 'Annuler (Ctrl+Z)', <Undo2 size={13} strokeWidth={2.2} />) },
-            { id: 'redo', priority: 0, minWidth: 32, render: () => toolBtn('redo', 'Rétablir (Ctrl+Y)', <Redo2 size={13} strokeWidth={2.2} />) },
-            { id: 'bold', priority: 1, minWidth: 32, render: () => toolBtn('bold', 'Gras (Ctrl+B)', <Bold size={13} strokeWidth={2.4} />) },
-            { id: 'italic', priority: 1, minWidth: 32, render: () => toolBtn('italic', 'Italique (Ctrl+I)', <Italic size={13} strokeWidth={2.4} />) },
-            { id: 'underline', priority: 2, minWidth: 32, render: () => toolBtn('underline', 'Souligné (Ctrl+U)', <Underline size={13} strokeWidth={2.4} />) },
-            { id: 'code', priority: 2, minWidth: 32, render: () => toolBtn('code', 'Code en ligne', <Code size={13} strokeWidth={2.2} />) },
-            { id: 'h1', priority: 3, minWidth: 32, render: () => toolBtn('h1', 'Titre de section', <Heading size={13} strokeWidth={2.2} />) },
-            { id: 'list', priority: 3, minWidth: 32, render: () => toolBtn('list', 'Liste à puces', <List size={13} strokeWidth={2.2} />) },
-            { id: 'list-ordered', priority: 3, minWidth: 32, render: () => toolBtn('list-ordered', 'Liste numérotée', <ListOrdered size={13} strokeWidth={2.2} />) },
-            { id: 'quote', priority: 3, minWidth: 32, render: () => toolBtn('quote', 'Citation', <Quote size={13} strokeWidth={2.2} />) },
-            { id: 'cipher', priority: 4, minWidth: 80, render: cipherTrigger },
-            { id: 'theme', priority: 5, minWidth: 160, render: themeTrigger },
-        ];
-        return items.sort((a, b) => a.priority - b.priority);
-    }, [state.theme_id, currentAccent, currentTheme, isSolution, cipherMenuOpen, themePickerOpen, selectedCipher, allThemeIds]);
+    // ─── Styles inline constants (AVANT les helpers qui les utilisent) ────────
+    const btnStyle: React.CSSProperties = {
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: '28px', height: '32px', borderRadius: '8px',
+        border: 'none', background: 'transparent', color: 'var(--text-secondary)',
+        cursor: 'pointer', transition: 'all 90ms ease', flexShrink: 0,
+    };
 
-    // ─── Mesure dynamique overflow ──────────────────────────────────────────
-    const [visibleItems, setVisibleItems] = useState<Set<string>>(new Set());
+    const cipherBadgeStyle: React.CSSProperties = {
+        fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700,
+        color: 'var(--accent-hover)', background: 'rgba(37, 99, 235, 0.1)',
+        border: '1px solid var(--border-subtle)', borderRadius: '4px',
+        padding: '1px 5px', letterSpacing: '0.04em', marginLeft: '4px',
+    };
+
+    const dropdownStyle: React.CSSProperties = {
+        position: 'absolute',
+        top: 'calc(100% + 8px)',
+        left: 0,
+        zIndex: 1600,
+        background: 'var(--bg-elevated)',
+        border: '1px solid var(--border-strong)',
+        borderRadius: '12px',
+        boxShadow: 'var(--shadow-lg)',
+        padding: '6px',
+        minWidth: '220px',
+        animation: 'popIn 140ms ease-out',
+    };
+
+    const dropdownHeaderStyle: React.CSSProperties = {
+        fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)',
+        padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em',
+    };
+
+    const dropdownItemStyle: React.CSSProperties = {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+        padding: '6px 8px', borderRadius: '7px', border: 'none',
+        background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 600,
+        cursor: 'pointer', textAlign: 'left', transition: 'background 80ms',
+    };
+
+    // ─── Refs ────────────────────────────────────────────────────────────────
     const toolbarRef = useRef<HTMLDivElement>(null);
     const overflowBtnRef = useRef<HTMLButtonElement>(null);
     const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-
-    useLayoutEffect(() => {
-        const toolbar = toolbarRef.current;
-        const overflowBtn = overflowBtnRef.current;
-        if (!toolbar) return;
-
-        const measure = () => {
-            const containerRect = toolbar.parentElement?.getBoundingClientRect();
-            const availableWidth = containerRect ? containerRect.width - 32 : toolbar.clientWidth;
-            let usedWidth = 0;
-            const gap = 2;
-            const overflowBtnWidth = overflowBtn?.offsetWidth || 40;
-            const visible = new Set<string>();
-
-            for (const item of toolbarItems) {
-                const el = itemRefs.current.get(item.id);
-                const itemWidth = el?.offsetWidth || item.minWidth;
-                const neededWidth = usedWidth === 0 ? itemWidth : usedWidth + gap + itemWidth;
-                const remainingItems = toolbarItems.filter(i => i.priority > item.priority || (i.priority === item.priority && i.id !== item.id));
-                const willNeedOverflow = remainingItems.length > 0;
-                const maxAllowed = availableWidth - (willNeedOverflow ? overflowBtnWidth + gap : 0);
-
-                if (neededWidth <= maxAllowed) {
-                    visible.add(item.id);
-                    usedWidth = neededWidth;
-                } else break;
-            }
-            setVisibleItems(visible);
-        };
-
-        measure();
-        const ro = new ResizeObserver(() => measure());
-        ro.observe(toolbar);
-        if (toolbar.parentElement) ro.observe(toolbar.parentElement);
-        requestAnimationFrame(measure);
-        return () => ro.disconnect();
-    }, [toolbarItems]);
 
     // ─── Helpers rendu ──────────────────────────────────────────────────────
     const toolBtn = useCallback((format: string, title: string, icon: React.ReactNode) => (
@@ -263,7 +325,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
             <button
                 ref={(el) => { if (el) itemRefs.current.set('cipher', el); else itemRefs.current.delete('cipher'); }}
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setCipherMenuOpen(v => !v); }}
+                onClick={(e) => { e.stopPropagation(); setCipherMenuOpen(v => !v); setThemePickerOpen(false); }}
                 title="Appliquer un codage cryptographique"
                 style={{
                     ...btnStyle,
@@ -292,7 +354,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                             <button
                                 key={opt.id}
                                 type="button"
-                                onClick={() => { setSelectedCipher(opt.id); handleFormat('cipher', opt.id); setCipherMenuOpen(false); }}
+                                onClick={() => { setSelectedCipher(opt.id); applyCipherWithExtras(opt.id); setCipherMenuOpen(false); }}
                                 style={{
                                     ...dropdownItemStyle,
                                     background: selectedCipher === opt.id ? 'var(--accent-transparent)' : 'transparent',
@@ -321,7 +383,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
             <button
                 ref={(el) => { if (el) itemRefs.current.set('theme', el); else itemRefs.current.delete('theme'); }}
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setThemePickerOpen(v => !v); }}
+                onClick={(e) => { e.stopPropagation(); setThemePickerOpen(v => !v); setCipherMenuOpen(false); }}
                 title={`Thème narratif : ${state.theme_id}`}
                 style={{
                     ...btnStyle,
@@ -385,8 +447,41 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         </div>
     ), [themePickerOpen, state.theme_id, currentAccent, currentTheme, allThemeIds]);
 
+    // ─── Items barre (ordre de priorité croissante = masqués en premier) ────
+    const toolbarItems = useMemo<ToolbarItem[]>(() => {
+        const items: ToolbarItem[] = [
+            { id: 'undo', priority: 0, minWidth: 32, render: () => toolBtn('undo', 'Annuler (Ctrl+Z)', <Undo2 size={13} strokeWidth={2.2} />) },
+            { id: 'redo', priority: 0, minWidth: 32, render: () => toolBtn('redo', 'Rétablir (Ctrl+Y)', <Redo2 size={13} strokeWidth={2.2} />) },
+            { id: 'bold', priority: 1, minWidth: 32, render: () => toolBtn('bold', 'Gras (Ctrl+B)', <Bold size={13} strokeWidth={2.4} />) },
+            { id: 'italic', priority: 1, minWidth: 32, render: () => toolBtn('italic', 'Italique (Ctrl+I)', <Italic size={13} strokeWidth={2.4} />) },
+            { id: 'underline', priority: 2, minWidth: 32, render: () => toolBtn('underline', 'Souligné (Ctrl+U)', <Underline size={13} strokeWidth={2.4} />) },
+            { id: 'code', priority: 2, minWidth: 32, render: () => toolBtn('code', 'Code en ligne', <Code size={13} strokeWidth={2.2} />) },
+            { id: 'h1', priority: 3, minWidth: 32, render: () => toolBtn('h1', 'Titre de section', <Heading size={13} strokeWidth={2.2} />) },
+            { id: 'list', priority: 3, minWidth: 32, render: () => toolBtn('list', 'Liste à puces', <List size={13} strokeWidth={2.2} />) },
+            { id: 'list-ordered', priority: 3, minWidth: 32, render: () => toolBtn('list-ordered', 'Liste numérotée', <ListOrdered size={13} strokeWidth={2.2} />) },
+            { id: 'quote', priority: 3, minWidth: 32, render: () => toolBtn('quote', 'Citation', <Quote size={13} strokeWidth={2.2} />) },
+            { id: 'cipher', priority: 4, minWidth: 80, render: cipherTrigger },
+            { id: 'theme', priority: 5, minWidth: 160, render: themeTrigger },
+        ];
+        return items.sort((a, b) => a.priority - b.priority);
+    }, [state.theme_id, currentAccent, currentTheme, isSolution, cipherMenuOpen, themePickerOpen, selectedCipher, allThemeIds, toolBtn, cipherTrigger, themeTrigger]);
+
+    // ─── État visibleItems (pour mesure overflow) ───────────────────────────
+    const [visibleItems, setVisibleItems] = useState<Set<string>>(new Set());
+
+    // ─── Items overflow (après visibleItems) ────────────────────────────────
     const isItemVisible = (id: string) => visibleItems.has(id);
     const overflowItems = toolbarItems.filter(item => !isItemVisible(item.id));
+
+    // ─── Un seul dropdown principal ouvert à la fois ─────────────────────────────
+    const openCipherMenu = useCallback(() => {
+        setCipherMenuOpen(true);
+        setThemePickerOpen(false);
+    }, []);
+    const openThemePicker = useCallback(() => {
+        setThemePickerOpen(true);
+        setCipherMenuOpen(false);
+    }, []);
 
     const handleOverflowItem = useCallback((itemId: string) => {
         switch (itemId) {
@@ -400,11 +495,11 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
             case 'list': handleFormat('list'); break;
             case 'list-ordered': handleFormat('list-ordered'); break;
             case 'quote': handleFormat('quote'); break;
-            case 'cipher': setCipherMenuOpen(true); break;
-            case 'theme': setThemePickerOpen(true); break;
+            case 'cipher': openCipherMenu(); break;
+            case 'theme': openThemePicker(); break;
         }
         setOverflowMenuOpen(false);
-    }, []);
+    }, [openCipherMenu, openThemePicker]);
 
     const overflowIcon = useCallback((id: string) => {
         switch (id) {
@@ -438,46 +533,43 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         }
     }, [state.theme_id, selectedCipher]);
 
-    // ─── Styles inline constants ────────────────────────────────────────────
-    const btnStyle: React.CSSProperties = {
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: '28px', height: '32px', borderRadius: '8px',
-        border: 'none', background: 'transparent', color: 'var(--text-secondary)',
-        cursor: 'pointer', transition: 'all 90ms ease', flexShrink: 0,
-    };
+    // ─── Mesure dynamique overflow ──────────────────────────────────────────
+    useLayoutEffect(() => {
+        const toolbar = toolbarRef.current;
+        const overflowBtn = overflowBtnRef.current;
+        if (!toolbar) return;
 
-    const cipherBadgeStyle: React.CSSProperties = {
-        fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700,
-        color: 'var(--accent-hover)', background: 'rgba(37, 99, 235, 0.1)',
-        border: '1px solid var(--border-subtle)', borderRadius: '4px',
-        padding: '1px 5px', letterSpacing: '0.04em', marginLeft: '4px',
-    };
+        const measure = () => {
+            const containerRect = toolbar.parentElement?.getBoundingClientRect();
+            const availableWidth = containerRect ? containerRect.width - 32 : toolbar.clientWidth;
+            let usedWidth = 0;
+            const gap = 2;
+            const overflowBtnWidth = overflowBtn?.offsetWidth || 40;
+            const visible = new Set<string>();
 
-    const dropdownStyle: React.CSSProperties = {
-        position: 'absolute',
-        top: 'calc(100% + 8px)',
-        left: 0,
-        zIndex: 1600,
-        background: 'var(--bg-elevated)',
-        border: '1px solid var(--border-strong)',
-        borderRadius: '12px',
-        boxShadow: 'var(--shadow-lg)',
-        padding: '6px',
-        minWidth: '220px',
-        animation: 'popIn 140ms ease-out',
-    };
+            for (const item of toolbarItems) {
+                const el = itemRefs.current.get(item.id);
+                const itemWidth = el?.offsetWidth || item.minWidth;
+                const neededWidth = usedWidth === 0 ? itemWidth : usedWidth + gap + itemWidth;
+                const remainingItems = toolbarItems.filter(i => i.priority > item.priority || (i.priority === item.priority && i.id !== item.id));
+                const willNeedOverflow = remainingItems.length > 0;
+                const maxAllowed = availableWidth - (willNeedOverflow ? overflowBtnWidth + gap : 0);
 
-    const dropdownHeaderStyle: React.CSSProperties = {
-        fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)',
-        padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em',
-    };
+                if (neededWidth <= maxAllowed) {
+                    visible.add(item.id);
+                    usedWidth = neededWidth;
+                } else break;
+            }
+            setVisibleItems(visible);
+        };
 
-    const dropdownItemStyle: React.CSSProperties = {
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-        padding: '6px 8px', borderRadius: '7px', border: 'none',
-        background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 600,
-        cursor: 'pointer', textAlign: 'left', transition: 'background 80ms',
-    };
+        measure();
+        const ro = new ResizeObserver(() => measure());
+        ro.observe(toolbar);
+        if (toolbar.parentElement) ro.observe(toolbar.parentElement);
+        requestAnimationFrame(measure);
+        return () => ro.disconnect();
+    }, [toolbarItems]);
 
     // ─── Fermeture menus au clic extérieur ──────────────────────────────────
     useEffect(() => {
@@ -572,25 +664,31 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                             }}>
                                 <div style={dropdownHeaderStyle}>Outils supplémentaires</div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    {overflowItems.map(item => (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            onClick={(e) => { e.preventDefault(); handleOverflowItem(item.id); }}
-                                            style={{
-                                                display: 'flex', alignItems: 'center', gap: '8px',
-                                                padding: '8px 10px', borderRadius: '7px', border: 'none',
-                                                background: 'transparent', color: 'var(--text-primary)',
-                                                fontSize: '12px', fontWeight: 500, cursor: 'pointer',
-                                                textAlign: 'left', width: '100%', transition: 'background 80ms'
-                                            }}
-                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                        >
-                                            {overflowIcon(item.id)}
-                                            <span>{overflowLabel(item.id)}</span>
-                                        </button>
-                                    ))}
+                                    {overflowItems.map(item => {
+                                        // Pour cipher et theme : rendre le VRAI trigger (avec son dropdown)
+                                        if (item.id === 'cipher') return <div key="cipher">{cipherTrigger()}</div>;
+                                        if (item.id === 'theme') return <div key="theme">{themeTrigger()}</div>;
+                                        // Pour les autres : bouton simple
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                onClick={(e) => { e.preventDefault(); handleOverflowItem(item.id); }}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                                    padding: '8px 10px', borderRadius: '7px', border: 'none',
+                                                    background: 'transparent', color: 'var(--text-primary)',
+                                                    fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                                                    textAlign: 'left', width: '100%', transition: 'background 80ms'
+                                                }}
+                                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                {overflowIcon(item.id)}
+                                                <span>{overflowLabel(item.id)}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
