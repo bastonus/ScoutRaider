@@ -12,6 +12,7 @@ import { scheduleAutosave, cancelAutosave, initSyncService, processSyncQueue } f
 import { migrateSrdocToV2, exportToSrproj, importFromSrproj, type SrprojExportData } from '../logic/documentMigration';
 import { generateBlockId } from '../logic/documentTypes';
 import { StateManager } from '../logic/StateManager';
+import { generateSelfContainedMapSvg } from '../logic/MapExportUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -88,8 +89,8 @@ export class CloudSyncService {
     try {
       this.config.dispatch({ type: 'SET_CLOUD_SYNC_STATUS', status: 'pending' });
 
-      // Construire le document V2 depuis l'état actuel
-      const document = this.buildDocumentV2(state);
+      // Construire le document V2 depuis l'état actuel (async pour pré-rendre les cartes)
+      const document = await this.buildDocumentV2(state);
 
       // Sauvegarder localement d'abord
       await saveDocumentLocal(document);
@@ -125,13 +126,21 @@ export class CloudSyncService {
     }
   }
 
-  /** Construit un DocumentV2 depuis l'AppState actuel */
-  private buildDocumentV2(state: any): DocumentV2 {
+  /** Construit un DocumentV2 depuis l'AppState actuel (async pour pré-rendre les cartes) */
+  private async buildDocumentV2(state: any): Promise<DocumentV2> {
     const now = new Date().toISOString();
     const docId = state.cloud_project_id || `doc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 
-    // Extraire les assets depuis carnet_steps
+    // Extraire les assets de base (polices, etc.)
     const assets = this.extractAssetsFromState(state);
+
+    // Pré-rendre les cartes pour les blocs map_snippet
+    const mapAssets = await this.generateMapAssets(state);
+    // Fusionner les assets de cartes
+    Object.assign(assets.images, mapAssets);
+
+    // Construire les blocs (avec assetId pour les cartes pré-rendues)
+    const blocks = this.convertCarnetStepsToBlocks(state.carnet_steps, state, mapAssets);
 
     return {
       schemaVersion: '2.0',
@@ -149,7 +158,7 @@ export class CloudSyncService {
         footer: { enabled: true, center: 'Page {{page}} / {{pages}}', fontSize: '8pt', color: '#999999' },
         backgroundColor: '#ffffff'
       },
-      blocks: this.convertCarnetStepsToBlocks(state.carnet_steps, state),
+      blocks,
       settings: {
         autoSave: state.autosave_enabled,
         autoSaveInterval: 5000,
@@ -160,6 +169,85 @@ export class CloudSyncService {
         theme: 'system'
       }
     };
+  }
+
+  /** Génère les SVG de cartes autonomes (tuiles en base64) pour chaque map_snippet */
+  private async generateMapAssets(state: any): Promise<Record<string, any>> {
+    const mapAssets: Record<string, any> = {};
+    let imgCounter = 0;
+
+    // Récupérer les clés API depuis l'état
+    const apiKeys = {
+      ign: state.ign_api_key,
+      mapy: state.mapy_api_key
+    };
+
+    for (const step of state.carnet_steps || []) {
+      if (!['carte_ign', 'carte_simple', 'drapeaux'].includes(step.moduleId)) continue;
+      if (!step.coords?.length) continue;
+
+      const assetId = `map_${step.id}`;
+      const imgKey = `img_${++imgCounter}`;
+
+      const latLngs = step.coords.map((c: any) => [c[1], c[0]] as [number, number]);
+      const center = step.mapPersist?.center || step.mapCenter || [48.85, 2.35];
+      const zoom = step.mapPersist?.zoom || step.mapZoom || 15;
+      const width = step.mapPersist?.width || 800;
+      const height = step.mapPersist?.height || 600;
+      const layerId = step.mapPersist?.layerId || 'PLAN.IGN';
+      const scaleName = step.mapPersist?.scaleName || '1:25000';
+      const showRoute = step.mapPersist?.showRoute ?? true;
+      const showEndpoints = step.mapPersist?.showEndpoints ?? true;
+      const showAnnotations = step.mapPersist?.showAnnotations ?? true;
+
+      try {
+        // Générer le SVG autonome avec tuiles en base64
+        const { svg, formattedScale } = await generateSelfContainedMapSvg({
+          latLngs,
+          center,
+          zoom,
+          width,
+          height,
+          layerId,
+          scaleName,
+          showRoute,
+          showEndpoints,
+          showAnnotations,
+          pointAnnotations: state.point_annotations,
+          areaAnnotations: state.area_annotations,
+          apiKeys
+        });
+
+        // Stocker le SVG comme data URI base64
+        const svgBase64 = btoa(unescape(encodeURIComponent(svg)));
+        const dataUri = `data:image/svg+xml;base64,${svgBase64}`;
+
+        mapAssets[imgKey] = {
+          assetId,
+          path: `assets/images/${assetId}.svg`,
+          width,
+          height,
+          mimeType: 'image/svg+xml',
+          base64: svgBase64, // SVG complet en base64
+          dataUri, // Data URI prête à l'emploi
+          formattedScale
+        };
+
+        console.log(`[CloudSync] Carte pré-rendue pour ${step.id}: ${formattedScale}, ${svg.length} chars`);
+      } catch (err) {
+        console.warn(`[CloudSync] Échec pré-rendu carte pour ${step.id}:`, err);
+        // Fallback: asset sans données (le backend fera un placeholder)
+        mapAssets[imgKey] = {
+          assetId,
+          path: `assets/images/${assetId}.svg`,
+          width,
+          height,
+          mimeType: 'image/svg+xml'
+        };
+      }
+    }
+
+    return mapAssets;
   }
 
   /** Extrait les assets (polices, images) depuis l'état */
@@ -208,9 +296,10 @@ export class CloudSyncService {
   }
 
   /** Convertit carnet_steps en blocks V2 */
-  private convertCarnetStepsToBlocks(steps: any[], state: any): any[] {
+  private convertCarnetStepsToBlocks(steps: any[], state: any, mapAssets: Record<string, any>): any[] {
     const blocks: any[] = [];
     let order = 0;
+    let mapImgIndex = 0;
 
     // Page de garde
     const titleStep = steps?.find((s: any) => s.isTitleStep);
@@ -267,6 +356,11 @@ export class CloudSyncService {
             }
           });
         } else if (['carte_ign', 'carte_simple', 'drapeaux'].includes(step.moduleId)) {
+          mapImgIndex++;
+          const assetId = `map_${step.id}`;
+          // Trouver la clé d'image correspondante
+          const imgKey = Object.keys(mapAssets).find(k => mapAssets[k].assetId === assetId);
+
           blocks.push({
             id: step.id || generateBlockId(),
             type: 'map_snippet',
@@ -284,7 +378,8 @@ export class CloudSyncService {
               showRoute: step.mapPersist?.showRoute ?? true,
               showEndpoints: step.mapPersist?.showEndpoints ?? true,
               showAnnotations: step.mapPersist?.showAnnotations ?? true,
-              routeCoords: step.coords?.map((c: any) => [c[1], c[0]])
+              routeCoords: step.coords?.map((c: any) => [c[1], c[0]]),
+              assetId: imgKey // Référence à l'asset pré-rendu
             }
           });
         }
@@ -407,7 +502,7 @@ export class CloudSyncService {
     if (!this.config) return;
     const state = this.config.getState();
 
-    const document = this.buildDocumentV2(state);
+    const document = await this.buildDocumentV2(state);
     const assetBlobs = new Map<string, Blob>();
 
     // Récupérer les assets depuis le cache local
