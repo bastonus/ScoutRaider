@@ -1,13 +1,10 @@
 /**
- * TextualHeader.tsx — Barre d'outils flottante VRAIMENT RESPONSIVE.
- * Affiche TOUS les icônes côte à côte tant qu'ils rentrent.
- * Ne regroupe dans le menu "Plus" (≡) que l'excédent qui déborde.
- *
- * Les dropdowns (Cipher, Theme) sont rendus au niveau racine → fonctionnent
- * que leur déclencheur soit dans la barre principale OU dans l'overflow.
+ * TextualHeader.tsx — Barre d'outils flottante responsive.
+ * Affiche tous les icônes côte à côte tant qu'ils rentrent.
+ * Excédent → menu "≡" (MoreHorizontal).
+ * Dropdowns (Cipher, Theme) : rendus DANS leur bouton parent → position absolute fiable.
  */
 import React, { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
-import { createPortal } from 'react-dom';
 import {
     Check, ChevronDown, KeyRound, MoreHorizontal,
     AlertTriangle, ArrowRight, Lightbulb, Palette,
@@ -140,7 +137,7 @@ interface ToolbarItem {
     id: string;
     priority: number;
     minWidth: number;
-    render: (ref: React.RefObject<HTMLButtonElement>) => React.ReactNode;
+    render: () => React.ReactNode;
 }
 
 interface TextualHeaderProps {
@@ -150,16 +147,12 @@ interface TextualHeaderProps {
 export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
     const { state, dispatch } = useApp();
 
-    // ─── États dropdowns (toujours montés) ───────────────────────────────────
+    // ─── États UI ────────────────────────────────────────────────────────────
     const [cipherMenuOpen, setCipherMenuOpen] = useState(false);
     const [themePickerOpen, setThemePickerOpen] = useState(false);
     const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
     const [allThemeIds, setAllThemeIds] = useState<string[]>([]);
     const [selectedCipher, setSelectedCipher] = useState<string>('morse');
-
-    // Refs pour positionnement dropdowns
-    const cipherTriggerRef = useRef<HTMLButtonElement>(null);
-    const themeTriggerRef = useRef<HTMLButtonElement>(null);
 
     // ─── Données ─────────────────────────────────────────────────────────────
     const currentAccent = getAccent(state.theme_id);
@@ -190,87 +183,21 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         return () => { delete (window as any).__textualErrors; };
     }, [errorItems]);
 
-    // ─── Items barre (sans dropdowns — ceux-ci sont rendus séparément) ───────
+    // ─── Items barre (ordre de priorité croissante = masqués en premier) ────
     const toolbarItems = useMemo<ToolbarItem[]>(() => {
         const items: ToolbarItem[] = [
-            { id: 'undo', priority: 0, minWidth: 32, render: (ref) => renderToolBtn(ref, 'undo', 'Annuler (Ctrl+Z)', <Undo2 size={13} strokeWidth={2.2} />) },
-            { id: 'redo', priority: 0, minWidth: 32, render: (ref) => renderToolBtn(ref, 'redo', 'Rétablir (Ctrl+Y)', <Redo2 size={13} strokeWidth={2.2} />) },
-            { id: 'bold', priority: 1, minWidth: 32, render: (ref) => renderToolBtn(ref, 'bold', 'Gras (Ctrl+B)', <Bold size={13} strokeWidth={2.4} />) },
-            { id: 'italic', priority: 1, minWidth: 32, render: (ref) => renderToolBtn(ref, 'italic', 'Italique (Ctrl+I)', <Italic size={13} strokeWidth={2.4} />) },
-            { id: 'underline', priority: 2, minWidth: 32, render: (ref) => renderToolBtn(ref, 'underline', 'Souligné (Ctrl+U)', <Underline size={13} strokeWidth={2.4} />) },
-            { id: 'code', priority: 2, minWidth: 32, render: (ref) => renderToolBtn(ref, 'code', 'Code en ligne', <Code size={13} strokeWidth={2.2} />) },
-            { id: 'h1', priority: 3, minWidth: 32, render: (ref) => renderToolBtn(ref, 'h1', 'Titre de section', <Heading size={13} strokeWidth={2.2} />) },
-            { id: 'list', priority: 3, minWidth: 32, render: (ref) => renderToolBtn(ref, 'list', 'Liste à puces', <List size={13} strokeWidth={2.2} />) },
-            { id: 'list-ordered', priority: 3, minWidth: 32, render: (ref) => renderToolBtn(ref, 'list-ordered', 'Liste numérotée', <ListOrdered size={13} strokeWidth={2.2} />) },
-            { id: 'quote', priority: 3, minWidth: 32, render: (ref) => renderToolBtn(ref, 'quote', 'Citation', <Quote size={13} strokeWidth={2.2} />) },
-
-            // Cipher : bouton déclencheur uniquement
-            {
-                id: 'cipher',
-                priority: 4,
-                minWidth: 70,
-                render: (ref) => (
-                    <button
-                        ref={ref}
-                        type="button"
-                        onClick={e => { e.stopPropagation(); setCipherMenuOpen(v => !v); }}
-                        title="Appliquer un codage cryptographique (Morse, Templiers, Maritime...)"
-                        style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '4px',
-                            height: '32px', padding: '0 10px', borderRadius: '8px',
-                            border: cipherMenuOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
-                            background: cipherMenuOpen ? 'var(--bg-hover)' : 'transparent',
-                            color: cipherMenuOpen ? 'var(--accent-hover)' : 'var(--text-secondary)',
-                            fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                            transition: 'all 90ms ease', flexShrink: 0
-                        }}
-                        onMouseEnter={e => { if (!cipherMenuOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                        onMouseLeave={e => { if (!cipherMenuOpen) e.currentTarget.style.background = 'transparent'; }}
-                    >
-                        <Type size={13} strokeWidth={2.4} color="var(--accent-hover)" />
-                        <span style={{
-                            fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700,
-                            color: 'var(--accent-hover)', background: 'rgba(37, 99, 235, 0.1)',
-                            border: '1px solid var(--border-subtle)', borderRadius: '4px',
-                            padding: '1px 5px', letterSpacing: '0.04em'
-                        }}>
-                            {CIPHER_FONT_OPTIONS.find(o => o.id === selectedCipher)?.tag || '[morse]'}
-                        </span>
-                        <ChevronDown size={10} style={{ opacity: 0.6, transform: cipherMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
-                    </button>
-                )
-            },
-
-            // Theme : bouton déclencheur uniquement
-            {
-                id: 'theme',
-                priority: 5,
-                minWidth: 140,
-                render: (ref) => (
-                    <button
-                        ref={ref}
-                        onClick={() => setThemePickerOpen(v => !v)}
-                        title={`Thème narratif actif : ${state.theme_id}`}
-                        style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '5px',
-                            padding: '0 9px', height: '32px', borderRadius: '9px',
-                            border: themePickerOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
-                            background: themePickerOpen ? 'var(--bg-hover)' : 'transparent',
-                            color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 500,
-                            cursor: 'pointer', transition: 'all 100ms ease', maxWidth: '180px',
-                            boxShadow: 'none', overflow: 'hidden', flexShrink: 1, minWidth: 0,
-                        }}
-                        onMouseEnter={e => { if (!themePickerOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                        onMouseLeave={e => { if (!themePickerOpen) e.currentTarget.style.background = 'transparent'; }}
-                    >
-                        <Palette size={13} color={currentAccent.color} strokeWidth={2.2} style={{ flexShrink: 0 }} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px', display: 'inline-block' }}>
-                            {state.theme_id}
-                        </span>
-                        <ChevronDown size={11} style={{ opacity: 0.6, flexShrink: 0, transform: themePickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
-                    </button>
-                )
-            },
+            { id: 'undo', priority: 0, minWidth: 32, render: () => toolBtn('undo', 'Annuler (Ctrl+Z)', <Undo2 size={13} strokeWidth={2.2} />) },
+            { id: 'redo', priority: 0, minWidth: 32, render: () => toolBtn('redo', 'Rétablir (Ctrl+Y)', <Redo2 size={13} strokeWidth={2.2} />) },
+            { id: 'bold', priority: 1, minWidth: 32, render: () => toolBtn('bold', 'Gras (Ctrl+B)', <Bold size={13} strokeWidth={2.4} />) },
+            { id: 'italic', priority: 1, minWidth: 32, render: () => toolBtn('italic', 'Italique (Ctrl+I)', <Italic size={13} strokeWidth={2.4} />) },
+            { id: 'underline', priority: 2, minWidth: 32, render: () => toolBtn('underline', 'Souligné (Ctrl+U)', <Underline size={13} strokeWidth={2.4} />) },
+            { id: 'code', priority: 2, minWidth: 32, render: () => toolBtn('code', 'Code en ligne', <Code size={13} strokeWidth={2.2} />) },
+            { id: 'h1', priority: 3, minWidth: 32, render: () => toolBtn('h1', 'Titre de section', <Heading size={13} strokeWidth={2.2} />) },
+            { id: 'list', priority: 3, minWidth: 32, render: () => toolBtn('list', 'Liste à puces', <List size={13} strokeWidth={2.2} />) },
+            { id: 'list-ordered', priority: 3, minWidth: 32, render: () => toolBtn('list-ordered', 'Liste numérotée', <ListOrdered size={13} strokeWidth={2.2} />) },
+            { id: 'quote', priority: 3, minWidth: 32, render: () => toolBtn('quote', 'Citation', <Quote size={13} strokeWidth={2.2} />) },
+            { id: 'cipher', priority: 4, minWidth: 80, render: cipherTrigger },
+            { id: 'theme', priority: 5, minWidth: 160, render: themeTrigger },
         ];
         return items.sort((a, b) => a.priority - b.priority);
     }, [state.theme_id, currentAccent, currentTheme, isSolution, cipherMenuOpen, themePickerOpen, selectedCipher, allThemeIds]);
@@ -318,25 +245,145 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         return () => ro.disconnect();
     }, [toolbarItems]);
 
-    // ─── Helpers ────────────────────────────────────────────────────────────
-    const renderToolBtn = useCallback((ref: React.RefObject<HTMLButtonElement>, format: string, title: string, icon: React.ReactNode) => (
+    // ─── Helpers rendu ──────────────────────────────────────────────────────
+    const toolBtn = useCallback((format: string, title: string, icon: React.ReactNode) => (
         <button
-            ref={ref}
+            ref={(el) => { if (el) itemRefs.current.set(format, el); else itemRefs.current.delete(format); }}
             type="button"
             onMouseDown={(e) => { e.preventDefault(); handleFormat(format); }}
             title={title}
-            style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: '28px', height: '32px', borderRadius: '8px',
-                border: 'none', background: 'transparent', color: 'var(--text-secondary)',
-                cursor: 'pointer', transition: 'all 90ms ease', flexShrink: 0
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+            style={btnStyle}
         >
             {icon}
         </button>
     ), []);
+
+    const cipherTrigger = useCallback(() => (
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <button
+                ref={(el) => { if (el) itemRefs.current.set('cipher', el); else itemRefs.current.delete('cipher'); }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setCipherMenuOpen(v => !v); }}
+                title="Appliquer un codage cryptographique"
+                style={{
+                    ...btnStyle,
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    width: 'auto', padding: '0 10px',
+                    border: cipherMenuOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
+                    background: cipherMenuOpen ? 'var(--bg-hover)' : 'transparent',
+                    color: cipherMenuOpen ? 'var(--accent-hover)' : 'var(--text-secondary)',
+                }}
+                onMouseEnter={e => { if (!cipherMenuOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { if (!cipherMenuOpen) e.currentTarget.style.background = 'transparent'; }}
+            >
+                <Type size={13} strokeWidth={2.4} color="var(--accent-hover)" />
+                <span style={cipherBadgeStyle}>
+                    {CIPHER_FONT_OPTIONS.find(o => o.id === selectedCipher)?.tag || '[morse]'}
+                </span>
+                <ChevronDown size={10} style={{ opacity: 0.6, transform: cipherMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
+            </button>
+
+            {/* Dropdown CIPHER — position absolute dans ce wrapper relative */}
+            {cipherMenuOpen && (
+                <div style={dropdownStyle}>
+                    <div style={dropdownHeaderStyle}>Choisir un codage cryptographique</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {CIPHER_FONT_OPTIONS.map(opt => (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => { setSelectedCipher(opt.id); handleFormat('cipher', opt.id); setCipherMenuOpen(false); }}
+                                style={{
+                                    ...dropdownItemStyle,
+                                    background: selectedCipher === opt.id ? 'var(--accent-transparent)' : 'transparent',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                                onMouseLeave={e => e.currentTarget.style.background = selectedCipher === opt.id ? 'var(--accent-transparent)' : 'transparent'}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
+                                    <div>
+                                        <div>{opt.label}</div>
+                                        <div style={{ fontSize: '9.5px', color: 'var(--text-dim)', fontWeight: 400 }}>{opt.tag}</div>
+                                    </div>
+                                </div>
+                                <span className={opt.fontClass} style={{ color: opt.color, fontSize: '13px' }}>{opt.sample}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    ), [cipherMenuOpen, selectedCipher]);
+
+    const themeTrigger = useCallback(() => (
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <button
+                ref={(el) => { if (el) itemRefs.current.set('theme', el); else itemRefs.current.delete('theme'); }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setThemePickerOpen(v => !v); }}
+                title={`Thème narratif : ${state.theme_id}`}
+                style={{
+                    ...btnStyle,
+                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                    width: 'auto', padding: '0 9px',
+                    border: themePickerOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
+                    background: themePickerOpen ? 'var(--bg-hover)' : 'transparent',
+                    color: 'var(--text-primary)',
+                    maxWidth: '180px', minWidth: 0, flexShrink: 1,
+                    overflow: 'hidden',
+                }}
+                onMouseEnter={e => { if (!themePickerOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { if (!themePickerOpen) e.currentTarget.style.background = 'transparent'; }}
+            >
+                <Palette size={13} color={currentAccent.color} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px', display: 'inline-block' }}>
+                    {state.theme_id}
+                </span>
+                <ChevronDown size={11} style={{ opacity: 0.6, flexShrink: 0, transform: themePickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
+            </button>
+
+            {/* Dropdown THEME — position absolute dans ce wrapper relative */}
+            {themePickerOpen && (
+                <div style={{ ...dropdownStyle, minWidth: '240px', maxHeight: '360px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(37, 99, 235, 0.08)', border: '1px solid rgba(37, 99, 235, 0.2)', borderRadius: '8px', marginBottom: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <KeyRound size={12} color="var(--accent-default)" />
+                            <span style={{ fontSize: '10.5px', color: 'var(--text-dim)', fontWeight: 600 }}>Clé Vigenère :</span>
+                        </div>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '11px', color: 'var(--accent-hover)', letterSpacing: '0.08em' }}>{currentTheme.vigenere_key || 'AUCUNE'}</span>
+                    </div>
+                    <div style={dropdownHeaderStyle}>Sélectionner un thème</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '360px', overflowY: 'auto' }}>
+                        {allThemeIds.map(tId => {
+                            const accent = getAccent(tId);
+                            const isCurrent = tId === state.theme_id;
+                            const IconComp = accent.Icon;
+                            return (
+                                <button
+                                    key={tId}
+                                    onClick={() => { dispatch({ type: 'SET_THEME', themeId: tId }); setThemePickerOpen(false); }}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 8px', borderRadius: '8px', border: 'none',
+                                        background: isCurrent ? 'var(--bg-hover)' : 'transparent',
+                                        color: isCurrent ? 'var(--text-primary)' : 'var(--text-default)',
+                                        cursor: 'pointer', fontSize: '12px', fontWeight: isCurrent ? 700 : 400,
+                                        textAlign: 'left', width: '100%', transition: 'all 80ms ease'
+                                    }}
+                                    onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                    onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}
+                                >
+                                    <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: `${accent.color}20`, border: `1px solid ${accent.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IconComp size={11} color={accent.color} /></div>
+                                    <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tId}</span>
+                                    {isCurrent && <Check size={13} color="var(--accent-default)" strokeWidth={2.6} />}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    ), [themePickerOpen, state.theme_id, currentAccent, currentTheme, allThemeIds]);
 
     const isItemVisible = (id: string) => visibleItems.has(id);
     const overflowItems = toolbarItems.filter(item => !isItemVisible(item.id));
@@ -359,23 +406,96 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         setOverflowMenuOpen(false);
     }, []);
 
-    // ─── Effets ─────────────────────────────────────────────────────────────
-    useEffect(() => {
-        const tryLoad = () => { if (themeManager.isLoaded) setAllThemeIds(themeManager.getThemeIds()); else setTimeout(tryLoad, 150); };
-        tryLoad();
-    }, []);
+    const overflowIcon = useCallback((id: string) => {
+        switch (id) {
+            case 'theme': return <Palette size={14} color={currentAccent.color} />;
+            case 'cipher': return <Type size={14} color="var(--accent-hover)" />;
+            case 'underline': return <Underline size={14} strokeWidth={2.4} />;
+            case 'code': return <Code size={14} strokeWidth={2.2} />;
+            case 'h1': return <Heading size={14} strokeWidth={2.2} />;
+            case 'list': return <List size={14} strokeWidth={2.2} />;
+            case 'list-ordered': return <ListOrdered size={14} strokeWidth={2.2} />;
+            case 'quote': return <Quote size={14} strokeWidth={2.2} />;
+            case 'undo': return <Undo2 size={14} strokeWidth={2.2} />;
+            case 'redo': return <Redo2 size={14} strokeWidth={2.2} />;
+            default: return <SlidersHorizontal size={14} />;
+        }
+    }, [currentAccent]);
 
+    const overflowLabel = useCallback((id: string) => {
+        switch (id) {
+            case 'theme': return `Thème : ${state.theme_id}`;
+            case 'cipher': return `Cryptographie : ${CIPHER_FONT_OPTIONS.find(o => o.id === selectedCipher)?.label}`;
+            case 'underline': return 'Souligné';
+            case 'code': return 'Code en ligne';
+            case 'h1': return 'Titre';
+            case 'list': return 'Liste à puces';
+            case 'list-ordered': return 'Liste numérotée';
+            case 'quote': return 'Citation';
+            case 'undo': return 'Annuler';
+            case 'redo': return 'Rétablir';
+            default: return id;
+        }
+    }, [state.theme_id, selectedCipher]);
+
+    // ─── Styles inline constants ────────────────────────────────────────────
+    const btnStyle: React.CSSProperties = {
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: '28px', height: '32px', borderRadius: '8px',
+        border: 'none', background: 'transparent', color: 'var(--text-secondary)',
+        cursor: 'pointer', transition: 'all 90ms ease', flexShrink: 0,
+    };
+
+    const cipherBadgeStyle: React.CSSProperties = {
+        fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700,
+        color: 'var(--accent-hover)', background: 'rgba(37, 99, 235, 0.1)',
+        border: '1px solid var(--border-subtle)', borderRadius: '4px',
+        padding: '1px 5px', letterSpacing: '0.04em', marginLeft: '4px',
+    };
+
+    const dropdownStyle: React.CSSProperties = {
+        position: 'absolute',
+        top: 'calc(100% + 8px)',
+        left: 0,
+        zIndex: 1600,
+        background: 'var(--bg-elevated)',
+        border: '1px solid var(--border-strong)',
+        borderRadius: '12px',
+        boxShadow: 'var(--shadow-lg)',
+        padding: '6px',
+        minWidth: '220px',
+        animation: 'popIn 140ms ease-out',
+    };
+
+    const dropdownHeaderStyle: React.CSSProperties = {
+        fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)',
+        padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em',
+    };
+
+    const dropdownItemStyle: React.CSSProperties = {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+        padding: '6px 8px', borderRadius: '7px', border: 'none',
+        background: 'transparent', color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 600,
+        cursor: 'pointer', textAlign: 'left', transition: 'background 80ms',
+    };
+
+    // ─── Fermeture menus au clic extérieur ──────────────────────────────────
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             const target = e.target as Node;
-            if (cipherTriggerRef.current && !cipherTriggerRef.current.contains(target)) setCipherMenuOpen(false);
-            if (themeTriggerRef.current && !themeTriggerRef.current.contains(target)) setThemePickerOpen(false);
-            if (overflowBtnRef.current && !overflowBtnRef.current.contains(target)) setOverflowMenuOpen(false);
+            // Ne ferme PAS si on clique dans un dropdown ouvert
+            if (cipherMenuOpen && target.closest('[style*="position: absolute"]')) return;
+            if (themePickerOpen && target.closest('[style*="position: absolute"]')) return;
+            if (overflowMenuOpen && target.closest('[style*="position: absolute"]')) return;
+            setCipherMenuOpen(false);
+            setThemePickerOpen(false);
+            setOverflowMenuOpen(false);
         };
         document.addEventListener('click', handler);
         return () => document.removeEventListener('click', handler);
-    }, []);
+    }, [cipherMenuOpen, themePickerOpen, overflowMenuOpen]);
 
+    // ─── Raccourci Alt+S ────────────────────────────────────────────────────
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.altKey && (e.key === 's' || e.key === 'S')) {
@@ -387,17 +507,21 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [dispatch, isSolution]);
 
-    // ─── Rendu ──────────────────────────────────────────────────────────────
+    useEffect(() => {
+        const tryLoad = () => { if (themeManager.isLoaded) setAllThemeIds(themeManager.getThemeIds()); else setTimeout(tryLoad, 150); };
+        tryLoad();
+    }, []);
+
+    // ─── RENDU ──────────────────────────────────────────────────────────────
     return (
         <>
             <style>{`
-                @keyframes islandPopoverInTopCentered {
-                    0% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.97); }
-                    100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+                @keyframes popIn {
+                    0% { opacity: 0; transform: translateY(-6px) scale(0.97); }
+                    100% { opacity: 1; transform: translateY(0) scale(1); }
                 }
             `}</style>
 
-            {/* Toolbar principale */}
             <div
                 ref={toolbarRef}
                 style={{
@@ -412,7 +536,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                 {toolbarItems.map(item =>
                     isItemVisible(item.id) ? (
                         <span key={item.id} style={{ display: 'flex', alignItems: 'center' }}>
-                            {item.render(itemRefs.current.has(item.id) ? itemRefs.current.get(item.id)! : { current: null } as React.RefObject<HTMLButtonElement>)}
+                            {item.render()}
                             {item.id !== toolbarItems[toolbarItems.length - 1]?.id &&
                              <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)', margin: '0 2px', flexShrink: 0 }} />
                             }
@@ -425,15 +549,14 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                         <button
                             ref={overflowBtnRef}
                             type="button"
-                            onClick={e => { e.stopPropagation(); setOverflowMenuOpen(v => !v); }}
+                            onClick={(e) => { e.stopPropagation(); setOverflowMenuOpen(v => !v); }}
                             title={`${overflowItems.length} outil${overflowItems.length > 1 ? 's' : ''} supplémentaire${overflowItems.length > 1 ? 's' : ''}`}
                             style={{
-                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                width: '32px', height: '32px', borderRadius: '8px',
+                                ...btnStyle,
+                                width: '32px', padding: '0',
                                 border: overflowMenuOpen ? '1px solid var(--accent-default)' : '1px solid transparent',
                                 background: overflowMenuOpen ? 'var(--bg-hover)' : 'transparent',
                                 color: overflowMenuOpen ? 'var(--accent-hover)' : 'var(--text-secondary)',
-                                cursor: 'pointer', transition: 'all 90ms ease', flexShrink: 0
                             }}
                             onMouseEnter={e => { if (!overflowMenuOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
                             onMouseLeave={e => { if (!overflowMenuOpen) e.currentTarget.style.background = 'transparent'; }}
@@ -445,286 +568,35 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                                 position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 1600,
                                 background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
                                 borderRadius: '12px', boxShadow: 'var(--shadow-lg)', padding: '6px',
-                                minWidth: '200px', animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
+                                minWidth: '200px', animation: 'popIn 140ms ease-out',
                             }}>
-                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>
-                                    Outils supplémentaires
-                                </div>
+                                <div style={dropdownHeaderStyle}>Outils supplémentaires</div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    {overflowItems.map(item => {
-                                            const getIcon = () => {
-                                                switch (item.id) {
-                                                    case 'theme': return <Palette size={14} color={currentAccent.color} />;
-                                                    case 'cipher': return <Type size={14} color="var(--accent-hover)" />;
-                                                    case 'underline': return <Underline size={14} strokeWidth={2.4} />;
-                                                    case 'code': return <Code size={14} strokeWidth={2.2} />;
-                                                    case 'h1': return <Heading size={14} strokeWidth={2.2} />;
-                                                    case 'list': return <List size={14} strokeWidth={2.2} />;
-                                                    case 'list-ordered': return <ListOrdered size={14} strokeWidth={2.2} />;
-                                                    case 'quote': return <Quote size={14} strokeWidth={2.2} />;
-                                                    case 'undo': return <Undo2 size={14} strokeWidth={2.2} />;
-                                                    case 'redo': return <Redo2 size={14} strokeWidth={2.2} />;
-                                                    default: return <SlidersHorizontal size={14} />;
-                                                }
-                                            };
-                                            return (
-                                                <button
-                                                    key={item.id}
-                                                    type="button"
-                                                    onClick={e => { e.preventDefault(); handleOverflowItem(item.id); }}
-                                                    style={{
-                                                        display: 'flex', alignItems: 'center', gap: '8px',
-                                                        padding: '8px 10px', borderRadius: '7px', border: 'none',
-                                                        background: 'transparent', color: 'var(--text-primary)',
-                                                        fontSize: '12px', fontWeight: 500, cursor: 'pointer',
-                                                        textAlign: 'left', width: '100%', transition: 'background 80ms'
-                                                    }}
-                                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                                >
-                                                    {getIcon()}
-                                                    <span>{item.id === 'theme' ? `Thème : ${state.theme_id}` :
-                                                          item.id === 'cipher' ? `Cryptographie : ${CIPHER_FONT_OPTIONS.find(o => o.id === selectedCipher)?.label}` :
-                                                          item.id === 'underline' ? 'Souligné' :
-                                                          item.id === 'code' ? 'Code en ligne' :
-                                                          item.id === 'h1' ? 'Titre' :
-                                                          item.id === 'list' ? 'Liste à puces' :
-                                                          item.id === 'list-ordered' ? 'Liste numérotée' :
-                                                          item.id === 'quote' ? 'Citation' :
-                                                          item.id === 'undo' ? 'Annuler' : 'Rétablir'}</span>
-                                                </button>
-                                            );
-                                        })}
+                                    {overflowItems.map(item => (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={(e) => { e.preventDefault(); handleOverflowItem(item.id); }}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                padding: '8px 10px', borderRadius: '7px', border: 'none',
+                                                background: 'transparent', color: 'var(--text-primary)',
+                                                fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                                                textAlign: 'left', width: '100%', transition: 'background 80ms'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                        >
+                                            {overflowIcon(item.id)}
+                                            <span>{overflowLabel(item.id)}</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         )}
                     </div>
                 )}
             </div>
-
-            {/* ─── Dropdown CIPHER (toujours monté, positionné via ref) ─── */}
-            {cipherMenuOpen && cipherTriggerRef.current && (
-                <CipherDropdown
-                    triggerRef={cipherTriggerRef}
-                    onClose={() => setCipherMenuOpen(false)}
-                    selectedCipher={selectedCipher}
-                    onSelect={(id) => { setSelectedCipher(id); handleFormat('cipher', id); setCipherMenuOpen(false); }}
-                />
-            )}
-
-            {/* ─── Dropdown THEME (toujours monté, positionné via ref) ─── */}
-            {themePickerOpen && themeTriggerRef.current && (
-                <ThemeDropdown
-                    triggerRef={themeTriggerRef}
-                    onClose={() => setThemePickerOpen(false)}
-                    themeId={state.theme_id}
-                    currentAccent={currentAccent}
-                    currentTheme={currentTheme}
-                    allThemeIds={allThemeIds}
-                    onSelect={(id) => { dispatch({ type: 'SET_THEME', themeId: id }); setThemePickerOpen(false); }}
-                />
-            )}
         </>
     );
-}
-
-// ─── Dropdown Cipher (composant séparé) — rendu via Portal dans document.body ─────
-function CipherDropdown({ triggerRef, onClose, selectedCipher, onSelect }: {
-    triggerRef: React.RefObject<HTMLButtonElement>;
-    onClose: () => void;
-    selectedCipher: string;
-    onSelect: (id: string) => void;
-}) {
-    const dropdownRef = useRef<HTMLDivElement>(null);
-    const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-    const [isMounted, setIsMounted] = useState(false);
-
-    useEffect(() => {
-        setIsMounted(true);
-        const handleClickOutside = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-                triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
-                onClose();
-            }
-        };
-        document.addEventListener('click', handleClickOutside);
-
-        const updatePosition = () => {
-            const trigger = triggerRef.current;
-            if (trigger) {
-                const rect = trigger.getBoundingClientRect();
-                setPosition({ top: rect.bottom + 8, left: rect.left });
-            }
-        };
-        updatePosition();
-        window.addEventListener('scroll', updatePosition, true);
-        window.addEventListener('resize', updatePosition);
-        requestAnimationFrame(updatePosition);
-
-        return () => {
-            document.removeEventListener('click', handleClickOutside);
-            window.removeEventListener('scroll', updatePosition, true);
-            window.removeEventListener('resize', updatePosition);
-            setIsMounted(false);
-        };
-    }, [triggerRef, onClose]);
-
-    if (!triggerRef.current || !isMounted) return null;
-
-    const content = (
-        <div
-            ref={dropdownRef}
-            style={{
-                position: 'fixed',
-                zIndex: 9999,
-                top: position.top,
-                left: position.left,
-                transform: 'none',
-                isolation: 'isolate',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-strong)',
-                borderRadius: '12px',
-                boxShadow: 'var(--shadow-lg)',
-                padding: '6px',
-                minWidth: '220px',
-                animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-        >
-            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Choisir un codage cryptographique
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {CIPHER_FONT_OPTIONS.map(opt => (
-                    <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => onSelect(opt.id)}
-                        style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                            padding: '6px 8px', borderRadius: '7px', border: 'none',
-                            background: selectedCipher === opt.id ? 'var(--accent-transparent)' : 'transparent',
-                            color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 600,
-                            cursor: 'pointer', textAlign: 'left', transition: 'background 80ms'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                        onMouseLeave={e => e.currentTarget.style.background = selectedCipher === opt.id ? 'var(--accent-transparent)' : 'transparent'}
-                    >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
-                            <div>
-                                <div>{opt.label}</div>
-                                <div style={{ fontSize: '9.5px', color: 'var(--text-dim)', fontWeight: 400 }}>{opt.tag}</div>
-                            </div>
-                        </div>
-                        <span className={opt.fontClass} style={{ color: opt.color, fontSize: '13px' }}>{opt.sample}</span>
-                    </button>
-                ))}
-            </div>
-        </div>
-    );
-
-    // Portal vers document.body pour échapper à tout containing block
-    return createPortal(content, document.body);
-}
-
-// ─── Dropdown Theme (composant séparé) — rendu via Portal dans document.body ─────
-function ThemeDropdown({ triggerRef, onClose, themeId, currentAccent, currentTheme, allThemeIds, onSelect }: {
-    triggerRef: React.RefObject<HTMLButtonElement>;
-    onClose: () => void;
-    themeId: string;
-    currentAccent: { color: string; Icon: React.ComponentType<any> };
-    currentTheme: any;
-    allThemeIds: string[];
-    onSelect: (id: string) => void;
-}) {
-    const dropdownRef = useRef<HTMLDivElement>(null);
-    const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-    const [isMounted, setIsMounted] = useState(false);
-
-    useEffect(() => {
-        setIsMounted(true);
-        const handleClickOutside = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-                triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
-                onClose();
-            }
-        };
-        document.addEventListener('click', handleClickOutside);
-
-        const updatePosition = () => {
-            const trigger = triggerRef.current;
-            if (trigger) {
-                const rect = trigger.getBoundingClientRect();
-                setPosition({ top: rect.bottom + 8, left: rect.left });
-            }
-        };
-        updatePosition();
-        window.addEventListener('scroll', updatePosition, true);
-        window.addEventListener('resize', updatePosition);
-        requestAnimationFrame(updatePosition);
-
-        return () => {
-            document.removeEventListener('click', handleClickOutside);
-            window.removeEventListener('scroll', updatePosition, true);
-            window.removeEventListener('resize', updatePosition);
-            setIsMounted(false);
-        };
-    }, [triggerRef, onClose]);
-
-    if (!triggerRef.current || !isMounted) return null;
-
-    const content = (
-        <div
-            ref={dropdownRef}
-            style={{
-                position: 'fixed',
-                zIndex: 9999,
-                top: position.top,
-                left: position.left,
-                transform: 'none',
-                isolation: 'isolate',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-strong)',
-                borderRadius: '12px',
-                boxShadow: 'var(--shadow-lg)',
-                padding: '6px',
-                minWidth: '240px',
-                maxHeight: '360px',
-                overflowY: 'auto',
-                animation: 'islandPopoverInTopCentered 140ms cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-        >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(37, 99, 235, 0.08)', border: '1px solid rgba(37, 99, 235, 0.2)', borderRadius: '8px', marginBottom: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <KeyRound size={12} color="var(--accent-default)" />
-                    <span style={{ fontSize: '10.5px', color: 'var(--text-dim)', fontWeight: 600 }}>Clé Vigenère :</span>
-                </div>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '11px', color: 'var(--accent-hover)', letterSpacing: '0.08em' }}>{currentTheme.vigenere_key || 'AUCUNE'}</span>
-            </div>
-            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Sélectionner un thème</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {allThemeIds.map(tId => {
-                    const accent = getAccent(tId);
-                    const isCurrent = tId === themeId;
-                    const IconComp = accent.Icon;
-                    return (
-                        <button
-                            key={tId}
-                            onClick={() => onSelect(tId)}
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 8px', borderRadius: '8px', border: 'none', background: isCurrent ? 'var(--bg-hover)' : 'transparent', color: isCurrent ? 'var(--text-primary)' : 'var(--text-default)', cursor: 'pointer', fontSize: '12px', fontWeight: isCurrent ? 700 : 400, textAlign: 'left', width: '100%', transition: 'all 80ms ease' }}
-                            onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                            onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}
-                        >
-                            <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: `${accent.color}20`, border: `1px solid ${accent.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IconComp size={11} color={accent.color} /></div>
-                            <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tId}</span>
-                            {isCurrent && <Check size={13} color="var(--accent-default)" strokeWidth={2.6} />}
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
-    );
-
-    // Portal vers document.body pour échapper à tout containing block
-    return createPortal(content, document.body);
 }
