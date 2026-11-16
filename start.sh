@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+echo "==> Running Alembic migrations..."
+cd /app && alembic upgrade head
+
 echo "==> Starting ScoutRaider FastAPI Backend Engine..."
 uvicorn app.main:app --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
