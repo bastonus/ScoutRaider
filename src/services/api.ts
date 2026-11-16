@@ -56,13 +56,10 @@ export interface UserProfile {
 
 export const authApi = {
   async login(username: string, password: string): Promise<AuthTokens> {
-    const formData = new FormData();
-    formData.append('username', username);
-    formData.append('password', password);
-
     const response = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
-      body: formData
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
     });
 
     if (!response.ok) {

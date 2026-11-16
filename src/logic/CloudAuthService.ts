@@ -218,11 +218,11 @@ export class CloudAuthService {
         return data;
     }
 
-    static async login(username_or_email: string, password: string): Promise<{ user: UserProfile; token: string }> {
+    static async login(username: string, password: string): Promise<{ user: UserProfile; token: string }> {
         const res = await fetch(`${this.getBaseUrl()}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username_or_email, password })
+            body: JSON.stringify({ username, password })
         });
 
         if (!res.ok) {

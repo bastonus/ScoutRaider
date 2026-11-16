@@ -30,30 +30,24 @@ export function calculateZoomForScale(scaleDenominator: number, lat: number): nu
     return Math.round(z * 4) / 4;
 }
 
+import { MAP_LAYERS } from './MapConfig';
+
 /**
- * Génère les URLs des tuiles pour une couche donnée.
+ * Génère les URLs des tuiles pour une couche donnée via MAP_LAYERS config.
  */
 export function getTileUrl(layerId: string, z: number, x: number, y: number, apiKeys: { ign?: string; mapy?: string } = {}): string {
-    if (layerId === 'OSM') {
-        return `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+    const layer = MAP_LAYERS[layerId] || MAP_LAYERS['PLAN.IGN'];
+    let url = layer.url;
+    if (layer.needsKey) {
+        const key = layerId.startsWith('MAPY_') ? apiKeys.mapy : apiKeys.ign;
+        url = url.replace('{key}', key || '');
     }
-    if (layerId === 'CYCLOSM') {
-        return `https://tile-cyclosm.openstreetmap.fr/cyclosm/${z}/${x}/${y}.png`;
-    }
-    if (layerId === 'SAT.IGN') {
-        return `https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}`;
-    }
-    if (layerId === 'MAPY_BASE') {
-        return `https://api.mapy.cz/v1/tiles/85a8c5e27aa780e83a75/tiles/${z}/${x}/${y}?apikey=${apiKeys.mapy || ''}`;
-    }
-    if (layerId === 'MAPY_TOURISTIC') {
-        return `https://api.mapy.cz/v1/tiles/85a8c5e27aa780e83a75/tiles-touristic/${z}/${x}/${y}?apikey=${apiKeys.mapy || ''}`;
-    }
-    if (layerId === 'MAPY_SATELLITE') {
-        return `https://api.mapy.cz/v1/tiles/85a8c5e27aa780e83a75/tiles-satellite/${z}/${x}/${y}?apikey=${apiKeys.mapy || ''}`;
-    }
-    // Défaut Plan IGN v2 (nécessite clé API pour l'authentification)
-    return `https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}`;
+    // Remplacer {s} pour OSM (subdomains)
+    url = url.replace('{s}', 'a');
+    return url
+        .replace('{z}', z.toString())
+        .replace('{x}', x.toString())
+        .replace('{y}', y.toString());
 }
 
 /**

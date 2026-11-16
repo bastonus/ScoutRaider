@@ -11,6 +11,7 @@
 import type { CarnetStep, ThemeData } from './types';
 import { ModuleLogic } from './ModuleLogic';
 import { calculateSmartMapDimensions } from '../components/textual/MiniMap';
+import { MAP_LAYERS } from './MapConfig';
 
 import { calculatePolygonArea, formatArea } from './GeoUtils';
 import type { PointAnnotation, AreaAnnotation, Itinerary } from './types';
@@ -35,6 +36,7 @@ export interface ExportRenderOptions {
     areaAnnotations?: AreaAnnotation[];
     itineraries?: Itinerary[];
     paperSize?: 'A4' | 'A5' | 'A3' | 'Letter';
+    apiKeys?: { ign?: string; mapy?: string };
 }
 
 function buildCSS(fontsBase64: Record<string, string>, paperSize: string = 'A4'): string {
@@ -386,8 +388,9 @@ function generateStaticMapSvg(params: {
     showAnnotations?: boolean;
     pointAnnotations?: any[];
     areaAnnotations?: any[];
+    apiKeys?: { ign?: string; mapy?: string };
 }): { svg: string; formattedScale: string } {
-    const { latLngs, center, zoom, width, height, layerId, showRoute, showEndpoints, showAnnotations, pointAnnotations, areaAnnotations } = params;
+    const { latLngs, center, zoom, width, height, layerId, showRoute, showEndpoints, showAnnotations, pointAnnotations, areaAnnotations, apiKeys = {} } = params;
 
     const W = Math.round(width);
     const H = Math.round(height);
@@ -412,22 +415,25 @@ function generateStaticMapSvg(params: {
     const minTy = Math.floor(originYTile / 256);
     const maxTy = Math.floor((originYTile + H) / 256);
 
+    // Résoudre l'URL de la couche via MAP_LAYERS (avec remplacement {key})
+    const layer = MAP_LAYERS[layerId || 'PLAN.IGN'] || MAP_LAYERS['PLAN.IGN'];
+    let tileUrlTemplate = layer.url;
+    if (layer.needsKey) {
+        const key = layerId?.startsWith('MAPY_') ? apiKeys.mapy : apiKeys.ign;
+        tileUrlTemplate = tileUrlTemplate.replace('{key}', key || '');
+    }
+    // Remplacer {s} pour OSM (subdomains)
+    tileUrlTemplate = tileUrlTemplate.replace('{s}', 'a');
+
     let tilesSvg = '';
     for (let ty = minTy; ty <= maxTy; ty++) {
         for (let tx = minTx; tx <= maxTx; tx++) {
             const px = Math.round(tx * 256 - originX);
             const py = Math.round(ty * 256 - originY);
-            let url = '';
-            if (layerId === 'OSM') {
-                url = `https://tile.openstreetmap.org/${zTile}/${tx}/${ty}.png`;
-            } else if (layerId === 'CYCLOSM') {
-                url = `https://tile-cyclosm.openstreetmap.fr/cyclosm/${zTile}/${tx}/${ty}.png`;
-            } else if (layerId === 'SAT.IGN') {
-                url = `https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX=${zTile}&TILEROW=${ty}&TILECOL=${tx}`;
-            } else {
-                // Défaut Plan IGN v2
-                url = `https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX=${zTile}&TILEROW=${ty}&TILECOL=${tx}`;
-            }
+            const url = tileUrlTemplate
+                .replace('{z}', zTile.toString())
+                .replace('{x}', tx.toString())
+                .replace('{y}', ty.toString());
             tilesSvg += `    <image href="${url}" x="${px}" y="${py}" width="256" height="256" preserveAspectRatio="none" />
 `;
         }
@@ -614,6 +620,7 @@ function renderStep(step: CarnetStep, stepNum: number, isSolution: boolean, expo
             showAnnotations: step.mapPersist?.showAnnotations,
             pointAnnotations: exportOptions?.pointAnnotations,
             areaAnnotations: exportOptions?.areaAnnotations,
+            apiKeys: exportOptions?.apiKeys,
         });
 
         const rawLabel = (step.fromLabel || '').trim();

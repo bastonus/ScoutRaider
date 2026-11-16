@@ -214,6 +214,10 @@ export class ExportService {
                 pointAnnotations: state.point_annotations,
                 areaAnnotations: state.area_annotations,
                 itineraries: state.itineraries,
+                apiKeys: {
+                    ign: state.ign_api_key,
+                    mapy: state.mapy_api_key,
+                },
             };
 
             console.log(`[ExportService] Generating HTML for ${format} export (version: ${options.version})...`);
