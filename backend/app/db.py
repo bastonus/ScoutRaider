@@ -13,8 +13,14 @@ from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger("scoutraider.db")
 
-DEFAULT_PG_URL = "postgres://postgres:F1VvmCz2cibxD9al/p9Rw+GjCuH0xLkkm8ksDYCe5lc=@dqitb10gzxtpiejn4kj3ub9b:5432/postgres"
-DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_PG_URL)
+# DATABASE_URL must be provided via environment variable — no hardcoded default
+# This ensures fail-fast if the secret is not configured (security requirement)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is required but not set. "
+        "Configure it in your deployment environment (Coolify, Docker, .env, etc.)."
+    )
 
 # SQLite persistent path — /data is a Docker volume mounted by Coolify
 # Falls back to local storage if /data is not available

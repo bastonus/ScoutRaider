@@ -11,8 +11,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     PYTHONPATH=/app \
-    DEBUG=true \
-    DATABASE_URL="postgresql+asyncpg://postgres:F1VvmCz2cibxD9al/p9Rw+GjCuH0xLkkm8ksDYCe5lc=@dqitb10gzxtpiejn4kj3ub9b:5432/postgres"
+    DEBUG=false
+# DATABASE_URL must be provided at runtime via Coolify environment variables
+# No hardcoded default — fail-fast if not configured (security requirement)
 
 # Install system dependencies (WeasyPrint, fonts, Nginx, curl)
 RUN apt-get update && apt-get install -y --no-install-recommends \
