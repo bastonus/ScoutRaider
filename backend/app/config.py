@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     # CORS
     CORS_ORIGINS: list[str] = Field(
-        default=["http://localhost:5173", "tauri://localhost", "https://scoutraider.app"],
+        default=["http://localhost:5173", "tauri://localhost", "https://scoutraider.app", "https://scoutraider.silverhorse.fr"],
         description="Allowed CORS origins"
     )
 
