@@ -2,100 +2,227 @@
 Test Suite for FastAPI Endpoints.
 Tests:
   - GET /health
-  - GET /modules
-  - POST /diffraction/solve
-  - POST /render/html
-  - POST /render/pdf
+  - GET /health/db, /health/s3, /health/full
+  - POST /api/auth/register, /api/auth/login
+  - CRUD /api/documents
+  - Share /api/documents/{id}/share
 """
 
-from fastapi.testclient import TestClient
 import pytest
-from backend.app.main import app
-
-client = TestClient(app)
 
 
-def test_health():
+def test_health(client):
     res = client.get("/health")
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] == "ok"
-    assert data["loaded_modules_count"] >= 11
+    assert data["status"] == "healthy"
+    assert data["version"] == "1.0.0"
+    assert data["service"] == "scoutraider-api"
 
 
-def test_list_modules():
-    res = client.get("/modules")
-    assert res.status_code == 200
-    modules = res.json()
-    ids = {m["id"] for m in modules}
-    assert "morse" in ids
-    assert "vigenere" in ids
-    assert "carte_ign" in ids
-    assert "carte_simple" in ids
-
-
-def test_diffraction_solve_endpoint():
-    payload = {
-        "segments": [
-            {"index": 0, "distance": 120.0, "azimut": 45.0, "poi_count": 0, "poi_density": 0.0},
-            {"index": 1, "distance": 350.0, "azimut": 90.0, "poi_count": 0, "poi_density": 0.0},
-            {"index": 2, "distance": 400.0, "azimut": 180.0, "poi_count": 0, "poi_density": 0.0},
-            {"index": 3, "distance": 500.0, "azimut": 270.0, "poi_count": 0, "poi_density": 0.0},
-            {"index": 4, "distance": 220.0, "azimut": 315.0, "poi_count": 0, "poi_density": 0.0}
-        ],
-        "preset_id": "seconde_classe_1",
-        "seed": 42
-    }
-    res = client.post("/diffraction/solve", json=payload)
+def test_health_db(client):
+    res = client.get("/health/db")
     assert res.status_code == 200
     data = res.json()
-    assert data["segment_count"] == 5
-    assert len(data["assignments"]) > 0
+    assert data["status"] in ("ok", "error")
+    assert "database" in data
 
 
-def test_render_html_endpoint():
-    payload = {
-        "segments": [
-            {"index": 0, "distance": 150.0, "azimut": 30.0, "poi_count": 0, "poi_density": 0.0},
-            {"index": 1, "distance": 280.0, "azimut": 120.0, "poi_count": 0, "poi_density": 0.0}
-        ],
-        "preset_id": "arret_de_promesse_1",
-        "options": {
-            "title": "Carnet Test API",
-            "is_solution": False
-        }
-    }
-    res = client.post("/render/html", json=payload)
+def test_health_full(client):
+    res = client.get("/health/full")
     assert res.status_code == 200
-    assert "text/html" in res.headers["content-type"]
-    assert "Carnet Test API" in res.text
+    data = res.json()
+    assert data["status"] in ("ok", "degraded")
+    assert "database" in data
+    assert "s3" in data
+    assert "environment" in data
 
 
-def test_render_pdf_endpoint():
-    payload = {
-        "segments": [
-            {"index": 0, "distance": 200.0, "azimut": 60.0, "poi_count": 0, "poi_density": 0.0},
-            {"index": 1, "distance": 310.0, "azimut": 180.0, "poi_count": 0, "poi_density": 0.0}
-        ],
-        "preset_id": "arret_de_promesse_1",
-        "options": {
-            "title": "Carnet API PDF",
-            "is_solution": True
-        }
+def test_auth_register_and_login(client):
+    import time
+    username = f"testuser_{int(time.time())}"
+
+    # Register
+    reg_res = client.post("/api/auth/register", json={
+        "username": username,
+        "email": f"{username}@example.com",
+        "password": "password123"
+    })
+    assert reg_res.status_code == 201
+    user = reg_res.json()
+    assert user["username"] == username
+    assert "id" in user
+
+    # Login
+    login_res = client.post("/api/auth/login", json={
+        "username": username,
+        "password": "password123"
+    })
+    assert login_res.status_code == 200
+    tokens = login_res.json()
+    assert "access_token" in tokens
+    assert "refresh_token" in tokens
+    assert tokens["token_type"] == "bearer"
+
+    # Use access token
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    me_res = client.get("/api/auth/me", headers=headers)
+    assert me_res.status_code == 200
+    assert me_res.json()["username"] == username
+
+
+def test_documents_crud(client):
+    import time
+    username = f"cruduser_{int(time.time())}"
+
+    # Register and login
+    client.post("/api/auth/register", json={
+        "username": username,
+        "email": f"{username}@example.com",
+        "password": "password123"
+    })
+    login_res = client.post("/api/auth/login", json={"username": username, "password": "password123"})
+    headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
+
+    # Create document
+    sample_json = {
+        "schemaVersion": "2.0",
+        "blocks": [],
+        "assets": {"fonts": [], "images": {}},
+        "pageLayout": {}
     }
-    res = client.post("/render/pdf", json=payload)
-    assert res.status_code == 200
-    assert res.headers["content-type"] == "application/pdf"
-    assert len(res.content) > 1000  # valid PDF bytes
+    create_res = client.post("/api/documents", headers=headers, json={
+        "title": "Test Document",
+        "schema_version": "2.0",
+        "json_data": sample_json,
+        "page_layout": {}
+    })
+    assert create_res.status_code == 201
+    doc = create_res.json()
+    assert doc["title"] == "Test Document"
+    doc_id = doc["id"]
+
+    # List documents
+    list_res = client.get("/api/documents", headers=headers)
+    assert list_res.status_code == 200
+    docs = list_res.json()
+    assert len(docs) == 1
+    assert docs[0]["id"] == doc_id
+
+    # Get document
+    get_res = client.get(f"/api/documents/{doc_id}", headers=headers)
+    assert get_res.status_code == 200
+    assert get_res.json()["title"] == "Test Document"
+
+    # Update document with optimistic locking
+    update_res = client.put(
+        f"/api/documents/{doc_id}",
+        headers={**headers, "If-Match": "1"},
+        json={"title": "Updated Title", "version": 1}
+    )
+    assert update_res.status_code == 200
+    updated = update_res.json()
+    assert updated["title"] == "Updated Title"
+    assert updated["version"] == 2
+
+    # Delete document
+    del_res = client.delete(f"/api/documents/{doc_id}", headers=headers)
+    assert del_res.status_code == 204
+
+    # Verify deleted
+    get_res2 = client.get(f"/api/documents/{doc_id}", headers=headers)
+    assert get_res2.status_code == 404
 
 
-def test_render_raw_html_to_pdf_endpoint():
-    payload = {
-        "html": "<!DOCTYPE html><html><head><style>@page { size: A4; margin: 10mm; }</style></head><body><h1>Direct WeasyPrint Test</h1></body></html>",
-        "title": "DirectPDF"
-    }
-    res = client.post("/render/html-to-pdf", json=payload)
-    assert res.status_code == 200
-    assert res.headers["content-type"] == "application/pdf"
-    assert res.content.startswith(b"%PDF-")
-    assert len(res.content) > 500
+def test_share_links(client):
+    import time
+    # Use different timestamps to avoid collisions
+    ts = int(time.time())
+    owner_name = f"shareowner_{ts}"
+    viewer_name = f"shareviewer_{ts+1}"
+    password = "password123"
+
+    # Create owner and login
+    reg_owner = client.post("/api/auth/register", json={"username": owner_name, "email": f"{owner_name}@e.com", "password": password})
+    assert reg_owner.status_code == 201, f"Register failed: {reg_owner.text}"
+    owner_tokens = client.post("/api/auth/login", json={"username": owner_name, "password": password}).json()
+    assert "access_token" in owner_tokens, f"Login failed: {owner_tokens}"
+    h_owner = {"Authorization": f"Bearer {owner_tokens['access_token']}"}
+
+    # Create viewer and login
+    reg_viewer = client.post("/api/auth/register", json={"username": viewer_name, "email": f"{viewer_name}@e.com", "password": password})
+    assert reg_viewer.status_code == 201, f"Register failed: {reg_viewer.text}"
+    viewer_tokens = client.post("/api/auth/login", json={"username": viewer_name, "password": password}).json()
+    assert "access_token" in viewer_tokens, f"Login failed: {viewer_tokens}"
+    h_viewer = {"Authorization": f"Bearer {viewer_tokens['access_token']}"}
+
+    # Create document
+    create_res = client.post("/api/documents", headers=h_owner, json={
+        "title": "Shared Doc",
+        "schema_version": "2.0",
+        "json_data": {"schemaVersion": "2.0", "blocks": [], "assets": {"fonts": [], "images": {}}, "pageLayout": {}},
+        "page_layout": {}
+    })
+    doc_id = create_res.json()["id"]
+
+    # Create share link (read)
+    share_res = client.post(f"/api/documents/{doc_id}/share", headers=h_owner, json={
+        "permissions": "read",
+        "expires_in_days": 1
+    })
+    assert share_res.status_code == 200
+    share_token = share_res.json()["token"]
+
+    # Access via share token (unauthenticated)
+    pub_res = client.get(f"/api/documents/shared/{share_token}")
+    assert pub_res.status_code == 200
+    shared = pub_res.json()
+    assert shared["document"]["id"] == doc_id
+    assert shared["permissions"] == "read"
+
+    # List shares
+    list_res = client.get(f"/api/documents/{doc_id}/share", headers=h_owner)
+    assert list_res.status_code == 200
+    assert len(list_res.json()) == 1
+
+    # Revoke share
+    revoke_res = client.delete(f"/api/documents/{doc_id}/share/{share_token}", headers=h_owner)
+    assert revoke_res.status_code == 204
+
+    # Verify revoked
+    pub_res2 = client.get(f"/api/documents/shared/{share_token}")
+    assert pub_res2.status_code == 404
+
+
+def test_projects_shared_alias(client):
+    """Test the /api/projects/shared/{identifier} alias endpoint."""
+    import time
+    username = f"aliastest_{int(time.time())}"
+    password = "password123"
+    client.post("/api/auth/register", json={"username": username, "email": f"{username}@e.com", "password": password})
+    tokens = client.post("/api/auth/login", json={"username": username, "password": password}).json()
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+    create_res = client.post("/api/documents", headers=headers, json={
+        "title": "Alias Test Doc",
+        "schema_version": "2.0",
+        "json_data": {"schemaVersion": "2.0", "blocks": [], "assets": {"fonts": [], "images": {}}, "pageLayout": {}},
+        "page_layout": {}
+    })
+    doc_id = create_res.json()["id"]
+
+    share_res = client.post(f"/api/documents/{doc_id}/share", headers=headers, json={
+        "permissions": "read",
+        "expires_in_days": 1
+    })
+    share_token = share_res.json()["token"]
+
+    # Access via alias
+    alias_res = client.get(f"/api/projects/shared/{share_token}")
+    assert alias_res.status_code == 200
+    data = alias_res.json()
+    assert data["id"] == doc_id
+    assert data["title"] == "Alias Test Doc"
+    assert data["role"] == "read"
+    assert data["share_token"] == share_token
+    assert data["is_owner"] is False

@@ -11,11 +11,11 @@ from pathlib import Path
 from typing import List
 import pytest
 
-from backend.app.modules.schema import ModuleCategory
-from backend.app.modules.registry import ModuleRegistry
-from backend.app.diffraction.models import ItinerarySegment, PresetConfig
-from backend.app.diffraction.presets import BUILTIN_PRESETS
-from backend.app.diffraction.solver import DiffractionSolver
+from app.modules.schema import ModuleCategory
+from app.modules.registry import ModuleRegistry
+from app.diffraction.models import ItinerarySegment, PresetConfig
+from app.diffraction.presets import BUILTIN_PRESETS
+from app.diffraction.solver import DiffractionSolver
 
 LEGACY_MODULES_DIR = Path(__file__).resolve().parents[3] / "legacy" / "modules"
 

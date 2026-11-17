@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
 import secrets
+from datetime import datetime, timezone, timedelta
 
 from app.database import get_db
 from app.models.document import Document, ShareLink
@@ -40,8 +41,7 @@ async def create_share_link(
     # Calculer expiration
     expires_at = None
     if share_data.expires_in_days:
-        from datetime import datetime, timedelta
-        expires_at = datetime.utcnow() + timedelta(days=share_data.expires_in_days)
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=share_data.expires_in_days)
 
     share_link = ShareLink(
         document_id=document_id,
@@ -84,7 +84,7 @@ async def list_share_links(
         raise HTTPException(status_code=403, detail="Accès refusé")
 
     result = await db.execute(
-        select(ShareLink).where(ShareLink.document_id == document_id).order_by(ShareLink.created_at.desc())
+        select(ShareLink).where(ShareLink.document_id == document_id, ShareLink.is_revoked == False).order_by(ShareLink.created_at.desc())
     )
     links = result.scalars().all()
 
@@ -149,14 +149,12 @@ async def access_shared_document_documents(
 
     # Vérifier expiration
     if link.expires_at:
-        from datetime import datetime
-        if datetime.utcnow() > link.expires_at:
+        if datetime.now(timezone.utc).replace(tzinfo=None) > link.expires_at:
             raise HTTPException(status_code=410, detail="Lien de partage expiré")
 
     # Incrémenter compteur d'accès
     link.access_count += 1
-    from datetime import datetime
-    link.last_accessed_at = datetime.utcnow()
+    link.last_accessed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
 
     # Récupérer le document
@@ -170,8 +168,12 @@ async def access_shared_document_documents(
     if not document:
         raise HTTPException(status_code=404, detail="Document non trouvé")
 
+    # Convert to Pydantic model to avoid recursion during JSON serialization
+    from app.schemas.document import DocumentResponse
+    doc_response = DocumentResponse.model_validate(document)
+
     return {
-        "document": document,
+        "document": doc_response.model_dump(),
         "permissions": link.permissions,
         "share_token": token
     }
@@ -200,14 +202,12 @@ async def access_shared_document(
 
     # Vérifier expiration
     if link.expires_at:
-        from datetime import datetime
-        if datetime.utcnow() > link.expires_at:
+        if datetime.now(timezone.utc).replace(tzinfo=None) > link.expires_at:
             raise HTTPException(status_code=410, detail="Lien de partage expiré")
 
     # Incrémenter compteur d'accès
     link.access_count += 1
-    from datetime import datetime
-    link.last_accessed_at = datetime.utcnow()
+    link.last_accessed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
 
     # Récupérer le document

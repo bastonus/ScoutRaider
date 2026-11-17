@@ -183,9 +183,9 @@ async def delete_document(
     if document.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Seul le propriétaire peut supprimer")
 
-    from datetime import datetime
+    from datetime import datetime, timezone
     document.is_deleted = True
-    document.deleted_at = datetime.utcnow()
+    document.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
 
 

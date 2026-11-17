@@ -9,10 +9,10 @@ import zipfile
 import pytest
 from pathlib import Path
 
-from backend.app.modules.schema import ModuleMetadata, RenderType, ModuleCategory
-from backend.app.modules.registry import ModuleRegistry, SecurityError
-from backend.app.modules.adapter import LegacyManifestAdapter
-from backend.app.modules.sandbox import (
+from app.modules.schema import ModuleMetadata, RenderType, ModuleCategory
+from app.modules.registry import ModuleRegistry, SecurityError
+from app.modules.adapter import LegacyManifestAdapter
+from app.modules.sandbox import (
     execute_builtin_transform,
     encode_morse,
     encode_vigenere,

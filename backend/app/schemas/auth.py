@@ -1,5 +1,5 @@
 # app/schemas/auth.py - Auth schemas
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator, ConfigDict
 from datetime import datetime
 from typing import Optional
 import uuid
@@ -38,8 +38,7 @@ class UserResponse(UserBase):
     created_at: datetime
     last_login: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Token(BaseModel):

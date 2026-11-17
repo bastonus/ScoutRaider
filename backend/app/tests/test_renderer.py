@@ -14,10 +14,10 @@ from pathlib import Path
 import pytest
 import pypdf
 
-from backend.app.renderer.models import CarnetRenderOptions, StepRenderBlock, PageOrientation
-from backend.app.renderer.service import WeasyPrintRenderService
-from backend.app.renderer.inspector import PDFLayoutInspector
-from backend.app.modules.sandbox import generate_gilwell_svg
+from app.renderer.models import CarnetRenderOptions, StepRenderBlock, PageOrientation
+from app.renderer.service import WeasyPrintRenderService
+from app.renderer.inspector import PDFLayoutInspector
+from app.modules.sandbox import generate_gilwell_svg
 
 
 @pytest.fixture(scope="module")

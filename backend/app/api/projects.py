@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from datetime import datetime, timezone
 from app.database import get_db
 from app.models.document import Document, ShareLink
 
@@ -25,14 +26,12 @@ async def access_shared_project(
 
     # Vérifier expiration
     if link.expires_at:
-        from datetime import datetime
-        if datetime.utcnow() > link.expires_at:
+        if datetime.now(timezone.utc).replace(tzinfo=None) > link.expires_at:
             raise HTTPException(status_code=410, detail="Lien de partage expiré")
 
     # Incrémenter compteur d'accès
     link.access_count += 1
-    from datetime import datetime
-    link.last_accessed_at = datetime.utcnow()
+    link.last_accessed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
 
     # Récupérer le document

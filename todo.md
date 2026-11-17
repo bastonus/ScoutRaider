@@ -1,0 +1,2 @@
+review all modifications since latest release, and reviw all code and correct erriore (use retrocorrection and tests). try to understand what was meant to be done and what worked and what failed
+@audit de santé du code.md verifie ce plan et ce diagnostic et crée un plan d'implementayion@audit de santé du code.md verifie ce plan et ce diagnostic et crée un plan d'implementayion

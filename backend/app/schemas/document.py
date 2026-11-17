@@ -1,5 +1,5 @@
 # app/schemas/document.py - Document schemas
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import Optional, Literal
 import uuid
@@ -30,8 +30,7 @@ class DocumentResponse(DocumentBase):
     last_synced_at: Optional[datetime] = None
     is_deleted: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DocumentListItem(BaseModel):
@@ -42,8 +41,7 @@ class DocumentListItem(BaseModel):
     owner_id: uuid.UUID
     is_shared: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssetResponse(BaseModel):
@@ -59,8 +57,7 @@ class AssetResponse(BaseModel):
     archive_path: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssetUploadResponse(BaseModel):
@@ -91,5 +88,4 @@ class ShareLinkResponse(BaseModel):
     expires_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
