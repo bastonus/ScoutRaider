@@ -5,6 +5,67 @@ Tous les changements notables apportés à ce projet seront documentés dans ce 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.14] - 2026-11-20
+
+### Ajouté — Carnet textuel : badges interactifs, chiffrement visuel, bibliothèque modules
+
+- **Badges azimut déroulants** (`AzimutToken`) : dropdown avec preview des 4 formats de navigation (Tournant, Horaire, Cardinaux, Azimut°) et sélection persistante par `navLanguage` / `onNavLanguageChange`.
+- **Badges POI déroulants** (`PoiToken`) : fond coloré + flèche déroulante, liste de tous les POI cliquables, **sélection exclusive** (un seul POI actif à la fois par segment, géré par `TOGGLE_POI` dans `AppContext`).
+- **Couleurs sur texte encodé** : les tokens azimut, distance et POI conservent leurs couleurs sémantiques même sur les lignes chiffrées (via `EncodedHighlightedText` qui mappe les positions source → encodé).
+- **Icône sync dans la gouttière** (`BlockGutter`) : icône `Link2` sur les blocs calculés (itinéraire), rien sur les blocs manuels.
+- **Bibliothèque de modules dynamique** : menu contextuel et sélecteur chargés depuis `ModuleManagementService.getAllModules()` au lieu d'une liste statique.
+- **Markdown dans les commentaires** (`ManualStepHtml`) : rendu complet via `MarkdownRenderer` avec balises cipher `[cassis]…[/cassis]`, blocs ` ```morse … ``` ` et code inline.
+- **Blocs d'étape A/B/C** séparés en composant autonome `StageHeaderBlock`, jamais imbriqués dans une étape.
+
+### Corrigé
+
+- **`CIPHER_cassis_0` / `CIPHER_morse_0` affichés bruts** dans les commentaires : `marked.js` convertissait `__CIPHER_xxx_0__` en balise bold HTML (`<strong>`) → le placeholder était détruit avant restauration. Format changé en `CIPHERPH-xxx-0-END` (sans double underscore) dans tout `MarkdownRenderer.tsx`.
+- **Solutions ne s'affichaient plus** (hover ET bouton bas) : la condition `hovered` seule ignorait le mode `isSolutionView`. Restauré `(hovered || isSolutionView)` dans `ComputedStepLine` et `(hovered || isSolution)` dans `ManualCodeBlock`.
+- **Hover perdu lors de l'ouverture d'un dropdown** POI ou Azimut (position fixed) : ajout d'un `hoverTimer` de 120 ms sur `onMouseLeave` dans les trois composants concernés (`StageHeaderBlock`, `ManualCodeBlock`, `ComputedStepLine`) pour laisser le temps à la souris d'atteindre le dropdown avant que le hover soit annulé.
+- **Lignes calculées** : `MarkdownRenderer` retiré des `ComputedStepLine` (il génère des placeholders qui fuient dans le texte brut) — les lignes d'itinéraire utilisent exclusivement `HighlightedText` → `HighlightedTextCore`.
+
+### Infrastructure
+
+- Tests backend : **60/60 passed**.
+- `npx tsc --noEmit` : **0 erreur**.
+- `npm run build` : ✓ built in ~7 s.
+
+## [0.3.13] - 2026-11-20
+### Ajouté
+- **Distribution des modules Hub v2 via Garage S3** :
+  - Script `scripts/package_modules.py` : empaquète les 15 modules builtin en ZIP et les uploade dans `scoutraider-assets/modules/` sur Garage S3.
+  - `backend/app/api/hub.py` : nouvel endpoint `POST /api/hub/publish` (validation Pydantic + packaging ZIP en mémoire + upload Garage S3) et `GET /api/hub/catalog/s3` (lecture de `catalog_v2.json` depuis S3).
+  - `backend/app/services/s3_client.py` : méthodes `upload_module_package()`, `download_module_package()`, `upload_catalog_index()`, `get_module_url()`.
+  - `backend/app/mcp/server.py` : catalogue MCP enrichi avec les URLs S3 Garage.
+  - `src/logic/ModuleManagementService.ts` : interface `ManagedModule` avec `s3_url`, `s3_sha256`, `is_s3_synced` ; méthode `publishModuleToS3()`.
+  - `src/components/panels/ModuleEditorModal.tsx` : bouton **"Publier dans le Bucket S3"** avec retour d'état.
+  - `src/pages/ProjectsHomePage.tsx` : badge S3 Garage sur les cartes modules et bouton d'upload rapide.
+  - `src/components/panels/UnifiedResourceHub.tsx` : badge `S3` avec lien de téléchargement direct sur toutes les cartes.
+
+### Corrigé
+- **Design restauré des cartes fonds de carte** (`ResourceHubCard`) :
+  - Bannière 140 px pour les cartes `maps` avec image preview.
+  - Badges overlay (Bloqué, Favori, Satellite, Badge texte) en haut à gauche de la bannière.
+  - Logo provider en filigrane bas-droite avec gradient sombre (`item.logoImage` → img, fallback `@author` ou texte `IGN`).
+  - `minHeight: 285px` pour les cartes maps avec bannière, `110px` pour les cartes compactes.
+  - Bouton d'action plein-largeur sur les cartes maps.
+  - `background: rgba(255,255,255,0.02)` / hover `rgba(255,255,255,0.04)`, `borderRadius: 16px`.
+- **`auth.py`** : ajout de `get_current_user_optional()` manquant (référencé par `export.py`).
+- **`registry.py`** : singleton `module_registry = ModuleRegistry()` ajouté en fin de fichier (exporté pour `api/mcp.py`).
+
+### Infrastructure
+- **15 modules** uploadés + `catalog_v2.json` dans `scoutraider-assets/modules/` sur Garage S3.
+- Tests backend : **60/60 passed** (nouveau test `test_s3_module_storage_and_catalog` avec monkeypatch).
+
+## [0.3.12] - 2026-11-20
+### Corrigé & Infrastructure
+- **Rétablissement complet du Stockage S3 (Garage) en production** :
+  - **Identifiants réels synchronisés** : Remplacement des placeholders fictifs par les véritables identifiants générés par Coolify (`ViRY9mVo0wNuFGoU` et secret associé) dans les variables d'environnement de `scout-raider-web`.
+  - **Création du bucket `scoutraider-assets`** : Initialisation du bucket dédié sur le cluster Garage S3 (`https://s3-scoutraider.silverhorse.fr`).
+  - **Intégration Coolify Storage** : Déclaration et validation du stockage de sauvegarde S3 dans Coolify via le protocole MCP (`manage_s3_storage`).
+  - **Santé de l'infrastructure certifiée** : Endpoints `/health/s3` et `/health/full` passant à `200 OK` avec `s3: "connected"`, `write_test: true`, et `read_test: true`.
+  - **Configuration locale synchronisée** : Initialisation des fichiers `.env` et `backend/.env` avec validation du client asynchrone `garage_client`.
+
 ## [0.3.11] - 2026-11-18
 ### Ajouté
 - **Contrats d'Architecture EGM (Elephant-Goldfish Model)** : Spécification complète et vérifiée de 47 contrats d'interface, invariants et effets de bord (`README.md`) sur tous les sous-systèmes du dépôt (`electron/`, `backend/`, `legacy/`, `src/`).

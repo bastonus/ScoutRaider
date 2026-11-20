@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
     # App
     APP_NAME: str = "ScoutRaider API"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "0.3.14"
     DEBUG: bool = False
     API_PREFIX: str = "/api"
 
