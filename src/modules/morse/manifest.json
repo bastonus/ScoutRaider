@@ -1,0 +1,36 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "morse",
+  "name": "Code Morse International",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Transmission par signaux sonores, lumineux ou tracés sous forme de points et de traits.",
+  "data_capability": "alphabetic",
+  "supported_inputs": ["raw_text"],
+  "render_type": "text",
+  "entrypoint": "index.ts",
+  "pedagogy": {
+    "recommended_levels": ["louveteaux", "seconde_classe", "premiere_classe", "raider"],
+    "difficulty_weight": 2.0,
+    "rules_explanation": "Codes écrits : Pour ne pas saturer l'attention de la patrouille, évitez d'enchaîner plus de 3 messages cryptés consécutifs."
+  },
+  "constraints": {
+    "min_distance_m": 0.0,
+    "max_distance_m": null,
+    "max_azimuts": 2,
+    "max_proportion": 0.30,
+    "allow_consecutive": false,
+    "forbidden_zones": ["high_poi_density"]
+  },
+  "annexes": [
+    {
+      "id": "alphabet_morse",
+      "title": "Alphabet Morse & Mnémoniques",
+      "file": "assets/alphabet_morse.html"
+    }
+  ],
+  "assets": []
+}

@@ -390,8 +390,8 @@ function ResourceHubCard({
               Débloquer avec une clé {item.badge || item.categoryLabel}
             </span>
           </div>
-        ) : item.category !== 'maps' ? (
-          /* Action Button for non-maps */
+        ) : (
+          /* Action Button for all active resources */
           <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }} onClick={e => e.stopPropagation()}>
             <button
               onClick={onApply}
@@ -428,6 +428,11 @@ function ResourceHubCard({
                   <Play size={13} fill="#fff" />
                   <span>Tester / Insérer</span>
                 </>
+              ) : item.category === 'maps' ? (
+                <>
+                  <MapIcon size={13} />
+                  <span>Activer la carte</span>
+                </>
               ) : (
                 <>
                   <Play size={13} />
@@ -436,28 +441,32 @@ function ResourceHubCard({
               )}
             </button>
 
-            {!item.isBuiltIn && item.rawModule && onToggleLibrary && (
+            {onToggleLibrary && (
               <button
-                onClick={onToggleLibrary}
-                title={item.isInLibrary ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleLibrary();
+                }}
+                title={item.isInLibrary ? 'Actif dans Ma Bibliothèque (cliquer pour désactiver)' : 'Inactif (cliquer pour ajouter à Ma Bibliothèque)'}
                 style={{
                   width: '38px',
                   height: '38px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  background: item.isInLibrary ? 'rgba(110, 201, 126, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                  border: item.isInLibrary ? '1px solid rgba(110, 201, 126, 0.35)' : '1px solid rgba(255, 255, 255, 0.1)',
                   borderRadius: '10px',
-                  color: item.isInLibrary ? 'var(--accent-default)' : 'rgba(255, 255, 255, 0.5)',
-                  cursor: 'pointer'
+                  color: item.isInLibrary ? 'var(--accent-default)' : 'rgba(255, 255, 255, 0.4)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
                 }}
               >
-                <BookmarkCheck size={14} />
+                <BookmarkCheck size={15} strokeWidth={item.isInLibrary ? 2.5 : 1.8} />
               </button>
             )}
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );
@@ -575,6 +584,48 @@ export default function UnifiedResourceHub({
     }
   };
 
+  // Local persistence of library active/deactivated items
+  // By default, all modules and public maps are in the library.
+  // Private maps (requiring a missing key) are excluded by default.
+  const [disabledLibraryIds, setDisabledLibraryIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('scoutraider_hub_disabled_ids');
+      if (stored) return new Set(JSON.parse(stored));
+    } catch {}
+    return new Set();
+  });
+
+  const handleToggleLocalLibrary = useCallback((item: UnifiedResourceItem) => {
+    if (item.rawModule && !item.isBuiltIn) {
+      handleToggleLibrary(item.rawModule);
+      return;
+    }
+    const id = item.id;
+    setDisabledLibraryIds(prev => {
+      const next = new Set(prev);
+      const isCurrentlyIn = item.isInLibrary;
+      if (isCurrentlyIn) {
+        next.add(id);
+        dispatch({
+          type: 'ADD_NOTIFICATION',
+          message: `"${item.name}" retiré de votre bibliothèque`,
+          notifType: 'info'
+        });
+      } else {
+        next.delete(id);
+        dispatch({
+          type: 'ADD_NOTIFICATION',
+          message: `"${item.name}" ajouté à votre bibliothèque`,
+          notifType: 'info'
+        });
+      }
+      try {
+        localStorage.setItem('scoutraider_hub_disabled_ids', JSON.stringify(Array.from(next)));
+      } catch {}
+      return next;
+    });
+  }, [dispatch, handleToggleLibrary]);
+
   // ── 1. Map Layers (Original Rich Card Design) ──────────────────────────────
   const mapItems = useMemo<UnifiedResourceItem[]>(() => {
     const activeMapId = state.active_ign_layer || 'PLAN.IGN';
@@ -584,6 +635,8 @@ export default function UnifiedResourceHub({
         ? !!state.ign_api_key 
         : (data.provider === 'Mapy.cz' ? !!state.mapy_api_key : true);
       const isActive = activeMapId === id;
+      const isPrivate = data.needsKey && !hasKey;
+      const inLib = !isPrivate && !disabledLibraryIds.has(id);
 
       return {
         id,
@@ -599,7 +652,7 @@ export default function UnifiedResourceHub({
         websiteUrl: provider?.website,
         isActive,
         isBuiltIn: true,
-        isInLibrary: isActive || !!data.isFavorite,
+        isInLibrary: inLib,
         isFavorite: !!data.isFavorite,
         isSatellite: !!data.isSatellite,
         needsKey: data.needsKey,
@@ -723,7 +776,7 @@ export default function UnifiedResourceHub({
         previewBannerComponent,
         isActive: false,
         isBuiltIn: true,
-        isInLibrary: true,
+        isInLibrary: !disabledLibraryIds.has(mId),
         onApply: () => {
           setPreviewTestModule({ id: mId, name: meta.label });
           try {
@@ -759,7 +812,7 @@ export default function UnifiedResourceHub({
         icon: <Sliders size={16} />,
         isActive: false,
         isBuiltIn: true,
-        isInLibrary: true,
+        isInLibrary: !disabledLibraryIds.has('profil_altimetrique'),
         onApply: () => {
           dispatch({
             type: 'ADD_NOTIFICATION',
@@ -779,7 +832,7 @@ export default function UnifiedResourceHub({
         icon: <MapIcon size={16} />,
         isActive: false,
         isBuiltIn: true,
-        isInLibrary: true,
+        isInLibrary: !disabledLibraryIds.has('apercu_carte_synoptique'),
         onApply: () => {
           dispatch({
             type: 'ADD_NOTIFICATION',
@@ -791,7 +844,7 @@ export default function UnifiedResourceHub({
     ];
 
     return [...baseItems, ...topoItems];
-  }, []);
+  }, [disabledLibraryIds]);
 
   // ── 3. Règles de raid (Declined Rich Visual Banner) ─────────────────────────
   const orchestrationItems = useMemo<UnifiedResourceItem[]>(() => {
@@ -864,7 +917,7 @@ export default function UnifiedResourceHub({
         previewBannerComponent,
         isActive,
         isBuiltIn: !p.isCustom,
-        isInLibrary: true,
+        isInLibrary: !disabledLibraryIds.has(p.id),
         onApply: () => {
           dispatch({ type: 'SET_PRESET', presetId: p.id });
           dispatch({ 
@@ -879,7 +932,7 @@ export default function UnifiedResourceHub({
         }
       };
     });
-  }, [state.active_preset_id, dispatch]);
+  }, [state.active_preset_id, disabledLibraryIds, dispatch]);
 
   // ── 4. Thèmes & Récits (Declined Rich Visual Banner) ────────────────────────
   const themeItems = useMemo<UnifiedResourceItem[]>(() => {
@@ -967,7 +1020,7 @@ export default function UnifiedResourceHub({
         previewBannerComponent,
         isActive,
         isBuiltIn: true,
-        isInLibrary: true,
+        isInLibrary: !disabledLibraryIds.has(id),
         metaDetails: { vigenere_key: data.vigenere_key },
         onApply: () => {
           dispatch({ type: 'SET_THEME', themeId: id });
@@ -983,7 +1036,7 @@ export default function UnifiedResourceHub({
         }
       };
     });
-  }, [state.theme_id, dispatch]);
+  }, [state.theme_id, disabledLibraryIds, dispatch]);
 
   // ── 5. Cloud Marketplace Items ─────────────────────────────────────────────
   const cloudItems = useMemo<UnifiedResourceItem[]>(() => {
@@ -1283,7 +1336,7 @@ export default function UnifiedResourceHub({
               isActive={item.isActive}
               onApply={item.onApply}
               onEdit={item.onEdit}
-              onToggleLibrary={item.rawModule ? () => handleToggleLibrary(item.rawModule!) : undefined}
+              onToggleLibrary={() => handleToggleLocalLibrary(item)}
               onDragStart={item.onDragStart}
             />
           ))

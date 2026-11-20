@@ -11,7 +11,7 @@ interface ShareModalProps {
 }
 
 export default function ShareModal({ projectId: propProjectId, projectTitle: propProjectTitle, onClose }: ShareModalProps) {
-    const { cloudProjectId, user } = useAuth();
+    const { cloudProjectId, user, saveToCloudNow } = useAuth();
     const { state, dispatch } = useApp();
 
     const activeProjectId = propProjectId || cloudProjectId;
@@ -224,7 +224,7 @@ export default function ShareModal({ projectId: propProjectId, projectTitle: pro
                             <button
                                 onClick={async () => {
                                     setLoading(true);
-                                    await CloudAuthService.saveProject(documentTitle, state);
+                                    await saveToCloudNow();
                                     await loadDetails();
                                 }}
                                 style={{

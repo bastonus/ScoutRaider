@@ -5,7 +5,7 @@
  * Each encoder is called LIVE during editing.
  */
 import type { PolySegment } from './types';
-import { GilwellEngine } from '../modules/gilwell/logic/GilwellEngine';
+import { GilwellEngine, createDefaultGilwellConfig } from '../modules/gilwell/logic/GilwellEngine';
 import type { GilwellConfig } from '../modules/gilwell/logic/types';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -229,14 +229,16 @@ export class ModuleLogic {
 
     /** Generate Gilwell SVG from ScoutRaider PolySegments using the new WYSIWYG engine */
     static generateGilwellSVG(segments: PolySegment[], config?: Partial<GilwellConfig>): string {
-        return GilwellEngine.generateScoutRaiderSVG(segments, config);
+        const fullConfig = createDefaultGilwellConfig(config);
+        return GilwellEngine.generateScoutRaiderSVG(segments, fullConfig);
     }
 
     /** Generate multi-page Gilwell SVG for print/export (returns array of SVG strings, one per page) */
     static generateGilwellSVGPages(segments: PolySegment[], config?: Partial<GilwellConfig>): string[] {
+        const fullConfig = createDefaultGilwellConfig(config);
         const steps = GilwellEngine.fromPolySegments(segments);
-        const pages = GilwellEngine.computePages(steps, config);
-        return pages.map(page => GilwellEngine.renderPageToSvgString(page, config));
+        const pages = GilwellEngine.computePages(steps, fullConfig);
+        return pages.map(page => GilwellEngine.renderPageToSvgString(page, fullConfig));
     }
 
     // ── Universal encoder ────────────────────────────────────────────────────

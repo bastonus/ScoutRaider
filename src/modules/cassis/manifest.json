@@ -1,0 +1,25 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "cassis",
+  "name": "Code Cassis (K = 6)",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Chiffre de César basé sur la correspondance phonétique K = 6 (décalage de 21 lettres).",
+  "data_capability": "alphabetic",
+  "supported_inputs": ["raw_text"],
+  "render_type": "text",
+  "entrypoint": "index.ts",
+  "pedagogy": {
+    "recommended_levels": ["louveteaux", "seconde_classe"],
+    "difficulty_weight": 1.5
+  },
+  "constraints": {
+    "min_distance_m": 0.0,
+    "max_distance_m": null,
+    "max_proportion": 0.20,
+    "allow_consecutive": false
+  }
+}

@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { CloudAuthService, type CloudProjectSummary } from '../logic/CloudAuthService';
+import ShareModal from '../components/panels/ShareModal';
 import FleurDeLysLogo from '../components/layout/FleurDeLysLogo';
 import { version } from '../../package.json';
 import {
@@ -69,6 +70,7 @@ export default function ProjectsHomePage() {
     const [creating, setCreating] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [shareTarget, setShareTarget] = useState<CloudProjectSummary | null>(null);
     const loadingRef = useRef(false);
 
     // Load projects from cloud — silently refreshes without showing spinner if already has data
@@ -331,13 +333,25 @@ export default function ProjectsHomePage() {
                                 key={p.id}
                                 project={p}
                                 onOpen={() => handleOpen(p)}
-                                onShare={() => navigate(`/d/${p.share_token || p.id}`)}
+                                onShare={() => setShareTarget(p)}
                                 onCopyLink={() => handleCopyLink(p)}
                                 onDelete={() => handleDelete(p)}
                                 copied={copiedId === p.id}
                             />
                         ))}
                     </div>
+                )}
+
+                {/* Share Modal */}
+                {shareTarget && (
+                    <ShareModal
+                        projectId={shareTarget.id}
+                        projectTitle={shareTarget.title}
+                        onClose={() => {
+                            setShareTarget(null);
+                            loadProjects(true);
+                        }}
+                    />
                 )}
             </main>
 

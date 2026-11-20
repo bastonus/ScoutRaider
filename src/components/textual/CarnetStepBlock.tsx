@@ -402,6 +402,7 @@ function ManualStepHtml({
                 stepLabel={undefined} // Pas de label A,B,C pour les commentaires
                 isTitle={false}
                 isSelected={false}
+                isHovered={hovered || isEditing}
                 onEdit={startEditing}
                 onDelete={() => onRemoveStep?.(step.id)}
                 onDuplicate={onDuplicate ? () => onDuplicate(step.id) : undefined}
@@ -518,32 +519,6 @@ function ManualStepHtml({
                     </div>
                 )}
             </div>
-
-            {/* Menu contextuel unifié (3 points) - clic gauche */}
-            <UnifiedContextMenu
-                blockType={'html'}
-                blockId={step.id}
-                blockData={step}
-                availableCiphers={['morse', 'vigenere', 'polybe', 'templier', 'maritime', 'avocat', 'cassis', 'texte_clair']}
-                triggerRef={useRef(null)}
-                onEdit={startEditing}
-                onDelete={() => onRemoveStep?.(step.id)}
-                onDuplicate={() => onDuplicate?.(step.id)}
-                onMoveUp={() => onMoveUp?.(step.id)}
-                onMoveDown={() => onMoveDown?.(step.id)}
-                onCopy={() => onCopy?.(step.id)}
-                onLinkReference={() => onLinkRef?.(step.id)}
-                onConvertToCode={(cipher) => {
-                    dispatch({
-                        type: 'CONVERT_MANUAL_STEP_TYPE',
-                        stepId: step.id,
-                        targetType: 'code',
-                        moduleId: cipher,
-                    });
-                }}
-                onOpenFontSelector={() => onOpenFonts?.(step.id)}
-                onOpenSettings={() => onOpenSettings?.(step.id)}
-            />
         </div>
     );
 }
@@ -619,6 +594,7 @@ function ManualCodeBlock({
                 blockData={step}
                 moduleId={step.moduleId}
                 isSelected={isSelected}
+                isHovered={hovered}
                 onEdit={() => {}} // Double-clic géré par le textarea
                 onDelete={() => onRemoveStep?.(step.id)}
                 onDuplicate={() => onDuplicate?.(step.id)}
@@ -682,25 +658,6 @@ function ManualCodeBlock({
                     </div>
                 )}
             </div>
-
-            {/* Menu contextuel unifié */}
-            <UnifiedContextMenu
-                blockType="code"
-                blockId={step.id}
-                blockData={step}
-                availableCiphers={TEXTUAL_CIPHERS}
-                triggerRef={useRef(null)}
-                onEdit={() => {}} // Double-clic géré par le textarea
-                onDelete={() => onRemoveStep?.(step.id)}
-                onDuplicate={() => onDuplicate?.(step.id)}
-                onMoveUp={() => onMoveUp?.(step.id)}
-                onMoveDown={() => onMoveDown?.(step.id)}
-                onCopy={() => onCopy?.(step.id)}
-                onLinkReference={() => onLinkRef?.(step.id)}
-                onChangeCipher={handleSwitchModule}
-                onConvertToHtml={handleConvertToComment}
-                onOpenSettings={() => onOpenSettings?.(step.id)}
-            />
         </div>
     );
 }
@@ -792,12 +749,14 @@ function ComputedStepLine({
         <div
             ref={blockRef}
             id={`carnet-step-${step.id}-${lineIdx}`}
+            className="carnet-step-row"
             style={{
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection: 'row',
+                alignItems: 'flex-start',
                 position: 'relative',
-                minHeight: '26px',
-                padding: '2px 0 4px 0',
+                minHeight: '28px',
+                padding: '3px 0',
                 zIndex: hovered ? 150 : 1,
                 borderRadius: '6px',
                 transition: 'box-shadow 0.25s ease, background-color 0.2s ease',
@@ -814,6 +773,7 @@ function ComputedStepLine({
                 stepColor={dotColor}
                 moduleId={step.moduleId}
                 isSelected={isSelected}
+                isHovered={hovered || isEditing}
                 onEdit={() => setIsEditing(true)}
                 onDuplicate={() => onDuplicate?.(step.id)}
                 onMoveUp={() => onMoveUp?.(step.id)}
@@ -838,51 +798,42 @@ function ComputedStepLine({
                 containerRef={blockRef}
             />
 
-            {/* Corps du texte - avec badge d'étape (A, B, C) + ligne horizontale DANS LE CONTENU PRINCIPAL */}
+            {/* Corps du texte */}
             <div style={{
-                width: '100%', minWidth: 0, position: 'relative',
-                background: isSelected ? 'rgba(37, 99, 235, 0.12)' : (hovered ? 'rgba(255, 255, 255, 0.02)' : 'transparent'),
+                flex: 1, minWidth: 0, position: 'relative',
+                background: isSelected ? 'rgba(37, 99, 235, 0.08)' : (hovered ? 'rgba(255, 255, 255, 0.02)' : 'transparent'),
                 border: isSelected ? '1px solid var(--accent-default)' : '1px solid transparent',
-                borderRadius: '8px', padding: '3px 6px', boxSizing: 'border-box',
+                borderRadius: '6px', padding: '2px 4px', boxSizing: 'border-box',
                 transition: 'background-color 120ms ease, border-color 120ms ease',
-                display: 'flex', flexDirection: 'column', gap: '8px'
+                display: 'flex', flexDirection: 'column', gap: '4px'
             }}>
-                {/* Badge d'étape (A, B, C...) + ligne horizontale - DANS LE CONTENU PRINCIPAL */}
+                {/* Ligne horizontale d'étape (si début d'étape) */}
                 {lineLabel && (
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '10px',
+                        gap: '8px',
                         width: '100%',
-                        marginBottom: '4px',
+                        height: '20px',
+                        marginBottom: '3px',
                         userSelect: 'none'
                     }}>
-                        <div
-                            title={`Étape ${lineLabel}`}
-                            style={{
-                                width: '22px',
-                                height: '22px',
-                                borderRadius: '5px',
-                                background: 'var(--bg-base)',
-                                border: `2px solid ${dotColor}`,
-                                boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: dotColor,
-                                fontWeight: 800,
-                                fontSize: '11px',
-                                fontFamily: 'var(--font-mono)',
-                                flexShrink: 0
-                            }}
-                        >
-                            {lineLabel}
-                        </div>
+                        <span style={{
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            color: dotColor,
+                            letterSpacing: '0.05em',
+                            textTransform: 'uppercase',
+                            fontFamily: 'var(--font-mono)'
+                        }}>
+                            Étape {lineLabel}
+                        </span>
                         <div style={{
                             flex: 1,
-                            height: '2px',
+                            height: '1.5px',
                             borderRadius: '999px',
                             background: dotColor,
+                            opacity: 0.6,
                         }} />
                     </div>
                 )}

@@ -18,7 +18,7 @@ import type { ModuleId, CarnetStep, NavLanguage } from '../../logic/types';
 import { useApp } from '../../AppContext';
 
 // ─── Largeur fixe du gutter ──────────────────────────────────────────────
-export const GUTTER_WIDTH = 44; // 22px indicateur + 8px gap + 14px pour le bouton 3 points (centré)
+export const GUTTER_WIDTH = 48; // 24px badge/icône centré dans un couloir stable
 
 // ─── Types ──────────────────────────────────────────────────────────────
 export interface BlockGutterProps {
@@ -36,6 +36,8 @@ export interface BlockGutterProps {
     isSelected?: boolean;
     /** Si c'est un bloc titre */
     isTitle?: boolean;
+    /** Si le bloc parent est survolé */
+    isHovered?: boolean;
     /** Callbacks */
     onEdit?: () => void;
     onDelete?: () => void;
@@ -163,6 +165,7 @@ export default function BlockGutter({
     moduleId,
     isSelected,
     isTitle = false,
+    isHovered = false,
     onEdit,
     onDelete,
     onDuplicate,
@@ -201,6 +204,7 @@ export default function BlockGutter({
             className="block-gutter"
             style={{
                 width: GUTTER_WIDTH,
+                marginRight: '12px',
                 flexShrink: 0,
                 display: 'flex',
                 flexDirection: 'column',
@@ -214,11 +218,11 @@ export default function BlockGutter({
             {/* 1. Indicateur de type ou badge d'étape A, B, C */}
             <div
                 style={{
-                    width: '22px',
-                    height: '22px',
-                    borderRadius: stepLabel ? '50%' : '5px',
-                    background: indicator.bg,
-                    border: indicator.border,
+                    width: stepLabel ? '24px' : '22px',
+                    height: stepLabel ? '24px' : '22px',
+                    borderRadius: stepLabel ? '50%' : '6px',
+                    background: stepLabel ? 'var(--bg-base)' : indicator.bg,
+                    border: stepLabel ? `2px solid ${stepColor || 'var(--accent-default)'}` : indicator.border,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -226,14 +230,16 @@ export default function BlockGutter({
                     fontSize: stepLabel ? '11px' : undefined,
                     fontWeight: stepLabel ? 800 : undefined,
                     color: stepColor || (meta?.color || 'var(--text-primary)'),
-                    fontFamily: stepLabel ? 'var(--font-ui)' : undefined,
+                    fontFamily: stepLabel ? 'var(--font-mono)' : undefined,
+                    boxShadow: stepLabel ? '0 1px 3px rgba(0,0,0,0.25)' : undefined,
+                    transition: 'all 150ms ease',
                 }}
                 title={stepLabel ? `Étape ${stepLabel} — ${indicator.tooltip}` : indicator.tooltip}
             >
                 {stepLabel || indicator.icon}
             </div>
 
-            {/* 2. Menu contextuel unifié (3 points) - placé immédiatement sous l'icône */}
+            {/* 2. Menu contextuel unifié (3 points) */}
             <UnifiedContextMenu
                 blockType={blockType}
                 blockId={blockData.id}
@@ -261,6 +267,7 @@ export default function BlockGutter({
                 hasSolution={hasSolution}
                 navLanguage={navLanguage}
                 pois={pois}
+                isHovered={isHovered}
             />
 
             {/* 3. Indicateur de sélection (check) */}

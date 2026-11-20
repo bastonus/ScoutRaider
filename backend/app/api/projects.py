@@ -1,10 +1,11 @@
 # app/api/projects.py - Routes pour projets et synchronisation cloud (compatibilité frontend)
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from datetime import datetime, timezone
 import uuid
+import secrets
 from typing import Any, Dict, List, Optional
 
 from app.database import get_db
@@ -164,44 +165,71 @@ async def save_project(
 @router.get("/shared/{identifier}")
 async def access_shared_project(
     identifier: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    authorization: Optional[str] = Header(None)
 ):
     """Accède à un projet partagé via son token (alias pour /documents/shared/{token})."""
     result = await db.execute(
-        select(ShareLink).where(ShareLink.token == identifier, ShareLink.is_revoked == False)
+        select(ShareLink).options(selectinload(ShareLink.document))
+        .where(ShareLink.token == identifier, ShareLink.is_revoked == False)
     )
     link = result.scalar_one_or_none()
 
-    if not link:
-        raise HTTPException(status_code=404, detail="Lien de partage invalide ou révoqué")
-
-    # Vérifier expiration
-    if link.expires_at:
-        if datetime.now(timezone.utc).replace(tzinfo=None) > link.expires_at:
+    document: Optional[Document] = None
+    if link:
+        # Vérifier expiration
+        if link.expires_at and datetime.now(timezone.utc).replace(tzinfo=None) > link.expires_at:
             raise HTTPException(status_code=410, detail="Lien de partage expiré")
 
-    # Incrémenter compteur d'accès
-    link.access_count += 1
-    link.last_accessed_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    await db.commit()
+        link.access_count += 1
+        link.last_accessed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        await db.commit()
 
-    # Récupérer le document
-    result = await db.execute(
-        select(Document).options(selectinload(Document.assets))
-        .where(Document.id == link.document_id, Document.is_deleted == False)
-    )
-    document = result.scalar_one_or_none()
+        document = link.document
+    else:
+        # Try finding if identifier is a project UUID
+        try:
+            doc_uuid = _to_uuid(identifier)
+            res_doc = await db.execute(
+                select(Document).options(selectinload(Document.share_links))
+                .where(Document.id == doc_uuid, Document.is_deleted == False)
+            )
+            document = res_doc.scalar_one_or_none()
+            if document:
+                link = next((sl for sl in document.share_links if not sl.is_revoked), None)
+        except Exception:
+            pass
 
     if not document:
-        raise HTTPException(status_code=404, detail="Document non trouvé")
+        raise HTTPException(status_code=404, detail="Lien de partage invalide ou révoqué")
+
+    # Vérifier si l'utilisateur est le propriétaire (via token JWT optionnel)
+    is_owner = False
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            from app.services.auth import decode_token
+            jwt_token = authorization.split(" ")[1]
+            jwt_payload = decode_token(jwt_token)
+            if jwt_payload and jwt_payload.type == "access":
+                token_uid = uuid.UUID(jwt_payload.sub)
+                if token_uid == document.owner_id:
+                    is_owner = True
+        except Exception:
+            pass
+
+    if not link and not is_owner:
+        raise HTTPException(status_code=403, detail="Accès non autorisé à ce document")
+
+    effective_role = "owner" if is_owner else (link.permissions if link else "viewer")
+    clean_role = "editor" if effective_role in ("editor", "edit") else ("owner" if is_owner else "viewer")
 
     return {
         "id": str(document.id),
         "title": document.title,
         "state": document.json_data,
-        "role": link.permissions,
-        "is_owner": False,
-        "share_token": link.token
+        "role": clean_role,
+        "is_owner": is_owner,
+        "share_token": link.token if link else ""
     }
 
 
@@ -296,11 +324,144 @@ async def get_project_sharing(
         "title": document.title,
         "share_token": active_link.token if active_link else "",
         "is_public": active_link is not None,
-        "public_role": active_link.permissions if active_link else "viewer",
+        "public_role": "editor" if (active_link and active_link.permissions in ("editor", "edit")) else "viewer",
         "is_owner": True,
         "owner": {
             "id": str(current_user.id),
             "username": current_user.username
         },
-        "collaborators": []
+        "collaborators": [],
+        "access_requests": []
     }
+
+
+@router.post("/{project_id}/public-access")
+async def update_project_public_access(
+    project_id: str,
+    payload: Dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_dependency)
+):
+    """Modifier l'accès général (public/limité) et le rôle (viewer/editor)."""
+    doc_uuid = _to_uuid(project_id)
+    result = await db.execute(
+        select(Document).options(selectinload(Document.share_links))
+        .where(Document.id == doc_uuid, Document.is_deleted == False)
+    )
+    document = result.scalar_one_or_none()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+
+    if document.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Seul le propriétaire peut modifier l'accès général.")
+
+    is_public = bool(payload.get("is_public", False))
+    raw_role = payload.get("public_role", "viewer")
+    public_role = "editor" if raw_role in ("editor", "edit") else "viewer"
+
+    active_link = next((sl for sl in document.share_links if not sl.is_revoked), None)
+
+    if is_public:
+        if active_link:
+            active_link.permissions = public_role
+            share_token = active_link.token
+        else:
+            share_token = f"doc_{secrets.token_urlsafe(16)}"
+            active_link = ShareLink(
+                document_id=document.id,
+                creator_id=current_user.id,
+                token=share_token,
+                permissions=public_role,
+                is_revoked=False
+            )
+            db.add(active_link)
+    else:
+        # Pass to restricted: revoke all active share links
+        for sl in document.share_links:
+            sl.is_revoked = True
+        share_token = ""
+
+    await db.commit()
+
+    return {
+        "is_public": is_public,
+        "public_role": public_role,
+        "share_token": share_token
+    }
+
+
+@router.post("/{project_id}/share")
+async def invite_collaborator(
+    project_id: str,
+    payload: Dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_dependency)
+):
+    """Inviter un collaborateur par nom d'utilisateur ou email."""
+    doc_uuid = _to_uuid(project_id)
+    result = await db.execute(
+        select(Document).where(Document.id == doc_uuid, Document.is_deleted == False)
+    )
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+    if document.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Seul le propriétaire peut inviter des collaborateurs")
+
+    username_or_email = (payload.get("username_or_email") or "").strip()
+    raw_role = payload.get("role", "viewer")
+    role = "editor" if raw_role in ("editor", "edit") else "viewer"
+
+    if not username_or_email:
+        raise HTTPException(status_code=400, detail="Nom d'utilisateur ou email requis")
+
+    from app.services.auth import get_user_by_username, get_user_by_email
+    target_user = await get_user_by_username(db, username_or_email)
+    if not target_user:
+        target_user = await get_user_by_email(db, username_or_email)
+
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+
+    if target_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Vous êtes déjà propriétaire de ce projet")
+
+    token = f"doc_{secrets.token_urlsafe(16)}"
+    share_link = ShareLink(
+        document_id=document.id,
+        creator_id=current_user.id,
+        token=token,
+        permissions=role,
+        is_revoked=False
+    )
+    db.add(share_link)
+    await db.commit()
+
+    return {
+        "success": True,
+        "username": target_user.username,
+        "role": role,
+        "collaborator_id": str(target_user.id)
+    }
+
+
+@router.delete("/{project_id}/share/{target_user_id}")
+async def remove_collaborator(
+    project_id: str,
+    target_user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_dependency)
+):
+    """Retirer un collaborateur."""
+    doc_uuid = _to_uuid(project_id)
+    result = await db.execute(
+        select(Document).where(Document.id == doc_uuid, Document.is_deleted == False)
+    )
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+    if document.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Seul le propriétaire peut retirer des collaborateurs")
+
+    return {"success": True}

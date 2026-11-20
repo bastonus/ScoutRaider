@@ -38,20 +38,20 @@ export default function ScoutRaiderIntegrationView({
   const [showRawJson, setShowRawJson] = useState(false);
 
   // Convert Gilwell steps to PolySegments
-  const derivedSegments = useMemo(() => stepsToPolySegments(steps, config), [steps, config]);
+  const derivedSegments = useMemo(() => stepsToPolySegments(steps), [steps]);
 
   // Convert PolySegments back to Gilwell steps
-  const derivedSteps = useMemo(() => polySegmentsToSteps(polySegments, config), [polySegments, config]);
+  const derivedSteps = useMemo(() => polySegmentsToSteps(polySegments), [polySegments]);
 
   const handleGilwellToScoutRaider = () => {
-    const segments = stepsToPolySegments(steps, config);
+    const segments = stepsToPolySegments(steps);
     setPolySegments(segments);
     setSyncDirection('gilwell-to-sr');
     setLastSyncReport({ added: segments.length, updated: 0, removed: 0, matched: 0 });
   };
 
   const handleScoutRaiderToGilwell = () => {
-    const newSteps = polySegmentsToSteps(polySegments, config);
+    const newSteps = polySegmentsToSteps(polySegments);
     setSyncDirection('sr-to-gilwell');
     setLastSyncReport({
       added: Math.max(0, newSteps.length - steps.length),

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "vigenere",
+  "name": "Chiffre de Vigenère",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Cryptage polyalphabétique historique basé sur un mot-clé secret.",
+  "data_capability": "alphanumeric",
+  "supported_inputs": ["raw_text", "secret_key"],
+  "render_type": "grid",
+  "entrypoint": "index.ts",
+  "pedagogy": {
+    "recommended_levels": ["premiere_classe", "raider"],
+    "difficulty_weight": 4.5,
+    "rules_explanation": "Technique difficile : limitée à 1 seule occurrence par carnet pour préserver la dynamique de marche."
+  },
+  "constraints": {
+    "min_distance_m": 0.0,
+    "max_distance_m": null,
+    "max_occurrences": 1,
+    "max_proportion": 0.15,
+    "allow_consecutive": false
+  },
+  "annexes": [
+    {
+      "id": "tableau_vigenere",
+      "title": "Table de Vigenère (Tabula Recta)",
+      "file": "assets/tableau_vigenere.html"
+    }
+  ]
+}

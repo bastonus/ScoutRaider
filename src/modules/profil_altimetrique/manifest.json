@@ -1,0 +1,26 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "profil_altimetrique",
+  "name": "Profil Altimétrique & Dénivelé",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Calcul et restitution vectorielle SVG du profil altimétrique (altitudes min/max, dénivelés D+/D-, pentes et jalons topographiques).",
+  "data_capability": "elevation_profile",
+  "supported_inputs": ["elevation_points", "poly_segments"],
+  "render_type": "svg",
+  "entrypoint": "index.ts",
+  "pedagogy": {
+    "recommended_levels": ["louveteaux", "seconde_classe", "premiere_classe", "raider"],
+    "difficulty_weight": 1.0,
+    "rules_explanation": "Aide visuelle essentielle pour anticiper les efforts physiques et les points d'eau."
+  },
+  "constraints": {
+    "min_distance_m": 0.0,
+    "max_distance_m": null,
+    "max_proportion": 0.20,
+    "allow_consecutive": false
+  }
+}

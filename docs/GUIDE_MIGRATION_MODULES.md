@@ -5,6 +5,9 @@
 
 ## 1. Contexte & Pourquoi Migrer ?
 
+> 📄 **Spécifications des Codes du Projet :** Le cahier des charges et la liste complète de tous les codes et modules prévus pour ScoutRaider sont centralisés dans le document de référence Google Docs :  
+> 👉 [Document Maître des Codes à Implémenter (Google Docs)](https://docs.google.com/document/d/1bpodvArZtDRWSFa4pfR8y8y4V2ehFhRUxmQp32lL6bI/) *(Lien source : `ressources à adapter. privé/doc des codes à implementer.url`)*.
+
 Les anciens modules de chiffrement de ScoutRaider (Morse, Vigenère, Polybe, Templier, Avocat, Cassis, Pavillons Maritimes) souffraient de plusieurs limitations structurelles :
 1. **Couplage fort au moteur d'export ReportLab** : Le fichier `module.py` contenait à la fois la logique d'encodage et des instructions d'affichage impératif de bas niveau (`c.setStrokeColorRGB`, `c.drawString`), interdisant le rendu WYSIWYG dans le navigateur ou l'éditeur desktop.
 2. **Manifestes anémiques** : Les anciens `manifest.json` contenaient seulement 3 champs (`category`, `description`, `rules_explanation`), sans déclarer le type de données acceptées (`numeric`, `alphabetic`, `map_path`), ni la version SemVer, ni les métriques d'impression.

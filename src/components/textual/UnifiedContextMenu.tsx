@@ -54,6 +54,8 @@ interface UnifiedContextMenuProps {
     hasSolution?: boolean;
     navLanguage?: string;
     pois?: Array<{ id: string; name: string; selected: boolean }>;
+    /** Si le bloc parent est survolé */
+    isHovered?: boolean;
     /** Fermeture externe */
     onClose?: () => void;
 }
@@ -122,6 +124,7 @@ export default function UnifiedContextMenu({
     hasSolution = false,
     navLanguage,
     pois = [],
+    isHovered = false,
     onClose
 }: UnifiedContextMenuProps) {
     const { dispatch } = useApp();
@@ -622,26 +625,27 @@ export default function UnifiedContextMenu({
         <button
             ref={triggerButtonRef}
             type="button"
-            onMouseDown={handleMouseDown}
-            title="Options du bloc (clic gauche)"
+            onClick={toggleMenu}
+            title="Options du bloc (clic pour ouvrir)"
             style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: '22px', height: '22px',
-                border: 'none', background: 'transparent',
+                width: '20px', height: '20px',
+                border: 'none', background: isOpen ? 'var(--bg-hover)' : 'transparent',
                 color: isOpen ? 'var(--accent-hover)' : 'var(--text-dim)',
                 cursor: 'pointer', padding: 0,
-                opacity: isOpen ? 1 : 0.4,
-                transition: 'opacity 120ms ease, color 120ms ease',
+                opacity: isOpen ? 1 : (isHovered ? 0.9 : 0.2),
+                transition: 'opacity 150ms ease, color 120ms ease, background 120ms ease',
                 borderRadius: '4px',
             }}
             onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.opacity = '1'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = isOpen ? 'var(--accent-hover)' : 'var(--text-dim)'; e.currentTarget.style.opacity = isOpen ? '1' : '0.4'; }}
+            onMouseLeave={e => {
+                e.currentTarget.style.color = isOpen ? 'var(--accent-hover)' : 'var(--text-dim)';
+                e.currentTarget.style.opacity = isOpen ? '1' : (isHovered ? '0.9' : '0.2');
+            }}
         >
-            <MoreVertical size={16} strokeWidth={2} />
+            <MoreVertical size={14} strokeWidth={2.2} />
         </button>
     );
-
-    if (!isOpen) return triggerButton;
 
     // Positionnement du menu
     let menuStyle: React.CSSProperties = {
@@ -905,10 +909,18 @@ export default function UnifiedContextMenu({
     };
 
     return (
-        <>
+        <div
+            className="unified-context-menu-wrapper"
+            style={{
+                position: 'relative',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+            }}
+        >
             {triggerButton}
-            {renderMenu(menuSections)}
-        </>
+            {isOpen && renderMenu(menuSections)}
+        </div>
     );
 }
 

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "avocat",
+  "name": "Code Avocat (A = K)",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Chiffre de César à décalage fixe de 10 lettres (A devient K, B devient L...).",
+  "data_capability": "alphabetic",
+  "supported_inputs": ["raw_text"],
+  "render_type": "text",
+  "entrypoint": "index.ts",
+  "pedagogy": {
+    "recommended_levels": ["louveteaux", "seconde_classe"],
+    "difficulty_weight": 1.5
+  },
+  "constraints": {
+    "min_distance_m": 0.0,
+    "max_distance_m": null,
+    "max_proportion": 0.20,
+    "allow_consecutive": false
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "manifest_version": "2.0.0",
+  "id": "gilwell",
+  "name": "Piste Gilwell (Azimuts & Métrages)",
+  "version": "2.0.0",
+  "resource_type": "code",
+  "data_capability": "map_path",
+  "category": "graphic",
+  "description": "Générateur et éditeur WYSIWYG de schémas d'azimuts (piste Gilwell) avec pagination multi-colonnes, connecteurs de lecture, export vectoriel SVG et matriciel PNG haute résolution.",
+  "author": "ScoutRaider Team",
+  "license": "MIT",
+  "entry_point": "index.ts",
+  "tags": [
+    "topo",
+    "orientation",
+    "azimut",
+    "wysiwyg",
+    "gilwell",
+    "map_path"
+  ],
+  "engine_type": "react",
+  "capabilities": {
+    "wysiwyg": true,
+    "inPlaceEditing": true,
+    "dragRotate": true,
+    "multiColumn": true,
+    "pagination": true,
+    "flowConnectors": true,
+    "svgExport": true,
+    "pngExport": true,
+    "scoutRaiderSync": true
+  }
+}

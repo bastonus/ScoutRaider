@@ -288,6 +288,43 @@ def test_projects_crud_endpoints(client):
     assert updated["id"] == project_id
     assert updated["title"] == "Mon Raid 2026 (Mis à jour)"
 
+    # 4a. Test sharing details: initially limited/restricted
+    share_details_res = client.get(f"/api/projects/{project_id}/share", headers=headers)
+    assert share_details_res.status_code == 200
+    details = share_details_res.json()
+    assert details["is_public"] is False
+    assert details["project_id"] == project_id
+
+    # 4b. Update public access to Public (Tous avec le lien)
+    pub_res = client.post(f"/api/projects/{project_id}/public-access", headers=headers, json={
+        "is_public": True,
+        "public_role": "editor"
+    })
+    assert pub_res.status_code == 200
+    pub_data = pub_res.json()
+    assert pub_data["is_public"] is True
+    assert pub_data["public_role"] == "editor"
+    token = pub_data["share_token"]
+    assert token.startswith("doc_")
+
+    # 4c. Access project via shared permalink
+    shared_res = client.get(f"/api/projects/shared/{token}")
+    assert shared_res.status_code == 200
+    shared_data = shared_res.json()
+    assert shared_data["title"] == "Mon Raid 2026 (Mis à jour)"
+    assert shared_data["role"] == "editor"
+
+    # 4d. Revert public access back to restricted (Limité)
+    priv_res = client.post(f"/api/projects/{project_id}/public-access", headers=headers, json={
+        "is_public": False
+    })
+    assert priv_res.status_code == 200
+    assert priv_res.json()["is_public"] is False
+
+    # 4e. Verify shared permalink is now revoked (404/403)
+    shared_revoked = client.get(f"/api/projects/shared/{token}")
+    assert shared_revoked.status_code in (403, 404)
+
     # 5. Delete project via DELETE /api/projects/{id}
     del_res = client.delete(f"/api/projects/{project_id}", headers=headers)
     assert del_res.status_code == 200

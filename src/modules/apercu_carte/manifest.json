@@ -1,0 +1,25 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "apercu_carte",
+  "name": "Aperçu Synoptique de Carte",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Cartouche cartographique général de synthèse du raid avec tracé global, points de contrôle numérotés, rose des vents et coordonnées d'urgence.",
+  "data_capability": "map_overview",
+  "supported_inputs": ["full_itinerary_track", "waypoints"],
+  "render_type": "map",
+  "entrypoint": "index.ts",
+  "pedagogy": {
+    "recommended_levels": ["louveteaux", "seconde_classe", "premiere_classe", "raider"],
+    "difficulty_weight": 1.0
+  },
+  "constraints": {
+    "min_distance_m": 0.0,
+    "max_distance_m": null,
+    "max_proportion": 0.20,
+    "allow_consecutive": false
+  }
+}

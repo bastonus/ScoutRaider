@@ -1,0 +1,25 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "maritime",
+  "name": "Pavillons Maritimes",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Alphabet international du code des signaux maritimes et pavillons de transmission.",
+  "data_capability": "symbolic_visual",
+  "supported_inputs": ["raw_text"],
+  "render_type": "image",
+  "entrypoint": "index.ts",
+  "pedagogy": {
+    "recommended_levels": ["seconde_classe", "premiere_classe", "raider"],
+    "difficulty_weight": 3.0
+  },
+  "constraints": {
+    "min_distance_m": 0.0,
+    "max_distance_m": null,
+    "max_proportion": 0.25,
+    "allow_consecutive": false
+  }
+}

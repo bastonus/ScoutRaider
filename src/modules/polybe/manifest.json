@@ -1,0 +1,25 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "polybe",
+  "name": "Carré de Polybe",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Chiffrement par substitution matricielle dans une grille 6×6.",
+  "data_capability": "alphanumeric",
+  "supported_inputs": ["raw_text"],
+  "render_type": "grid",
+  "entrypoint": "index.ts",
+  "pedagogy": {
+    "recommended_levels": ["seconde_classe", "premiere_classe"],
+    "difficulty_weight": 2.5
+  },
+  "constraints": {
+    "min_distance_m": 0.0,
+    "max_distance_m": null,
+    "max_proportion": 0.25,
+    "allow_consecutive": false
+  }
+}

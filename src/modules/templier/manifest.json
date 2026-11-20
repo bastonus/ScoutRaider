@@ -1,0 +1,27 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "templier",
+  "name": "Croix des Templiers",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Chiffre maçonnique / pigpen traditionnel basé sur la croix templière et la police TemplarsCipherPlus.",
+  "data_capability": "symbolic_visual",
+  "supported_inputs": ["raw_text"],
+  "render_type": "text",
+  "entrypoint": "index.ts",
+  "pedagogy": {
+    "recommended_levels": ["seconde_classe", "premiere_classe"],
+    "difficulty_weight": 3.0,
+    "rules_explanation": "Idéal pour les messages solennels, le désert spirituel ou les enveloppes scellées."
+  },
+  "constraints": {
+    "min_distance_m": 0.0,
+    "max_distance_m": null,
+    "max_proportion": 0.25,
+    "allow_consecutive": false
+  },
+  "assets": ["assets/fonts/TemplarsCipherPlus.ttf"]
+}
