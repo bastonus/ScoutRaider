@@ -4,14 +4,15 @@
  * Contient : indicateur de type, label d'étape (A,B,C), bouton 3 points
  * Aligné pour tous les types : commentaire, code, carte, computed, etc.
  */
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import {
     MessageSquarePlus, Code2, Map, MapPin, Layers,
     Key, Grid, Hash, Flag, RotateCcw, Minus, Circle, Type,
     MoreVertical, Check, MoveUp, MoveDown, Copy, Link2, Trash2,
     Settings, Palette, Globe, Eye, EyeOff, Lock, Unlock
 } from 'lucide-react';
-import { MODULE_META, ALL_MODULE_IDS } from '../../logic/ModuleRegistry';
+import { MODULE_META } from '../../logic/ModuleRegistry';
+import { ModuleManagementService } from '../../logic/ModuleManagementService';
 import { CIPHER_FONTS, CIPHER_FONT_SIZES, CIPHER_ICONS } from './MarkdownRenderer';
 import UnifiedContextMenu from './UnifiedContextMenu';
 import type { ModuleId, CarnetStep, NavLanguage } from '../../logic/types';
@@ -67,6 +68,8 @@ export interface BlockGutterProps {
     pois?: Array<{ id: string; name: string; selected: boolean }>;
     /** Ref pour le conteneur parent (pour positionnement menu) */
     containerRef?: React.RefObject<HTMLDivElement>;
+    /** Si le bloc est calculé depuis l'itinéraire */
+    isComputedBlock?: boolean;
 }
 
 /**
@@ -192,7 +195,8 @@ export default function BlockGutter({
     hasSolution = false,
     navLanguage,
     pois = [],
-    containerRef
+    containerRef,
+    isComputedBlock = false
 }: BlockGutterProps) {
     const { dispatch } = useApp();
     const indicator = getBlockIndicator(blockType, blockData, moduleId, isTitle);
@@ -200,8 +204,14 @@ export default function BlockGutter({
     const triggerRef = useRef<HTMLButtonElement>(null);
 
     // Déterminer les ciphers textuels disponibles
-    const textualCiphers = ALL_MODULE_IDS.filter(id =>
-        ['morse', 'vigenere', 'polybe', 'templier', 'maritime', 'avocat', 'cassis', 'texte_clair'].includes(id)
+    const textualCiphers = useMemo(() =>
+        ModuleManagementService.getAllModules()
+            .filter(m =>
+                m.resource_type === 'crypto_module' &&
+                !['map_path', 'elevation_profile', 'map_overview'].includes(m.data_capability || '')
+            )
+            .map(m => m.id as ModuleId),
+        []
     );
 
     const handleIconClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -253,6 +263,13 @@ export default function BlockGutter({
             >
                 {indicator.icon}
             </button>
+
+            {/* Icône de synchronisation avec l'itinéraire */}
+            {isComputedBlock && (
+                <div title="Synchronisé avec l'itinéraire" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1px', opacity: 0.4 }}>
+                    <Link2 size={8} color="var(--text-dim)" strokeWidth={2} />
+                </div>
+            )}
 
             {/* Menu contextuel unifié (sans bouton 3 points visible, activable par clic icône, clic droit ou appui long) */}
             <UnifiedContextMenu

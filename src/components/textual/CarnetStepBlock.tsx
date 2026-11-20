@@ -895,16 +895,7 @@ function ManualCodeBlock({
                         {displayText}
                     </div>
                 )}
-                {isSolution && isActuallyEncoded && step.solutionText && (
-                    <div style={{
-                        marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px',
-                        fontSize: '11px', color: 'var(--semantic-green)', fontWeight: 600,
-                    }}>
-                        <Lightbulb size={12} strokeWidth={2.4} color="var(--semantic-green)" style={{ flexShrink: 0 }} />
-                        <span>Solution : {step.solutionText}</span>
-                    </div>
-                )}
-                {hovered && !isSolution && isActuallyEncoded && step.solutionText && (
+                {hovered && isActuallyEncoded && step.solutionText && (
                     <div style={{
                         marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px',
                         fontSize: '11px', color: 'var(--semantic-green)', fontWeight: 600,
@@ -1050,6 +1041,7 @@ function ComputedStepLine({
                 moduleId={step.moduleId}
                 isSelected={isSelected}
                 isHovered={hovered || isEditing}
+                isComputedBlock={true}
                 contextMenuPos={contextMenuPos}
                 onOpenContextMenu={pos => setContextMenuPos(pos)}
                 onCloseContextMenu={() => setContextMenuPos(null)}
@@ -1101,8 +1093,8 @@ function ComputedStepLine({
                                     <div style={{ fontFamily: font, fontSize: fontSize, color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', wordBreak: 'break-all', letterSpacing: step.moduleId === 'morse' ? '2px' : '0.02em', lineHeight: 1.4 }}>
                                         <HighlightedText text={encodedLine} pois={pois} isEncoded={true} />
                                     </div>
-                                    {/* Ligne de solution affichée en colonne sous le code chiffré (au survol ou en mode solution) */}
-                                    {(hovered || isSolutionView) && (
+                                    {/* Ligne de solution affichée en colonne sous le code chiffré (au survol uniquement) */}
+                                    {hovered && (
                                         <div style={{ fontSize: '11px', color: dangerColor || 'var(--semantic-green)', marginTop: '3px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                             <Lightbulb size={11} strokeWidth={2.4} color={dangerColor || 'var(--semantic-green)'} style={{ flexShrink: 0 }} />
                                             <HighlightedText text={solutionLine} pois={pois} isEncoded={false} />
@@ -1112,7 +1104,10 @@ function ComputedStepLine({
                             ) : (
                                 /* Texte déjà en clair : DEMEURE STRICTEMENT INCHANGÉ, pas de colonne, pas de vert, pas d'ampoule */
                                 <div style={{ fontSize: '13px', color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', lineHeight: 1.5 }}>
-                                    <HighlightedText text={encodedLine || solutionLine} pois={pois} isEncoded={false} />
+                                    {dangerColor
+                                        ? <HighlightedText text={encodedLine || solutionLine} pois={pois} isEncoded={false} />
+                                        : <MarkdownRenderer content={encodedLine || solutionLine} viewMode="participant" />
+                                    }
                                 </div>
                             )}
                         </div>
@@ -1122,7 +1117,7 @@ function ComputedStepLine({
                             {hasMap && isFirst && (
                                 <MiniMap stepId={step.id} moduleId={step.moduleId} coords={step.coords} initialPersist={step.mapPersist} />
                             )}
-                            {isSolutionView && step.moduleId !== 'texte_clair' && !hasMap && solutionLine && (
+                            {hovered && step.moduleId !== 'texte_clair' && !hasMap && solutionLine && (
                                 <div style={{ fontSize: '11.5px', color: 'var(--semantic-green)', marginTop: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <Lightbulb size={12} strokeWidth={2.4} color="var(--semantic-green)" style={{ flexShrink: 0 }} />
                                     <HighlightedText text={solutionLine} pois={pois} isEncoded={false} />

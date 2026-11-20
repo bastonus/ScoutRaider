@@ -6,13 +6,13 @@
  * - Clic droit n'importe où sur le bloc
  * - Appui long (500ms) sur mobile / tactile
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     MoreVertical, Edit2, Trash2, Copy, MoveUp, MoveDown,
     Lock, Unlock, Eye, EyeOff, Palette, MapPin, Check,
-    Waves, Key, Grid, Hash, Flag, RotateCcw, Minus, Type, Layers
+    Waves, Key, Grid, Hash, Flag, RotateCcw, Minus, Type, Layers, Code2
 } from 'lucide-react';
-import { MODULE_META } from '../../logic/ModuleRegistry';
+import { ModuleManagementService } from '../../logic/ModuleManagementService';
 import type { ModuleId, NavLanguage } from '../../logic/types';
 
 export interface UnifiedContextMenuProps {
@@ -48,16 +48,7 @@ export interface UnifiedContextMenuProps {
     onClose?: () => void;
 }
 
-const TEXTUAL_CIPHERS: { id: ModuleId; label: string; color: string; Icon: React.ComponentType<any> }[] = [
-    { id: 'morse', label: 'Morse', color: '#ef4444', Icon: Waves },
-    { id: 'vigenere', label: 'Vigenère', color: '#8b5cf6', Icon: Key },
-    { id: 'polybe', label: 'Polybe', color: '#14b8a6', Icon: Grid },
-    { id: 'templier', label: 'Templier', color: '#b45309', Icon: Hash },
-    { id: 'avocat', label: 'Avocat', color: '#f59e0b', Icon: RotateCcw },
-    { id: 'cassis', label: 'Cassis', color: '#7c3aed', Icon: Minus },
-    { id: 'maritime', label: 'Maritime', color: '#0ea5e9', Icon: Flag },
-    { id: 'texte_clair', label: 'Clair', color: '#6b7280', Icon: Type },
-];
+
 
 const NAV_LANGUAGES: { id: NavLanguage; label: string }[] = [
     { id: 'Horaire', label: '12h' },
@@ -101,6 +92,20 @@ export default function UnifiedContextMenu({
     const triggerButtonRef = useRef<HTMLButtonElement>(null);
 
     const currentCipher = blockData?.moduleId as ModuleId | undefined;
+
+    // Chargement dynamique des ciphers depuis la bibliothèque personnelle
+    const dynamicCiphers = useMemo(() => {
+        const managedModules = ModuleManagementService.getAllModules();
+        const textualModules = managedModules.filter(m =>
+            m.resource_type === 'crypto_module' &&
+            !['map_path', 'elevation_profile', 'map_overview'].includes(m.data_capability || '')
+        );
+        return textualModules.map(m => ({
+            id: m.id as ModuleId,
+            label: m.name.length > 10 ? m.name.split(' ')[0] : m.name,
+            color: m.color || '#6b7280',
+        }));
+    }, []);
 
     // Synchronisation si ouverture par anchorPosition externe (clic droit ou long press)
     useEffect(() => {
@@ -323,9 +328,8 @@ export default function UnifiedContextMenu({
                                     gridTemplateColumns: 'repeat(4, 1fr)',
                                     gap: '3px',
                                 }}>
-                                    {TEXTUAL_CIPHERS.map(c => {
+                                    {dynamicCiphers.map(c => {
                                         const isCurrent = c.id === currentCipher;
-                                        const IconComponent = c.Icon;
                                         return (
                                             <button
                                                 key={c.id}
@@ -357,7 +361,7 @@ export default function UnifiedContextMenu({
                                                     if (!isCurrent) e.currentTarget.style.background = 'transparent';
                                                 }}
                                             >
-                                                <IconComponent size={12} color={c.color} strokeWidth={2.4} />
+                                                <Code2 size={12} color={c.color} strokeWidth={2.4} />
                                                 <span style={{ marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '58px' }}>
                                                     {c.label}
                                                 </span>
@@ -373,7 +377,7 @@ export default function UnifiedContextMenu({
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                 <div style={sectionLabelStyle}>Convertir en message chiffré</div>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '3px' }}>
-                                    {TEXTUAL_CIPHERS.slice(0, 4).map(c => (
+                                    {dynamicCiphers.slice(0, 4).map(c => (
                                         <button
                                             key={c.id}
                                             type="button"
@@ -386,7 +390,7 @@ export default function UnifiedContextMenu({
                                             onMouseEnter={e => (e.currentTarget.style.background = `${c.color}15`)}
                                             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                         >
-                                            <c.Icon size={11} strokeWidth={2.4} />
+                                            <Code2 size={11} color={c.color} strokeWidth={2.4} />
                                             <span>{c.label}</span>
                                         </button>
                                     ))}
