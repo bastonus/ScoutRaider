@@ -1103,11 +1103,10 @@ function ComputedStepLine({
                                 </>
                             ) : (
                                 /* Texte déjà en clair : DEMEURE STRICTEMENT INCHANGÉ, pas de colonne, pas de vert, pas d'ampoule */
+                                /* NB: MarkdownRenderer NE doit PAS être utilisé ici — les lignes calculées par l'itinéraire sont du texte brut,
+                                   non du markdown. MarkdownRenderer génère des placeholders internes (CIPHER_xxx_0) qui fuient dans l'affichage. */
                                 <div style={{ fontSize: '13px', color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', lineHeight: 1.5 }}>
-                                    {dangerColor
-                                        ? <HighlightedText text={encodedLine || solutionLine} pois={pois} isEncoded={false} />
-                                        : <MarkdownRenderer content={encodedLine || solutionLine} viewMode="participant" />
-                                    }
+                                    <HighlightedText text={encodedLine || solutionLine} pois={pois} isEncoded={false} />
                                 </div>
                             )}
                         </div>
