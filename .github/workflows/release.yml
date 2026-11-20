@@ -188,12 +188,16 @@ jobs:
 
       # Notifier Coolify de redéployer après le push Docker
       - name: Trigger Coolify redeploy (webhook)
-        if: ${{ secrets.COOLIFY_WEBHOOK_URL != '' }}
+        env:
+          COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
         run: |
-          curl --silent --show-error --fail \
-            --request GET \
-            "${{ secrets.COOLIFY_WEBHOOK_URL }}" \
-            || echo "⚠️ Coolify webhook call failed (non-blocking)"
+          if [ -n "$COOLIFY_WEBHOOK_URL" ]; then
+            curl --silent --show-error --fail --request GET "$COOLIFY_WEBHOOK_URL" \
+              && echo "✅ Coolify redeploy triggered" \
+              || echo "⚠️ Coolify webhook failed (non-blocking)"
+          else
+            echo "ℹ️ COOLIFY_WEBHOOK_URL not set, skipping"
+          fi
         continue-on-error: true
 
   # ─────────────────────────────────────────────────────────
