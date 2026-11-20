@@ -1,40 +1,40 @@
 /**
- * UnifiedContextMenu.tsx — Menu contextuel unifié (trois points) pour tous les types de blocs
- * Style identique à la barre textuelle (toolbarSwapIn, bg-elevated, border-subtle, shadow-md)
- * Sur desktop : clic gauche sur les 3 points ouvre le menu
- * Pour blocs d'encodage : boutons contextuels selon le mode de chiffrement
+ * UnifiedContextMenu.tsx — Menu contextuel unifié et synthétique
+ * Style épuré identique à la barre d'outils flottante (bg-elevated, border-strong, shadow-lg)
+ * Déclenché par :
+ * - Clic gauche sur le bouton 3 points du gutter
+ * - Clic droit n'importe où sur le bloc
+ * - Appui long (500ms) sur mobile / tactile
  */
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-    MoreVertical, Edit2, Trash2, Code2, MessageSquarePlus,
-    Copy, Check, ChevronDown, Lock, Unlock, Eye, EyeOff,
-    MoveUp, MoveDown, Copy as DuplicateIcon, Link2, Flag, Info,
-    Heading1, Heading2, Heading3, List, Quote, Image,
-    FileText, Key, Sigma, Zap, Settings, Palette, MapPin, Globe,
-    RotateCcw, Type, Grid, Hash, Minus, Circle, Waves
+    MoreVertical, Edit2, Trash2, Copy, MoveUp, MoveDown,
+    Lock, Unlock, Eye, EyeOff, Palette, MapPin, Check,
+    Waves, Key, Grid, Hash, Flag, RotateCcw, Minus, Type, Layers
 } from 'lucide-react';
-import { MODULE_META, ALL_MODULE_IDS } from '../../logic/ModuleRegistry';
-import { CIPHER_FONTS, CIPHER_FONT_SIZES } from './MarkdownRenderer';
-import type { ModuleId, CarnetStep } from '../../logic/types';
-import { useApp } from '../../AppContext';
+import { MODULE_META } from '../../logic/ModuleRegistry';
+import type { ModuleId, NavLanguage } from '../../logic/types';
 
-interface UnifiedContextMenuProps {
-    /** Type de bloc pour adapter le menu */
+export interface UnifiedContextMenuProps {
     blockType: 'html' | 'code' | 'computed' | 'map' | 'annexe' | 'title' | 'generic';
-    /** ID unique du bloc */
     blockId: string;
-    /** Données du bloc (pour actions contextuelles) */
     blockData?: any;
-    /** Modules de chiffrement disponibles */
     availableCiphers?: ModuleId[];
-    /** Position d'ancrage (optionnel, calculé auto si non fourni) */
-    anchorPosition?: { x: number; y: number };
-    /** Ref de l'élément déclencheur (bouton 3 points) */
+    anchorPosition?: { x: number; y: number } | null;
     triggerRef?: React.RefObject<HTMLButtonElement>;
-    /** Callbacks d'actions */
+    isHovered?: boolean;
+    isLocked?: boolean;
+    isSolutionView?: boolean;
+    hasSolution?: boolean;
+    navLanguage?: string;
+    pois?: Array<{ id: string; name: string; selected: boolean }>;
     onEdit?: () => void;
     onDelete?: () => void;
     onDuplicate?: () => void;
+    onMoveUp?: () => void;
+    onMoveDown?: () => void;
+    onCopy?: () => void;
+    onLinkReference?: () => void;
     onConvertToCode?: (cipher: ModuleId) => void;
     onConvertToHtml?: () => void;
     onChangeCipher?: (cipher: ModuleId) => void;
@@ -42,70 +42,47 @@ interface UnifiedContextMenuProps {
     onTogglePOI?: (poiId: string) => void;
     onToggleSolution?: () => void;
     onLockToggle?: () => void;
-    onMoveUp?: () => void;
-    onMoveDown?: () => void;
-    onCopy?: () => void;
-    onLinkReference?: () => void;
     onOpenFontSelector?: () => void;
     onOpenSettings?: () => void;
-    /** État pour les éléments du menu */
-    isLocked?: boolean;
-    isSolutionView?: boolean;
-    hasSolution?: boolean;
-    navLanguage?: string;
-    pois?: Array<{ id: string; name: string; selected: boolean }>;
-    /** Si le bloc parent est survolé */
-    isHovered?: boolean;
-    /** Fermeture externe */
     onClose?: () => void;
 }
 
-type MenuSection = {
-    title?: string;
-    items: MenuItem[];
-    dividerAfter?: boolean;
-};
+const TEXTUAL_CIPHERS: { id: ModuleId; label: string; color: string; Icon: React.ComponentType<any> }[] = [
+    { id: 'morse', label: 'Morse', color: '#ef4444', Icon: Waves },
+    { id: 'vigenere', label: 'Vigenère', color: '#8b5cf6', Icon: Key },
+    { id: 'polybe', label: 'Polybe', color: '#14b8a6', Icon: Grid },
+    { id: 'templier', label: 'Templier', color: '#b45309', Icon: Hash },
+    { id: 'avocat', label: 'Avocat', color: '#f59e0b', Icon: RotateCcw },
+    { id: 'cassis', label: 'Cassis', color: '#7c3aed', Icon: Minus },
+    { id: 'maritime', label: 'Maritime', color: '#0ea5e9', Icon: Flag },
+    { id: 'texte_clair', label: 'Clair', color: '#6b7280', Icon: Type },
+];
 
-type MenuItem = {
-    id: string;
-    label: string;
-    description?: string;
-    icon: React.ReactNode;
-    action: () => void;
-    disabled?: boolean;
-    dangerous?: boolean;
-    shortcut?: string;
-    submenu?: MenuSection;
-    checked?: boolean;
-    dividerAfter?: boolean;
-};
-
-// ─── Icônes spécifiques par module de chiffrement ──────────────────────────
-const CIPHER_ICONS: Record<string, React.ReactNode> = {
-    morse: <Waves size={14} />,
-    vigenere: <Key size={14} />,
-    polybe: <Grid size={14} />,
-    templier: <Hash size={14} />,
-    maritime: <Flag size={14} />,
-    avocat: <RotateCcw size={14} />,
-    cassis: <Minus size={14} />,
-    texte_clair: <Type size={14} />,
-};
-
-const TEXTUAL_CIPHERS: ModuleId[] = ALL_MODULE_IDS.filter(id =>
-    ['morse', 'vigenere', 'polybe', 'templier', 'maritime', 'avocat', 'cassis', 'texte_clair'].includes(id)
-);
+const NAV_LANGUAGES: { id: NavLanguage; label: string }[] = [
+    { id: 'Horaire', label: '12h' },
+    { id: 'Cardinaux', label: 'N-E' },
+    { id: 'Azimut', label: 'Azimut' },
+    { id: 'Tournant', label: 'Tournant' },
+];
 
 export default function UnifiedContextMenu({
     blockType,
     blockId,
     blockData,
-    availableCiphers = [],
     anchorPosition,
     triggerRef,
+    isHovered = false,
+    isLocked = false,
+    isSolutionView = false,
+    hasSolution = false,
+    navLanguage,
+    pois = [],
     onEdit,
     onDelete,
     onDuplicate,
+    onMoveUp,
+    onMoveDown,
+    onCopy,
     onConvertToCode,
     onConvertToHtml,
     onChangeCipher,
@@ -113,816 +90,487 @@ export default function UnifiedContextMenu({
     onTogglePOI,
     onToggleSolution,
     onLockToggle,
-    onMoveUp,
-    onMoveDown,
-    onCopy,
-    onLinkReference,
     onOpenFontSelector,
-    onOpenSettings,
-    isLocked = false,
-    isSolutionView = false,
-    hasSolution = false,
-    navLanguage,
-    pois = [],
-    isHovered = false,
     onClose
 }: UnifiedContextMenuProps) {
-    const { dispatch } = useApp();
     const [isOpen, setIsOpen] = useState(false);
-    const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
+    const [menuCoords, setMenuCoords] = useState<{ x: number; y: number } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const triggerButtonRef = useRef<HTMLButtonElement>(null);
 
-    // Déterminer le cipher actuel pour les blocs code
     const currentCipher = blockData?.moduleId as ModuleId | undefined;
-    const cipherMeta = currentCipher ? MODULE_META[currentCipher] : null;
-    const cipherColor = cipherMeta?.color || '#6b7280';
-    const cipherFont = CIPHER_FONTS[currentCipher || ''] || 'monospace';
-    const cipherFontSize = CIPHER_FONT_SIZES[currentCipher || ''] || '14px';
 
-    // ─── Construction du menu selon le type de bloc ────────────────────────
-    const menuSections = useMemo((): MenuSection[] => {
-        const sections: MenuSection[] = [];
-        const textualCiphers = TEXTUAL_CIPHERS;
-
-        // Section 1: Actions principales (style toolbar)
-        const primaryItems: MenuItem[] = [];
-
-        if (onEdit) {
-            primaryItems.push({
-                id: 'edit',
-                label: 'Éditer',
-                description: 'Modifier le contenu (Double-clic)',
-                icon: <Edit2 size={14} />,
-                action: () => { onEdit(); setIsOpen(false); },
-                shortcut: 'Entrée / Double-clic'
-            });
+    // Synchronisation si ouverture par anchorPosition externe (clic droit ou long press)
+    useEffect(() => {
+        if (anchorPosition) {
+            setMenuCoords(anchorPosition);
+            setIsOpen(true);
         }
+    }, [anchorPosition]);
 
-        if (onDuplicate) {
-            primaryItems.push({
-                id: 'duplicate',
-                label: 'Dupliquer',
-                description: 'Créer une copie de ce bloc',
-                icon: <DuplicateIcon size={14} />,
-                action: () => { onDuplicate(); setIsOpen(false); },
-                shortcut: 'Ctrl+D'
-            });
-        }
-
-        if (onMoveUp || onMoveDown) {
-            if (onMoveUp) {
-                primaryItems.push({
-                    id: 'move_up',
-                    label: 'Monter',
-                    description: 'Déplacer le bloc vers le haut',
-                    icon: <MoveUp size={14} />,
-                    action: () => { onMoveUp(); setIsOpen(false); },
-                    shortcut: 'Alt+↑'
-                });
-            }
-            if (onMoveDown) {
-                primaryItems.push({
-                    id: 'move_down',
-                    label: 'Descendre',
-                    description: 'Déplacer le bloc vers le bas',
-                    icon: <MoveDown size={14} />,
-                    action: () => { onMoveDown(); setIsOpen(false); },
-                    shortcut: 'Alt+↓'
-                });
-            }
-        }
-
-        if (onCopy) {
-            primaryItems.push({
-                id: 'copy',
-                label: 'Copier',
-                description: 'Copier le contenu dans le presse-papiers',
-                icon: <Copy size={14} />,
-                action: () => { onCopy(); setIsOpen(false); },
-                shortcut: 'Ctrl+C'
-            });
-        }
-
-        if (onLinkReference) {
-            primaryItems.push({
-                id: 'link_ref',
-                label: 'Copier la référence',
-                description: 'Insérer une référence vers ce bloc',
-                icon: <Link2 size={14} />,
-                action: () => { onLinkReference(); setIsOpen(false); },
-                shortcut: 'Ctrl+Shift+C'
-            });
-        }
-
-        if (primaryItems.length > 0) {
-            sections.push({ title: 'Actions', items: primaryItems.filter(i => i.icon) });
-        }
-
-        // Section 2: Conversion de type (pour blocs manuels)
-        if (blockType === 'html' || blockType === 'code' || blockType === 'title') {
-            const convertItems: MenuItem[] = [];
-
-            if (blockType === 'html' || blockType === 'title') {
-                // Convertir en code chiffré
-                if (textualCiphers.length > 0) {
-                    convertItems.push({
-                        id: 'convert_to_code',
-                        label: 'Convertir en code chiffré',
-                        description: 'Choisir un module de chiffrement',
-                        icon: <Code2 size={14} />,
-                        action: () => {},
-                        submenu: {
-                            title: 'Choisir le code',
-                            items: textualCiphers.map(cipherId => {
-                                const m = MODULE_META[cipherId];
-                                return {
-                                    id: `cipher_${cipherId}`,
-                                    label: m?.label || cipherId,
-                                    description: m?.description,
-                                    icon: (
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: m?.color || '#6b7280' }} />
-                                            <span>{m?.label || cipherId}</span>
-                                        </span>
-                                    ),
-                                    action: () => { onConvertToCode?.(cipherId as ModuleId); setIsOpen(false); setActiveSubmenu(null); }
-                                };
-                            })
-                        }
-                    });
-                }
-            }
-
-            if (blockType === 'code' && onConvertToHtml) {
-                convertItems.push({
-                    id: 'convert_to_html',
-                    label: 'Convertir en commentaire riche',
-                    description: 'Passer en mode texte formaté (Markdown/HTML)',
-                    icon: <MessageSquarePlus size={14} />,
-                    action: () => { onConvertToHtml(); setIsOpen(false); }
-                });
-            }
-
-            if (convertItems.length > 0) {
-                sections.push({ title: 'Conversion', items: convertItems });
-            }
-        }
-
-        // Section 3: CHANGEMENT DE CHIFFREMENT — Boutons contextuels selon le mode actuel
-        if ((blockType === 'code' || blockType === 'computed') && textualCiphers.length > 0) {
-            const cipherItems: MenuItem[] = [];
-
-            // Bouton principal : changer de chiffrement (avec indicateur du mode actuel)
-            cipherItems.push({
-                id: 'change_cipher_main',
-                label: currentCipher
-                    ? `${MODULE_META[currentCipher]?.label || currentCipher}`
-                    : 'Choisir le chiffrement',
-                description: currentCipher ? `Mode actuel : ${MODULE_META[currentCipher]?.label || currentCipher}` : 'Aucun chiffrement sélectionné',
-                icon: (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{
-                            width: '10px', height: '10px', borderRadius: '50%',
-                            background: cipherColor,
-                            boxShadow: '0 0 0 2px var(--bg-elevated)'
-                        }} />
-                        {CIPHER_ICONS[currentCipher || '']}
-                    </span>
-                ),
-                action: () => setActiveSubmenu('cipher_picker'),
-            });
-
-            // Sous-menu : sélecteur de chiffrement avec aperçu
-            if (textualCiphers.length > 0) {
-                // On ajoute le sous-menu comme section séparée qui sera affichée via activeSubmenu
-                sections.push({
-                    title: 'Chiffrement',
-                    items: [{
-                        id: 'cipher_picker',
-                        label: currentCipher
-                            ? `${MODULE_META[currentCipher]?.label || currentCipher}`
-                            : 'Choisir le chiffrement',
-                        description: 'Cliquer pour changer de mode de chiffrement',
-                        icon: (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{
-                                    width: '10px', height: '10px', borderRadius: '50%',
-                                    background: cipherColor,
-                                    boxShadow: '0 0 0 2px var(--bg-elevated)'
-                                }} />
-                                {CIPHER_ICONS[currentCipher || '']}
-                            </span>
-                        ),
-                        action: () => setActiveSubmenu('cipher_picker'),
-                    }]
-                });
-            }
-        }
-
-        // Section 4: Options spécifiques au chiffrement ACTUEL
-        if ((blockType === 'code' || blockType === 'computed') && currentCipher) {
-            const cipherSpecificItems: MenuItem[] = [];
-
-            // Pour chaque type de chiffrement, ajouter des options contextuelles
-            switch (currentCipher) {
-                case 'morse':
-                    cipherSpecificItems.push(
-                        {
-                            id: 'morse_speed',
-                            label: 'Vitesse Morse',
-                            description: 'Ajuster la vitesse de lecture',
-                            icon: <Waves size={14} />,
-                            action: () => { /* TODO: ouvrir panel vitesse */ setIsOpen(false); }
-                        },
-                        {
-                            id: 'morse_format',
-                            label: 'Format points/traits',
-                            description: 'Choisir • − ou . -',
-                            icon: <Waves size={14} />,
-                            action: () => { /* TODO */ setIsOpen(false); }
-                        }
-                    );
-                    break;
-                case 'vigenere':
-                    cipherSpecificItems.push(
-                        {
-                            id: 'vigenere_key',
-                            label: 'Changer la clé',
-                            description: 'Modifier la clé de chiffrement Vigenère',
-                            icon: <Key size={14} />,
-                            action: () => { /* TODO */ setIsOpen(false); }
-                        },
-                        {
-                            id: 'vigenere_table',
-                            label: 'Voir la table',
-                            description: 'Afficher le carré de Vigenère complet',
-                            icon: <Grid size={14} />,
-                            action: () => { /* TODO */ setIsOpen(false); }
-                        }
-                    );
-                    break;
-                case 'polybe':
-                    cipherSpecificItems.push(
-                        {
-                            id: 'polybe_grid',
-                            label: 'Grille 5×5 ou 6×6',
-                            description: 'Choisir la taille de la grille',
-                            icon: <Grid size={14} />,
-                            action: () => { /* TODO */ setIsOpen(false); }
-                        },
-                        {
-                            id: 'polybe_coords',
-                            label: 'Format coordonnées',
-                            description: '11-12 ou A1-B2',
-                            icon: <Hash size={14} />,
-                            action: () => { /* TODO */ setIsOpen(false); }
-                        }
-                    );
-                    break;
-                case 'templier':
-                    cipherSpecificItems.push(
-                        {
-                            id: 'templier_style',
-                            label: 'Style de croix',
-                            description: 'Choisir le variant pigpen',
-                            icon: <Hash size={14} />,
-                            action: () => { /* TODO */ setIsOpen(false); }
-                        }
-                    );
-                    break;
-                case 'maritime':
-                    cipherSpecificItems.push(
-                        {
-                            id: 'maritime_nato',
-                            label: 'Alphabet NATO',
-                            description: 'Alpha, Bravo, Charlie...',
-                            icon: <Flag size={14} />,
-                            action: () => { /* TODO */ setIsOpen(false); }
-                        },
-                        {
-                            id: 'maritime_flags',
-                            label: 'Pavillons visuels',
-                            description: 'Drapeaux de signalisation',
-                            icon: <Flag size={14} />,
-                            action: () => { /* TODO */ setIsOpen(false); }
-                        }
-                    );
-                    break;
-                case 'avocat':
-                case 'cassis':
-                    cipherSpecificItems.push(
-                        {
-                            id: 'caesar_shift',
-                            label: 'Valeur du décalage',
-                            description: currentCipher === 'avocat' ? 'Décalage +10 (A=K)' : 'Décalage +6 (K=6)',
-                            icon: <RotateCcw size={14} />,
-                            action: () => { /* TODO */ setIsOpen(false); }
-                        }
-                    );
-                    break;
-                case 'texte_clair':
-                    cipherSpecificItems.push(
-                        {
-                            id: 'plain_format',
-                            label: 'Mise en forme',
-                            description: 'Gras, italique, listes...',
-                            icon: <Type size={14} />,
-                            action: () => { /* TODO */ setIsOpen(false); }
-                        }
-                    );
-                    break;
-            }
-
-            if (cipherSpecificItems.length > 0) {
-                sections.push({ title: `Options ${MODULE_META[currentCipher]?.label || currentCipher}`, items: cipherSpecificItems });
-            }
-        }
-
-        // Section 5: Langage de guidage (pour blocs computed)
-        if (blockType === 'computed' && (onChangeLanguage || navLanguage !== undefined)) {
-            const languages = ['Aléatoire', 'Horaire', 'Cardinaux', 'Azimut', 'Tournant'];
-            sections.push({
-                title: 'Guidage',
-                items: [{
-                    id: 'nav_language',
-                    label: navLanguage ? `Langage: ${navLanguage}` : 'Langage: Aléatoire',
-                    description: 'Changer le style de guidage',
-                    icon: <Globe size={14} />,
-                    action: () => {},
-                    submenu: {
-                        title: 'Langage de guidage',
-                        items: languages.map(lang => ({
-                            id: `lang_${lang}`,
-                            label: lang === 'Aléatoire' ? 'Aléatoire (mélange)' : lang,
-                            icon: lang !== 'Aléatoire' && navLanguage === lang
-                                ? <Check size={12} color="var(--accent-hover)" strokeWidth={2.5} />
-                                : null,
-                            action: () => { onChangeLanguage?.(lang === 'Aléatoire' ? '' : lang); setIsOpen(false); setActiveSubmenu(null); },
-                            checked: navLanguage === lang || (!navLanguage && lang === 'Aléatoire')
-                        }))
-                    }
-                }]
-            });
-        }
-
-        // Section 6: POI (si disponibles)
-        if (pois.length > 0 && onTogglePOI) {
-            sections.push({
-                title: 'Points d\'intérêt',
-                items: pois.map(poi => ({
-                    id: `poi_${poi.id}`,
-                    label: poi.name,
-                    icon: poi.selected ? <Check size={12} color="var(--semantic-orange)" strokeWidth={2.5} /> : <MapPin size={14} />,
-                    action: () => { onTogglePOI(poi.id); },
-                    checked: poi.selected
-                }))
-            });
-        }
-
-        // Section 7: Affichage solution/participant
-        if (blockType === 'computed' && hasSolution && onToggleSolution) {
-            sections.push({
-                title: 'Affichage',
-                items: [{
-                    id: 'toggle_solution',
-                    label: isSolutionView ? 'Mode participant (chiffré)' : 'Mode solution (clair)',
-                    description: 'Basculer entre vue participant et vue organisateur',
-                    icon: isSolutionView ? <EyeOff size={14} /> : <Eye size={14} />,
-                    action: () => { onToggleSolution(); setIsOpen(false); },
-                    shortcut: 'Ctrl+Shift+S'
-                }]
-            });
-        }
-
-        // Section 8: Verrouillage (pour cartes, blocs calculés)
-        if ((blockType === 'map' || blockType === 'computed') && onLockToggle) {
-            sections.push({
-                title: 'Verrouillage',
-                items: [{
-                    id: 'toggle_lock',
-                    label: isLocked ? 'Déverrouiller' : 'Verrouiller',
-                    description: isLocked ? 'Autoriser les modifications automatiques' : 'Empêcher la régénération automatique',
-                    icon: isLocked ? <Unlock size={14} /> : <Lock size={14} />,
-                    action: () => { onLockToggle(); setIsOpen(false); },
-                    checked: isLocked
-                }]
-            });
-        }
-
-        // Section 9: Polices (pour blocs HTML/rich text)
-        if ((blockType === 'html' || blockType === 'title') && onOpenFontSelector) {
-            sections.push({
-                title: 'Apparence',
-                items: [{
-                    id: 'font_selector',
-                    label: 'Choisir les polices',
-                    description: 'Police de base, titres, code… par bloc',
-                    icon: <Palette size={14} />,
-                    action: () => { onOpenFontSelector(); setIsOpen(false); }
-                }]
-            });
-        }
-
-        // Section 10: Paramètres avancés
-        const advancedItems: MenuItem[] = [];
-
-        if (onOpenSettings) {
-            advancedItems.push({
-                id: 'settings',
-                label: 'Paramètres avancés',
-                description: 'Configuration détaillée du bloc',
-                icon: <Settings size={14} />,
-                action: () => { onOpenSettings(); setIsOpen(false); }
-            });
-        }
-
-        if (blockType === 'computed') {
-            advancedItems.push({
-                id: 'info',
-                label: 'Informations',
-                description: 'Voir les détails techniques (segment, azimut, distance)',
-                icon: <Info size={14} />,
-                action: () => { /* TODO: ouvrir panel info */ setIsOpen(false); }
-            });
-        }
-
-        if (advancedItems.length > 0) {
-            sections.push({ title: 'Avancé', items: advancedItems });
-        }
-
-        // Section 11: Supprimer (toujours en dernier, dangereux)
-        if (onDelete) {
-            sections.push({
-                items: [{
-                    id: 'delete',
-                    label: 'Supprimer',
-                    description: 'Supprimer définitivement ce bloc',
-                    icon: <Trash2 size={14} />,
-                    action: () => { if (window.confirm('Supprimer ce bloc ?')) { onDelete(); setIsOpen(false); } },
-                    dangerous: true,
-                    shortcut: 'Suppr'
-                }]
-            });
-        }
-
-        return sections;
-    }, [
-        blockType, blockData, availableCiphers, onEdit, onDelete, onDuplicate,
-        onConvertToCode, onConvertToHtml, onChangeCipher, onChangeLanguage,
-        onTogglePOI, onToggleSolution, onLockToggle, onMoveUp, onMoveDown,
-        onCopy, onLinkReference, onOpenFontSelector, onOpenSettings,
-        isLocked, isSolutionView, hasSolution, navLanguage, pois,
-        currentCipher, cipherMeta, cipherColor
-    ]);
-
-    // ─── Gestion ouverture/fermeture ──────────────────────────────────────
-    const toggleMenu = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        e.preventDefault(); // Empêcher le menu contextuel natif
-        setIsOpen(!isOpen);
-        setActiveSubmenu(null);
-    };
-
-    const closeMenu = () => {
+    const handleClose = () => {
         setIsOpen(false);
-        setActiveSubmenu(null);
+        setMenuCoords(null);
         onClose?.();
     };
 
-    // Clic gauche sur les 3 points = ouvre le menu
-    // Clic droit = menu natif du navigateur (on ne l'intercepte pas)
-    const handleMouseDown = (e: React.MouseEvent) => {
-        if (e.button === 0) { // Clic gauche
-            e.stopPropagation();
-            e.preventDefault();
-            toggleMenu(e);
-        }
-        // Clic droit (button === 2) : laisser le menu natif du navigateur
-    };
-
-    // Clic extérieur pour fermer
+    // Clic extérieur ou touche Échap pour fermer
     useEffect(() => {
         if (!isOpen) return;
-        const handleClickOutside = (e: MouseEvent) => {
+        const handleOutside = (e: MouseEvent | TouchEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                closeMenu();
+                handleClose();
             }
         };
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') closeMenu();
+            if (e.key === 'Escape') handleClose();
         };
-        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('mousedown', handleOutside);
+        document.addEventListener('touchstart', handleOutside);
         document.addEventListener('keydown', handleKeyDown);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('mousedown', handleOutside);
+            document.removeEventListener('touchstart', handleOutside);
             document.removeEventListener('keydown', handleKeyDown);
         };
     }, [isOpen]);
 
-    // ─── Rendu ────────────────────────────────────────────────────────────
+    const toggleFromButton = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (isOpen) {
+            handleClose();
+        } else {
+            if (triggerButtonRef.current) {
+                const rect = triggerButtonRef.current.getBoundingClientRect();
+                setMenuCoords({ x: rect.right + 6, y: rect.top });
+            }
+            setIsOpen(true);
+        }
+    };
+
+    // Calcul de position ajustée aux bords de l'écran
+    const getComputedPosition = (): React.CSSProperties => {
+        const menuWidth = 284;
+        const menuHeight = 290;
+        let x = menuCoords ? menuCoords.x : 0;
+        let y = menuCoords ? menuCoords.y : 0;
+
+        if (x + menuWidth > window.innerWidth - 8) {
+            x = Math.max(8, window.innerWidth - menuWidth - 8);
+        }
+        if (y + menuHeight > window.innerHeight - 8) {
+            y = Math.max(8, window.innerHeight - menuHeight - 8);
+        }
+
+        return {
+            position: 'fixed',
+            left: `${x}px`,
+            top: `${y}px`,
+            zIndex: 99999,
+        };
+    };
+
     const triggerButton = (
         <button
             ref={triggerButtonRef}
             type="button"
-            onClick={toggleMenu}
-            title="Options du bloc (clic pour ouvrir)"
+            onClick={toggleFromButton}
+            title="Options du bloc (clic gauche ou clic droit)"
             style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: '20px', height: '20px',
-                border: 'none', background: isOpen ? 'var(--bg-hover)' : 'transparent',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '20px',
+                height: '20px',
+                border: 'none',
+                background: isOpen ? 'var(--bg-hover)' : 'transparent',
                 color: isOpen ? 'var(--accent-hover)' : 'var(--text-dim)',
-                cursor: 'pointer', padding: 0,
-                opacity: isOpen ? 1 : (isHovered ? 0.9 : 0.2),
-                transition: 'opacity 150ms ease, color 120ms ease, background 120ms ease',
+                cursor: 'pointer',
+                padding: 0,
                 borderRadius: '4px',
+                opacity: isOpen ? 1 : (isHovered ? 0.9 : 0.2),
+                transition: 'opacity 150ms ease, background 120ms ease, color 120ms ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.opacity = '1'; }}
+            onMouseEnter={e => {
+                e.currentTarget.style.color = 'var(--text-primary)';
+                e.currentTarget.style.background = 'var(--bg-hover)';
+            }}
             onMouseLeave={e => {
                 e.currentTarget.style.color = isOpen ? 'var(--accent-hover)' : 'var(--text-dim)';
-                e.currentTarget.style.opacity = isOpen ? '1' : (isHovered ? '0.9' : '0.2');
+                e.currentTarget.style.background = isOpen ? 'var(--bg-hover)' : 'transparent';
             }}
         >
             <MoreVertical size={14} strokeWidth={2.2} />
         </button>
     );
 
-    // Positionnement du menu
-    let menuStyle: React.CSSProperties = {
-        position: 'fixed',
-        zIndex: 9999,
-        pointerEvents: 'auto',
-    };
-
-    if (anchorPosition) {
-        menuStyle.left = Math.max(12, Math.min(window.innerWidth - 300, anchorPosition.x));
-        menuStyle.top = Math.max(12, Math.min(window.innerHeight - 420, anchorPosition.y));
-    } else if (triggerButtonRef.current) {
-        const rect = triggerButtonRef.current.getBoundingClientRect();
-        let left = rect.right + 6;
-        if (left + 280 > window.innerWidth) {
-            left = Math.max(12, rect.left - 280);
-        }
-        let top = rect.top - 4;
-        if (top + 420 > window.innerHeight) {
-            top = Math.max(12, window.innerHeight - 430);
-        }
-        menuStyle.left = left;
-        menuStyle.top = top;
-    }
-
-    // Rendu du menu (principal ou sous-menu)
-    const renderMenu = (sections: MenuSection[], isSubmenu = false, parentId = '') => {
-        if (activeSubmenu && !isSubmenu) {
-            // Afficher le sous-menu actif
-            if (activeSubmenu === 'cipher_picker') {
-                return renderCipherPicker();
-            }
-            const section = sections.find(s => s.items.some(i => i.id === activeSubmenu));
-            const item = section?.items.find(i => i.id === activeSubmenu);
-            if (item?.submenu) {
-                return renderMenu([item.submenu], true, activeSubmenu);
-            }
-        }
-
-        return (
-            <div
-                ref={menuRef}
-                style={menuStyle}
-                onMouseDown={e => e.stopPropagation()}
-                onTouchStart={e => e.stopPropagation()}
-            >
-                <div style={{
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border-strong)',
-                    borderRadius: '10px',
-                    boxShadow: 'var(--shadow-lg)',
-                    minWidth: '260px',
-                    maxWidth: '340px',
-                    maxHeight: '450px',
-                    overflowY: 'auto',
-                    animation: 'islandPopoverIn 120ms cubic-bezier(0.16, 1, 0.3, 1)',
-                }}>
-                    {isSubmenu && (
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)',
-                            background: 'var(--bg-hover)'
-                        }}>
-                            <button
-                                type="button"
-                                onClick={() => setActiveSubmenu(null)}
-                                style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '2px' }}
-                            >
-                                <ChevronDown size={14} style={{ transform: 'rotate(-90deg)' }} />
-                            </button>
-                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                {sections[0].title || 'Options'}
-                            </span>
-                        </div>
-                    )}
-
-                    {sections.map((section, si) => (
-                        <React.Fragment key={si}>
-                            {section.title && !isSubmenu && (
-                                <div style={{ padding: '6px 12px 2px', fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                    {section.title}
-                                </div>
-                            )}
-                            {section.items.map((item, ii) => {
-                                if (!item.icon && item.dividerAfter) {
-                                    return <div key={`${parentId}_div_${ii}`} style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />;
-                                }
-                                return (
-                                    <button
-                                        key={`${parentId}_${item.id}`}
-                                        type="button"
-                                        onClick={item.action}
-                                        disabled={item.disabled}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                            width: '100%', padding: '8px 12px',
-                                            border: 'none', background: 'transparent',
-                                            color: item.dangerous ? '#ef4444' : (item.disabled ? 'var(--text-dim)' : 'var(--text-primary)'),
-                                            fontSize: '12px', fontWeight: item.checked ? 600 : 400,
-                                            textAlign: 'left', cursor: item.disabled ? 'not-allowed' : 'pointer',
-                                            transition: 'background 80ms ease',
-                                        }}
-                                        onMouseEnter={e => { if (!item.disabled && !item.dangerous) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                                        onMouseLeave={e => { if (!item.disabled) e.currentTarget.style.background = 'transparent'; }}
-                                    >
-                                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', flexShrink: 0, color: item.dangerous ? '#ef4444' : 'var(--accent-hover)' }}>
-                                            {item.icon}
-                                        </span>
-                                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-                                            {item.description && <span style={{ fontSize: '10px', color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.description}</span>}
-                                        </div>
-                                        {item.shortcut && <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginLeft: '8px' }}>{item.shortcut}</span>}
-                                        {item.checked && !item.submenu && <Check size={12} color="var(--accent-hover)" strokeWidth={2.5} />}
-                                        {item.submenu && <ChevronDown size={12} color="var(--text-dim)" />}
-                                    </button>
-                                );
-                            })}
-                            {section.dividerAfter && <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />}
-                        </React.Fragment>
-                    ))}
-                </div>
-            </div>
-        );
-    };
-
-    // ─── Rendu du sélecteur de chiffrement (sous-menu spécial) ─────────────
-    const renderCipherPicker = () => (
-        <div
-            ref={menuRef}
-            style={menuStyle}
-            onMouseDown={e => e.stopPropagation()}
-            onTouchStart={e => e.stopPropagation()}
-        >
-            <div style={{
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-strong)',
-                borderRadius: '10px',
-                boxShadow: 'var(--shadow-lg)',
-                minWidth: '280px',
-                maxWidth: '360px',
-                maxHeight: '450px',
-                overflowY: 'auto',
-                animation: 'islandPopoverIn 120ms cubic-bezier(0.16, 1, 0.3, 1)',
-            }}>
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '10px 12px', borderBottom: '1px solid var(--border-subtle)',
-                    background: 'var(--bg-hover)'
-                }}>
-                    <button
-                        type="button"
-                        onClick={() => setActiveSubmenu(null)}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '2px' }}
-                    >
-                        <ChevronDown size={14} style={{ transform: 'rotate(-90deg)' }} />
-                    </button>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Choisir le chiffrement
-                    </span>
-                    {currentCipher && (
-                        <span style={{
-                            marginLeft: 'auto',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            background: `${cipherColor}20`,
-                            color: cipherColor,
-                            fontWeight: 600,
-                            fontFamily: cipherFont,
-                            fontSize: cipherFontSize || '10px',
-                        }}>
-                            Actuel: {MODULE_META[currentCipher]?.label || currentCipher}
-                        </span>
-                    )}
-                </div>
-
-                <div style={{ padding: '8px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px' }}>
-                    {TEXTUAL_CIPHERS.map(cipherId => {
-                        const m = MODULE_META[cipherId];
-                        const isCurrent = cipherId === currentCipher;
-                        const font = CIPHER_FONTS[cipherId] || 'monospace';
-                        const size = CIPHER_FONT_SIZES[cipherId] || '14px';
-                        const icon = CIPHER_ICONS[cipherId] || <Type size={14} />;
-
-                        return (
-                            <button
-                                key={cipherId}
-                                type="button"
-                                onClick={() => {
-                                    onChangeCipher?.(cipherId as ModuleId);
-                                    setIsOpen(false);
-                                    setActiveSubmenu(null);
-                                }}
-                                disabled={isCurrent}
-                                style={{
-                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-                                    padding: '10px', borderRadius: '8px',
-                                    cursor: isCurrent ? 'not-allowed' : 'pointer',
-                                    textAlign: 'left',
-                                    border: `2px solid ${isCurrent ? m?.color || 'var(--accent-default)' : 'var(--border-subtle)'}`,
-                                    background: isCurrent ? `${m?.color || 'var(--accent-default)'}15` : 'var(--bg-surface)',
-                                    transition: 'all 0.12s ease',
-                                    boxSizing: 'border-box',
-                                    opacity: isCurrent ? 1 : 0.9,
-                                }}
-                                onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                                onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'var(--bg-surface)'; }}
-                            >
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '6px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{
-                                            width: '10px', height: '10px', borderRadius: '50%',
-                                            background: m?.color || '#6b7280',
-                                            boxShadow: '0 0 0 2px var(--bg-elevated)'
-                                        }} />
-                                        <span style={{
-                                            fontSize: '12px', fontWeight: 700,
-                                            color: isCurrent ? m?.color || 'var(--accent-hover)' : 'var(--text-primary)'
-                                        }}>
-                                            {m?.label || cipherId}
-                                        </span>
-                                    </div>
-                                    {isCurrent && <Check size={12} color={m?.color || 'var(--accent-hover)'} strokeWidth={2.8} />}
-                                </div>
-                                <div style={{
-                                    color: 'var(--text-dim)', lineHeight: 1.2,
-                                    fontFamily: font, fontSize: size,
-                                }}>
-                                    {m?.description || ''}
-                                </div>
-                                <div style={{
-                                    marginTop: '6px', paddingTop: '6px',
-                                    borderTop: '1px solid var(--border-subtle)',
-                                    fontFamily: font, fontSize: size, color: m?.color || '#6b7280',
-                                    width: '100%', textAlign: 'center'
-                                }}>
-                                    {/* Aperçu du chiffrement */}
-                                    {getCipherPreview(cipherId)}
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
-    );
-
-    // ─── Aperçu du chiffrement pour le sélecteur ──────────────────────────
-    const getCipherPreview = (cipherId: string) => {
-        const previews: Record<string, string> = {
-            morse: '• − • −   − • −',
-            vigenere: 'K P Q X',
-            polybe: '34 25 11',
-            templier: '⟐ ⟒ ⟑',
-            maritime: '🏁 ⚓ 🚩',
-            avocat: 'K L M N',
-            cassis: 'Q R S T',
-            texte_clair: 'Texte clair',
-        };
-        return previews[cipherId] || '';
-    };
-
     return (
         <div
             className="unified-context-menu-wrapper"
-            style={{
-                position: 'relative',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-            }}
+            style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+            onClick={e => e.stopPropagation()}
         >
             {triggerButton}
-            {isOpen && renderMenu(menuSections)}
+
+            {isOpen && (
+                <div
+                    ref={menuRef}
+                    style={getComputedPosition()}
+                    onMouseDown={e => e.stopPropagation()}
+                    onTouchStart={e => e.stopPropagation()}
+                >
+                    <div style={{
+                        width: '284px',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border-strong)',
+                        borderRadius: '12px',
+                        boxShadow: 'var(--shadow-lg)',
+                        padding: '6px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        animation: 'popIn 120ms ease-out',
+                        userSelect: 'none',
+                        boxSizing: 'border-box',
+                    }}>
+                        {/* 1. BARRE D'ACTIONS RAPIDES (Éditer, Dupliquer, Monter, Descendre, Copier, Supprimer) */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: '8px',
+                            padding: '2px 4px',
+                        }}>
+                            {onEdit && (
+                                <button
+                                    type="button"
+                                    onClick={() => { onEdit(); handleClose(); }}
+                                    title="Éditer le texte"
+                                    style={quickBtnStyle}
+                                    onMouseEnter={quickBtnHover}
+                                    onMouseLeave={quickBtnUnhover}
+                                >
+                                    <Edit2 size={13} strokeWidth={2.2} />
+                                </button>
+                            )}
+                            {onDuplicate && (
+                                <button
+                                    type="button"
+                                    onClick={() => { onDuplicate(); handleClose(); }}
+                                    title="Dupliquer l'étape"
+                                    style={quickBtnStyle}
+                                    onMouseEnter={quickBtnHover}
+                                    onMouseLeave={quickBtnUnhover}
+                                >
+                                    <Copy size={13} strokeWidth={2.2} />
+                                </button>
+                            )}
+                            {onMoveUp && (
+                                <button
+                                    type="button"
+                                    onClick={() => { onMoveUp(); handleClose(); }}
+                                    title="Monter d'un rang"
+                                    style={quickBtnStyle}
+                                    onMouseEnter={quickBtnHover}
+                                    onMouseLeave={quickBtnUnhover}
+                                >
+                                    <MoveUp size={13} strokeWidth={2.2} />
+                                </button>
+                            )}
+                            {onMoveDown && (
+                                <button
+                                    type="button"
+                                    onClick={() => { onMoveDown(); handleClose(); }}
+                                    title="Descendre d'un rang"
+                                    style={quickBtnStyle}
+                                    onMouseEnter={quickBtnHover}
+                                    onMouseLeave={quickBtnUnhover}
+                                >
+                                    <MoveDown size={13} strokeWidth={2.2} />
+                                </button>
+                            )}
+                            <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)', margin: '0 2px' }} />
+                            {onDelete && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (window.confirm('Supprimer cette étape ?')) {
+                                            onDelete();
+                                            handleClose();
+                                        }
+                                    }}
+                                    title="Supprimer l'étape"
+                                    style={{ ...quickBtnStyle, color: '#ef4444' }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                >
+                                    <Trash2 size={13} strokeWidth={2.2} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* 2. SÉLECTEUR SYNTHÉTIQUE DE CHIFFREMENT (Grille compacte 4×2) */}
+                        {(blockType === 'code' || blockType === 'computed') && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={sectionLabelStyle}>Chiffrement</div>
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(4, 1fr)',
+                                    gap: '3px',
+                                }}>
+                                    {TEXTUAL_CIPHERS.map(c => {
+                                        const isCurrent = c.id === currentCipher;
+                                        const IconComponent = c.Icon;
+                                        return (
+                                            <button
+                                                key={c.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    onChangeCipher?.(c.id);
+                                                    handleClose();
+                                                }}
+                                                title={`Chiffrement ${c.label}`}
+                                                style={{
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '5px 2px',
+                                                    borderRadius: '6px',
+                                                    border: isCurrent ? `1.5px solid ${c.color}` : '1px solid var(--border-subtle)',
+                                                    background: isCurrent ? `${c.color}20` : 'transparent',
+                                                    color: isCurrent ? c.color : 'var(--text-primary)',
+                                                    cursor: 'pointer',
+                                                    fontSize: '10px',
+                                                    fontWeight: isCurrent ? 700 : 500,
+                                                    transition: 'all 80ms ease',
+                                                }}
+                                                onMouseEnter={e => {
+                                                    if (!isCurrent) e.currentTarget.style.background = 'var(--bg-hover)';
+                                                }}
+                                                onMouseLeave={e => {
+                                                    if (!isCurrent) e.currentTarget.style.background = 'transparent';
+                                                }}
+                                            >
+                                                <IconComponent size={12} color={c.color} strokeWidth={2.4} />
+                                                <span style={{ marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '58px' }}>
+                                                    {c.label}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Pour commentaire HTML : Option de conversion rapide en bloc chiffré */}
+                        {blockType === 'html' && onConvertToCode && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={sectionLabelStyle}>Convertir en message chiffré</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '3px' }}>
+                                    {TEXTUAL_CIPHERS.slice(0, 4).map(c => (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            onClick={() => { onConvertToCode(c.id); handleClose(); }}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
+                                                padding: '4px', borderRadius: '6px', border: '1px solid var(--border-subtle)',
+                                                background: 'transparent', color: c.color, fontSize: '10px', fontWeight: 600, cursor: 'pointer'
+                                            }}
+                                            onMouseEnter={e => (e.currentTarget.style.background = `${c.color}15`)}
+                                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                        >
+                                            <c.Icon size={11} strokeWidth={2.4} />
+                                            <span>{c.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3. GUIDAGE (HORAIRE, CARDINAUX, AZIMUT, TOURNANT) — pour blocs calculés */}
+                        {blockType === 'computed' && onChangeLanguage && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={sectionLabelStyle}>Guidage</div>
+                                <div style={{ display: 'flex', gap: '3px' }}>
+                                    {NAV_LANGUAGES.map(lang => {
+                                        const isCurrent = navLanguage === lang.id;
+                                        return (
+                                            <button
+                                                key={lang.id}
+                                                type="button"
+                                                onClick={() => { onChangeLanguage(lang.id); handleClose(); }}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '4px 0',
+                                                    borderRadius: '6px',
+                                                    border: isCurrent ? '1px solid var(--accent-default)' : '1px solid var(--border-subtle)',
+                                                    background: isCurrent ? 'rgba(37, 99, 235, 0.15)' : 'transparent',
+                                                    color: isCurrent ? 'var(--accent-hover)' : 'var(--text-dim)',
+                                                    fontSize: '10.5px',
+                                                    fontWeight: isCurrent ? 700 : 500,
+                                                    cursor: 'pointer',
+                                                    textAlign: 'center',
+                                                    transition: 'all 80ms ease'
+                                                }}
+                                                onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                                onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}
+                                            >
+                                                {lang.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 4. ACTIONS COMPACTES : SOLUTION, VERROUILLAGE, POLICES */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderTop: '1px solid var(--border-subtle)', paddingTop: '4px' }}>
+                            {/* Toggle Solution / Participant */}
+                            {hasSolution && onToggleSolution && (
+                                <button
+                                    type="button"
+                                    onClick={() => { onToggleSolution(); handleClose(); }}
+                                    style={rowItemStyle}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                        {isSolutionView ? <EyeOff size={13} color="var(--semantic-green)" /> : <Eye size={13} color="var(--text-dim)" />}
+                                        <span style={{ fontSize: '11px', color: isSolutionView ? 'var(--semantic-green)' : 'var(--text-primary)', fontWeight: 500 }}>
+                                            {isSolutionView ? 'Vue organisateur (solution)' : 'Vue participant (chiffré)'}
+                                        </span>
+                                    </div>
+                                    <span style={{ fontSize: '9.5px', color: 'var(--text-dim)', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '4px' }}>
+                                        {isSolutionView ? 'Actif' : 'Masqué'}
+                                    </span>
+                                </button>
+                            )}
+
+                            {/* Toggle Verrouillage */}
+                            {onLockToggle && (
+                                <button
+                                    type="button"
+                                    onClick={() => { onLockToggle(); handleClose(); }}
+                                    style={rowItemStyle}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                        {isLocked ? <Lock size={13} color="var(--semantic-orange)" /> : <Unlock size={13} color="var(--text-dim)" />}
+                                        <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: 500 }}>
+                                            {isLocked ? 'Étape verrouillée' : 'Verrouiller cette étape'}
+                                        </span>
+                                    </div>
+                                </button>
+                            )}
+
+                            {/* Sélecteur de typographie */}
+                            {onOpenFontSelector && (
+                                <button
+                                    type="button"
+                                    onClick={() => { onOpenFontSelector(); handleClose(); }}
+                                    style={rowItemStyle}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                        <Palette size={13} color="var(--accent-default)" />
+                                        <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: 500 }}>
+                                            Polices et typographie…
+                                        </span>
+                                    </div>
+                                </button>
+                            )}
+
+                            {/* Points d'intérêt (POIs) */}
+                            {pois.length > 0 && onTogglePOI && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                                    <div style={sectionLabelStyle}>Repères (POI)</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                                        {pois.map(poi => (
+                                            <button
+                                                key={poi.id}
+                                                type="button"
+                                                onClick={() => onTogglePOI(poi.id)}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    padding: '3px 7px',
+                                                    borderRadius: '4px',
+                                                    border: poi.selected ? '1px solid var(--semantic-orange)' : '1px solid var(--border-subtle)',
+                                                    background: poi.selected ? 'rgba(245, 158, 11, 0.15)' : 'transparent',
+                                                    color: poi.selected ? 'var(--semantic-orange)' : 'var(--text-dim)',
+                                                    fontSize: '10px',
+                                                    fontWeight: poi.selected ? 700 : 400,
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                <MapPin size={10} />
+                                                <span>{poi.name}</span>
+                                                {poi.selected && <Check size={10} strokeWidth={2.5} />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
-// Re-export pour utilisation dans d'autres composants
-export { CIPHER_ICONS, CIPHER_FONTS, CIPHER_FONT_SIZES };
+// ─── Styles constants pour le menu synthétique ──────────────────────────────
+const quickBtnStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '28px',
+    borderRadius: '6px',
+    border: 'none',
+    background: 'transparent',
+    color: 'var(--text-secondary)',
+    cursor: 'pointer',
+    transition: 'all 90ms ease',
+};
+
+const quickBtnHover = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = 'var(--bg-hover)';
+    e.currentTarget.style.color = 'var(--text-primary)';
+};
+
+const quickBtnUnhover = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = 'transparent';
+    e.currentTarget.style.color = 'var(--text-secondary)';
+};
+
+const sectionLabelStyle: React.CSSProperties = {
+    fontSize: '9.5px',
+    fontWeight: 700,
+    color: 'var(--text-dim)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    paddingLeft: '2px',
+};
+
+const rowItemStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    padding: '5px 6px',
+    borderRadius: '6px',
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    transition: 'background 80ms ease',
+    textAlign: 'left',
+};

@@ -369,8 +369,41 @@ function ManualStepHtml({
         setEditValue(t.value);
     };
 
+    const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+    const touchTimerRef = useRef<any>(null);
+
+    // Clic droit = ouverture menu contextuel à la position du curseur
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+    };
+
+    // Appui long tactile (500ms) = menu contextuel sur mobile
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const x = touch.clientX;
+            const y = touch.clientY;
+            touchTimerRef.current = setTimeout(() => {
+                setContextMenuPos({ x, y });
+            }, 500);
+        }
+    };
+
+    const handleTouchMove = () => {
+        if (touchTimerRef.current) {
+            clearTimeout(touchTimerRef.current);
+            touchTimerRef.current = null;
+        }
+    };
+
     // Mobile double-tap → enter edit mode
     const handleTouchEnd = () => {
+        if (touchTimerRef.current) {
+            clearTimeout(touchTimerRef.current);
+            touchTimerRef.current = null;
+        }
         const now = Date.now();
         if (now - lastTapRef.current < 300) {
             startEditing();
@@ -394,6 +427,10 @@ function ManualStepHtml({
             }}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => { if (!isEditing) setHovered(false); }}
+            onContextMenu={handleContextMenu}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onTouchMove={handleTouchMove}
         >
             {/* Gutter unifié : indicateur + label étape + menu 3 points */}
             <BlockGutter
@@ -403,6 +440,8 @@ function ManualStepHtml({
                 isTitle={false}
                 isSelected={false}
                 isHovered={hovered || isEditing}
+                contextMenuPos={contextMenuPos}
+                onCloseContextMenu={() => setContextMenuPos(null)}
                 onEdit={startEditing}
                 onDelete={() => onRemoveStep?.(step.id)}
                 onDuplicate={onDuplicate ? () => onDuplicate(step.id) : undefined}
@@ -572,6 +611,32 @@ function ManualCodeBlock({
     };
 
     const blockRef = useRef<HTMLDivElement>(null);
+    const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+    const touchTimerRef = useRef<any>(null);
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const x = touch.clientX;
+            const y = touch.clientY;
+            touchTimerRef.current = setTimeout(() => {
+                setContextMenuPos({ x, y });
+            }, 500);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (touchTimerRef.current) {
+            clearTimeout(touchTimerRef.current);
+            touchTimerRef.current = null;
+        }
+    };
 
     return (
         <div
@@ -587,6 +652,10 @@ function ManualCodeBlock({
             }}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
+            onContextMenu={handleContextMenu}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onTouchMove={handleTouchEnd}
         >
             {/* Gutter unifié : indicateur + menu 3 points */}
             <BlockGutter
@@ -595,6 +664,8 @@ function ManualCodeBlock({
                 moduleId={step.moduleId}
                 isSelected={isSelected}
                 isHovered={hovered}
+                contextMenuPos={contextMenuPos}
+                onCloseContextMenu={() => setContextMenuPos(null)}
                 onEdit={() => {}} // Double-clic géré par le textarea
                 onDelete={() => onRemoveStep?.(step.id)}
                 onDuplicate={() => onDuplicate?.(step.id)}
@@ -744,6 +815,33 @@ function ComputedStepLine({
     // Référence pour le bouton 3 points
     const blockRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
+    const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+    const touchTimerRef = useRef<any>(null);
+    const stepNumber = !lineLabel ? (segIdx !== undefined ? (segIdx + 1) : (lineIdx + 1)) : undefined;
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const x = touch.clientX;
+            const y = touch.clientY;
+            touchTimerRef.current = setTimeout(() => {
+                setContextMenuPos({ x, y });
+            }, 500);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (touchTimerRef.current) {
+            clearTimeout(touchTimerRef.current);
+            touchTimerRef.current = null;
+        }
+    };
 
     return (
         <div
@@ -764,16 +862,23 @@ function ComputedStepLine({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             onDoubleClick={handleDoubleClick}
+            onContextMenu={handleContextMenu}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onTouchMove={handleTouchEnd}
         >
             {/* Gutter unifié : indicateur + label étape (A,B,C) + menu 3 points */}
             <BlockGutter
                 blockType={isVisual ? (hasMap ? 'map' : 'generic') : 'computed'}
                 blockData={step}
-                stepLabel={lineLabel}
+                stepLabel={lineLabel || undefined}
+                stepNumber={stepNumber}
                 stepColor={dotColor}
                 moduleId={step.moduleId}
                 isSelected={isSelected}
                 isHovered={hovered || isEditing}
+                contextMenuPos={contextMenuPos}
+                onCloseContextMenu={() => setContextMenuPos(null)}
                 onEdit={() => setIsEditing(true)}
                 onDuplicate={() => onDuplicate?.(step.id)}
                 onMoveUp={() => onMoveUp?.(step.id)}

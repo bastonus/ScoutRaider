@@ -220,14 +220,13 @@ async def access_shared_project(
     if not link and not is_owner:
         raise HTTPException(status_code=403, detail="Accès non autorisé à ce document")
 
-    effective_role = "owner" if is_owner else (link.permissions if link else "viewer")
-    clean_role = "editor" if effective_role in ("editor", "edit") else ("owner" if is_owner else "viewer")
+    effective_role = link.permissions if link else ("owner" if is_owner else "read")
 
     return {
         "id": str(document.id),
         "title": document.title,
         "state": document.json_data,
-        "role": clean_role,
+        "role": effective_role,
         "is_owner": is_owner,
         "share_token": link.token if link else ""
     }

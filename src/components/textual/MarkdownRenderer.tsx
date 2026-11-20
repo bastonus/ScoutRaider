@@ -154,6 +154,19 @@ function configureMarked() {
 }
 
 /**
+ * Extraction des options pour un chiffrement (clé, décalage...)
+ */
+function parseCipherOptions(optionsStr?: string): { key?: string; offset?: number } {
+    if (!optionsStr) return {};
+    const opts: { key?: string; offset?: number } = {};
+    const keyMatch = optionsStr.match(/key=["']?([^"'\s]+)["']?/i);
+    if (keyMatch) opts.key = keyMatch[1];
+    const offsetMatch = optionsStr.match(/offset=["']?(\d+)["']?/i);
+    if (offsetMatch) opts.offset = parseInt(offsetMatch[1], 10);
+    return opts;
+}
+
+/**
  * Protège les balises de chiffrement personnalisées avant le parsing marked
  */
 function protectCipherTags(raw: string, viewMode: 'participant' | 'solution' | 'edit' = 'participant'): { protected: string; placeholders: Map<string, string> } {
@@ -161,46 +174,62 @@ function protectCipherTags(raw: string, viewMode: 'participant' | 'solution' | '
     let protected_ = raw;
     let counter = 0;
 
-    const cipherTags = ['morse', 'templier', 'maritime', 'polybe', 'vigenere', 'avocat', 'cassis', 'drapeaux'];
+    const cipherTags = [
+        'morse', 'vigenere', 'polybe', 'templier', 'avocat', 'cassis',
+        'maritime', 'drapeaux', 'gilwell', 'texte_clair', 'carte_ign', 'carte_simple'
+    ];
 
+    // 1. Balises inline [tag options]...[/tag] et <tag options>...</tag>
     cipherTags.forEach(tag => {
-        const regex = new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[\\/${tag}\\]`, 'gi');
-        protected_ = protected_.replace(regex, (_match, content) => {
+        // [tag ...]...[/tag]
+        const bbRegex = new RegExp(`\\[${tag}(?:\\s+([^\\]]*))?\\]([\\s\\S]*?)\\[\\/${tag}\\]`, 'gi');
+        protected_ = protected_.replace(bbRegex, (_match, optionsStr, content) => {
             const placeholder = `__CIPHER_${tag}_${counter++}__`;
+            const options = parseCipherOptions(optionsStr);
             let display = content;
             if (viewMode === 'participant') {
                 try {
-                    display = ModuleLogic.encode(tag, content);
+                    display = ModuleLogic.encode(tag, content, options);
                 } catch {
                     display = content;
                 }
             }
-            placeholders.set(placeholder, `<span class="font-${tag} cipher-inline" data-cipher="${tag}" title="${escapeHtml(content)}">${escapeHtml(display)}</span>`);
+            const meta = MODULE_META[tag as ModuleId];
+            const color = meta?.color || '#6b7280';
+            placeholders.set(placeholder, `<span class="font-${tag} cipher-inline" data-cipher="${tag}" style="border-bottom-color: ${color};" title="${tag.toUpperCase()}: ${escapeHtml(content)}">${escapeHtml(display)}</span>`);
             return placeholder;
         });
 
-        // Supporter aussi les balises XML-style <tag>...</tag>
-        const xmlRegex = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'gi');
-        protected_ = protected_.replace(xmlRegex, (_match, content) => {
+        // <tag ...>...</tag>
+        const xmlRegex = new RegExp(`<${tag}(?:\\s+([^>]*))?>([\\s\\S]*?)<\\/${tag}>`, 'gi');
+        protected_ = protected_.replace(xmlRegex, (_match, optionsStr, content) => {
             const placeholder = `__CIPHER_${tag}_${counter++}__`;
+            const options = parseCipherOptions(optionsStr);
             let display = content;
             if (viewMode === 'participant') {
                 try {
-                    display = ModuleLogic.encode(tag, content);
+                    display = ModuleLogic.encode(tag, content, options);
                 } catch {
                     display = content;
                 }
             }
-            placeholders.set(placeholder, `<span class="font-${tag} cipher-inline" data-cipher="${tag}" title="${escapeHtml(content)}">${escapeHtml(display)}</span>`);
+            const meta = MODULE_META[tag as ModuleId];
+            const color = meta?.color || '#6b7280';
+            placeholders.set(placeholder, `<span class="font-${tag} cipher-inline" data-cipher="${tag}" style="border-bottom-color: ${color};" title="${tag.toUpperCase()}: ${escapeHtml(content)}">${escapeHtml(display)}</span>`);
             return placeholder;
         });
     });
 
-    // Blocs de code ```
-    const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
-    protected_ = protected_.replace(codeBlockRegex, (_match, lang, code) => {
+    // 2. Blocs de code ```tag options ... ```
+    const codeBlockRegex = /```([^\n`]*)\n([\s\S]*?)```/g;
+    protected_ = protected_.replace(codeBlockRegex, (_match, headerLine, code) => {
         const placeholder = `__CODEBLOCK_${counter++}__`;
-        const lowerLang = (lang || '').toLowerCase().trim();
+        const trimmedHeader = (headerLine || '').trim();
+        const tokens = trimmedHeader.split(/\s+/);
+        const lowerLang = (tokens[0] || '').toLowerCase().trim();
+        const optionsStr = tokens.slice(1).join(' ');
+        const options = parseCipherOptions(optionsStr);
+
         if (cipherTags.includes(lowerLang) || lowerLang === 'texte_clair') {
             const meta = MODULE_META[lowerLang as ModuleId];
             const color = meta?.color || '#6b7280';
@@ -208,27 +237,35 @@ function protectCipherTags(raw: string, viewMode: 'participant' | 'solution' | '
             let bodyText = code.trim();
             if (viewMode === 'participant') {
                 try {
-                    bodyText = ModuleLogic.encode(lowerLang, bodyText);
+                    bodyText = ModuleLogic.encode(lowerLang, bodyText, options);
                 } catch {
                     bodyText = code.trim();
                 }
             }
+
+            const badgesHtml = [
+                options.key ? `<span class="cipher-badge">Clé: ${escapeHtml(options.key)}</span>` : '',
+                options.offset ? `<span class="cipher-badge">Décalage: +${options.offset}</span>` : '',
+                `<span class="cipher-mode-chip">${viewMode === 'solution' ? 'Solution' : 'Chiffré'}</span>`
+            ].filter(Boolean).join('');
+
             placeholders.set(placeholder, `
                 <div class="cipher-card cipher-card-${lowerLang}" data-cipher="${lowerLang}">
                     <div class="cipher-card-header">
                         <span class="cipher-dot" style="background: ${color};"></span>
                         <span class="cipher-title">${escapeHtml(label)}</span>
+                        ${badgesHtml}
                     </div>
                     <div class="cipher-card-body font-${lowerLang}">${escapeHtml(bodyText)}</div>
                 </div>
             `.trim());
         } else {
-            placeholders.set(placeholder, `<pre class="code-block${lang ? ` language-${lang}` : ''}"><code>${escapeHtml(code)}</code></pre>`);
+            placeholders.set(placeholder, `<pre class="code-block${lowerLang ? ` language-${lowerLang}` : ''}"><code>${escapeHtml(code)}</code></pre>`);
         }
         return placeholder;
     });
 
-    // Protéger code inline `
+    // 3. Protéger code inline `
     const inlineCodeRegex = /`([^`\n]+)`/g;
     protected_ = protected_.replace(inlineCodeRegex, (_match, code) => {
         const placeholder = `__INLINECODE_${counter++}__`;
@@ -467,7 +504,9 @@ export default function MarkdownRenderer({
         .markdown-renderer .cipher-card-header { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-subtle); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
         .markdown-renderer .cipher-card-body { padding: 10px 14px; line-height: 1.6; word-break: break-word; }
         .markdown-renderer .cipher-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-        .markdown-renderer .cipher-inline { padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.04); border-bottom: 1px dashed var(--border-strong); }
+        .markdown-renderer .cipher-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); color: var(--text-primary); text-transform: none; letter-spacing: normal; font-family: var(--font-mono); }
+        .markdown-renderer .cipher-mode-chip { margin-left: auto; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: rgba(37,99,235,0.15); color: var(--accent-hover); text-transform: uppercase; letter-spacing: 0.05em; }
+        .markdown-renderer .cipher-inline { padding: 2px 5px; border-radius: 4px; background: rgba(255,255,255,0.04); border-bottom: 2px dashed; font-size: 1.05em; }
         .markdown-renderer .font-morse { font-family: "Morse", "Courier New", monospace; font-size: 1.2em; letter-spacing: 0.12em; display: inline-block; }
         .markdown-renderer .font-templier { font-family: "TemplarsCipherPlus", "Times New Roman", serif; font-size: 1.25em; letter-spacing: 0.08em; display: inline-block; }
         .markdown-renderer .font-maritime { font-family: "Maritime", "Courier New", monospace; font-size: 1.3em; letter-spacing: 0.08em; display: inline-block; }
