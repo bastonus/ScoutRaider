@@ -186,6 +186,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Notifier Coolify de redéployer après le push Docker
+      - name: Trigger Coolify redeploy (webhook)
+        if: ${{ secrets.COOLIFY_WEBHOOK_URL != '' }}
+        run: |
+          curl --silent --show-error --fail \
+            --request GET \
+            "${{ secrets.COOLIFY_WEBHOOK_URL }}" \
+            || echo "⚠️ Coolify webhook call failed (non-blocking)"
+        continue-on-error: true
+
   # ─────────────────────────────────────────────────────────
   # RELEASE — Attach all installers to the GitHub Release
   # Waits for all builds (Electron + Docker)
