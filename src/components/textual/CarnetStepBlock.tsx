@@ -48,7 +48,7 @@ interface CarnetStepBlockProps {
     onManualContentChange?: (stepId: string, text: string) => void;
     onRemoveStep?: (stepId: string) => void;
     onNavLanguageChange?: (stepId: string, lang?: NavLanguage) => void;
-    onPoiToggle?: (stepId?: string, segIdx?: number, poiId: string) => void;
+    onPoiToggle?: (stepId?: string, segIdx?: number, poiId?: string) => void;
     onLineClick?: (step: CarnetStep, segIdx?: number) => void;
     onAddInlineCode?: (segIdx: number) => void;
     selectedKeys?: Set<string>;
@@ -404,11 +404,11 @@ function ManualStepHtml({
                 isSelected={false}
                 onEdit={startEditing}
                 onDelete={() => onRemoveStep?.(step.id)}
-                onDuplicate={onDuplicate}
-                onMoveUp={onMoveUp}
-                onMoveDown={onMoveDown}
-                onCopy={onCopy}
-                onLinkRef={onLinkRef}
+                onDuplicate={onDuplicate ? () => onDuplicate(step.id) : undefined}
+                onMoveUp={onMoveUp ? () => onMoveUp(step.id) : undefined}
+                onMoveDown={onMoveDown ? () => onMoveDown(step.id) : undefined}
+                onCopy={onCopy ? () => onCopy(step.id) : undefined}
+                onLinkRef={onLinkRef ? () => onLinkRef(step.id) : undefined}
                 onConvertToCode={(cipher) => {
                     dispatch({
                         type: 'CONVERT_MANUAL_STEP_TYPE',
@@ -417,8 +417,8 @@ function ManualStepHtml({
                         moduleId: cipher,
                     });
                 }}
-                onOpenFonts={onOpenFonts}
-                onOpenSettings={onOpenSettings}
+                onOpenFonts={onOpenFonts ? () => onOpenFonts(step.id) : undefined}
+                onOpenSettings={onOpenSettings ? () => onOpenSettings(step.id) : undefined}
                 containerRef={blockRef}
             />
 
@@ -821,7 +821,7 @@ function ComputedStepLine({
                 onCopy={() => onCopy?.(step.id)}
                 onLinkRef={() => onLinkRef?.(lineKey)}
                 onChangeCipher={(cipher) => onModuleChange?.(cipher)}
-                onChangeLanguage={(lang) => onNavLanguageChange?.(lang)}
+                onChangeLanguage={(lang) => onNavLanguageChange?.(lang as NavLanguage)}
                 onTogglePOI={(poiId) => onPoiToggle?.(poiId)}
                 onToggleSolution={() => dispatch({ type: 'SET_CARNET_VIEW', view: isSolutionView ? 'participant' : 'solution' })}
                 onLockToggle={() => {

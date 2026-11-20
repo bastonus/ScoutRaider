@@ -1,6 +1,7 @@
-# ScoutRaider Backend
+# backend
 
-API backend pour l'application ScoutRaider - Éditeur de carnets de raid.
+## Overview
+ScoutRaider asynchronous FastAPI backend providing cloud persistence, REST API, and document compilation.
 
 ## Stack
 
@@ -104,155 +105,18 @@ docker run -d --name garage \
   garage:latest
 ```
 
-## API Endpoints
+## Interface
+- `None` (configuration / migration files only)
 
-### Authentification
-- `POST /api/auth/register` - Inscription
-- `POST /api/auth/login` - Connexion (retourne access + refresh tokens)
-- `POST /api/auth/refresh` - Rafraîchir access token
-- `POST /api/auth/logout` - Déconnexion
-- `GET /api/auth/me` - Profil utilisateur
+### Subdirectories
+- [alembic](./alembic/README.md) - Alembic environment configuration and migration runner for PostgreSQL schema evolution.
+- [app](./app/README.md) - FastAPI core application setup, dependency injection, and middleware orchestration.
 
-### Documents
-- `POST /api/documents` - Créer document
-- `GET /api/documents` - Lister documents (pagination, recherche)
-- `GET /api/documents/{id}` - Récupérer document complet
-- `PUT /api/documents/{id}` - Mettre à jour (optimistic locking via If-Match)
-- `DELETE /api/documents/{id}` - Supprimer (soft delete)
-- `POST /api/documents/{id}/duplicate` - Dupliquer
+## Invariants
+- None
 
-### Assets
-- `POST /api/assets?document_id=` - Upload asset (image/font)
-- `GET /api/assets/{asset_id}` - Infos asset
-- `GET /api/assets/{asset_id}/download` - Télécharger
-- `GET /api/assets/{asset_id}/url?expiry=` - URL signée
-- `DELETE /api/assets/{asset_id}` - Supprimer
+## Side Effects
+- Filesystem operations (file read/write)
 
-### Export
-- `POST /api/documents/{id}/export/pdf` - Export PDF (WeasyPrint)
-- `GET /api/documents/{id}/export/srproj` - Export archive .srproj
-
-### Partage
-- `POST /api/documents/{id}/share` - Créer lien partage
-- `GET /api/documents/{id}/share` - Lister liens
-- `DELETE /api/documents/{id}/share/{token}` - Révoquer
-- `GET /api/documents/shared/{token}` - Accès public via token
-
-### Import
-- `POST /api/documents/import` - Import .srproj
-- `POST /api/documents/migrate-srdoc` - Migration .srdoc → .srproj
-
-## Format .srproj
-
-Archive ZIP contenant:
-```
-archive.srproj/
-├── manifest.json          # DocumentV2 complet
-└── assets/
-    ├── fonts/             # Polices .woff2
-    ├── images/            # Images .webp
-    └── maps/              # Cartes (optionnel)
-```
-
-## Déploiement Coolify
-
-### Services requis
-
-1. **PostgreSQL 16** - Base de données
-2. **Garage S3** - Stockage objets (déjà configuré: `s3-scoutraider.silverhorse.fr`)
-3. **Backend API** - Container Docker
-
-### Variables Coolify
-
-```env
-DB_USER=scoutraider
-DB_PASS=secure_password
-SECRET_KEY=generate_with_openssl_rand_base64_32
-GARAGE_ACCESS_KEY=from_garage_admin
-GARAGE_SECRET_KEY=from_garage_admin
-GARAGE_ENDPOINT=https://s3-scoutraider.silverhorse.fr
-GARAGE_PUBLIC_URL=https://s3-scoutraider.silverhorse.fr
-CORS_ORIGINS=["https://scoutraider.app","https://app.scoutraider.app"]
-```
-
-### Commandes Coolify
-
-```bash
-# Build & Deploy
-docker compose -f docker-compose.yml build
-docker compose -f docker-compose.yml up -d
-
-# Migrations
-docker compose -f docker-compose.yml run migrate
-
-# Logs
-docker compose -f docker-compose.yml logs -f backend
-```
-
-## Tests
-
-```bash
-# Lancer les tests
-pytest tests/ -v
-
-# Coverage
-pytest tests/ --cov=app --cov-report=html
-```
-
-## Architecture des données
-
-### DocumentV2 (manifest.json)
-
-```json
-{
-  "schemaVersion": "2.0",
-  "id": "uuid",
-  "title": "Carnet de Raid",
-  "createdAt": "2024-01-15T10:00:00Z",
-  "updatedAt": "2024-01-15T10:00:00Z",
-  "version": 1,
-  "assets": {
-    "fonts": [...],
-    "images": {...}
-  },
-  "pageLayout": {...},
-  "blocks": [...],
-  "settings": {...}
-}
-```
-
-### Blocs supportés
-
-- `rich_text` - Texte riche (paragraphes, titres, images inline)
-- `crypto_block` - Texte chiffré (Vigenère, Morse, Polybe, etc.)
-- `map_snippet` - Extrait de carte statique
-- `elevation_profile` - Profil altimétrique SVG
-- `route_table` - Tableau récapitulatif itinéraire
-- `annexe` - Tables de décodage
-- `title_page` - Page de garde
-- `page_break` - Saut de page
-
-### Mécanisme locked / autoUpdate
-
-- `locked: true` - Bloc généré automatiquement, protégé contre édition manuelle
-- `autoUpdate: true` - Recalculé si `dependsOn` change
-- `dependsOn: ["route_main", "segment_3"]` - IDs sources
-
-## Sécurité
-
-- JWT avec access token (7j) + refresh token (30j, cookie HttpOnly)
-- Bcrypt pour hash mots de passe
-- Optimistic locking sur documents (header If-Match)
-- URLs signées pour assets (expiration configurable)
-- CORS restrictif
-- Rate limiting (100 req/min par défaut)
-
-## Monitoring
-
-- Health check: `GET /health`
-- Logs structurés JSON (structlog)
-- Métriques: durée requêtes, status codes, erreurs
-
-## Licence
-
-Propriétaire - ScoutRaider Suite
+## Verification
+- Run: `pytest tests/ -v`

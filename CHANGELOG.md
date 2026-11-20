@@ -5,6 +5,39 @@ Tous les changements notables apportés à ce projet seront documentés dans ce 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.11] - 2026-11-18
+### Ajouté
+- **Contrats d'Architecture EGM (Elephant-Goldfish Model)** : Spécification complète et vérifiée de 47 contrats d'interface, invariants et effets de bord (`README.md`) sur tous les sous-systèmes du dépôt (`electron/`, `backend/`, `legacy/`, `src/`).
+- **Audit de Santé du Code** : Plan d'action priorisé P0–P3 couvrant la rotation des secrets, l'automatisation CI et le refactoring d'AppContext (`PLAN_IMPLEMENTATION.md`).
+- **Recette de Production** : Validation de 31 cas de tests d'intégration sur l'environnement de production `scoutraider.silverhorse.fr` (`PRODUCTION_TESTS.md`).
+
+### Sécurité
+- **Retrait des identifiants PostgreSQL en dur** : Élimination des secrets par défaut dans `Dockerfile` et `backend/app/db.py`.
+- **CORS restrictif** : Autorisation stricte des domaines de production (`scoutraider.silverhorse.fr`, `scoutraider.app`).
+
+## [0.3.10-beta] - 2026-11-17
+### Ajouté
+- **Endpoints de surveillance (Health checks)** : `/health`, `/health/db` et `/health/s3` pour le monitoring des conteneurs.
+- **Accès aux projets partagés** : Endpoint public `/api/projects/shared/{id}` et support de l'authentification par email ou nom d'utilisateur.
+- **Verrouillage optimiste** : Gestion des conflits d'édition concurrente via l'en-tête HTTP `If-Match` et suivi de révision sur les documents.
+
+### Corrigé
+- **Migrations Alembic** : Correction de l'interpolation des caractères `%` dans l'URL de connexion et utilisation native du driver asynchrone `asyncpg`.
+- **Chiffrement des mots de passe** : Migration de `passlib` vers `bcrypt` direct avec coût configuré explicitement pour éviter les avertissements d'obsolescence.
+- **Cycle de vie de la base de données** : Suppression de la réinitialisation automatique destructrice (`DROP SCHEMA`) au démarrage du serveur.
+
+## [0.3.9-beta] - 2026-11-12
+### Ajouté
+- **Transformer vectoriel pour les dessins** : Boîte englobante projetée, 8 poignées de redimensionnement, rotation et déplacement avec aperçu fluide à 60 FPS.
+- **Hiérarchie Calques / Sous-calques** : Gestion arborescente des dessins avec sélection et édition unitaire des traits (`DrawStroke`).
+- **Panneau latéral contextuel** : Affichage d'informations dynamiques adaptées au type d'entité sélectionnée (itinéraire, zone, repère ou dessin).
+- **Focus visuel d'itinéraire** : Itinéraire actif affiché en plein, itinéraires secondaires en pointillés cliquables.
+- **Raccourcis clavier d'édition** : Raccourcis `Ctrl+T`, `Suppr`, `Échap`, `F2` et `Espace`.
+
+### Corrigé
+- **Nettoyage automatique des calques vides** : Suppression automatique des entités sans géométrie lors du changement d'outil.
+- **Persistance de l'ordre d'empilement (z-index)** : Sauvegarde et restauration fidèles de l'ordre des calques dans le document.
+
 ## [0.3.8-beta] - 2026-11-06
 ### Ajouté
 - **Transformer vectoriel pour les dessins** : boîte englobante projetée, 8 poignées de redimensionnement, rotation et déplacement, avec aperçu temps réel (60 FPS) et validation en une seule étape (compatible Ctrl+Z / Ctrl+Y).

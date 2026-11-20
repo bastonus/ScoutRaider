@@ -43,15 +43,15 @@ export const CSV_COLUMNS: { key: CsvColumnKey; label: string }[] = [
 
 export interface ExportPipelineOptions {
     title: string;
-    subtitle: string;
-    includeGeneralMap: boolean;
+    subtitle?: string;
+    includeGeneralMap?: boolean;
     includeElevationProfile?: boolean;
     includeMapPagination?: boolean;
-    includeAnnexes: boolean;
+    includeAnnexes?: boolean;
     /** 'participant' | 'solution' | 'both' */
     version: 'participant' | 'solution' | 'both';
     /** 'weasyprint' | 'electron' | 'auto' */
-    pdfEngine: 'weasyprint' | 'electron' | 'auto';
+    pdfEngine?: 'weasyprint' | 'electron' | 'auto';
     /** Columns to include in CSV export */
     csvColumns?: CsvColumnKey[];
     /** Separator for CSV export (default: ';') */

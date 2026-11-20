@@ -4,6 +4,7 @@ interface LogoProps {
     size?: number;
     className?: string;
     style?: React.CSSProperties;
+    color?: string;
 }
 
 /**

@@ -6,7 +6,7 @@
  */
 import React, { useRef } from 'react';
 import {
-    MessageSquarePlus, Code2, Map, MapPin, Layers, Braille,
+    MessageSquarePlus, Code2, Map, MapPin, Layers,
     Key, Grid, Hash, Flag, RotateCcw, Minus, Circle, Type,
     MoreVertical, Check, MoveUp, MoveDown, Copy, Link2, Trash2,
     Settings, Palette, Globe, Eye, EyeOff, Lock, Unlock
@@ -26,9 +26,10 @@ export interface BlockGutterProps {
     blockType: 'html' | 'code' | 'computed' | 'map' | 'title' | 'generic';
     /** Données du bloc */
     blockData: CarnetStep;
-    /** Label d'étape (A, B, C...) - AFFICHÉ DANS LE CONTENU PRINCIPAL, PAS DANS LE GUTTER */
-    // stepLabel?: string; // Supprimé : affiché dans le corps du bloc
-    // stepColor?: string; // Supprimé : affiché dans le corps du bloc
+    /** Label d'étape (A, B, C...) */
+    stepLabel?: string;
+    /** Couleur d'étape */
+    stepColor?: string;
     /** Module ID pour les blocs code */
     moduleId?: ModuleId;
     /** Si le bloc est sélectionné */

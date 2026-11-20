@@ -31,6 +31,8 @@ interface MarkdownRendererProps {
     blockId?: string;
     /** Classe CSS additionnelle */
     className?: string;
+    /** Styles CSS en ligne */
+    style?: React.CSSProperties;
 }
 
 /**
@@ -286,7 +288,8 @@ export default function MarkdownRenderer({
     viewMode = 'participant',
     onChange,
     blockId,
-    className = ''
+    className = '',
+    style
 }: MarkdownRendererProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [renderedHtml, setRenderedHtml] = useState<string>('');
@@ -365,8 +368,9 @@ export default function MarkdownRenderer({
         }
         if (e.key === 'Tab') {
             e.preventDefault();
-            const start = e.currentTarget.selectionStart;
-            const end = e.currentTarget.selectionEnd;
+            const target = e.currentTarget as HTMLTextAreaElement;
+            const start = target.selectionStart;
+            const end = target.selectionEnd;
             const newContent = editContent.substring(0, start) + '  ' + editContent.substring(end);
             setEditContent(newContent);
             setTimeout(() => {
@@ -468,7 +472,7 @@ export default function MarkdownRenderer({
             className={`markdown-renderer ${className}`}
             ref={containerRef}
             onDoubleClick={handleDoubleClick}
-            style={{ minHeight: '24px' }}
+            style={{ minHeight: '24px', ...style }}
         >
             <style dangerouslySetInnerHTML={{ __html: fontStyles }} />
             <style dangerouslySetInnerHTML={{ __html: defaultRenderStyles }} />

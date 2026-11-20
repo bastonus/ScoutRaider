@@ -249,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const register = async (username: string, password: string, email?: string) => {
         try {
-            const data = await CloudAuthService.register(username, password, email);
+            const data = await CloudAuthService.register(username, password, email || '');
             setUser(data.user);
             setIsGuest(false);
             setCloudSyncStatus('saved');

@@ -46,6 +46,7 @@ class Token(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int  # seconds
+    user: Optional[UserResponse] = None
 
 
 class TokenPayload(BaseModel):

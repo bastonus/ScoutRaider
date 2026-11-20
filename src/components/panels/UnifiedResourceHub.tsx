@@ -34,6 +34,7 @@ import { useAuth } from '../../AuthContext';
 import { CloudAuthService, MarketplaceModule, UserLibraryItem } from '../../logic/CloudAuthService';
 import { MAP_LAYERS, PROVIDERS } from '../../logic/MapConfig';
 import { ALL_MODULE_IDS, MODULE_META, ModuleRegistry } from '../../logic/ModuleRegistry';
+import { ModuleLogic } from '../../logic/ModuleLogic';
 import { presetsManager } from '../../logic/PresetsManager';
 import { themeManager } from '../../logic/ThemeManager';
 import type { ThemeData } from '../../logic/types';
@@ -619,7 +620,7 @@ export default function UnifiedResourceHub({
           dispatch({ 
             type: 'ADD_NOTIFICATION', 
             message: `Fond de carte activé : ${id}`, 
-            notifType: 'success' 
+            notifType: 'info' 
           });
         },
         onEdit: () => {
@@ -721,8 +722,8 @@ export default function UnifiedResourceHub({
         onApply: () => {
           setPreviewTestModule({ id: mId, name: meta.label });
           try {
-            const encoded = ModuleRegistry.encode(mId, 'SCOUT RAID 2026');
-            setTestOutput(encoded?.encoded_text || (typeof encoded === 'string' ? encoded : 'Module activé'));
+            const encoded = ModuleLogic.encode(mId, 'SCOUT RAID 2026');
+            setTestOutput((encoded as any)?.encoded_text || (typeof encoded === 'string' ? encoded : 'Module activé'));
           } catch {
             setTestOutput('Prêt à être utilisé sur vos étapes.');
           }
@@ -793,7 +794,7 @@ export default function UnifiedResourceHub({
             textTransform: 'uppercase',
             zIndex: 2
           }}>
-            Niveau {i + 1} • {p.polygonalisation?.hors_piste ? 'Hors-piste' : 'Sentiers BRouter'}
+            Niveau {i + 1} • {(p as any).polygonalisation?.hors_piste ? 'Hors-piste' : 'Sentiers BRouter'}
           </div>
         </div>
       );
@@ -818,7 +819,7 @@ export default function UnifiedResourceHub({
           dispatch({ 
             type: 'ADD_NOTIFICATION', 
             message: `Règles appliquées : ${p.name}`, 
-            notifType: 'success' 
+            notifType: 'info' 
           });
         },
         onEdit: () => {
@@ -922,7 +923,7 @@ export default function UnifiedResourceHub({
           dispatch({ 
             type: 'ADD_NOTIFICATION', 
             message: `Thème narratif activé : ${id}`, 
-            notifType: 'success' 
+            notifType: 'info' 
           });
         },
         onEdit: () => {
@@ -1268,8 +1269,8 @@ export default function UnifiedResourceHub({
                 const val = e.target.value;
                 setTestInput(val);
                 try {
-                  const res = ModuleRegistry.encode(previewTestModule.id, val);
-                  setTestOutput(res?.encoded_text || (typeof res === 'string' ? res : ''));
+                  const res = ModuleLogic.encode(previewTestModule.id, val);
+                  setTestOutput((res as any)?.encoded_text || (typeof res === 'string' ? res : ''));
                 } catch {
                   setTestOutput('Erreur d\'encodage');
                 }

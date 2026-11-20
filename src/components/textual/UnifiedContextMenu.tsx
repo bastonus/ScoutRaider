@@ -61,6 +61,7 @@ interface UnifiedContextMenuProps {
 type MenuSection = {
     title?: string;
     items: MenuItem[];
+    dividerAfter?: boolean;
 };
 
 type MenuItem = {
@@ -88,6 +89,10 @@ const CIPHER_ICONS: Record<string, React.ReactNode> = {
     cassis: <Minus size={14} />,
     texte_clair: <Type size={14} />,
 };
+
+const TEXTUAL_CIPHERS: ModuleId[] = ALL_MODULE_IDS.filter(id =>
+    ['morse', 'vigenere', 'polybe', 'templier', 'maritime', 'avocat', 'cassis', 'texte_clair'].includes(id)
+);
 
 export default function UnifiedContextMenu({
     blockType,
@@ -135,9 +140,7 @@ export default function UnifiedContextMenu({
     // ─── Construction du menu selon le type de bloc ────────────────────────
     const menuSections = useMemo((): MenuSection[] => {
         const sections: MenuSection[] = [];
-        const textualCiphers = ALL_MODULE_IDS.filter(id =>
-            ['morse', 'vigenere', 'polybe', 'templier', 'maritime', 'avocat', 'cassis', 'texte_clair'].includes(id)
-        );
+        const textualCiphers = TEXTUAL_CIPHERS;
 
         // Section 1: Actions principales (style toolbar)
         const primaryItems: MenuItem[] = [];
@@ -798,10 +801,9 @@ export default function UnifiedContextMenu({
                             borderRadius: '4px',
                             background: `${cipherColor}20`,
                             color: cipherColor,
-                            fontSize: '10px',
                             fontWeight: 600,
                             fontFamily: cipherFont,
-                            fontSize: cipherFontSize,
+                            fontSize: cipherFontSize || '10px',
                         }}>
                             Actuel: {MODULE_META[currentCipher]?.label || currentCipher}
                         </span>
@@ -809,7 +811,7 @@ export default function UnifiedContextMenu({
                 </div>
 
                 <div style={{ padding: '8px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px' }}>
-                    {textualCiphers.map(cipherId => {
+                    {TEXTUAL_CIPHERS.map(cipherId => {
                         const m = MODULE_META[cipherId];
                         const isCurrent = cipherId === currentCipher;
                         const font = CIPHER_FONTS[cipherId] || 'monospace';
@@ -857,7 +859,7 @@ export default function UnifiedContextMenu({
                                     {isCurrent && <Check size={12} color={m?.color || 'var(--accent-hover)'} strokeWidth={2.8} />}
                                 </div>
                                 <div style={{
-                                    fontSize: '10px', color: 'var(--text-dim)', lineHeight: 1.2,
+                                    color: 'var(--text-dim)', lineHeight: 1.2,
                                     fontFamily: font, fontSize: size,
                                 }}>
                                     {m?.description || ''}

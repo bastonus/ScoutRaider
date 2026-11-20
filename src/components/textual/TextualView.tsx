@@ -27,7 +27,8 @@ import {
     LayoutGrid, KeyRound, Flag, Shield, Scale, Table,
     CheckSquare, X, ChevronDown, Globe, Code2, SlidersHorizontal,
     Maximize2, Minimize2, FileText,
-    Lightbulb, ArrowRight
+    Lightbulb, ArrowRight,
+    Cloud, RefreshCw, CloudOff, AlertCircle
 } from 'lucide-react';
 
 function AnnexeSwitch({ isChecked, onToggle }: { isChecked: boolean; onToggle: () => void }) {
@@ -639,7 +640,7 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                 const segIndices = (step.stepIndices && step.stepIndices.length > 0)
                     ? step.stepIndices
                     : (step.originalSegmentIndex !== undefined ? [step.originalSegmentIndex] : [0]);
-                segIndices.forEach((segIdx, lIdx) => {
+                segIndices.forEach((segIdx: number, lIdx: number) => {
                     list.push({ key: `seg-${segIdx}`, stepId: step.id, segIdx, stepIndex: sIdx, lineIdx: lIdx });
                 });
             }
@@ -836,8 +837,12 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
         dispatch({ type: 'SET_NAV_LANGUAGE', stepId, lang });
     }, [dispatch]);
 
-    const handlePoiToggle = useCallback((stepId: string, poiId: string) => {
-        dispatch({ type: 'TOGGLE_POI', stepId, poiId });
+    const handlePoiToggle = useCallback((stepId?: string, segIdx?: number, poiId?: string) => {
+        const pId = poiId || (typeof segIdx === 'string' ? (segIdx as any) : undefined);
+        const sId = stepId || '';
+        if (pId) {
+            dispatch({ type: 'TOGGLE_POI', stepId: sId, poiId: pId });
+        }
     }, [dispatch]);
 
     // Nouvelles actions pour les blocs

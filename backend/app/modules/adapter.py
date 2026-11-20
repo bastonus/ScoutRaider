@@ -6,7 +6,7 @@ Reports missing, defaulted, or deprecated fields explicitly.
 
 import re
 from typing import Dict, Any, Tuple, List
-from .schema import ModuleMetadata, ModuleCategory, RenderType, DiffractionConstraints
+from .schema import ModuleMetadata, ModuleCategory, RenderType, DiffractionConstraints, DataCapability
 
 # Default fallback categories constraints from legacy/config/constraints_categories.json
 DEFAULT_CATEGORY_CONSTRAINTS: Dict[str, Dict[str, Any]] = {
@@ -60,7 +60,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 2.0,
         "max_proportion": 0.30,
         "annexes": ["alphabet_morse"],
-        "base_weight": 20.0
+        "base_weight": 20.0,
+        "data_capability": DataCapability.ALPHABETIC
     },
     "vigenere": {
         "name": "Chiffre de Vigenère",
@@ -69,7 +70,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "max_proportion": 0.15,
         "max_occurrences": 1,
         "annexes": ["tableau_vigenere"],
-        "base_weight": 10.0
+        "base_weight": 10.0,
+        "data_capability": DataCapability.ALPHANUMERIC
     },
     "polybe": {
         "name": "Carré de Polybe",
@@ -77,7 +79,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 2.5,
         "max_proportion": 0.25,
         "annexes": ["grille_polybe"],
-        "base_weight": 20.0
+        "base_weight": 20.0,
+        "data_capability": DataCapability.ALPHANUMERIC
     },
     "gilwell": {
         "name": "Relevé Gilwell",
@@ -85,7 +88,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 3.5,
         "max_proportion": 0.25,
         "annexes": ["alphabet_gilwell"],
-        "base_weight": 20.0
+        "base_weight": 20.0,
+        "data_capability": DataCapability.MAP_PATH
     },
     "avocat": {
         "name": "Code Avocat",
@@ -93,7 +97,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 1.5,
         "max_proportion": 0.20,
         "annexes": ["methode_avocat"],
-        "base_weight": 15.0
+        "base_weight": 15.0,
+        "data_capability": DataCapability.ALPHABETIC
     },
     "cassis": {
         "name": "Code Cassis",
@@ -101,7 +106,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 1.5,
         "max_proportion": 0.20,
         "annexes": ["methode_cassis"],
-        "base_weight": 15.0
+        "base_weight": 15.0,
+        "data_capability": DataCapability.ALPHABETIC
     },
     "templier": {
         "name": "Croix des Templiers",
@@ -109,7 +115,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 3.0,
         "max_proportion": 0.25,
         "annexes": ["alphabet_templier"],
-        "base_weight": 20.0
+        "base_weight": 20.0,
+        "data_capability": DataCapability.SYMBOLIC_VISUAL
     },
     "maritime": {
         "name": "Pavillons Maritimes",
@@ -117,7 +124,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 3.0,
         "max_proportion": 0.25,
         "annexes": ["index_maritime"],
-        "base_weight": 20.0
+        "base_weight": 20.0,
+        "data_capability": DataCapability.SYMBOLIC_VISUAL
     },
     "drapeaux": {
         "name": "Sémaphore Drapeaux",
@@ -125,7 +133,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 3.0,
         "max_proportion": 0.25,
         "annexes": ["index_drapeaux"],
-        "base_weight": 20.0
+        "base_weight": 20.0,
+        "data_capability": DataCapability.SYMBOLIC_VISUAL
     },
     "carte_ign": {
         "name": "Carte IGN Découverte",
@@ -133,7 +142,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 1.0,
         "max_proportion": 0.40,
         "annexes": [],
-        "base_weight": 30.0
+        "base_weight": 30.0,
+        "data_capability": DataCapability.MAP_OVERVIEW
     },
     "carte_simple": {
         "name": "Carte Simple",
@@ -141,7 +151,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 1.0,
         "max_proportion": 0.45,
         "annexes": [],
-        "base_weight": 35.0
+        "base_weight": 35.0,
+        "data_capability": DataCapability.MAP_OVERVIEW
     },
     "texte_clair": {
         "name": "Texte Clair",
@@ -149,7 +160,8 @@ MODULE_KNOWN_PROPERTIES: Dict[str, Dict[str, Any]] = {
         "difficulty_weight": 0.5,
         "max_proportion": 0.85,
         "annexes": [],
-        "base_weight": 40.0
+        "base_weight": 40.0,
+        "data_capability": DataCapability.ALPHANUMERIC
     }
 }
 

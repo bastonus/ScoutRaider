@@ -50,14 +50,14 @@ export async function migrateSrdocToV2(
   const title = options.title || oldState.document_title || 'Document sans titre';
 
   // 1. Extraire les assets (polices, images) depuis l'ancien état
-  const { assets, assetWarnings } = await extractAssets(oldState, options.loadAssetBlobs);
+  const { assets, warnings: assetWarnings } = await extractAssets(oldState, options.loadAssetBlobs);
   warnings.push(...assetWarnings);
 
   // 2. Construire la mise en page depuis les préférences/etat
   const pageLayout = buildPageLayout(oldState);
 
   // 3. Convertir carnet_steps → blocks[]
-  const { blocks, blockWarnings } = buildBlocksFromCarnet(oldState, assets);
+  const { blocks, warnings: blockWarnings } = buildBlocksFromCarnet(oldState, assets);
   warnings.push(...blockWarnings);
 
   // 4. Détecter les modules utilisés pour les annexes

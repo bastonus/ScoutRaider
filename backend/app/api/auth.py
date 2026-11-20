@@ -83,7 +83,7 @@ async def login(response: Response, credentials: UserLogin, db: AsyncSession = D
 
     await update_last_login(db, user)
 
-    access_token = create_access_token(user.id)
+    access_token = create_access_token(user.id, username=user.username, email=user.email)
     refresh_token = create_refresh_token(user.id)
 
     # Cookie sécurisé pour le refresh token
@@ -100,7 +100,8 @@ async def login(response: Response, credentials: UserLogin, db: AsyncSession = D
     return Token(
         access_token=access_token,
         refresh_token=refresh_token,
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user=UserResponse.model_validate(user)
     )
 
 
@@ -132,7 +133,7 @@ async def refresh_token(
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Utilisateur inactif")
 
-    new_access = create_access_token(user.id)
+    new_access = create_access_token(user.id, username=user.username, email=user.email)
     new_refresh = create_refresh_token(user.id)
 
     response.set_cookie(
@@ -148,7 +149,8 @@ async def refresh_token(
     return Token(
         access_token=new_access,
         refresh_token=new_refresh,
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user=UserResponse.model_validate(user)
     )
 
 

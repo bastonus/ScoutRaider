@@ -4,7 +4,7 @@
  * Par bloc ou globalement
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronDown, X, Check, Type, Heading1, Code2 } from 'lucide-react';
+import { ChevronDown, X, Check, Type, Heading1, Heading2, Heading3, Code2, Lock } from 'lucide-react';
 import { FONT_PRESETS, CIPHER_FONTS } from './MarkdownRenderer';
 
 interface FontSelectorProps {
@@ -26,7 +26,7 @@ interface FontSelectorProps {
 
 const DEFAULT_CONFIG = {
     baseFont: FONT_PRESETS.base[0].font,
-    headingFonts: { 1: 'inherit', 2: 'inherit', 3: 'inherit' },
+    headingFonts: { 1: 'inherit', 2: 'inherit', 3: 'inherit' } as Record<number, string>,
     monoFont: FONT_PRESETS.mono[0].font,
 };
 
@@ -77,7 +77,7 @@ export default function FontSelector({
     const getCurrentFont = (category: 'base' | 'heading' | 'mono', level?: number) => {
         if (category === 'base') return mergedConfig.baseFont;
         if (category === 'mono') return mergedConfig.monoFont;
-        return mergedConfig.headingFonts[level!] || 'inherit';
+        return (mergedConfig.headingFonts as Record<number, string>)[level!] || 'inherit';
     };
 
     const renderFontOptions = (category: 'base' | 'heading' | 'mono', level?: number) => {

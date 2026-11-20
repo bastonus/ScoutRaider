@@ -264,6 +264,9 @@ export interface CarnetStep {
     };
     /** Indices of polygonal segments that this step encompasses */
     segmentIndices?: number[];
+    stepIndices?: number[];
+    originalSegmentIndex?: number;
+    isTitleStep?: boolean;
     /** Gilwell SVG string (computed live) */
     gilwellSvg?: string;
     /** Annexes included for this step */
@@ -564,6 +567,8 @@ export interface AppState {
     carnet_view: CarnetView;
     carnet_include_general_map: boolean;
     carnet_include_elevation_profile?: boolean;
+    elevation_profile_svg?: string;
+    elevation_profile_stats?: any;
     enabled_annexes: AnnexeId[];
     disabled_annexes?: AnnexeId[];
 

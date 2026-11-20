@@ -292,9 +292,9 @@ export class StateManager {
         const images: Record<string, any> = {};
 
         // Polices utilisées par les modules de chiffrement dans carnet_steps
-        const usedModules = new Set(
+        const usedModules = new Set<string>(
             (state.carnet_steps || [])
-                .map((s: any) => s.moduleId)
+                .map((s: any) => s.moduleId as string)
                 .filter(Boolean)
         );
 

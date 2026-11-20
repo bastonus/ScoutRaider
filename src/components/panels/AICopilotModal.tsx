@@ -41,7 +41,8 @@ export default function AICopilotModal({ isOpen, onClose, initialTab = 'narrativ
     const [narrativeResult, setNarrativeResult] = useState<NarrativeResponse | null>(null);
 
     // Riddles State
-    const [selectedPoi, setSelectedPoi] = useState(state.pois?.[0]?.name || 'Abbaye en ruines');
+    const firstPoi = Object.values(state.segment_pois || {}).flat()[0]?.name;
+    const [selectedPoi, setSelectedPoi] = useState(firstPoi || 'Abbaye en ruines');
     const [riddleModule, setRiddleModule] = useState('morse');
     const [riddleDifficulty, setRiddleDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
     const [riddleLoading, setRiddleLoading] = useState(false);
@@ -81,7 +82,7 @@ export default function AICopilotModal({ isOpen, onClose, initialTab = 'narrativ
     const stagesPayload = (state.stages || []).map((st, idx) => ({
         to_label: st.label || `Balise ${idx + 1}`,
         distance_m: 1200, // Estimated or calculated distance
-        poi: st.poi || null
+        poi: (st as any).poi || st.address || null
     }));
 
     const totalKm = (stagesPayload.length * 1.2) || 8.5;

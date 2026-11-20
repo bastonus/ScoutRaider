@@ -130,7 +130,9 @@ export interface UserLibraryItem {
 const DEFAULT_REMOTE_API = 'https://scoutraider.silverhorse.fr';
 
 export class CloudAuthService {
-    private static TOKEN_KEY = 'scoutraider_auth_token';
+    private static TOKEN_KEY = 'scoutraider_token';
+    private static LEGACY_TOKEN_KEY = 'scoutraider_auth_token';
+    private static REFRESH_KEY = 'scoutraider_refresh';
     private static GUEST_KEY = 'scoutraider_is_guest';
 
     static getBaseUrl(): string {
@@ -153,12 +155,22 @@ export class CloudAuthService {
 
     static getToken(): string | null {
         if (typeof localStorage === 'undefined') return null;
-        return localStorage.getItem(this.TOKEN_KEY);
+        const token = localStorage.getItem(this.TOKEN_KEY) || localStorage.getItem(this.LEGACY_TOKEN_KEY);
+        if (!token || token === 'undefined' || token === 'null') return null;
+        return token;
     }
 
-    static setToken(token: string) {
+    static setToken(token: string | undefined | null, refreshToken?: string | null) {
         if (typeof localStorage !== 'undefined') {
+            if (!token || token === 'undefined' || token === 'null') {
+                this.logout();
+                return;
+            }
             localStorage.setItem(this.TOKEN_KEY, token);
+            localStorage.setItem(this.LEGACY_TOKEN_KEY, token);
+            if (refreshToken) {
+                localStorage.setItem(this.REFRESH_KEY, refreshToken);
+            }
             localStorage.removeItem(this.GUEST_KEY);
         }
     }
@@ -166,8 +178,8 @@ export class CloudAuthService {
     static isGuest(): boolean {
         if (typeof localStorage === 'undefined') return true;
         const guestFlag = localStorage.getItem(this.GUEST_KEY);
-        const hasToken = !!localStorage.getItem(this.TOKEN_KEY);
-        return guestFlag === 'true' || !hasToken;
+        const token = this.getToken();
+        return guestFlag === 'true' || !token;
     }
 
     static setGuest(isGuest: boolean) {
@@ -175,6 +187,8 @@ export class CloudAuthService {
             if (isGuest) {
                 localStorage.setItem(this.GUEST_KEY, 'true');
                 localStorage.removeItem(this.TOKEN_KEY);
+                localStorage.removeItem(this.LEGACY_TOKEN_KEY);
+                localStorage.removeItem(this.REFRESH_KEY);
             } else {
                 localStorage.removeItem(this.GUEST_KEY);
             }
@@ -184,6 +198,8 @@ export class CloudAuthService {
     static logout() {
         if (typeof localStorage !== 'undefined') {
             localStorage.removeItem(this.TOKEN_KEY);
+            localStorage.removeItem(this.LEGACY_TOKEN_KEY);
+            localStorage.removeItem(this.REFRESH_KEY);
             localStorage.setItem(this.GUEST_KEY, 'true');
         }
     }
@@ -201,11 +217,11 @@ export class CloudAuthService {
 
     // ─── Authentication ───────────────────────────────────────────────────────
 
-    static async register(username: string, password: string, email: string): Promise<{ user: UserProfile; token: string }> {
+    static async register(username: string, password: string, email?: string): Promise<{ user: UserProfile; token: string }> {
         const res = await fetch(`${this.getBaseUrl()}/api/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, email })
+            body: JSON.stringify({ username, password, email: email || `${username}@scoutraider.local` })
         });
 
         if (!res.ok) {
@@ -213,9 +229,8 @@ export class CloudAuthService {
             throw new Error(err.detail || 'Échec de l\'inscription');
         }
 
-        const data = await res.json();
-        this.setToken(data.token);
-        return data;
+        // Connexion automatique après inscription réussie
+        return await this.login(username, password);
     }
 
     static async login(username: string, password: string): Promise<{ user: UserProfile; token: string }> {
@@ -231,8 +246,25 @@ export class CloudAuthService {
         }
 
         const data = await res.json();
-        this.setToken(data.token);
-        return data;
+        const token = data.access_token || data.token;
+        if (!token) {
+            throw new Error('Réponse d\'authentification invalide (aucun jeton reçu).');
+        }
+        this.setToken(token, data.refresh_token);
+
+        // Récupérer le profil utilisateur
+        let user: UserProfile | null = data.user || null;
+        if (!user) {
+            user = await this.getMe();
+        }
+        if (!user) {
+            user = this.decodeTokenLocally();
+        }
+        if (!user) {
+            user = { id: '', username, email: null };
+        }
+
+        return { user, token };
     }
 
     static async getMe(): Promise<UserProfile | null> {
@@ -253,7 +285,7 @@ export class CloudAuthService {
                 return this.decodeTokenLocally();
             }
             const data = await res.json();
-            return data.user;
+            return data.user || data;
         } catch {
             // Network error (offline, timeout, etc.) — don't log out, use local JWT decode
             return this.decodeTokenLocally();

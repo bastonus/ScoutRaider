@@ -55,19 +55,19 @@ const CATEGORY_CONSTRAINTS: Record<ModuleCategory, CategoryConstraints> = {
 
 // ─── Display metadata (colors, labels, default annexes) ───────────────────────
 
-export const MODULE_META: Record<ModuleId, { label: string; color: string; defaultAnnexes: string[] }> = {
-    morse:       { label: 'Morse',              color: '#ef4444', defaultAnnexes: ['alphabet_morse'] },
-    vigenere:    { label: 'Vigenère',            color: '#8b5cf6', defaultAnnexes: ['tableau_vigenere'] },
-    polybe:      { label: 'Carré de Polybe',     color: '#14b8a6', defaultAnnexes: ['grille_polybe'] },
-    gilwell:     { label: 'Gilwell',             color: '#10b981', defaultAnnexes: ['alphabet_gilwell'] },
-    avocat:      { label: 'Avocat',              color: '#f59e0b', defaultAnnexes: ['methode_avocat'] },
-    drapeaux:    { label: 'Drapeaux',            color: '#06b6d4', defaultAnnexes: ['index_drapeaux'] },
-    maritime:    { label: 'Pavillon Maritime',   color: '#0ea5e9', defaultAnnexes: [] },
-    cassis:      { label: 'Cassis',              color: '#7c3aed', defaultAnnexes: [] },
-    templier:    { label: 'Templier',            color: '#b45309', defaultAnnexes: [] },
-    texte_clair: { label: 'Texte clair',         color: '#6b7280', defaultAnnexes: [] },
-    carte_ign:   { label: 'Carte IGN',           color: '#16a34a', defaultAnnexes: [] },
-    carte_simple:{ label: 'Carte Simple',        color: '#10b981', defaultAnnexes: [] },
+export const MODULE_META: Record<ModuleId, { label: string; color: string; defaultAnnexes: string[]; description?: string }> = {
+    morse:       { label: 'Morse',              color: '#ef4444', defaultAnnexes: ['alphabet_morse'], description: MODULE_MANIFESTS.morse.description },
+    vigenere:    { label: 'Vigenère',            color: '#8b5cf6', defaultAnnexes: ['tableau_vigenere'], description: MODULE_MANIFESTS.vigenere.description },
+    polybe:      { label: 'Carré de Polybe',     color: '#14b8a6', defaultAnnexes: ['grille_polybe'], description: MODULE_MANIFESTS.polybe.description },
+    gilwell:     { label: 'Gilwell',             color: '#10b981', defaultAnnexes: ['alphabet_gilwell'], description: MODULE_MANIFESTS.gilwell.description },
+    avocat:      { label: 'Avocat',              color: '#f59e0b', defaultAnnexes: ['methode_avocat'], description: MODULE_MANIFESTS.avocat.description },
+    drapeaux:    { label: 'Drapeaux',            color: '#06b6d4', defaultAnnexes: ['index_drapeaux'], description: MODULE_MANIFESTS.drapeaux.description },
+    maritime:    { label: 'Pavillon Maritime',   color: '#0ea5e9', defaultAnnexes: [], description: MODULE_MANIFESTS.maritime.description },
+    cassis:      { label: 'Cassis',              color: '#7c3aed', defaultAnnexes: [], description: MODULE_MANIFESTS.cassis.description },
+    templier:    { label: 'Templier',            color: '#b45309', defaultAnnexes: [], description: MODULE_MANIFESTS.templier.description },
+    texte_clair: { label: 'Texte clair',         color: '#6b7280', defaultAnnexes: [], description: MODULE_MANIFESTS.texte_clair.description },
+    carte_ign:   { label: 'Carte IGN',           color: '#16a34a', defaultAnnexes: [], description: MODULE_MANIFESTS.carte_ign.description },
+    carte_simple:{ label: 'Carte Simple',        color: '#10b981', defaultAnnexes: [], description: MODULE_MANIFESTS.carte_simple.description },
 };
 
 // ─── All module IDs ───────────────────────────────────────────────────────────

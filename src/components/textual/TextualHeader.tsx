@@ -17,7 +17,7 @@ import { useApp } from '../../AppContext';
 import { themeManager } from '../../logic/ThemeManager';
 import { ModuleLogic } from '../../logic/ModuleLogic';
 
-const THEME_ACCENTS: Record<string, { color: string; Icon: React.ComponentType<{ size?: number; color?: string; style?: React.CSSProperties; strokeWidth?: number }> }> = {
+const THEME_ACCENTS: Record<string, { color: string; Icon: React.ComponentType<{ size?: number | string; color?: string; style?: React.CSSProperties; strokeWidth?: number }> }> = {
     'Neutre':                              { color: '#94a3b8', Icon: Globe },
     'La Mafia':                            { color: '#ef4444', Icon: Crosshair },
     'Les Vikings':                         { color: '#60a5fa', Icon: Swords },
@@ -78,7 +78,7 @@ function applyCipher(text: string, cipherId: string): string {
     // Pour Vigenère, on a besoin de la clé du thème actuel
     const options: { key?: string; offset?: number } = {};
     if (cipherId === 'vigenere') {
-        const currentTheme = themeManager.getTheme(state.theme_id);
+        const currentTheme = themeManager.currentTheme;
         options.key = currentTheme?.vigenere_key || 'MOUSTACHE';
     }
 
@@ -574,11 +574,11 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
     // ─── Fermeture menus au clic extérieur ──────────────────────────────────
     useEffect(() => {
         const handler = (e: MouseEvent) => {
-            const target = e.target as Node;
+            const target = e.target as HTMLElement | null;
             // Ne ferme PAS si on clique dans un dropdown ouvert
-            if (cipherMenuOpen && target.closest('[style*="position: absolute"]')) return;
-            if (themePickerOpen && target.closest('[style*="position: absolute"]')) return;
-            if (overflowMenuOpen && target.closest('[style*="position: absolute"]')) return;
+            if (cipherMenuOpen && target?.closest?.('[style*="position: absolute"]')) return;
+            if (themePickerOpen && target?.closest?.('[style*="position: absolute"]')) return;
+            if (overflowMenuOpen && target?.closest?.('[style*="position: absolute"]')) return;
             setCipherMenuOpen(false);
             setThemePickerOpen(false);
             setOverflowMenuOpen(false);

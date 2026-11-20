@@ -226,3 +226,65 @@ def test_projects_shared_alias(client):
     assert data["role"] == "read"
     assert data["share_token"] == share_token
     assert data["is_owner"] is False
+
+
+def test_projects_crud_endpoints(client):
+    """Test /api/projects CRUD endpoints used by frontend CloudAuthService."""
+    import time
+    username = f"projuser_{int(time.time() * 1000)}"
+    password = "password123"
+    reg_res = client.post("/api/auth/register", json={"username": username, "email": f"{username}@test.com", "password": password})
+    assert reg_res.status_code == 201
+
+    login_res = client.post("/api/auth/login", json={"username": username, "password": password})
+    assert login_res.status_code == 200
+    login_data = login_res.json()
+    assert "user" in login_data
+    assert login_data["user"]["username"] == username
+    token = login_data["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Save new project via POST /api/projects
+    save_res = client.post("/api/projects", headers=headers, json={
+        "title": "Mon Raid 2026",
+        "state": {"routes": [], "markers": []}
+    })
+    assert save_res.status_code == 200
+    saved = save_res.json()
+    assert saved["title"] == "Mon Raid 2026"
+    assert saved["is_owner"] is True
+    project_id = saved["id"]
+
+    # 2. List projects via GET /api/projects
+    list_res = client.get("/api/projects", headers=headers)
+    assert list_res.status_code == 200
+    projects = list_res.json()
+    assert len(projects) >= 1
+    assert any(p["id"] == project_id for p in projects)
+
+    # 3. Get single project via GET /api/projects/{id}
+    get_res = client.get(f"/api/projects/{project_id}", headers=headers)
+    assert get_res.status_code == 200
+    project = get_res.json()
+    assert project["id"] == project_id
+    assert project["title"] == "Mon Raid 2026"
+    assert project["state"] == {"routes": [], "markers": []}
+
+    # 4. Update project via POST /api/projects with existing id
+    update_res = client.post("/api/projects", headers=headers, json={
+        "id": project_id,
+        "title": "Mon Raid 2026 (Mis à jour)",
+        "state": {"routes": ["route_1"], "markers": []}
+    })
+    assert update_res.status_code == 200
+    updated = update_res.json()
+    assert updated["id"] == project_id
+    assert updated["title"] == "Mon Raid 2026 (Mis à jour)"
+
+    # 5. Delete project via DELETE /api/projects/{id}
+    del_res = client.delete(f"/api/projects/{project_id}", headers=headers)
+    assert del_res.status_code == 200
+
+    # 6. Verify deleted
+    get_after_del = client.get(f"/api/projects/{project_id}", headers=headers)
+    assert get_after_del.status_code == 404

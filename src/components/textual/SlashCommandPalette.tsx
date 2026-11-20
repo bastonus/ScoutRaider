@@ -20,7 +20,7 @@ interface SlashCommandPaletteProps {
     onInsertBlock: (blockType: string, config?: any) => void;
     onSearchReference: (query: string) => void;
     anchorRef: React.RefObject<HTMLDivElement>;
-    triggerPosition?: { x: number; y: number };
+    triggerPosition?: { x: number; y: number } | null;
 }
 
 export default function SlashCommandPalette({

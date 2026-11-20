@@ -46,7 +46,12 @@ def get_password_hash(password: str) -> str:
     ).decode("utf-8")
 
 
-def create_access_token(user_id: uuid.UUID, expires_delta: timedelta | None = None) -> str:
+def create_access_token(
+    user_id: uuid.UUID,
+    expires_delta: timedelta | None = None,
+    username: str | None = None,
+    email: str | None = None,
+) -> str:
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
@@ -58,6 +63,10 @@ def create_access_token(user_id: uuid.UUID, expires_delta: timedelta | None = No
         "iat": int(datetime.now(timezone.utc).timestamp()),
         "type": "access"
     }
+    if username:
+        to_encode["username"] = username
+    if email:
+        to_encode["email"] = email
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
