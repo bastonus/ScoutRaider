@@ -71,6 +71,109 @@ marked.use({ gfm: true, breaks: true });
 
 // ─── Composant principal ──────────────────────────────────────────────────
 
+// ─── Helpers & Composant d'Étape Dédiée ───────────────────────────────────
+
+export function getStageDotColor(stageLabel: string, stages: any[]): string {
+    const stageIdx = stages.findIndex((st: any) => st.label === stageLabel);
+    if (stageIdx === 0) return 'var(--semantic-green)';
+    if (stageIdx === stages.length - 1 && stageIdx > 0) return 'var(--semantic-red)';
+    return 'var(--accent-hover)';
+}
+
+/**
+ * Bloc dédié à part entière pour une étape (A, B, C...)
+ * Colonne latérale unifiée (26px + 12px) avec badge d'étape et séparateur stylé
+ */
+export function StageHeaderBlock({
+    stageLabel,
+    stageName,
+    dotColor,
+    isFirst = false,
+    isArrival = false
+}: {
+    stageLabel: string;
+    stageName?: string;
+    dotColor: string;
+    isFirst?: boolean;
+    isArrival?: boolean;
+}) {
+    return (
+        <div
+            className="carnet-stage-block"
+            style={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                minHeight: '28px',
+                marginTop: isFirst ? '6px' : (isArrival ? '24px' : '20px'),
+                marginBottom: '8px',
+                userSelect: 'none',
+                width: '100%'
+            }}
+        >
+            {/* Gutter unifié : 26px + 12px de marge pour alignement parfait */}
+            <div
+                style={{
+                    width: '26px',
+                    marginRight: '12px',
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}
+            >
+                <div
+                    style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: 'var(--bg-base)',
+                        border: `2px solid ${dotColor}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        color: dotColor,
+                        fontFamily: 'var(--font-mono)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                    }}
+                >
+                    {stageLabel}
+                </div>
+            </div>
+
+            {/* Corps du bloc d'étape : Titre + ligne séparatrice */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span
+                    style={{
+                        fontSize: '12px',
+                        fontWeight: 800,
+                        color: dotColor,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        fontFamily: 'var(--font-mono)',
+                        whiteSpace: 'nowrap'
+                    }}
+                >
+                    Étape {stageLabel}{isArrival ? ' — Arrivée' : (stageName ? ` — ${stageName}` : '')}
+                </span>
+                <div
+                    style={{
+                        flex: 1,
+                        height: '1.5px',
+                        borderRadius: '999px',
+                        background: dotColor,
+                        opacity: 0.5
+                    }}
+                />
+            </div>
+        </div>
+    );
+}
+
+// ─── Composant Principal CarnetStepBlock ────────────────────────────────────
+
 export default function CarnetStepBlock({
     step, stepIndex = 0, view, onModuleChange, onManualContentChange, onRemoveStep,
     onNavLanguageChange, onPoiToggle, onLineClick, onAddInlineCode,
@@ -87,44 +190,66 @@ export default function CarnetStepBlock({
         const lineKey = `step-${step.id}`;
         const isSelected = selectedKeys?.has(lineKey) || false;
         const lineLabel = stageLabelMap?.get(lineKey) || '';
+        const stageObj = lineLabel ? state.stages.find(s => s.label === lineLabel) : null;
+        const dotColor = lineLabel ? getStageDotColor(lineLabel, state.stages) : 'var(--accent-hover)';
 
         if (step.manualType === 'html') {
             return (
-                <ManualStepHtml
-                    step={step}
-                    stepIndex={stepIndex}
-                    onManualContentChange={onManualContentChange}
-                    onRemoveStep={onRemoveStep}
-                    isSelected={isSelected}
-                    onItemSelect={(e: React.MouseEvent) => onItemSelect?.(lineKey, e, undefined, step.id)}
-                    fontConfig={blockFontConfigs[step.id]}
-                    onDuplicate={onDuplicateStep}
-                    onMoveUp={onMoveStepUp}
-                    onMoveDown={onMoveStepDown}
-                    onCopy={onCopyStep}
-                    onLinkRef={onLinkReference}
-                    onOpenFonts={onOpenFontSelector}
-                    onOpenSettings={onOpenSettings}
-                />
+                <React.Fragment>
+                    {lineLabel && (
+                        <StageHeaderBlock
+                            stageLabel={lineLabel}
+                            stageName={stageObj?.address}
+                            dotColor={dotColor}
+                            isFirst={stepIndex === 0}
+                        />
+                    )}
+                    <ManualStepHtml
+                        step={step}
+                        stepIndex={stepIndex}
+                        onManualContentChange={onManualContentChange}
+                        onRemoveStep={onRemoveStep}
+                        isSelected={isSelected}
+                        onItemSelect={(e: React.MouseEvent) => onItemSelect?.(lineKey, e, undefined, step.id)}
+                        fontConfig={blockFontConfigs[step.id]}
+                        onDuplicate={onDuplicateStep}
+                        onMoveUp={onMoveStepUp}
+                        onMoveDown={onMoveStepDown}
+                        onCopy={onCopyStep}
+                        onLinkRef={onLinkReference}
+                        onOpenFonts={onOpenFontSelector}
+                        onOpenSettings={onOpenSettings}
+                    />
+                </React.Fragment>
             );
         }
         if (step.manualType === 'code') {
             return (
-                <ManualCodeBlock
-                    step={step}
-                    stepIndex={stepIndex}
-                    onManualContentChange={onManualContentChange}
-                    onRemoveStep={onRemoveStep}
-                    isSolution={isSolution}
-                    isSelected={isSelected}
-                    onItemSelect={(e: React.MouseEvent) => onItemSelect?.(lineKey, e, undefined, step.id)}
-                    onDuplicate={onDuplicateStep}
-                    onMoveUp={onMoveStepUp}
-                    onMoveDown={onMoveStepDown}
-                    onCopy={onCopyStep}
-                    onLinkRef={onLinkReference}
-                    onOpenSettings={onOpenSettings}
-                />
+                <React.Fragment>
+                    {lineLabel && (
+                        <StageHeaderBlock
+                            stageLabel={lineLabel}
+                            stageName={stageObj?.address}
+                            dotColor={dotColor}
+                            isFirst={stepIndex === 0}
+                        />
+                    )}
+                    <ManualCodeBlock
+                        step={step}
+                        stepIndex={stepIndex}
+                        onManualContentChange={onManualContentChange}
+                        onRemoveStep={onRemoveStep}
+                        isSolution={isSolution}
+                        isSelected={isSelected}
+                        onItemSelect={(e: React.MouseEvent) => onItemSelect?.(lineKey, e, undefined, step.id)}
+                        onDuplicate={onDuplicateStep}
+                        onMoveUp={onMoveStepUp}
+                        onMoveDown={onMoveStepDown}
+                        onCopy={onCopyStep}
+                        onLinkRef={onLinkReference}
+                        onOpenSettings={onOpenSettings}
+                    />
+                </React.Fragment>
             );
         }
     }
@@ -222,9 +347,19 @@ export default function CarnetStepBlock({
                     const lineKey = segIdx !== undefined ? `seg-${segIdx}` : `step-${step.id}`;
                     const isSelected = selectedKeys?.has(lineKey) || false;
                     const lineLabel = stageLabelMap ? (stageLabelMap.get(lineKey) || '') : (stepIndex === 0 && idx === 0 ? (state.stages[0]?.label || 'A') : '');
+                    const stageObj = lineLabel ? state.stages.find(s => s.label === lineLabel) : null;
+                    const dotColor = lineLabel ? getStageDotColor(lineLabel, state.stages) : 'var(--accent-hover)';
 
                     return (
                         <React.Fragment key={idx}>
+                            {lineLabel && (
+                                <StageHeaderBlock
+                                    stageLabel={lineLabel}
+                                    stageName={stageObj?.address}
+                                    dotColor={dotColor}
+                                    isFirst={stepIndex === 0 && idx === 0}
+                                />
+                            )}
                             <ComputedStepLine
                                 step={step}
                                 stepIndex={stepIndex}
@@ -240,7 +375,6 @@ export default function CarnetStepBlock({
                                 isFirst={idx === 0}
                                 isSolutionView={isSolution}
                                 isVisual={isVisual}
-                                lineLabel={lineLabel}
                                 dangerLevel={getDangerLevel(segIdx)}
                                 navLanguage={segIdx !== undefined ? state.custom_languages?.[segIdx.toString()] : step.navLanguage}
                                 pois={segIdx !== undefined ? state.segment_pois?.[segIdx.toString()] : step.pois}
@@ -432,15 +566,15 @@ function ManualStepHtml({
             onTouchEnd={handleTouchEnd}
             onTouchMove={handleTouchMove}
         >
-            {/* Gutter unifié : indicateur + label étape + menu 3 points */}
+            {/* Gutter unifié : indicateur + menu contextuel */}
             <BlockGutter
                 blockType="html"
                 blockData={step}
-                stepLabel={undefined} // Pas de label A,B,C pour les commentaires
                 isTitle={false}
                 isSelected={false}
                 isHovered={hovered || isEditing}
                 contextMenuPos={contextMenuPos}
+                onOpenContextMenu={pos => setContextMenuPos(pos)}
                 onCloseContextMenu={() => setContextMenuPos(null)}
                 onEdit={startEditing}
                 onDelete={() => onRemoveStep?.(step.id)}
@@ -657,7 +791,7 @@ function ManualCodeBlock({
             onTouchEnd={handleTouchEnd}
             onTouchMove={handleTouchEnd}
         >
-            {/* Gutter unifié : indicateur + menu 3 points */}
+            {/* Gutter unifié : indicateur + menu contextuel */}
             <BlockGutter
                 blockType="code"
                 blockData={step}
@@ -665,6 +799,7 @@ function ManualCodeBlock({
                 isSelected={isSelected}
                 isHovered={hovered}
                 contextMenuPos={contextMenuPos}
+                onOpenContextMenu={pos => setContextMenuPos(pos)}
                 onCloseContextMenu={() => setContextMenuPos(null)}
                 onEdit={() => {}} // Double-clic géré par le textarea
                 onDelete={() => onRemoveStep?.(step.id)}
@@ -750,7 +885,6 @@ interface ComputedStepLineProps {
     isFirst: boolean;
     isSolutionView: boolean;
     isVisual: boolean;
-    lineLabel: string;
     dangerLevel: string | null;
     navLanguage?: NavLanguage;
     pois?: Array<{ id: string; name: string; selected: boolean }>;
@@ -769,7 +903,7 @@ interface ComputedStepLineProps {
 function ComputedStepLine({
     step, stepIndex = 0, lineIdx, segIdx, lineKey, isSelected, onItemSelect,
     encodedLine, solutionLine, distance, azimuth, isFirst, isSolutionView, isVisual,
-    lineLabel, dangerLevel, navLanguage, pois, onModuleChange, onNavLanguageChange,
+    dangerLevel, navLanguage, pois, onModuleChange, onNavLanguageChange,
     onLineClick, onPoiToggle, onDuplicate, onMoveUp, onMoveDown, onCopy,
     onLinkRef, onOpenSettings
 }: ComputedStepLineProps) {
@@ -792,13 +926,6 @@ function ComputedStepLine({
     else if (dangerLevel === 'high') dangerColor = '#f97316';
     else if (dangerLevel === 'minor') dangerColor = '#eab308';
 
-    let dotColor = 'var(--accent-default)';
-    if (lineLabel) {
-        const stageIdx = state.stages.findIndex((st: any) => st.label === lineLabel);
-        if (stageIdx === 0) dotColor = 'var(--semantic-green)';
-        else if (stageIdx === state.stages.length - 1 && stageIdx > 0) dotColor = 'var(--semantic-red)';
-    }
-
     // Double clic pour éditer
     const handleDoubleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -812,12 +939,11 @@ function ComputedStepLine({
         if (!e.ctrlKey && !e.metaKey && !e.shiftKey && onLineClick) onLineClick();
     };
 
-    // Référence pour le bouton 3 points
+    // Référence pour le bloc
     const blockRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
     const touchTimerRef = useRef<any>(null);
-    const stepNumber = !lineLabel ? (segIdx !== undefined ? (segIdx + 1) : (lineIdx + 1)) : undefined;
 
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -867,17 +993,15 @@ function ComputedStepLine({
             onTouchEnd={handleTouchEnd}
             onTouchMove={handleTouchEnd}
         >
-            {/* Gutter unifié : indicateur + label étape (A,B,C) + menu 3 points */}
+            {/* Gutter unifié : indicateur + menu contextuel */}
             <BlockGutter
                 blockType={isVisual ? (hasMap ? 'map' : 'generic') : 'computed'}
                 blockData={step}
-                stepLabel={lineLabel || undefined}
-                stepNumber={stepNumber}
-                stepColor={dotColor}
                 moduleId={step.moduleId}
                 isSelected={isSelected}
                 isHovered={hovered || isEditing}
                 contextMenuPos={contextMenuPos}
+                onOpenContextMenu={pos => setContextMenuPos(pos)}
                 onCloseContextMenu={() => setContextMenuPos(null)}
                 onEdit={() => setIsEditing(true)}
                 onDuplicate={() => onDuplicate?.(step.id)}
@@ -912,36 +1036,6 @@ function ComputedStepLine({
                 transition: 'background-color 120ms ease, border-color 120ms ease',
                 display: 'flex', flexDirection: 'column', gap: '4px'
             }}>
-                {/* Ligne horizontale d'étape (si début d'étape) */}
-                {lineLabel && (
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        width: '100%',
-                        height: '20px',
-                        marginBottom: '3px',
-                        userSelect: 'none'
-                    }}>
-                        <span style={{
-                            fontSize: '11px',
-                            fontWeight: 800,
-                            color: dotColor,
-                            letterSpacing: '0.05em',
-                            textTransform: 'uppercase',
-                            fontFamily: 'var(--font-mono)'
-                        }}>
-                            Étape {lineLabel}
-                        </span>
-                        <div style={{
-                            flex: 1,
-                            height: '1.5px',
-                            borderRadius: '999px',
-                            background: dotColor,
-                            opacity: 0.6,
-                        }} />
-                    </div>
-                )}
 
                 <div style={{
                     display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px'

@@ -13,7 +13,7 @@ import { CarnetEngine } from '../../logic/CarnetEngine';
 import { themeManager } from '../../logic/ThemeManager';
 import { ModuleLogic } from '../../logic/ModuleLogic';
 import { MODULE_META, ALL_MODULE_IDS } from '../../logic/ModuleRegistry';
-import CarnetStepBlock from './CarnetStepBlock';
+import CarnetStepBlock, { StageHeaderBlock } from './CarnetStepBlock';
 import CodeBlockPicker from './CodeBlockPicker';
 import CarnetElevationBlock from './CarnetElevationBlock';
 import StepInsertSeparator from './StepInsertSeparator';
@@ -1052,45 +1052,13 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                                 </React.Fragment>
                             ))}
 
-                            {/* ── Marqueur d'arrivée final : badge carré + barre pleine arrondie ── */}
+                            {/* ── Marqueur d'arrivée final : bloc d'étape à part entière ── */}
                             {steps.length > 0 && !steps[steps.length - 1].isManual && steps[steps.length - 1].toLabel && (
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    width: '100%',
-                                    marginTop: '18px',
-                                    marginBottom: '10px',
-                                    userSelect: 'none'
-                                }}>
-                                    <div 
-                                        title={`Arrivée : Étape ${steps[steps.length - 1].toLabel}`}
-                                        style={{ 
-                                            width: '22px',
-                                            height: '22px', 
-                                            borderRadius: '5px',
-                                            background: 'var(--bg-base)', 
-                                            border: `2px solid var(--semantic-green)`,
-                                            boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: 'var(--semantic-green)',
-                                            fontWeight: 800,
-                                            fontSize: '11px',
-                                            fontFamily: 'var(--font-mono)',
-                                            flexShrink: 0
-                                        }}
-                                    >
-                                        {steps[steps.length - 1].toLabel}
-                                    </div>
-                                    <div style={{
-                                        flex: 1,
-                                        height: '2px',
-                                        borderRadius: '999px',
-                                        background: 'var(--semantic-green)',
-                                    }} />
-                                </div>
+                                <StageHeaderBlock
+                                    stageLabel={steps[steps.length - 1].toLabel!}
+                                    dotColor="var(--semantic-red)"
+                                    isArrival={true}
+                                />
                             )}
                             {/* Bandeau d'aide lorsque le tracé n'a pas encore été commencé */}
                             {state.polygonal_steps.length === 0 && (

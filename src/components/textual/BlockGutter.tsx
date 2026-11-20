@@ -18,7 +18,7 @@ import type { ModuleId, CarnetStep, NavLanguage } from '../../logic/types';
 import { useApp } from '../../AppContext';
 
 // ─── Largeur fixe du gutter ──────────────────────────────────────────────
-export const GUTTER_WIDTH = 56; // Permet d'afficher l'indicateur d'étape (A,B,C ou n°) + l'icône du module de cryptage/carte
+export const GUTTER_WIDTH = 26; // Colonne latérale épurée pour l'icône interactive du module
 
 // ─── Types ──────────────────────────────────────────────────────────────
 export interface BlockGutterProps {
@@ -26,11 +26,7 @@ export interface BlockGutterProps {
     blockType: 'html' | 'code' | 'computed' | 'map' | 'title' | 'generic';
     /** Données du bloc */
     blockData: CarnetStep;
-    /** Label d'étape (A, B, C...) */
-    stepLabel?: string;
-    /** Numéro d'étape dans l'itinéraire (1, 2, 3...) */
-    stepNumber?: number | string;
-    /** Couleur d'étape */
+    /** Couleur d'étape (optionnelle) */
     stepColor?: string;
     /** Module ID pour les blocs code */
     moduleId?: ModuleId;
@@ -42,6 +38,8 @@ export interface BlockGutterProps {
     isHovered?: boolean;
     /** Position d'ouverture externe du menu contextuel (clic droit ou long press) */
     contextMenuPos?: { x: number; y: number } | null;
+    /** Callback d'ouverture manuelle du menu contextuel */
+    onOpenContextMenu?: (pos: { x: number; y: number }) => void;
     /** Callback de fermeture du menu contextuel */
     onCloseContextMenu?: () => void;
     /** Callbacks */
@@ -166,14 +164,12 @@ function getBlockIndicator(blockType: BlockGutterProps['blockType'], blockData: 
 export default function BlockGutter({
     blockType,
     blockData,
-    stepLabel,
-    stepNumber,
-    stepColor,
     moduleId,
     isSelected,
     isTitle = false,
     isHovered = false,
     contextMenuPos,
+    onOpenContextMenu,
     onCloseContextMenu,
     onEdit,
     onDelete,
@@ -208,111 +204,64 @@ export default function BlockGutter({
         ['morse', 'vigenere', 'polybe', 'templier', 'maritime', 'avocat', 'cassis', 'texte_clair'].includes(id)
     );
 
-    const hasRouteStep = !!stepLabel || stepNumber !== undefined;
+    const handleIconClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        onOpenContextMenu?.({ x: rect.right + 6, y: rect.top });
+    };
 
     return (
         <div
             className="block-gutter"
             style={{
                 width: GUTTER_WIDTH,
-                marginRight: '10px',
+                marginRight: '12px',
                 flexShrink: 0,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '2px',
                 paddingTop: '2px',
                 position: 'relative',
                 userSelect: 'none',
             }}
         >
-            {/* Ligne des badges dans la marge : [ Étape/N° ] + [ Icône Module/Cryptage ] */}
-            <div
+            {/* Icône interactive du module (clic ouvre les options synthétiques) */}
+            <button
+                type="button"
+                onClick={handleIconClick}
                 style={{
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '6px',
+                    background: indicator.bg,
+                    border: indicator.border,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '4px',
-                    width: '100%',
                     flexShrink: 0,
-                    minHeight: '24px',
+                    color: meta?.color || 'var(--text-dim)',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                    cursor: 'pointer',
+                    padding: 0,
+                    transition: 'transform 120ms ease, box-shadow 120ms ease',
                 }}
+                onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
+                onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                title={`${indicator.tooltip} — Clic pour les options`}
             >
-                {/* 1. Badge d'étape de l'itinéraire (A, B, C ou numéro de segment) */}
-                {stepLabel ? (
-                    <div
-                        style={{
-                            width: '22px',
-                            height: '22px',
-                            borderRadius: '50%',
-                            background: 'var(--bg-base)',
-                            border: `2px solid ${stepColor || 'var(--accent-default)'}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            fontSize: '11px',
-                            fontWeight: 800,
-                            color: stepColor || 'var(--accent-default)',
-                            fontFamily: 'var(--font-mono)',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-                        }}
-                        title={`Étape ${stepLabel} de l'itinéraire`}
-                    >
-                        {stepLabel}
-                    </div>
-                ) : stepNumber !== undefined ? (
-                    <div
-                        style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            background: 'var(--bg-surface)',
-                            border: '1.5px solid var(--border-subtle)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            fontSize: '10px',
-                            fontWeight: 700,
-                            color: 'var(--text-dim)',
-                            fontFamily: 'var(--font-mono)',
-                        }}
-                        title={`Segment ${stepNumber} de l'itinéraire`}
-                    >
-                        {stepNumber}
-                    </div>
-                ) : null}
+                {indicator.icon}
+            </button>
 
-                {/* 2. Icône du type de module (texte, cryptage spécifique, carte IGN, gilwell...) */}
-                <div
-                    style={{
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '6px',
-                        background: indicator.bg,
-                        border: indicator.border,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        color: meta?.color || 'var(--text-dim)',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
-                        transition: 'transform 120ms ease',
-                    }}
-                    title={indicator.tooltip}
-                >
-                    {indicator.icon}
-                </div>
-            </div>
-
-            {/* 3. Menu contextuel unifié (3 points) */}
+            {/* Menu contextuel unifié (sans bouton 3 points visible, activable par clic icône, clic droit ou appui long) */}
             <UnifiedContextMenu
                 blockType={blockType}
                 blockId={blockData.id}
                 blockData={blockData}
                 availableCiphers={textualCiphers}
                 triggerRef={triggerRef}
+                showTriggerButton={false}
                 anchorPosition={contextMenuPos}
                 onClose={onCloseContextMenu}
                 onEdit={onEdit}
@@ -339,7 +288,7 @@ export default function BlockGutter({
                 isHovered={isHovered}
             />
 
-            {/* 4. Indicateur de sélection (check) */}
+            {/* Indicateur de sélection (check) */}
             {isSelected && (
                 <div
                     style={{
@@ -351,6 +300,7 @@ export default function BlockGutter({
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#ffffff',
+                        marginTop: '2px',
                     }}
                     title="Bloc sélectionné"
                 >

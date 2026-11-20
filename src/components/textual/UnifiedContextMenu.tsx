@@ -23,6 +23,7 @@ export interface UnifiedContextMenuProps {
     anchorPosition?: { x: number; y: number } | null;
     triggerRef?: React.RefObject<HTMLButtonElement>;
     isHovered?: boolean;
+    showTriggerButton?: boolean;
     isLocked?: boolean;
     isSolutionView?: boolean;
     hasSolution?: boolean;
@@ -72,6 +73,7 @@ export default function UnifiedContextMenu({
     anchorPosition,
     triggerRef,
     isHovered = false,
+    showTriggerButton = false,
     isLocked = false,
     isSolutionView = false,
     hasSolution = false,
@@ -208,10 +210,10 @@ export default function UnifiedContextMenu({
     return (
         <div
             className="unified-context-menu-wrapper"
-            style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+            style={{ position: 'relative', display: showTriggerButton ? 'inline-flex' : 'contents', alignItems: 'center' }}
             onClick={e => e.stopPropagation()}
         >
-            {triggerButton}
+            {showTriggerButton && triggerButton}
 
             {isOpen && (
                 <div
