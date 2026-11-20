@@ -104,6 +104,7 @@ export function StageHeaderBlock({
 }) {
     const { state } = useApp();
     const [hovered, setHovered] = useState(false);
+    const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Libellé synthétique : pas de "Étape X" redondant avec le badge
     const labelText = isArrival
@@ -128,8 +129,8 @@ export function StageHeaderBlock({
         <div
             className="carnet-stage-block"
             onClick={handleClick}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
+            onMouseEnter={() => { if (hoverTimer.current) clearTimeout(hoverTimer.current); setHovered(true); }}
+            onMouseLeave={() => { hoverTimer.current = setTimeout(() => setHovered(false), 120); }}
             role="button"
             tabIndex={0}
             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleClick(e as any); }}
@@ -766,6 +767,7 @@ function ManualCodeBlock({
 }: ManualCodeBlockProps) {
     const { dispatch } = useApp();
     const [hovered, setHovered] = useState(false);
+    const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const meta = MODULE_META[step.moduleId as keyof typeof MODULE_META];
     const accentColor = meta?.color || '#6b7280';
     const font = CIPHER_FONTS[step.moduleId] || 'monospace';
@@ -833,8 +835,8 @@ function ManualCodeBlock({
                 padding: '4px 0',
                 zIndex: hovered ? 50 : 1
             }}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
+            onMouseEnter={() => { if (hoverTimer.current) clearTimeout(hoverTimer.current); setHovered(true); }}
+            onMouseLeave={() => { hoverTimer.current = setTimeout(() => setHovered(false), 120); }}
             onContextMenu={handleContextMenu}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
@@ -895,7 +897,7 @@ function ManualCodeBlock({
                         {displayText}
                     </div>
                 )}
-                {hovered && isActuallyEncoded && step.solutionText && (
+                {(hovered || isSolution) && isActuallyEncoded && step.solutionText && (
                     <div style={{
                         marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px',
                         fontSize: '11px', color: 'var(--semantic-green)', fontWeight: 600,
@@ -951,6 +953,7 @@ function ComputedStepLine({
     const { state, dispatch } = useApp();
     const [hovered, setHovered] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const hasMap = ['carte_ign', 'drapeaux'].includes(step.moduleId) && step.coords && step.coords.length > 0;
     const hasGilwell = step.moduleId === 'gilwell' && step.gilwellSvg;
@@ -1026,8 +1029,8 @@ function ComputedStepLine({
                 borderRadius: '6px',
                 transition: 'box-shadow 0.25s ease, background-color 0.2s ease',
             }}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
+            onMouseEnter={() => { if (hoverTimer.current) clearTimeout(hoverTimer.current); setHovered(true); }}
+            onMouseLeave={() => { hoverTimer.current = setTimeout(() => setHovered(false), 120); }}
             onDoubleClick={handleDoubleClick}
             onContextMenu={handleContextMenu}
             onTouchStart={handleTouchStart}
@@ -1093,8 +1096,8 @@ function ComputedStepLine({
                                     <div style={{ fontFamily: font, fontSize: fontSize, color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', wordBreak: 'break-all', letterSpacing: step.moduleId === 'morse' ? '2px' : '0.02em', lineHeight: 1.4 }}>
                                         <HighlightedText text={encodedLine} pois={pois} isEncoded={true} sourceLine={solutionLine} onPoiToggle={onPoiToggle} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange} />
                                     </div>
-                                    {/* Ligne de solution affichée en colonne sous le code chiffré (au survol uniquement) */}
-                                    {hovered && (
+                                    {/* Ligne de solution affichée en colonne sous le code chiffré (au survol ou mode solution) */}
+                                    {(hovered || isSolutionView) && (
                                         <div style={{ fontSize: '11px', color: dangerColor || 'var(--semantic-green)', marginTop: '3px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                             <Lightbulb size={11} strokeWidth={2.4} color={dangerColor || 'var(--semantic-green)'} style={{ flexShrink: 0 }} />
                                             <HighlightedText text={solutionLine} pois={pois} isEncoded={false} onPoiToggle={onPoiToggle} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange} />
@@ -1116,7 +1119,7 @@ function ComputedStepLine({
                             {hasMap && isFirst && (
                                 <MiniMap stepId={step.id} moduleId={step.moduleId} coords={step.coords} initialPersist={step.mapPersist} />
                             )}
-                            {hovered && step.moduleId !== 'texte_clair' && !hasMap && solutionLine && (
+                            {(hovered || isSolutionView) && step.moduleId !== 'texte_clair' && !hasMap && solutionLine && (
                                 <div style={{ fontSize: '11.5px', color: 'var(--semantic-green)', marginTop: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <Lightbulb size={12} strokeWidth={2.4} color="var(--semantic-green)" style={{ flexShrink: 0 }} />
                                     <HighlightedText text={solutionLine} pois={pois} isEncoded={false} onPoiToggle={onPoiToggle} />

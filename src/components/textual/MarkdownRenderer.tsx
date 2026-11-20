@@ -184,7 +184,7 @@ function protectCipherTags(raw: string, viewMode: 'participant' | 'solution' | '
         // [tag ...]...[/tag]
         const bbRegex = new RegExp(`\\[${tag}(?:\\s+([^\\]]*))?\\]([\\s\\S]*?)\\[\\/${tag}\\]`, 'gi');
         protected_ = protected_.replace(bbRegex, (_match, optionsStr, content) => {
-            const placeholder = `__CIPHER_${tag}_${counter++}__`;
+            const placeholder = `CIPHERPH-${tag}-${counter++}-END`;
             const options = parseCipherOptions(optionsStr);
             let display = content;
             if (viewMode === 'participant') {
@@ -203,7 +203,7 @@ function protectCipherTags(raw: string, viewMode: 'participant' | 'solution' | '
         // <tag ...>...</tag>
         const xmlRegex = new RegExp(`<${tag}(?:\\s+([^>]*))?>([\\s\\S]*?)<\\/${tag}>`, 'gi');
         protected_ = protected_.replace(xmlRegex, (_match, optionsStr, content) => {
-            const placeholder = `__CIPHER_${tag}_${counter++}__`;
+            const placeholder = `CIPHERPH-${tag}-${counter++}-END`;
             const options = parseCipherOptions(optionsStr);
             let display = content;
             if (viewMode === 'participant') {
@@ -223,7 +223,7 @@ function protectCipherTags(raw: string, viewMode: 'participant' | 'solution' | '
     // 2. Blocs de code ```tag options ... ```
     const codeBlockRegex = /```([^\n`]*)\n([\s\S]*?)```/g;
     protected_ = protected_.replace(codeBlockRegex, (_match, headerLine, code) => {
-        const placeholder = `__CODEBLOCK_${counter++}__`;
+        const placeholder = `CODEBLOCKPH-${counter++}-END`;
         const trimmedHeader = (headerLine || '').trim();
         const tokens = trimmedHeader.split(/\s+/);
         const lowerLang = (tokens[0] || '').toLowerCase().trim();
@@ -270,7 +270,7 @@ function protectCipherTags(raw: string, viewMode: 'participant' | 'solution' | '
     // 3. Protéger code inline `
     const inlineCodeRegex = /`([^`\n]+)`/g;
     protected_ = protected_.replace(inlineCodeRegex, (_match, code) => {
-        const placeholder = `__INLINECODE_${counter++}__`;
+        const placeholder = `INLINECODEPH-${counter++}-END`;
         placeholders.set(placeholder, `<code class="inline-code">${escapeHtml(code)}</code>`);
         return placeholder;
     });
