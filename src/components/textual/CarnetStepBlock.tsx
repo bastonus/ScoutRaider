@@ -26,6 +26,7 @@ import InlineEditor from './InlineEditor';
 import MiniMap, { calculateZoomForScale, calculateScaleForZoom } from './MiniMap';
 import UnifiedContextMenu from './UnifiedContextMenu';
 import BlockGutter, { GUTTER_WIDTH } from './BlockGutter';
+import { mapRef } from '../map/MapComponent';
 import MarkdownRenderer, { FONT_PRESETS, CIPHER_FONTS, CIPHER_FONT_SIZES } from './MarkdownRenderer';
 import WritingAids from './WritingAids';
 import FontSelector from './FontSelector';
@@ -63,6 +64,7 @@ interface CarnetStepBlockProps {
     onOpenFontSelector?: (stepId: string) => void;
     onOpenSettings?: (stepId: string) => void;
     blockFontConfigs?: Record<string, { baseFont?: string; headingFonts?: Record<number, string>; monoFont?: string }>;
+    onStageClick?: (stageLabel: string) => void;
 }
 
 // ─── Configuration marked ─────────────────────────────────────────────────
@@ -82,24 +84,56 @@ export function getStageDotColor(stageLabel: string, stages: any[]): string {
 
 /**
  * Bloc dédié à part entière pour une étape (A, B, C...)
- * Colonne latérale unifiée (26px + 12px) avec badge d'étape et séparateur stylé
+ * Colonne latérale unifiée (26px + 12px) avec badge carré arrondi cliquable
+ * Titre synthétique : pas de mention "Étape..." redondante
  */
 export function StageHeaderBlock({
     stageLabel,
     stageName,
     dotColor,
     isFirst = false,
-    isArrival = false
+    isArrival = false,
+    onStageClick
 }: {
     stageLabel: string;
     stageName?: string;
     dotColor: string;
     isFirst?: boolean;
     isArrival?: boolean;
+    onStageClick?: (stageLabel: string) => void;
 }) {
+    const { state } = useApp();
+    const [hovered, setHovered] = useState(false);
+
+    // Libellé synthétique : pas de "Étape X" redondant avec le badge
+    const labelText = isArrival
+        ? 'Arrivée'
+        : stageName
+            ? (isFirst ? `Départ — ${stageName}` : stageName)
+            : (isFirst ? 'Départ' : '');
+
+    const handleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onStageClick) {
+            onStageClick(stageLabel);
+        } else {
+            const st = state.stages.find(s => s.label === stageLabel);
+            if (st && st.coords && mapRef.current) {
+                mapRef.current.flyTo(st.coords, Math.max(mapRef.current.getZoom(), 16), { duration: 0.8 });
+            }
+        }
+    };
+
     return (
         <div
             className="carnet-stage-block"
+            onClick={handleClick}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleClick(e as any); }}
+            title={`Localiser l'étape ${stageLabel} sur la carte`}
             style={{
                 display: 'flex',
                 flexDirection: 'row',
@@ -108,7 +142,8 @@ export function StageHeaderBlock({
                 marginTop: isFirst ? '6px' : (isArrival ? '24px' : '20px'),
                 marginBottom: '8px',
                 userSelect: 'none',
-                width: '100%'
+                width: '100%',
+                cursor: 'pointer'
             }}
         >
             {/* Gutter unifié : 26px + 12px de marge pour alignement parfait */}
@@ -122,12 +157,13 @@ export function StageHeaderBlock({
                     justifyContent: 'center'
                 }}
             >
+                {/* Badge carré arrondi (24x24px, borderRadius 6px) */}
                 <div
                     style={{
                         width: '24px',
                         height: '24px',
-                        borderRadius: '50%',
-                        background: 'var(--bg-base)',
+                        borderRadius: '6px',
+                        background: hovered ? `${dotColor}22` : 'var(--bg-base)',
                         border: `2px solid ${dotColor}`,
                         display: 'flex',
                         alignItems: 'center',
@@ -136,35 +172,41 @@ export function StageHeaderBlock({
                         fontWeight: 800,
                         color: dotColor,
                         fontFamily: 'var(--font-mono)',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                        boxShadow: hovered ? `0 0 8px ${dotColor}66` : '0 1px 3px rgba(0,0,0,0.2)',
+                        transform: hovered ? 'scale(1.08)' : 'scale(1)',
+                        transition: 'transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease'
                     }}
                 >
                     {stageLabel}
                 </div>
             </div>
 
-            {/* Corps du bloc d'étape : Titre + ligne séparatrice */}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span
-                    style={{
-                        fontSize: '12px',
-                        fontWeight: 800,
-                        color: dotColor,
-                        letterSpacing: '0.06em',
-                        textTransform: 'uppercase',
-                        fontFamily: 'var(--font-mono)',
-                        whiteSpace: 'nowrap'
-                    }}
-                >
-                    Étape {stageLabel}{isArrival ? ' — Arrivée' : (stageName ? ` — ${stageName}` : '')}
-                </span>
+            {/* Corps du bloc d'étape : Libellé synthétique + ligne séparatrice */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {labelText && (
+                    <span
+                        style={{
+                            fontSize: '11.5px',
+                            fontWeight: 800,
+                            color: hovered ? 'var(--text-primary)' : dotColor,
+                            letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                            fontFamily: 'var(--font-mono)',
+                            whiteSpace: 'nowrap',
+                            transition: 'color 0.15s ease'
+                        }}
+                    >
+                        {labelText}
+                    </span>
+                )}
                 <div
                     style={{
                         flex: 1,
                         height: '1.5px',
                         borderRadius: '999px',
                         background: dotColor,
-                        opacity: 0.5
+                        opacity: hovered ? 0.8 : 0.5,
+                        transition: 'opacity 0.15s ease'
                     }}
                 />
             </div>
@@ -180,7 +222,8 @@ export default function CarnetStepBlock({
     selectedKeys, onItemSelect, stageLabelMap,
     onDuplicateStep, onMoveStepUp, onMoveStepDown, onCopyStep,
     onLinkReference, onOpenFontSelector, onOpenSettings,
-    blockFontConfigs = {}
+    blockFontConfigs = {},
+    onStageClick
 }: CarnetStepBlockProps) {
     const { state, dispatch } = useApp();
     const isSolution = view === 'solution';
@@ -202,6 +245,7 @@ export default function CarnetStepBlock({
                             stageName={stageObj?.address}
                             dotColor={dotColor}
                             isFirst={stepIndex === 0}
+                            onStageClick={onStageClick}
                         />
                     )}
                     <ManualStepHtml
@@ -232,6 +276,7 @@ export default function CarnetStepBlock({
                             stageName={stageObj?.address}
                             dotColor={dotColor}
                             isFirst={stepIndex === 0}
+                            onStageClick={onStageClick}
                         />
                     )}
                     <ManualCodeBlock
@@ -358,6 +403,7 @@ export default function CarnetStepBlock({
                                     stageName={stageObj?.address}
                                     dotColor={dotColor}
                                     isFirst={stepIndex === 0 && idx === 0}
+                                    onStageClick={onStageClick}
                                 />
                             )}
                             <ComputedStepLine
@@ -480,7 +526,6 @@ function ManualStepHtml({
 
     const handleValidate = () => {
         onManualContentChange?.(step.id, editValue);
-        dispatch({ type: 'LOCK_DOCUMENT_TITLE' });
         setIsEditing(false);
     };
 
@@ -825,7 +870,6 @@ function ManualCodeBlock({
                 <textarea
                     value={step.solutionText || ''}
                     onChange={e => onManualContentChange?.(step.id, e.target.value)}
-                    onBlur={() => dispatch({ type: 'LOCK_DOCUMENT_TITLE' })}
                     placeholder="Tapez le texte à encoder…"
                     style={{
                         width: '100%', background: 'var(--bg-base)',

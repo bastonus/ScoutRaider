@@ -604,6 +604,105 @@ function ErrorBottomSheet({ errorItems, hasErrors }: { errorItems: any[]; hasErr
     );
 }
 
+/**
+ * Titre éditorial principal du document de raid.
+ * Écrit directement en grand format titre, au-dessus de l'étape 1,
+ * et bidirectionnellement synchronisé avec state.document_title (MenuBar, exports, etc.).
+ */
+function CarnetDocumentTitle() {
+    const { state, dispatch } = useApp();
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [title, setTitle] = useState(state.document_title || '');
+
+    useEffect(() => {
+        setTitle(state.document_title || '');
+    }, [state.document_title]);
+
+    const adjustHeight = () => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    };
+
+    useEffect(() => {
+        adjustHeight();
+    }, [title]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value.replace(/[\r\n]+/g, ' ');
+        setTitle(val);
+        dispatch({ type: 'SET_DOCUMENT_TITLE', title: val });
+    };
+
+    const handleBlur = () => {
+        const clean = title.trim();
+        if (!clean) {
+            const fallback = 'Document sans titre';
+            setTitle(fallback);
+            dispatch({ type: 'SET_DOCUMENT_TITLE', title: fallback });
+        } else if (clean !== title) {
+            setTitle(clean);
+            dispatch({ type: 'SET_DOCUMENT_TITLE', title: clean });
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            textareaRef.current?.blur();
+        }
+        if (e.key === 'Escape') {
+            textareaRef.current?.blur();
+        }
+    };
+
+    return (
+        <div
+            className="carnet-document-title-wrapper"
+            style={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                width: '100%',
+                paddingLeft: '38px', // Alignement strict avec le contenu des étapes (26px gutter + 12px margin)
+                marginBottom: '16px',
+                marginTop: '6px',
+                boxSizing: 'border-box'
+            }}
+        >
+            <textarea
+                ref={textareaRef}
+                value={title}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                onKeyDown={handleKeyDown}
+                placeholder="Document sans titre"
+                rows={1}
+                spellCheck={false}
+                style={{
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    resize: 'none',
+                    overflow: 'hidden',
+                    fontSize: 'clamp(24px, 3.4vw, 34px)',
+                    fontWeight: 800,
+                    letterSpacing: '-0.025em',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'var(--font-heading, "Plus Jakarta Sans", sans-serif)',
+                    lineHeight: 1.25,
+                    padding: '2px 0',
+                    margin: 0,
+                    boxSizing: 'border-box',
+                    transition: 'color 0.15s ease'
+                }}
+            />
+        </div>
+    );
+}
+
 export interface TextualViewProps {
     onExport?: () => void;
     viewMode?: ViewMode;
@@ -768,17 +867,13 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [selectedKeys.size]);
 
-    // Garantir qu'au moins un bloc de commentaire existe par défaut si le carnet est vide
+    // Nettoyage de l'ancienne cellule artificielle résiduelle "# Document sans titre"
     useEffect(() => {
-        if (steps.length === 0) {
-            dispatch({
-                type: 'INSERT_MANUAL_STEP_TYPED',
-                afterStepId: '',
-                content: '# Document sans titre',
-                manualType: 'html'
-            });
+        const dummyTitleStep = steps.find(s => s.isManual && s.solutionText?.trim() === '# Document sans titre');
+        if (dummyTitleStep) {
+            dispatch({ type: 'REMOVE_MANUAL_STEP', stepId: dummyTitleStep.id });
         }
-    }, [steps.length, dispatch]);
+    }, [steps, dispatch]);
 
     // Action par lot : assignation de module
     const handleBatchAssignModule = useCallback((moduleId: ModuleId) => {
@@ -916,6 +1011,21 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
         }
     }, [viewMode, state.polygonal_steps]);
 
+    const handleStageClick = useCallback((stageLabel: string) => {
+        const stage = state.stages.find(s => s.label === stageLabel);
+        if (!stage || !stage.coords) return;
+
+        if (viewMode === 'text') {
+            onViewModeChange?.('split');
+        }
+
+        setTimeout(() => {
+            if (mapRef.current) {
+                mapRef.current.flyTo(stage.coords, Math.max(mapRef.current.getZoom(), 16), { duration: 0.8 });
+            }
+        }, viewMode === 'text' ? 120 : 0);
+    }, [state.stages, viewMode, onViewModeChange]);
+
     const warningCount = steps.reduce((n, s) => n + (s.warnings || []).filter(w => w.severity === 'error').length, 0);
 
     // Extraction de tous les modules réellement employés dans le carnet
@@ -992,7 +1102,9 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                     flexDirection: 'column',
                     boxSizing: 'border-box'
                 }}>
-                        {/* ── Liste des étapes du carnet (jamais vide : commence par le titre) ── */}
+                        {/* ── Titre principal du document (au-dessus de l'étape 1, synchronisé avec le doc) ── */}
+                        <CarnetDocumentTitle />
+
                         <>
                             {/* Profil altimétrique monté dans le doc sans contours séparateurs */}
                             <CarnetElevationBlock />
@@ -1035,6 +1147,7 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                                         onLinkReference={handleLinkReference}
                                         onOpenFontSelector={handleOpenFontSelector}
                                         onOpenSettings={handleOpenSettings}
+                                        onStageClick={handleStageClick}
                                     />
                                     {pickingCodeFor?.stepId === step.id && (
                                         <CodeBlockPicker
@@ -1058,6 +1171,7 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                                     stageLabel={steps[steps.length - 1].toLabel!}
                                     dotColor="var(--semantic-red)"
                                     isArrival={true}
+                                    onStageClick={handleStageClick}
                                 />
                             )}
                             {/* Bandeau d'aide lorsque le tracé n'a pas encore été commencé */}
