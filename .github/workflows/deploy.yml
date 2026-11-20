@@ -13,7 +13,7 @@ jobs:
         run: |
           curl --silent --show-error --fail \
             --request GET \
-            "https://coolify.silverhorse.fr/api/v1/deploy?uuid=og78cnruazg5wkwx9aygludb&force=false" \
+            "https://host.silverhorse.fr/api/v1/deploy?uuid=og78cnruazg5wkwx9aygludb&force=false" \
             --header "Authorization: Bearer 4|7cY6lhB2GAxgdyjHtB1THZL0UJSr1UEreDmm1RnI62906306" \
             && echo "✅ Coolify redeploy triggered" \
             || echo "⚠️ Coolify webhook failed"
