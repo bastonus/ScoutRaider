@@ -1091,13 +1091,13 @@ function ComputedStepLine({
                                 <>
                                     {/* Code chiffré */}
                                     <div style={{ fontFamily: font, fontSize: fontSize, color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', wordBreak: 'break-all', letterSpacing: step.moduleId === 'morse' ? '2px' : '0.02em', lineHeight: 1.4 }}>
-                                        <HighlightedText text={encodedLine} pois={pois} isEncoded={true} sourceLine={solutionLine} onPoiToggle={onPoiToggle} />
+                                        <HighlightedText text={encodedLine} pois={pois} isEncoded={true} sourceLine={solutionLine} onPoiToggle={onPoiToggle} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange} />
                                     </div>
                                     {/* Ligne de solution affichée en colonne sous le code chiffré (au survol uniquement) */}
                                     {hovered && (
                                         <div style={{ fontSize: '11px', color: dangerColor || 'var(--semantic-green)', marginTop: '3px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                             <Lightbulb size={11} strokeWidth={2.4} color={dangerColor || 'var(--semantic-green)'} style={{ flexShrink: 0 }} />
-                                            <HighlightedText text={solutionLine} pois={pois} isEncoded={false} onPoiToggle={onPoiToggle} />
+                                            <HighlightedText text={solutionLine} pois={pois} isEncoded={false} onPoiToggle={onPoiToggle} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange} />
                                         </div>
                                     )}
                                 </>
@@ -1106,7 +1106,7 @@ function ComputedStepLine({
                                 /* NB: MarkdownRenderer NE doit PAS être utilisé ici — les lignes calculées par l'itinéraire sont du texte brut,
                                    non du markdown. MarkdownRenderer génère des placeholders internes (CIPHER_xxx_0) qui fuient dans l'affichage. */
                                 <div style={{ fontSize: '13px', color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', lineHeight: 1.5 }}>
-                                    <HighlightedText text={encodedLine || solutionLine} pois={pois} isEncoded={false} onPoiToggle={onPoiToggle} />
+                                    <HighlightedText text={encodedLine || solutionLine} pois={pois} isEncoded={false} onPoiToggle={onPoiToggle} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange} />
                                 </div>
                             )}
                         </div>
@@ -1171,7 +1171,12 @@ function degreesToCardinal(deg: number): string {
 // Popover azimut — supprimé, intégré directement dans AzimutToken
 
 // Token azimut — badge déroulant style POI avec fond bleu + flèche
-function AzimutToken({ children }: { children: string }) {
+// Permet de choisir le format de direction (Tournant / Horaire / Cardinaux / Azimut)
+function AzimutToken({ children, navLanguage, onNavLanguageChange }: {
+    children: string;
+    navLanguage?: NavLanguage;
+    onNavLanguageChange?: (lang: NavLanguage) => void;
+}) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLSpanElement>(null);
     const deg = azimutToDegres(children);
@@ -1183,11 +1188,33 @@ function AzimutToken({ children }: { children: string }) {
         return () => document.removeEventListener('mousedown', close);
     }, [open]);
 
-    const formats = deg !== null ? [
-        { label: `${deg}°`, title: 'Degrés', desc: 'Azimut en degrés' },
-        { label: degreesToHoraire(deg), title: 'Horaire', desc: 'Format horloge' },
-        { label: degreesToCardinal(deg), title: 'Cardinal', desc: 'Point cardinal' },
-    ] : [];
+    // 4 formats de navigation — le format actif est mis en évidence
+    const navOptions: { lang: NavLanguage; label: string; desc: string; example: string }[] = [
+        {
+            lang: 'Tournant',
+            label: 'Tournant',
+            desc: 'tout droit / à droite…',
+            example: deg !== null ? (deg < 22 || deg > 338 ? 'tout droit' : deg < 112 ? 'à droite' : deg < 248 ? 'demi-tour' : 'à gauche') : 'tournant',
+        },
+        {
+            lang: 'Horaire',
+            label: 'Horaire',
+            desc: '12h / 3h / 9h…',
+            example: deg !== null ? degreesToHoraire(deg) : '—',
+        },
+        {
+            lang: 'Cardinaux',
+            label: 'Cardinaux',
+            desc: 'N / NE / SO…',
+            example: deg !== null ? degreesToCardinal(deg) : '—',
+        },
+        {
+            lang: 'Azimut',
+            label: 'Azimut',
+            desc: 'en degrés (0–360°)',
+            example: deg !== null ? `${deg}°` : '—',
+        },
+    ];
 
     const rect = ref.current?.getBoundingClientRect();
 
@@ -1205,7 +1232,7 @@ function AzimutToken({ children }: { children: string }) {
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.25)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.15)')}
-                title="Cliquer pour afficher les conversions"
+                title="Cliquer pour changer le format de direction"
             >
                 {children}
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ flexShrink: 0, marginLeft: '1px' }}>
@@ -1217,29 +1244,42 @@ function AzimutToken({ children }: { children: string }) {
                     position: 'fixed', left: rect.left, top: rect.bottom + 4, zIndex: 99999,
                     background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
                     borderRadius: '8px', padding: '5px', boxShadow: 'var(--shadow-lg)',
-                    minWidth: '150px',
+                    minWidth: '190px',
                     display: 'flex', flexDirection: 'column', gap: '2px',
                     animation: 'popIn 100ms ease-out',
                 }}>
-                    <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 4px 4px' }}>Direction</div>
-                    {formats.map(f => (
-                        <div key={f.title} style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '5px 7px', borderRadius: '6px',
-                            background: 'transparent',
-                        }}>
-                            <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontWeight: 500 }}>{f.desc}</span>
-                            <span style={{
-                                background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.4)',
-                                borderRadius: '5px', padding: '2px 8px',
-                                fontSize: '11px', color: '#60a5fa', fontWeight: 700,
-                                fontVariantNumeric: 'tabular-nums', flexShrink: 0,
-                            }}>{f.label}</span>
-                        </div>
-                    ))}
-                    {formats.length === 0 && (
-                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', padding: '5px 7px' }}>Direction relative</div>
-                    )}
+                    <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 4px 4px' }}>Format de direction</div>
+                    {navOptions.map(opt => {
+                        const isCurrent = navLanguage === opt.lang;
+                        return (
+                            <button key={opt.lang} type="button"
+                                onClick={() => { onNavLanguageChange?.(opt.lang); setOpen(false); }}
+                                style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    padding: '5px 7px', borderRadius: '6px', border: 'none',
+                                    background: isCurrent ? 'rgba(96,165,250,0.15)' : 'transparent',
+                                    cursor: onNavLanguageChange ? 'pointer' : 'default',
+                                    width: '100%', textAlign: 'left', gap: '8px',
+                                    transition: 'background 70ms ease',
+                                }}
+                                onMouseEnter={e => { if (!isCurrent && onNavLanguageChange) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}
+                            >
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', flex: 1, minWidth: 0 }}>
+                                    <span style={{ fontSize: '11px', color: isCurrent ? '#60a5fa' : 'var(--text-primary)', fontWeight: isCurrent ? 700 : 500 }}>{opt.label}</span>
+                                    <span style={{ fontSize: '9.5px', color: 'var(--text-dim)', fontWeight: 400 }}>{opt.desc}</span>
+                                </div>
+                                <span style={{
+                                    background: 'rgba(96,165,250,0.15)', border: `1px solid ${isCurrent ? 'rgba(96,165,250,0.6)' : 'rgba(96,165,250,0.3)'}`,
+                                    borderRadius: '5px', padding: '2px 7px',
+                                    fontSize: '11px', color: '#60a5fa', fontWeight: 700,
+                                    fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+                                    whiteSpace: 'nowrap',
+                                }}>{opt.example}</span>
+                                {isCurrent && <Check size={11} color="#60a5fa" style={{ flexShrink: 0 }} />}
+                            </button>
+                        );
+                    })}
                 </div>
             )}
         </span>
@@ -1329,9 +1369,11 @@ interface HighlightedTextProps {
     /** Pour le texte encodé, le texte source (non encodé) pour situer les patterns */
     sourceLine?: string;
     onPoiToggle?: (poiId: string) => void;
+    navLanguage?: NavLanguage;
+    onNavLanguageChange?: (lang: NavLanguage) => void;
 }
 
-const HighlightedText = ({ text, pois, isEncoded, sourceLine, onPoiToggle }: HighlightedTextProps) => {
+const HighlightedText = ({ text, pois, isEncoded, sourceLine, onPoiToggle, navLanguage, onNavLanguageChange }: HighlightedTextProps) => {
     if (!text) return null;
 
     // Pattern pour balises personnalisées : [morse]...[/morse], etc.
@@ -1346,7 +1388,7 @@ const HighlightedText = ({ text, pois, isEncoded, sourceLine, onPoiToggle }: Hig
         while ((match = customTagRegex.exec(text)) !== null) {
             const before = text.substring(lastIndex, match.index);
             if (before) {
-                segments.push(<HighlightedTextCore key={`before-${lastIndex}`} text={before} pois={pois} isEncoded={isEncoded} onPoiToggle={onPoiToggle} />);
+                segments.push(<HighlightedTextCore key={`before-${lastIndex}`} text={before} pois={pois} isEncoded={isEncoded} onPoiToggle={onPoiToggle} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange} />);
             }
 
             const tagName = (match[2] || match[4] || '').toLowerCase();
@@ -1379,13 +1421,13 @@ const HighlightedText = ({ text, pois, isEncoded, sourceLine, onPoiToggle }: Hig
 
         const remaining = text.substring(lastIndex);
         if (remaining) {
-            segments.push(<HighlightedTextCore key={`after-${lastIndex}`} text={remaining} pois={pois} isEncoded={isEncoded} onPoiToggle={onPoiToggle} />);
+            segments.push(<HighlightedTextCore key={`after-${lastIndex}`} text={remaining} pois={pois} isEncoded={isEncoded} onPoiToggle={onPoiToggle} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange} />);
         }
 
         return <>{segments}</>;
     }
 
-    return <HighlightedTextCore text={text} pois={pois} isEncoded={isEncoded} sourceLine={sourceLine} onPoiToggle={onPoiToggle} />;
+    return <HighlightedTextCore text={text} pois={pois} isEncoded={isEncoded} sourceLine={sourceLine} onPoiToggle={onPoiToggle} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange} />;
 }
 
 interface HighlightedTextCoreProps {
@@ -1394,9 +1436,11 @@ interface HighlightedTextCoreProps {
     isEncoded: boolean;
     sourceLine?: string;
     onPoiToggle?: (poiId: string) => void;
+    navLanguage?: NavLanguage;
+    onNavLanguageChange?: (lang: NavLanguage) => void;
 }
 
-const HighlightedTextCore = ({ text, pois, isEncoded, sourceLine, onPoiToggle }: HighlightedTextCoreProps) => {
+const HighlightedTextCore = ({ text, pois, isEncoded, sourceLine, onPoiToggle, navLanguage, onNavLanguageChange }: HighlightedTextCoreProps) => {
     if (!text) return null;
 
     // Pour texte encodé : on affiche le texte encodé brut mais on insère des marqueurs
@@ -1405,7 +1449,7 @@ const HighlightedTextCore = ({ text, pois, isEncoded, sourceLine, onPoiToggle }:
     if (isEncoded) {
         if (!sourceLine) return <>{text}</>;
         // On va colorer le texte encodé par segments de même longueur que les tokens source
-        return <EncodedHighlightedText encoded={text} source={sourceLine} pois={pois} onPoiToggle={onPoiToggle} />;
+        return <EncodedHighlightedText encoded={text} source={sourceLine} pois={pois} onPoiToggle={onPoiToggle} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange} />;
     }
 
     const selectedPoi = pois?.find(p => p.selected);
@@ -1445,9 +1489,9 @@ const HighlightedTextCore = ({ text, pois, isEncoded, sourceLine, onPoiToggle }:
                 if (new RegExp(`^${distanceRegex}$`, 'i').test(part)) {
                     return <span key={i} style={{ color: '#34d399', fontWeight: 700 }}>{part}</span>;
                 }
-                // Azimut : token cliquable avec popover multi-format
+                // Azimut : badge déroulant avec choix du format de navigation
                 if (new RegExp(`^(${azimuthRegex})$`, 'i').test(part)) {
-                    return <AzimutToken key={i}>{part}</AzimutToken>;
+                    return <AzimutToken key={i} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange}>{part}</AzimutToken>;
                 }
 
                 return <span key={i}>{part}</span>;
@@ -1460,12 +1504,14 @@ const HighlightedTextCore = ({ text, pois, isEncoded, sourceLine, onPoiToggle }:
 // On détecte les tokens dans la source, on calcule leur position relative dans le texte encodé
 // par rapport à la longueur totale, et on applique la couleur sur la tranche correspondante.
 function EncodedHighlightedText({
-    encoded, source, pois, onPoiToggle
+    encoded, source, pois, onPoiToggle, navLanguage, onNavLanguageChange
 }: {
     encoded: string;
     source: string;
     pois?: Array<{ id: string; name: string; selected: boolean; type?: string }>;
     onPoiToggle?: (id: string) => void;
+    navLanguage?: NavLanguage;
+    onNavLanguageChange?: (lang: NavLanguage) => void;
 }) {
     if (!encoded || !source) return <>{encoded}</>;
 
@@ -1530,7 +1576,7 @@ function EncodedHighlightedText({
             } else if (span.type === 'distance') {
                 segments.push(<span key={`dist-${si}`} style={{ color: '#34d399', fontWeight: 700 }}>{slice}</span>);
             } else {
-                segments.push(<AzimutToken key={`az-${si}`}>{slice}</AzimutToken>);
+                segments.push(<AzimutToken key={`az-${si}`} navLanguage={navLanguage} onNavLanguageChange={onNavLanguageChange}>{slice}</AzimutToken>);
             }
         }
         encCursor = eEnd;
