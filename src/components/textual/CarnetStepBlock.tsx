@@ -725,8 +725,12 @@ function ManualCodeBlock({
     const accentColor = meta?.color || '#6b7280';
     const font = CIPHER_FONTS[step.moduleId] || 'monospace';
     const fontSize = CIPHER_FONT_SIZES[step.moduleId] || '14px';
-    const displayText = isSolution ? (step.solutionText || '') : (step.encodedText || step.solutionText || '');
-    const isEncoded = !isSolution && step.encodedText && step.encodedText !== step.solutionText;
+
+    const isActuallyEncoded = step.moduleId !== 'texte_clair' && !!step.encodedText && step.encodedText !== step.solutionText;
+    const displayText = isActuallyEncoded
+        ? (isSolution ? (step.solutionText || '') : (step.encodedText || step.solutionText || ''))
+        : (step.solutionText || step.encodedText || '');
+    const isEncoded = !isSolution && isActuallyEncoded;
 
     const handleConvertToComment = () => {
         dispatch({
@@ -811,6 +815,8 @@ function ManualCodeBlock({
                 onChangeCipher={handleSwitchModule}
                 onConvertToHtml={handleConvertToComment}
                 onOpenSettings={() => onOpenSettings?.(step.id)}
+                hasSolution={isActuallyEncoded}
+                isSolutionView={isSolution}
                 containerRef={blockRef}
             />
 
@@ -845,7 +851,7 @@ function ManualCodeBlock({
                         {displayText}
                     </div>
                 )}
-                {isSolution && step.solutionText && (
+                {isSolution && isActuallyEncoded && step.solutionText && (
                     <div style={{
                         marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px',
                         fontSize: '11px', color: 'var(--semantic-green)', fontWeight: 600,
@@ -854,7 +860,7 @@ function ManualCodeBlock({
                         <span>Solution : {step.solutionText}</span>
                     </div>
                 )}
-                {hovered && !isSolution && step.solutionText && step.encodedText && step.encodedText !== step.solutionText && (
+                {hovered && !isSolution && isActuallyEncoded && step.solutionText && (
                     <div style={{
                         marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px',
                         fontSize: '11px', color: 'var(--semantic-green)', fontWeight: 600,
@@ -919,7 +925,7 @@ function ComputedStepLine({
     const font = CIPHER_FONTS[step.moduleId] || 'monospace';
     const fontSize = CIPHER_FONT_SIZES[step.moduleId] || '14px';
 
-    const isEncoded = !isSolutionView && !isVisual && encodedLine !== solutionLine;
+    const isActuallyEncoded = !isVisual && step.moduleId !== 'texte_clair' && encodedLine !== solutionLine;
 
     let dangerColor: string | undefined;
     if (dangerLevel === 'extreme' || dangerLevel === 'motorway_cross') dangerColor = '#ef4444';
@@ -1021,7 +1027,7 @@ function ComputedStepLine({
                 onOpenSettings={() => onOpenSettings?.(step.id)}
                 isLocked={step.mapPersist?.isLocked}
                 isSolutionView={isSolutionView}
-                hasSolution={!!step.solutionText && step.solutionText !== step.encodedText}
+                hasSolution={isActuallyEncoded}
                 navLanguage={navLanguage}
                 pois={pois}
                 containerRef={blockRef}
@@ -1045,16 +1051,13 @@ function ComputedStepLine({
                         <InlineEditor stepId={step.id} solutionText={solutionLine} moduleId={step.moduleId} lineIdx={lineIdx} onClose={() => setIsEditing(false)} />
                     ) : !isVisual ? (
                         <div style={{ cursor: 'pointer' }} onClick={handleLineClickInternal}>
-                            {isSolutionView ? (
-                                <div style={{ fontSize: '13px', color: dangerColor || 'var(--semantic-green)', fontWeight: dangerColor ? 700 : 600, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <Lightbulb size={13} strokeWidth={2.4} color={dangerColor || 'var(--semantic-green)'} style={{ flexShrink: 0 }} />
-                                    <HighlightedText text={solutionLine} pois={pois} isEncoded={false} />
-                                </div>
-                            ) : isEncoded ? (
+                            {isActuallyEncoded ? (
                                 <>
+                                    {/* Code chiffré */}
                                     <div style={{ fontFamily: font, fontSize: fontSize, color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', wordBreak: 'break-all', letterSpacing: step.moduleId === 'morse' ? '2px' : '0.02em', lineHeight: 1.4 }}>
                                         <HighlightedText text={encodedLine} pois={pois} isEncoded={true} />
                                     </div>
+                                    {/* Ligne de solution affichée en colonne sous le code chiffré (au survol ou en mode solution) */}
                                     {(hovered || isSolutionView) && (
                                         <div style={{ fontSize: '11px', color: dangerColor || 'var(--semantic-green)', marginTop: '3px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                             <Lightbulb size={11} strokeWidth={2.4} color={dangerColor || 'var(--semantic-green)'} style={{ flexShrink: 0 }} />
@@ -1063,8 +1066,9 @@ function ComputedStepLine({
                                     )}
                                 </>
                             ) : (
+                                /* Texte déjà en clair : DEMEURE STRICTEMENT INCHANGÉ, pas de colonne, pas de vert, pas d'ampoule */
                                 <div style={{ fontSize: '13px', color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', lineHeight: 1.5 }}>
-                                    <HighlightedText text={encodedLine} pois={pois} isEncoded={false} />
+                                    <HighlightedText text={encodedLine || solutionLine} pois={pois} isEncoded={false} />
                                 </div>
                             )}
                         </div>
@@ -1074,7 +1078,7 @@ function ComputedStepLine({
                             {hasMap && isFirst && (
                                 <MiniMap stepId={step.id} moduleId={step.moduleId} coords={step.coords} initialPersist={step.mapPersist} />
                             )}
-                            {isSolutionView && (
+                            {isSolutionView && step.moduleId !== 'texte_clair' && !hasMap && solutionLine && (
                                 <div style={{ fontSize: '11.5px', color: 'var(--semantic-green)', marginTop: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <Lightbulb size={12} strokeWidth={2.4} color="var(--semantic-green)" style={{ flexShrink: 0 }} />
                                     <HighlightedText text={solutionLine} pois={pois} isEncoded={false} />

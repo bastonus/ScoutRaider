@@ -176,7 +176,7 @@ function protectCipherTags(raw: string, viewMode: 'participant' | 'solution' | '
 
     const cipherTags = [
         'morse', 'vigenere', 'polybe', 'templier', 'avocat', 'cassis',
-        'maritime', 'drapeaux', 'gilwell', 'texte_clair', 'carte_ign', 'carte_simple'
+        'maritime', 'drapeaux', 'gilwell'
     ];
 
     // 1. Balises inline [tag options]...[/tag] et <tag options>...</tag>
@@ -230,7 +230,9 @@ function protectCipherTags(raw: string, viewMode: 'participant' | 'solution' | '
         const optionsStr = tokens.slice(1).join(' ');
         const options = parseCipherOptions(optionsStr);
 
-        if (cipherTags.includes(lowerLang) || lowerLang === 'texte_clair') {
+        if (lowerLang === 'texte_clair') {
+            placeholders.set(placeholder, `<div class="plain-text-block">${escapeHtml(code.trim())}</div>`);
+        } else if (cipherTags.includes(lowerLang)) {
             const meta = MODULE_META[lowerLang as ModuleId];
             const color = meta?.color || '#6b7280';
             const label = meta?.label || lowerLang.toUpperCase();
