@@ -1,0 +1,24 @@
+name: Deploy to Coolify
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify redeploy
+        env:
+          COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+        run: |
+          if [ -n "$COOLIFY_WEBHOOK_URL" ]; then
+            curl --silent --show-error --fail \
+              --request GET \
+              "$COOLIFY_WEBHOOK_URL" \
+              && echo "✅ Coolify redeploy triggered" \
+              || echo "⚠️ Coolify webhook failed"
+          else
+            echo "ℹ️ COOLIFY_WEBHOOK_URL not set — skipping"
+          fi
