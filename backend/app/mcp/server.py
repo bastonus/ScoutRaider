@@ -80,6 +80,64 @@ TOOLS_SCHEMA = [
             },
             "required": ["module_id", "text"]
         }
+    },
+    {
+        "name": "scout_hub_query_catalog",
+        "description": "Interroge le catalogue unifié du Hub ScoutRaider (modules de chiffrement, topographie/altimétrie, fonds de cartes, trames de raid, thèmes).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "resource_type": {"type": "string", "enum": ["all", "crypto_module", "map_provider", "raid_trame", "theme_style", "syntax_extension"]},
+                "capability": {"type": "string", "enum": ["all", "map_path", "elevation_profile", "map_overview", "numeric", "alphabetic", "alphanumeric", "symbolic_visual"]},
+                "query": {"type": "string", "description": "Recherche textuelle"}
+            }
+        }
+    },
+    {
+        "name": "scout_hub_get_manifest",
+        "description": "Récupère le manifeste JSON complet v2.0 d'un module ou d'une ressource du Hub.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "resource_id": {"type": "string", "description": "ID de la ressource (ex: gilwell, morse, trame_premiere_classe)"}
+            },
+            "required": ["resource_id"]
+        }
+    },
+    {
+        "name": "scout_hub_validate_manifest",
+        "description": "Valide formellement un manifeste JSON selon les règles du standard Hub v2.0.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "manifest_data": {"type": "object", "description": "JSON du manifeste à vérifier"}
+            },
+            "required": ["manifest_data"]
+        }
+    },
+    {
+        "name": "scout_hub_resolve_dependencies",
+        "description": "Résout le graphe de dépendances d'une Trame de Raid (modules requis, fonds de cartes, thèmes).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "trame_id": {"type": "string", "description": "ID de la Trame de Raid"},
+                "dependencies": {"type": "object", "description": "Bloc optionnel de dépendances à évaluer"}
+            },
+            "required": ["trame_id"]
+        }
+    },
+    {
+        "name": "scout_hub_generate_template",
+        "description": "Génère un squelette complet de module conforme v2.0 pour la création autonome par une IA.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "module_id": {"type": "string", "description": "ID technique du module"},
+                "data_capability": {"type": "string", "enum": ["map_path", "elevation_profile", "map_overview", "numeric", "alphabetic", "alphanumeric", "symbolic_visual"]}
+            },
+            "required": ["module_id"]
+        }
     }
 ]
 
@@ -248,6 +306,94 @@ class ScoutRaiderMCPServer:
                 "preset": args.get("preset_name"),
                 "status": "solved",
                 "assigned_modules": ["carte_ign", "morse", "avocat", "templier", "vigenere"]
+            }
+
+        elif name == "scout_hub_query_catalog":
+            res_type = args.get("resource_type", "all")
+            capability = args.get("capability", "all")
+            query = args.get("query", "").lower()
+
+            modules = []
+            if self.module_registry:
+                for m in self.module_registry.list_all():
+                    cap = m.data_capability.value if getattr(m, "data_capability", None) else "alphabetic"
+                    if capability != "all" and cap != capability:
+                        continue
+                    if query and query not in m.name.lower() and query not in m.description.lower():
+                        continue
+                    modules.append({
+                        "id": m.id,
+                        "name": m.name,
+                        "version": m.version,
+                        "resource_type": "crypto_module",
+                        "data_capability": cap,
+                        "description": m.description,
+                        "s3_url": f"https://scoutraider.silverhorse.fr/hub/crypto_module/{m.id}/{m.id}-{m.version}.zip"
+                    })
+            else:
+                modules = [
+                    {"id": "gilwell", "name": "Relevé Gilwell", "data_capability": "map_path", "resource_type": "crypto_module"},
+                    {"id": "morse", "name": "Code Morse", "data_capability": "alphabetic", "resource_type": "crypto_module"},
+                    {"id": "templier", "name": "Code Templier", "data_capability": "symbolic_visual", "resource_type": "crypto_module"},
+                    {"id": "polybe", "name": "Carré de Polybe", "data_capability": "alphanumeric", "resource_type": "crypto_module"},
+                    {"id": "profil_alti", "name": "Profil Altimétrique", "data_capability": "elevation_profile", "resource_type": "crypto_module"},
+                    {"id": "vue_synoptique", "name": "Aperçu Carte Synoptique", "data_capability": "map_overview", "resource_type": "crypto_module"}
+                ]
+
+            if res_type in ("all", "raid_trame"):
+                modules.extend([
+                    {"id": "trame_premiere_classe", "name": "Trame Raid 1re Classe", "resource_type": "raid_trame", "target": "eclaireurs"},
+                    {"id": "trame_seconde_classe", "name": "Trame Raid 2de Classe", "resource_type": "raid_trame", "target": "eclaireurs"}
+                ])
+            return modules
+
+        elif name == "scout_hub_get_manifest":
+            res_id = args.get("resource_id", "").lower().strip()
+            if self.module_registry:
+                meta = self.module_registry.get(res_id)
+                if meta:
+                    return meta.model_dump()
+            return {
+                "id": res_id,
+                "schema_version": "2.0",
+                "resource_type": "crypto_module",
+                "name": res_id.replace("_", " ").title(),
+                "description": f"Module {res_id} standard v2"
+            }
+
+        elif name == "scout_hub_validate_manifest":
+            from app.modules.registry import ModuleRegistry
+            return ModuleRegistry.validate_manifest_payload(args.get("manifest_data", {}))
+
+        elif name == "scout_hub_resolve_dependencies":
+            trame_id = args.get("trame_id", "trame")
+            raw_deps = args.get("dependencies", {})
+            if self.module_registry:
+                from app.modules.schema import TrameDependencies
+                parsed = TrameDependencies(**raw_deps) if raw_deps else None
+                return self.module_registry.resolve_trame_dependencies(trame_id, parsed)
+            return {
+                "trame_id": trame_id,
+                "status": "ready",
+                "satisfied": [{"id": "morse"}, {"id": "carte_ign"}],
+                "to_download": [],
+                "missing": []
+            }
+
+        elif name == "scout_hub_generate_template":
+            mod_id = args.get("module_id", "mon_module").lower().strip()
+            cap = args.get("data_capability", "alphabetic")
+            return {
+                "module_id": mod_id,
+                "manifest.json": {
+                    "schema_version": "2.0",
+                    "id": mod_id,
+                    "name": mod_id.replace("_", " ").title(),
+                    "version": "1.0.0",
+                    "resource_type": "crypto_module",
+                    "data_capability": cap
+                },
+                "logic/index.ts": f"// Logic for {mod_id} ({cap})\nexport function transform(input: any) {{ return {{ result: input }}; }}"
             }
 
         raise ValueError(f"Unknown tool: {name}")

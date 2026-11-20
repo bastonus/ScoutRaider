@@ -77,6 +77,7 @@ export function generateStaticMapSvg(params: {
     // zTile : entier strict pour URLs WMTS/OSM
     const zProj = Math.min(18, Math.max(8, zoom));
     const zTile = Math.min(18, Math.max(8, Math.round(zoom)));
+    const scaleRatio = Math.pow(2, zProj - zTile);
 
     // Pixel monde du centre
     const cPx = latLngToWorldPixel(center[0], center[1], zProj);
@@ -85,23 +86,25 @@ export function generateStaticMapSvg(params: {
 
     // Calcul tuiles requises (au zoom entier pour indices)
     const cPxTile = latLngToWorldPixel(center[0], center[1], zTile);
-    const originXTile = cPxTile.x - W / 2;
-    const originYTile = cPxTile.y - H / 2;
-    const minTx = Math.floor(originXTile / TILE_SIZE);
-    const maxTx = Math.floor((originXTile + W) / TILE_SIZE);
-    const minTy = Math.floor(originYTile / TILE_SIZE);
-    const maxTy = Math.floor((originYTile + H) / TILE_SIZE);
+    const minTx = Math.floor((cPxTile.x - (W / 2) / scaleRatio) / TILE_SIZE);
+    const maxTx = Math.floor((cPxTile.x + (W / 2) / scaleRatio) / TILE_SIZE);
+    const minTy = Math.floor((cPxTile.y - (H / 2) / scaleRatio) / TILE_SIZE);
+    const maxTy = Math.floor((cPxTile.y + (H / 2) / scaleRatio) / TILE_SIZE);
 
     let tilesSvg = '';
     const tileUrls: string[] = [];
 
     for (let ty = minTy; ty <= maxTy; ty++) {
         for (let tx = minTx; tx <= maxTx; tx++) {
-            const px = Math.round(tx * TILE_SIZE - originX);
-            const py = Math.round(ty * TILE_SIZE - originY);
+            const px = Math.round(tx * TILE_SIZE * scaleRatio - originX);
+            const py = Math.round(ty * TILE_SIZE * scaleRatio - originY);
+            const nextPx = Math.round((tx + 1) * TILE_SIZE * scaleRatio - originX);
+            const nextPy = Math.round((ty + 1) * TILE_SIZE * scaleRatio - originY);
+            const tileW = nextPx - px + 1;
+            const tileH = nextPy - py + 1;
             const url = getTileUrl(layerId || 'PLAN.IGN', zTile, tx, ty, apiKeys);
             tileUrls.push(url);
-            tilesSvg += `    <image href="${url}" x="${px}" y="${py}" width="${TILE_SIZE}" height="${TILE_SIZE}" preserveAspectRatio="none" />\n`;
+            tilesSvg += `    <image href="${url}" xlink:href="${url}" x="${px}" y="${py}" width="${tileW}" height="${tileH}" preserveAspectRatio="none" />\n`;
         }
     }
 
@@ -186,7 +189,7 @@ export function generateStaticMapSvg(params: {
         <text x="46" y="1" font-family="monospace" font-size="6.5px" fill="#475569" text-anchor="middle">IGN &bull; ${formattedScale}</text>
     </g>`;
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display: block; width: 100%; max-width: ${W}px; height: auto; border: 1.5px solid #0f172a; background: #e2e8f0; overflow: hidden; margin: 0 auto;">
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display: block; width: 100%; max-width: ${W}px; height: auto; border: 1.5px solid #0f172a; background: #e2e8f0; overflow: hidden; margin: 0 auto;">
 ${tilesSvg}${annotationsSvg}${routeSvg}${endpointsSvg}${scaleBarSvg}
 </svg>`;
 
@@ -206,7 +209,13 @@ export async function inlineMapTilesInSvg(svg: string, tileUrls: string[]): Prom
     await Promise.all(uniqueUrls.map(async (url) => {
         for (let attempt = 0; attempt < 2; attempt++) {
             try {
-                const res = await fetch(url);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const res = await fetch(url, {
+                    headers: { 'User-Agent': 'ScoutRaider/1.0 (Cartography Export)' },
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
                 if (res.ok) {
                     const buffer = await res.arrayBuffer();
                     const bytes = new Uint8Array(buffer);

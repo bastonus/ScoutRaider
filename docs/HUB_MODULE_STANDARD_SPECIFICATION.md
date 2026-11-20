@@ -61,7 +61,7 @@ Le Hub ScoutRaider réunit 5 familles de ressources sous un modèle de données 
 
 | Type de Ressource (`resource_type`) | Description | Capacités / Spécificités |
 | :--- | :--- | :--- |
-| **`crypto_module`** | Modules de chiffrement, d'encodage et de guidage | Déclare une ou plusieurs capacités (`capabilities`) : `map_path`, `numeric`, `alphabetic`, `alphanumeric`, `symbolic_visual`. |
+| **`crypto_module`** | Modules de chiffrement, d'encodage, de guidage et de restitution topographique | Déclare une capacité d'entrée/sortie (`data_capability`) : `map_path`, `elevation_profile`, `map_overview`, `panoramic_sketch`, `numeric`, `alphabetic`, `alphanumeric`, `symbolic_visual`. |
 | **`map_provider`** | Fonds de cartes et couches topographiques | Tuiles raster/vectorielles (`xyz`, `wmts`, `tms`, `wms`), paramètres d'accès, clés API, projections. |
 | **`raid_trame`** | Trames de Raid (anciennement « Orchestrations ») | Règles pédagogiques de progression scoute, contraintes de diffraction, graphe de dépendances vers les modules requis. |
 | **`theme_style`** | Thèmes graphiques, styles d'export et gabarits | Palettes, typographies, règles CSS d'impression WeasyPrint, habillage narratif. |
@@ -71,11 +71,14 @@ Le Hub ScoutRaider réunit 5 familles de ressources sous un modèle de données 
 
 ## 4. Spécification Détaillée des Manifestes par Type
 
-### 4.1 Modules de Chiffrement & Encodage (`crypto_module`)
+### 4.1 Modules d'Encodage, de Chiffrement & de Topographie (`crypto_module`)
 
-Le manifeste doit obligatoirement expliciter la capacité d'encodage du module (`data_capability`) :
+Le manifeste doit obligatoirement expliciter la capacité de traitement du module (`data_capability`) :
 
 - **`map_path` / `routing`** : Encodage d'un tracé spatial du point A au point B, ou séquence d'itinéraires (séquence d'azimuts en degrés 0-360° et distances/métrages en mètres, coordonnées GPS, POI intermédiaires). *Exemple : Relevé Gilwell.*
+- **`elevation_profile`** : Profil altimétrique et graphique de relief le long du parcours (altitudes min/max, dénivelés positifs/négatifs D+/D-, pentes en %, jalons de points d'eau et de cols). *Exemple : Profil Altimétrique Vectoriel.*
+- **`map_overview`** : Cartouche d'aperçu général / vue synoptique du raid complet (rose des vents, échelle graphique, boîte de sécurité/numéros d'urgence, découpage des tronçons sur fond cartographique).
+- **`panoramic_sketch`** : Croquis panoramique ou d'observation visuelle de paysage pour l'épreuve de repérage.
 - **`numeric`** : Encode exclusivement des données numériques (coordonnées chiffrées, distances, dates, codes matriciels).
 - **`alphabetic`** : Encode des lettres alphabétiques (A-Z). *Exemple : Code Avocat (A=K), Code Cassis (K=6), Morse alphabétique.*
 - **`alphanumeric`** : Encode lettres et chiffres. *Exemple : Carré de Polybe 6×6, Chiffre de Vigenère étendu.*
@@ -121,6 +124,55 @@ Le manifeste doit obligatoirement expliciter la capacité d'encodage du module (
   "assets": [
     "assets/fonts/ScoutSymbols.ttf"
   ]
+}
+```
+
+#### Exemple de `manifest.json` pour un module de Profil Altimétrique (`elevation_profile`) :
+```json
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "profil_altimetrique",
+  "name": "Profil Altimétrique & Dénivelé",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Calcul et tracé vectoriel du profil altimétrique (courbes de niveau, D+, D-, altitude min/max, pente moyenne et jalons de sécurité).",
+  "data_capability": "elevation_profile",
+  "supported_inputs": ["elevation_points", "poly_segments"],
+  "render_type": "svg",
+  "entrypoint": "logic/ElevationEngine.ts",
+  "pedagogy": {
+    "recommended_levels": ["louveteaux", "seconde_classe", "premiere_classe", "raider"],
+    "difficulty_weight": 1.0,
+    "rules_explanation": "Le profil altimétrique permet à la patrouille d'anticiper les dénivelés critiques et les points d'eau."
+  },
+  "constraints": {
+    "min_distance_m": 0.0,
+    "max_distance_m": null,
+    "max_proportion": 0.20,
+    "allow_consecutive": false
+  }
+}
+```
+
+#### Exemple de `manifest.json` pour un Aperçu Général de la Carte (`map_overview`) :
+```json
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "apercu_synoptique_carte",
+  "name": "Aperçu Synoptique de Carte",
+  "version": "2.0.0",
+  "resource_type": "crypto_module",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Vue d'ensemble cartographique de synthèse avec tracé global, points de contrôle numérotés, zone de bivouac et cartouche de sécurité.",
+  "data_capability": "map_overview",
+  "supported_inputs": ["full_itinerary_track", "waypoints"],
+  "render_type": "map",
+  "entrypoint": "logic/SynopticMapEngine.ts"
 }
 ```
 

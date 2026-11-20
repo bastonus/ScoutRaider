@@ -25,6 +25,26 @@ def _to_uuid(val: Any) -> uuid.UUID:
         return uuid.uuid5(uuid.NAMESPACE_DNS, str(val))
 
 
+def _is_state_empty(state: Any) -> bool:
+    """Helper to detect if a project state contains any real content."""
+    if not isinstance(state, dict):
+        return True
+    routes = state.get("routes") or []
+    stages = state.get("stages") or []
+    poly_steps = state.get("polygonal_steps") or []
+    point_ann = state.get("point_annotations") or []
+    area_ann = state.get("area_annotations") or []
+    draw_ann = state.get("draw_annotations") or []
+    text_ann = state.get("text_annotations") or []
+    carnet = state.get("carnet_steps") or {}
+    itins = state.get("itineraries") or []
+    itin_has_content = any(
+        (it.get("stages") or it.get("routes") or it.get("polygonal_steps"))
+        for it in itins if isinstance(it, dict)
+    )
+    return not (routes or stages or poly_steps or point_ann or area_ann or draw_ann or text_ann or carnet or itin_has_content)
+
+
 @router.get("", response_model=List[Dict[str, Any]])
 async def list_projects(
     db: AsyncSession = Depends(get_db),
@@ -40,7 +60,14 @@ async def list_projects(
     documents = result.scalars().all()
 
     projects = []
+    has_deletes = False
     for doc in documents:
+        clean_title = (doc.title or "").strip()
+        if (not clean_title or clean_title == "Document sans titre") and _is_state_empty(doc.json_data):
+            doc.is_deleted = True
+            has_deletes = True
+            continue
+
         share_token = None
         for sl in doc.share_links:
             if not sl.is_revoked:
@@ -61,6 +88,9 @@ async def list_projects(
             "updated_at": doc.updated_at.isoformat() if doc.updated_at else ""
         })
 
+    if has_deletes:
+        await db.commit()
+
     return projects
 
 
@@ -72,8 +102,15 @@ async def save_project(
 ):
     """Créer ou mettre à jour un projet (CloudAuthService.saveProject)."""
     raw_id = payload.get("id")
-    title = payload.get("title") or "Document sans titre"
+    title = (payload.get("title") or "").strip() or "Document sans titre"
     state = payload.get("state") or {}
+
+    # Refuse to auto-create empty ghost projects with default title
+    if not raw_id and title == "Document sans titre" and _is_state_empty(state):
+        raise HTTPException(
+            status_code=400,
+            detail="Impossible de créer un document vide sans titre ni contenu."
+        )
 
     document: Optional[Document] = None
     if raw_id:

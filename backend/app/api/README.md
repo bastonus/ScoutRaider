@@ -29,6 +29,12 @@ FastAPI REST API router endpoints handling auth, documents, assets, export, and 
 - `[export.py] def get_asset_image_data_uri()`
 - `[export.py] def build_export_html()`
 - `[export.py] def build_export_css()`
+- `[hub.py] def list_catalog()`
+- `[hub.py] def get_resource_detail()`
+- `[hub.py] def validate_manifest()`
+- `[hub.py] def resolve_dependencies()`
+- `[hub.py] def register_custom_map()`
+- `[hub.py] def generate_template()`
 - *(and 14 more exported symbols)*
 
 ## Invariants

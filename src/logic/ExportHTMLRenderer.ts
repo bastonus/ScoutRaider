@@ -399,21 +399,20 @@ function generateStaticMapSvg(params: {
     // zTile : entier strict pour les URLs WMTS/OSM (l'API rejette tout non-entier).
     const zProj = Math.min(18, Math.max(8, zoom));
     const zTile = Math.min(18, Math.max(8, Math.round(zoom)));
+    const scaleRatio = Math.pow(2, zProj - zTile);
 
     // Pixel monde du centre (projection à l'échelle fractionnaire exacte)
     const cPx = latLngToWorldPixel(center[0], center[1], zProj);
     const originX = cPx.x - W / 2;
     const originY = cPx.y - H / 2;
 
-    // Tuiles requises : positions à l'aide du zoom entier pour les indices de tuile,
-    // mais positions pixel en cohérence avec zProj
+    // Tuiles requises : indices calculés dans l'espace de tuiles (zoom zTile)
+    // en tenant compte de l'échelle d'affichage scaleRatio
     const cPxTile = latLngToWorldPixel(center[0], center[1], zTile);
-    const originXTile = cPxTile.x - W / 2;
-    const originYTile = cPxTile.y - H / 2;
-    const minTx = Math.floor(originXTile / 256);
-    const maxTx = Math.floor((originXTile + W) / 256);
-    const minTy = Math.floor(originYTile / 256);
-    const maxTy = Math.floor((originYTile + H) / 256);
+    const minTx = Math.floor((cPxTile.x - (W / 2) / scaleRatio) / 256);
+    const maxTx = Math.floor((cPxTile.x + (W / 2) / scaleRatio) / 256);
+    const minTy = Math.floor((cPxTile.y - (H / 2) / scaleRatio) / 256);
+    const maxTy = Math.floor((cPxTile.y + (H / 2) / scaleRatio) / 256);
 
     // Résoudre l'URL de la couche via MAP_LAYERS (avec remplacement {key})
     const layer = MAP_LAYERS[layerId || 'PLAN.IGN'] || MAP_LAYERS['PLAN.IGN'];
@@ -428,14 +427,17 @@ function generateStaticMapSvg(params: {
     let tilesSvg = '';
     for (let ty = minTy; ty <= maxTy; ty++) {
         for (let tx = minTx; tx <= maxTx; tx++) {
-            const px = Math.round(tx * 256 - originX);
-            const py = Math.round(ty * 256 - originY);
+            const px = Math.round(tx * 256 * scaleRatio - originX);
+            const py = Math.round(ty * 256 * scaleRatio - originY);
+            const nextPx = Math.round((tx + 1) * 256 * scaleRatio - originX);
+            const nextPy = Math.round((ty + 1) * 256 * scaleRatio - originY);
+            const tileW = nextPx - px + 1;
+            const tileH = nextPy - py + 1;
             const url = tileUrlTemplate
                 .replace('{z}', zTile.toString())
                 .replace('{x}', tx.toString())
                 .replace('{y}', ty.toString());
-            tilesSvg += `    <image href="${url}" x="${px}" y="${py}" width="256" height="256" preserveAspectRatio="none" />
-`;
+            tilesSvg += `    <image href="${url}" xlink:href="${url}" x="${px}" y="${py}" width="${tileW}" height="${tileH}" preserveAspectRatio="none" />\n`;
         }
     }
 
@@ -530,7 +532,7 @@ function generateStaticMapSvg(params: {
         <text x="46" y="1" font-family="monospace" font-size="6.5px" fill="#475569" text-anchor="middle">IGN &bull; ${formattedScale}</text>
     </g>`;
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display: block; width: 100%; max-width: ${W}px; height: auto; border: 1.5px solid #0f172a; background: #e2e8f0; overflow: hidden; margin: 0 auto;">
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display: block; width: 100%; max-width: ${W}px; height: auto; border: 1.5px solid #0f172a; background: #e2e8f0; overflow: hidden; margin: 0 auto;">
 ${tilesSvg}${annotationsSvg}${routeSvg}${endpointsSvg}${scaleBarSvg}
 </svg>`;
 
@@ -798,17 +800,23 @@ export class ExportHTMLRenderer {
      * en data:image/png;base64,... pour que WeasyPrint ne souffre d'aucune tuile manquante.
      */
     static async inlineMapTiles(html: string): Promise<string> {
-        const tileRegex = /<image\s+([^>]*?)href="(https:\/\/[^"]+)"([^>]*?)\/>/g;
+        const tileRegex = /<image\s+[^>]*?(?:href|xlink:href)="(https?:\/\/[^"]+)"[^>]*?\/>/g;
         const matches = Array.from(html.matchAll(tileRegex));
         if (!matches.length) return html;
 
-        const uniqueUrls = Array.from(new Set(matches.map(m => m[2])));
+        const uniqueUrls = Array.from(new Set(matches.map(m => m[1])));
         const cache = new Map<string, string>();
 
         await Promise.all(uniqueUrls.map(async url => {
             for (let attempt = 0; attempt < 2; attempt++) {
                 try {
-                    const res = await fetch(url);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 6000);
+                    const res = await fetch(url, {
+                        headers: { 'User-Agent': 'ScoutRaider/1.0 (Cartography Export)' },
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
                     if (res.ok) {
                         const buffer = await res.arrayBuffer();
                         const bytes = new Uint8Array(buffer);

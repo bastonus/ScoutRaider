@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { CloudAuthService, type CloudProjectSummary, generateDocId } from '../logic/CloudAuthService';
+import { CloudAuthService, type CloudProjectSummary } from '../logic/CloudAuthService';
 import FleurDeLysLogo from '../components/layout/FleurDeLysLogo';
 import { version } from '../../package.json';
 import {
@@ -132,10 +132,8 @@ export default function ProjectsHomePage() {
     });
 
     const handleNewProject = () => {
-        // Generate a new document identifier directly and navigate to it immediately
-        const newDocId = generateDocId();
-        newProject(newDocId);
-        navigate(`/d/${newDocId}`);
+        newProject();
+        navigate('/d/new');
     };
 
     const handleOpen = (p: CloudProjectSummary) => {

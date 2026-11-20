@@ -10,7 +10,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { generateDocId } from '../logic/CloudAuthService';
 import { useApp } from '../AppContext';
 import { cloudSync } from '../services/cloudSync';
 import App from '../App';
@@ -34,22 +33,19 @@ export default function EditorPage() {
     const loadedIdentifier = useRef<string | null>(null);
     const syncInitialized = useRef<string | null>(null);
 
-    // ── Instant /d/new: NEVER stay on /d/new, generate doc id and redirect immediately ──
-    useEffect(() => {
-        if (identifier === 'new') {
-            const newDocId = generateDocId();
-            loadedIdentifier.current = newDocId;
-            newProject(newDocId);
-            navigate(`/d/${newDocId}`, { replace: true });
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [identifier]);
-
     // ── Load document when identifier changes ────────────────────────────────
     useEffect(() => {
         if (isLoading) return;
         if (!identifier) return;
-        if (identifier === 'new') return; // already redirected above
+
+        if (identifier === 'new') {
+            if (loadedIdentifier.current !== 'new') {
+                loadedIdentifier.current = 'new';
+                newProject();
+            }
+            return;
+        }
+
         if (loadedIdentifier.current === identifier) return;
 
         loadedIdentifier.current = identifier;
@@ -78,7 +74,7 @@ export default function EditorPage() {
             });
             console.log('[EditorPage] CloudSync initialisé pour:', docId);
         }
-    }, [state.cloud_project_id, state.current_filepath, identifier, state]);
+    }, [state.cloud_project_id, state.current_filepath, identifier, state, dispatch]);
 
     // ── After first save on /d/new: redirect to /d/<projectId> ───────────────
     useEffect(() => {
@@ -86,6 +82,7 @@ export default function EditorPage() {
         if (identifier === 'new') {
             // Replace /d/new with the real project URL (use share_token if available)
             const targetId = shareToken || cloudProjectId;
+            loadedIdentifier.current = targetId;
             navigate(`/d/${targetId}`, { replace: true });
         }
     }, [cloudProjectId, shareToken, identifier, navigate]);

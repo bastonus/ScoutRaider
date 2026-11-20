@@ -30,7 +30,12 @@ backend/
 │   │   ├── assets.py        # Upload/download assets
 │   │   ├── export.py        # Export PDF / .srproj
 │   │   ├── share.py         # Partage documents
-│   │   └── import_export.py # Import .srproj / migration .srdoc
+│   │   ├── import_export.py # Import .srproj / migration .srdoc
+│   │   ├── projects.py      # Alias et partage projets
+│   │   └── hub.py           # Hub v2 : catalogue, validation, dépendances, cartes
+│   ├── modules/             # Registre modulaire v2, sandboxing, extraction sécurisée ZIP
+│   ├── mcp/                 # Serveur Model Context Protocol (Agent-First)
+│   ├── diffraction/         # Solveur probabiliste CSP d'affectation de modules
 │   └── services/
 │       ├── auth.py          # Service authentification
 │       ├── s3_client.py     # Client Garage S3

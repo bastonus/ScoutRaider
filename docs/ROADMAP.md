@@ -44,10 +44,17 @@ Synthèse du plan d'action d'audit de code ([PLAN_IMPLEMENTATION.md](../PLAN_IMP
 - [ ] **Gestion avancée du hors-piste** : Bascule dynamique fluide entre tronçons routés BRouter et segments hors-piste à vol d'oiseau.
 - [ ] **Profil altimétrique enrichi** : Calcul des dénivelés cumulés positifs/négatifs et intégration directe dans les en-têtes d'étapes.
 
-### 2. Moteur de Carnet & Modules d'Épreuves
+### 2. Moteur de Carnet, Hub Unifié & Modules d'Épreuves
+> 📄 **Référence Maître :** [Catalogue & Spécifications des Codes à Implémenter (Google Docs)](https://docs.google.com/document/d/1bpodvArZtDRWSFa4pfR8y8y4V2ehFhRUxmQp32lL6bI/) *(Source : `ressources à adapter. privé/doc des codes à implementer.url`)*
+
+- [x] **Architecture du Hub Unifié v2.0** : Spécification du standard de distribution ZIP, schéma de manifestes JSON v2 et typologie complète (chiffrements, spatial, altimétrie, cartes custom, trames).
+- [x] **Adoption du Standard Gilwell** : Intégration du standard modulaire WYSIWYG de référence (types purs, SVG vectoriel 300 DPI, interface de personnalisation).
+- [x] **Pédagogie scoute & Trames de Raid** : Abandon du terme « Orchestrations » au profit de « Trames de Raid » avec modélisation du graphe de dépendances déclaratives.
+- [x] **Exposition Agent-First & MCP** : Intégration de 5 outils MCP pour permettre aux agents IA de requêter, valider et créer des modules de manière autonome.
+- [ ] **Implémentation complète du catalogue des codes scoutes** : Intégration progressive de tous les codes recensés dans le document de référence Google Docs (chiffres historiques, grilles, signaux optiques et acoustiques).
+- [ ] **Migration des anciens modules** : Application du plan de conversion pas-à-pas (Morse, Vigenère, Polybe, Templier, Avocat, etc.) vers le standard v2 sans ReportLab.
+- [ ] **Stockage distant S3 Garage** : Mise en place de la synchronisation bidirectionnelle du catalogue et téléchargement automatisé des paquets `.zip`.
 - [ ] **Édition WYSIWYG des blocs de carnet** : Enrichissement des options de mise en page textuelle (polices additionnelles, lettrines, notes de bas de page).
-- [ ] **Modules d'épreuves supplémentaires** : Portage moderne de nouveaux chiffrements et modules terrain (ex: azimut-distance combiné, coordonnées UTM/Lambert).
-- [ ] **Génération d'annexes personnalisées** : Sélection à la carte des fiches de décodage à insérer en fin de carnet (alphabet morse, grille Polybe, etc.).
 
 ### 3. Collaboration & Partage
 - [ ] **Export d'archive `.srproj`** : Export et import sans perte incluant les images compressées (WebP), polices intégrées et métadonnées complètes.

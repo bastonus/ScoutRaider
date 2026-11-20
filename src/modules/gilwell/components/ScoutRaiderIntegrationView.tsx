@@ -187,7 +187,7 @@ export default function ScoutRaiderIntegrationView({
               </pre>
             ) : (
               <div className="space-y-2 max-h-96 overflow-auto">
-                {derivedSegments.map((seg, i) => (
+                {derivedSegments.map((seg: ScoutRaiderPolySegment, i: number) => (
                   <div key={seg.leg_key || i} className="border border-slate-200 rounded-lg p-3 bg-white hover:bg-slate-50">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">
@@ -220,8 +220,8 @@ export default function ScoutRaiderIntegrationView({
                       <details className="mt-2">
                         <summary className="text-xs text-slate-500 cursor-pointer">Tous les points ({seg.coords.length})</summary>
                         <div className="mt-1 font-mono text-xs text-slate-500 bg-slate-50 p-2 rounded max-h-32 overflow-auto">
-                          {seg.coords.map((c, ci) => (
-                            <div key={ci}>{ci}: {c[0].toFixed(6)}, {c[1].toFixed(6)}</div>
+                          {seg.coords.map((c: any, ci: number) => (
+                            <div key={ci}>{ci}: {c[0]?.toFixed?.(6)}, {c[1]?.toFixed?.(6)}</div>
                           ))}
                         </div>
                       </details>
@@ -251,7 +251,7 @@ export default function ScoutRaiderIntegrationView({
               </pre>
             ) : (
               <div className="space-y-2 max-h-96 overflow-auto">
-                {derivedSteps.map((step, i) => (
+                {derivedSteps.map((step: GilwellStep, i: number) => (
                   <div key={step.id} className="border border-slate-200 rounded-lg p-3 bg-white hover:bg-slate-50">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">

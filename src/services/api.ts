@@ -5,10 +5,12 @@
 
 import type { DocumentV2, DocumentAssets, FontAsset, ImageAsset, PendingSyncOperation } from '../logic/documentTypes';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const S3_PUBLIC_URL = import.meta.env.VITE_S3_PUBLIC_URL || 'https://s3-scoutraider.silverhorse.fr';
+export type { DocumentV2, DocumentAssets, FontAsset, ImageAsset, PendingSyncOperation };
 
-class ApiError extends Error {
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const S3_PUBLIC_URL = import.meta.env.VITE_S3_PUBLIC_URL || 'https://s3-scoutraider.silverhorse.fr';
+
+export class ApiError extends Error {
   constructor(public status: number, message: string, public data?: any) {
     super(message);
     this.name = 'ApiError';
@@ -339,5 +341,3 @@ export async function checkBackendHealth(): Promise<{ status: string; version: s
     return { status: 'unreachable', version: 'unknown', weasyprint: false };
   }
 }
-
-export { ApiError };

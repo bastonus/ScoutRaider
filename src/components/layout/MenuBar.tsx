@@ -65,7 +65,8 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
         setShareModalOpen,
         makeEditableCopy,
         saveToCloudNow, 
-        logout 
+        logout,
+        newProject 
     } = useAuth();
 
     const navigate = useNavigate();
@@ -258,7 +259,8 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
     const menus: Record<string, any[]> = {
         'Fichier': [
             { label: 'Nouveau Projet', shortcut: 'Ctrl+N', action: () => {
-                dispatch({ type: 'NEW_PROJECT' });
+                newProject();
+                navigate('/d/new');
                 dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouveau projet créé.', notifType: 'info' });
             }},
             { label: 'Ouvrir Projet...', shortcut: 'Ctrl+O', action: async () => {

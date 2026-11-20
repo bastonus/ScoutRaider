@@ -188,6 +188,7 @@ export default function BlockGutter({
 }: BlockGutterProps) {
     const { dispatch } = useApp();
     const indicator = getBlockIndicator(blockType, blockData, moduleId, isTitle);
+    const meta = moduleId ? MODULE_META[moduleId] : null;
     const triggerRef = useRef<HTMLButtonElement>(null);
 
     // Déterminer les ciphers textuels disponibles
@@ -197,59 +198,42 @@ export default function BlockGutter({
 
     return (
         <div
+            className="block-gutter"
             style={{
                 width: GUTTER_WIDTH,
                 flexShrink: 0,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
+                gap: '3px',
                 paddingTop: '2px',
                 position: 'relative',
+                userSelect: 'none',
             }}
         >
-            {/* 1. Indicateur de type (22x22) */}
+            {/* 1. Indicateur de type ou badge d'étape A, B, C */}
             <div
                 style={{
                     width: '22px',
                     height: '22px',
-                    borderRadius: '5px',
+                    borderRadius: stepLabel ? '50%' : '5px',
                     background: indicator.bg,
                     border: indicator.border,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
-                    marginBottom: '4px',
+                    fontSize: stepLabel ? '11px' : undefined,
+                    fontWeight: stepLabel ? 800 : undefined,
+                    color: stepColor || (meta?.color || 'var(--text-primary)'),
+                    fontFamily: stepLabel ? 'var(--font-ui)' : undefined,
                 }}
-                title={indicator.tooltip}
+                title={stepLabel ? `Étape ${stepLabel} — ${indicator.tooltip}` : indicator.tooltip}
             >
-                {indicator.icon}
+                {stepLabel || indicator.icon}
             </div>
 
-            {/* 3. Indicateur de sélection (check) - optionnel */}
-            {isSelected && (
-                <div
-                    style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '5px',
-                        background: 'var(--accent-default)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#ffffff',
-                        marginBottom: '4px',
-                    }}
-                    title="Bloc sélectionné"
-                >
-                    <Check size={12} strokeWidth={3} />
-                </div>
-            )}
-
-            {/* 4. Espace flexible pour pousser le menu 3 points en bas */}
-            <div style={{ flex: 1 }} />
-
-            {/* 5. Menu contextuel unifié (3 points) - TOUJOURS EN BAS */}
+            {/* 2. Menu contextuel unifié (3 points) - placé immédiatement sous l'icône */}
             <UnifiedContextMenu
                 blockType={blockType}
                 blockId={blockData.id}
@@ -278,6 +262,25 @@ export default function BlockGutter({
                 navLanguage={navLanguage}
                 pois={pois}
             />
+
+            {/* 3. Indicateur de sélection (check) */}
+            {isSelected && (
+                <div
+                    style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '5px',
+                        background: 'var(--accent-default)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#ffffff',
+                    }}
+                    title="Bloc sélectionné"
+                >
+                    <Check size={11} strokeWidth={3} />
+                </div>
+            )}
         </div>
     );
 }

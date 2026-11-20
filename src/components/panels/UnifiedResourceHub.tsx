@@ -633,7 +633,7 @@ export default function UnifiedResourceHub({
 
   // ── 2. Codes & Énigmes (Declined Rich Visual Banner) ────────────────────────
   const codeItems = useMemo<UnifiedResourceItem[]>(() => {
-    return ALL_MODULE_IDS.map(mId => {
+    const baseItems = ALL_MODULE_IDS.map(mId => {
       const meta = MODULE_META[mId];
       const manifest = ModuleRegistry.getManifest(mId);
       
@@ -706,13 +706,18 @@ export default function UnifiedResourceHub({
         </div>
       );
 
+      const isSpatial = mId === 'gilwell';
+      const isMap = mId === 'carte_ign' || mId === 'carte_simple';
+      const catLabel = isSpatial ? 'Module Spatial & Itinéraire' : isMap ? 'Cartographie & Repérage' : manifest?.type === 'visual' ? 'Module Visuel & Graphique' : 'Module de Chiffrement';
+      const badgeLabel = isSpatial ? 'Itinéraire / Azimuts' : isMap ? 'Carte' : manifest?.type === 'visual' ? 'Graphique' : 'Chiffré';
+
       return {
         id: mId,
         name: meta.label,
-        category: 'code',
-        categoryLabel: manifest?.type === 'visual' ? 'Module Visuel & Graphique' : 'Module de Chiffrement',
+        category: 'code' as const,
+        categoryLabel: catLabel,
         description: manifest?.description || 'Module d\'encodage cryptographique ou visuel.',
-        badge: manifest?.type === 'visual' ? 'Graphique' : 'Chiffré',
+        badge: badgeLabel,
         color: meta.color || '#f59e0b',
         icon,
         previewBannerComponent,
@@ -740,6 +745,52 @@ export default function UnifiedResourceHub({
         }
       };
     });
+
+    // Modules topographiques additionnels (Altimétrie, Aperçu général)
+    const topoItems: UnifiedResourceItem[] = [
+      {
+        id: 'profil_altimetrique',
+        name: 'Profil Altimétrique & Dénivelé',
+        category: 'code' as const,
+        categoryLabel: 'Topographie & Relief',
+        description: 'Calcul et tracé vectoriel du profil altimétrique (courbes de niveau, D+, D-, altitude min/max, pente moyenne et jalons).',
+        badge: 'Altimétrie / D+',
+        color: '#0284c7',
+        icon: <Sliders size={16} />,
+        isActive: false,
+        isBuiltIn: true,
+        isInLibrary: true,
+        onApply: () => {
+          dispatch({
+            type: 'ADD_NOTIFICATION',
+            message: 'Profil Altimétrique : Génération automatique du dénivelé pour votre raid.',
+            notifType: 'info'
+          });
+        }
+      },
+      {
+        id: 'apercu_carte_synoptique',
+        name: 'Aperçu Synoptique de Carte',
+        category: 'code' as const,
+        categoryLabel: 'Topographie & Cartouche',
+        description: 'Cartouche cartographique général avec vue d\'ensemble du parcours, rose des vents, échelle et boîte de sécurité.',
+        badge: 'Vue d\'ensemble',
+        color: '#16a34a',
+        icon: <MapIcon size={16} />,
+        isActive: false,
+        isBuiltIn: true,
+        isInLibrary: true,
+        onApply: () => {
+          dispatch({
+            type: 'ADD_NOTIFICATION',
+            message: 'Aperçu Synoptique : Cartouche général de raid activé.',
+            notifType: 'info'
+          });
+        }
+      }
+    ];
+
+    return [...baseItems, ...topoItems];
   }, []);
 
   // ── 3. Règles de raid (Declined Rich Visual Banner) ─────────────────────────
@@ -803,11 +854,11 @@ export default function UnifiedResourceHub({
         id: p.id,
         name: p.name,
         category: 'orchestration',
-        categoryLabel: p.isCustom ? 'Règle Personnalisée' : 'Preset Officiel ScoutRaider',
+        categoryLabel: p.isCustom ? 'Trame de Raid Personnalisée' : 'Trame de Raid Officielle',
         description: p.isCustom 
-          ? 'Règles de progression sur-mesure pour votre carnet de raid.' 
-          : 'Preset officiel calibré pour un dosage équilibré d\'orientation et d\'étapes.',
-        badge: p.isCustom ? 'Personnalisé' : `Niveau ${i + 1}`,
+          ? 'Trame de progression et contraintes sur-mesure pour votre carnet de raid.' 
+          : 'Trame pédagogique officielle avec gestion des dépendances et alternance des étapes.',
+        badge: p.isCustom ? 'Trame Custom' : `Trame Niveau ${i + 1}`,
         color: themeColor,
         icon: <Sliders size={16} />,
         previewBannerComponent,
@@ -818,7 +869,7 @@ export default function UnifiedResourceHub({
           dispatch({ type: 'SET_PRESET', presetId: p.id });
           dispatch({ 
             type: 'ADD_NOTIFICATION', 
-            message: `Règles appliquées : ${p.name}`, 
+            message: `Trame appliquée : ${p.name}`, 
             notifType: 'info' 
           });
         },
@@ -1015,7 +1066,7 @@ export default function UnifiedResourceHub({
     { id: 'all' as UnifiedCategory, label: 'Tout', icon: <Sparkles size={13} />, count: allItems.length },
     { id: 'maps' as UnifiedCategory, label: 'Fonds de carte', icon: <MapIcon size={13} />, count: mapItems.length },
     { id: 'code' as UnifiedCategory, label: 'Codes & Énigmes', icon: <Code size={13} />, count: codeItems.length },
-    { id: 'orchestration' as UnifiedCategory, label: 'Règles de raid', icon: <Sliders size={13} />, count: orchestrationItems.length },
+    { id: 'orchestration' as UnifiedCategory, label: 'Trames de Raid', icon: <Sliders size={13} />, count: orchestrationItems.length },
     { id: 'theme' as UnifiedCategory, label: 'Thèmes & Récits', icon: <Palette size={13} />, count: themeItems.length },
     { id: 'my_library' as UnifiedCategory, label: 'Ma Bibliothèque', icon: <BookmarkCheck size={13} />, count: allItems.filter(i => i.isInLibrary).length }
   ], [allItems, mapItems, codeItems, orchestrationItems, themeItems]);

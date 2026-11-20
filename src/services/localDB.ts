@@ -4,7 +4,7 @@
  */
 
 import Dexie, { Table } from 'dexie';
-import type { DocumentV2, DocumentAssets, FontAsset, ImageAsset, PendingSyncOperation, SyncOperationType } from '../logic/documentTypes';
+import type { DocumentV2, DocumentAssets, FontAsset, ImageAsset } from '../logic/documentTypes';
 
 export class ScoutRaiderDB extends Dexie {
   documents!: Table<LocalDocument, string>;
@@ -169,7 +169,8 @@ export async function getCachedAsset(assetId: string): Promise<Blob | null> {
 }
 
 export async function getAssetInfo(assetId: string): Promise<LocalAsset | null> {
-  return db.assets.get(assetId) || null;
+  const asset = await db.assets.get(assetId);
+  return asset || null;
 }
 
 export async function markAssetUploaded(assetId: string): Promise<void> {
@@ -217,7 +218,8 @@ export async function markSyncCompleted(id: number): Promise<void> {
 }
 
 export async function markSyncFailed(id: number, error: string): Promise<void> {
-  await db.pendingSync.update(id, { status: 'failed', error, retries: (await db.pendingSync.get(id))?.retries + 1 || 1 });
+  const existing = await db.pendingSync.get(id);
+  await db.pendingSync.update(id, { status: 'failed', error, retries: (existing?.retries ?? 0) + 1 });
 }
 
 export async function clearCompletedSync(): Promise<void> {
@@ -261,7 +263,8 @@ export async function cleanupOldCache(maxAgeDays = 30): Promise<void> {
 export async function getStorageEstimate(): Promise<{ usage: number; quota: number } | null> {
   if ('storage' in navigator && 'estimate' in navigator.storage) {
     try {
-      return await navigator.storage.estimate();
+      const est = await navigator.storage.estimate();
+      return { usage: est.usage ?? 0, quota: est.quota ?? 0 };
     } catch {
       return null;
     }

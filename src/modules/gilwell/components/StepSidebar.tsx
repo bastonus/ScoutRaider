@@ -345,7 +345,7 @@ export default function StepSidebar({
                       </div>
 
                       <div className="flex gap-2 pt-2 border-t border-slate-200">
-                        <button onClick={() => onAddStepAfter(step.id)} className="flex-1 px-2 py-1.5 text-xs border border-slate-300 rounded bg-white hover:bg-slate-50">Ajouter après</button>
+                        <button onClick={() => onAddStep()} className="flex-1 px-2 py-1.5 text-xs border border-slate-300 rounded bg-white hover:bg-slate-50">Ajouter</button>
                         <button onClick={() => onDeleteStep(step.id)} className="flex-1 px-2 py-1.5 text-xs border border-red-300 rounded bg-red-50 text-red-700 hover:bg-red-100">Supprimer</button>
                       </div>
                     </div>
@@ -363,15 +363,15 @@ export default function StepSidebar({
             <div className="grid grid-cols-2 gap-2">
               <label className="text-xs text-slate-600">Format</label>
               <select value={config.numbering.format} onChange={(e) => onUpdateConfig({ numbering: { ...config.numbering, format: e.target.value as any } })} className="px-2 py-1 text-sm border border-slate-300 rounded bg-white">
-                {NUMBERING_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
+                {NUMBERING_FORMATS.map((f: string) => <option key={f} value={f}>{f}</option>)}
               </select>
               <label className="text-xs text-slate-600">Position</label>
               <select value={config.numbering.position} onChange={(e) => onUpdateConfig({ numbering: { ...config.numbering, position: e.target.value as any } })} className="px-2 py-1 text-sm border border-slate-300 rounded bg-white">
-                {NUMBERING_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                {NUMBERING_POSITIONS.map((p: string) => <option key={p} value={p}>{p}</option>)}
               </select>
               <label className="text-xs text-slate-600">Badge</label>
               <select value={config.numbering.badgeShape} onChange={(e) => onUpdateConfig({ numbering: { ...config.numbering, badgeShape: e.target.value as any } })} className="px-2 py-1 text-sm border border-slate-300 rounded bg-white">
-                {NUMBERING_BADGE_SHAPES.map(b => <option key={b} value={b}>{b}</option>)}
+                {NUMBERING_BADGE_SHAPES.map((b: string) => <option key={b} value={b}>{b}</option>)}
               </select>
               <label className="text-xs text-slate-600">Départ</label>
               <input type="number" min="1" max="100" value={config.numbering.startAt} onChange={(e) => onUpdateConfig({ numbering: { ...config.numbering, startAt: parseInt(e.target.value) } })} className="px-2 py-1 text-sm border border-slate-300 rounded bg-white" />

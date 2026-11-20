@@ -5,7 +5,6 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../AppContext';
-import { dispatch as appDispatch } from '../AppContext'; // Pour usage hors composant
 import { authApi, assetsApi, documentsApi, exportApi, importApi, type DocumentV2, type AssetUploadResponse, ApiError } from './api';
 import { saveDocumentLocal, getDocumentLocal, markDocumentSynced, markDocumentDirty, cacheAsset, getCachedAsset } from './localDB';
 import { scheduleAutosave, cancelAutosave, initSyncService, processSyncQueue } from './syncService';
@@ -263,7 +262,7 @@ export class CloudSyncService {
     const images: Record<string, any> = {};
 
     // Polices utilisées par les modules de chiffrement
-    const usedModules = new Set(state.carnet_steps?.map((s: any) => s.moduleId).filter(Boolean) || []);
+    const usedModules = new Set<string>(state.carnet_steps?.map((s: any) => s.moduleId as string).filter(Boolean) || []);
     const moduleFonts: Record<string, { family: string; weight: number }> = {
       morse: { family: 'Morse', weight: 400 },
       templier: { family: 'TemplarsCipherPlus', weight: 400 },
@@ -439,7 +438,7 @@ export class CloudSyncService {
   /** Upload un asset (image, police) vers S3 */
   async uploadAsset(file: File, documentId: string): Promise<AssetUploadResponse> {
     // Optimisation image côté client
-    let blob = file;
+    let blob: Blob = file;
     let mimeType = file.type;
 
     if (file.type.startsWith('image/') && file.size > 50000) {
@@ -519,7 +518,7 @@ export class CloudSyncService {
         if (blob) assetBlobs.set(font.assetId, blob);
       }
     }
-    for (const img of Object.values(document.assets.images)) {
+    for (const img of Object.values(document.assets.images) as any[]) {
       const blob = await getCachedAsset(img.assetId);
       if (blob) assetBlobs.set(img.assetId, blob);
     }

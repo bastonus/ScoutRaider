@@ -651,12 +651,20 @@ export default function UnifiedContextMenu({
     };
 
     if (anchorPosition) {
-        menuStyle.left = anchorPosition.x;
-        menuStyle.top = anchorPosition.y;
+        menuStyle.left = Math.max(12, Math.min(window.innerWidth - 300, anchorPosition.x));
+        menuStyle.top = Math.max(12, Math.min(window.innerHeight - 420, anchorPosition.y));
     } else if (triggerButtonRef.current) {
         const rect = triggerButtonRef.current.getBoundingClientRect();
-        menuStyle.left = rect.left - 240; // Aligné à droite du trigger
-        menuStyle.top = rect.bottom + 4;
+        let left = rect.right + 6;
+        if (left + 280 > window.innerWidth) {
+            left = Math.max(12, rect.left - 280);
+        }
+        let top = rect.top - 4;
+        if (top + 420 > window.innerHeight) {
+            top = Math.max(12, window.innerHeight - 430);
+        }
+        menuStyle.left = left;
+        menuStyle.top = top;
     }
 
     // Rendu du menu (principal ou sous-menu)

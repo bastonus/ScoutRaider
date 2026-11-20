@@ -43,13 +43,14 @@ export default function ExportModal({ pages, config, onClose }: ExportModalProps
 
     try {
       if (format === 'svg') {
-        pagesToExport.forEach((page, i) => {
+        for (let i = 0; i < pagesToExport.length; i++) {
+          const page = pagesToExport[i];
           setCurrentPage(page.pageNumber);
           setProgress(Math.round(((i + 1) / pagesToExport.length) * 100));
           // Small delay to show progress
           await new Promise(r => setTimeout(r, 50));
           downloadSvgPage(page, { ...config, transparentBackground: transparentBg });
-        });
+        }
       } else {
         for (let i = 0; i < pagesToExport.length; i++) {
           const page = pagesToExport[i];

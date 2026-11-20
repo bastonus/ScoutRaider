@@ -17,7 +17,7 @@ import { useApp } from '../../AppContext';
 import { themeManager } from '../../logic/ThemeManager';
 import { ModuleLogic } from '../../logic/ModuleLogic';
 
-const THEME_ACCENTS: Record<string, { color: string; Icon: React.ComponentType<{ size?: number | string; color?: string; style?: React.CSSProperties; strokeWidth?: number }> }> = {
+const THEME_ACCENTS: Record<string, { color: string; Icon: React.ComponentType<any> }> = {
     'Neutre':                              { color: '#94a3b8', Icon: Globe },
     'La Mafia':                            { color: '#ef4444', Icon: Crosshair },
     'Les Vikings':                         { color: '#60a5fa', Icon: Swords },

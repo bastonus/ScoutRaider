@@ -271,6 +271,16 @@ class LegacyManifestAdapter:
 
         annexes = list(raw_manifest.get("annexes", known.get("annexes", [])))
 
+        data_cap_raw = raw_manifest.get("data_capability")
+        data_cap = None
+        if data_cap_raw:
+            try:
+                data_cap = DataCapability(data_cap_raw.lower())
+            except ValueError:
+                data_cap = known.get("data_capability")
+        else:
+            data_cap = known.get("data_capability")
+
         metadata = ModuleMetadata(
             id=clean_id,
             name=name,
@@ -286,7 +296,8 @@ class LegacyManifestAdapter:
             annexes=annexes,
             assets=assets,
             rules_explanation=rules_exp,
-            schema_version="1.0"
+            schema_version="1.0",
+            data_capability=data_cap
         )
 
         return metadata, warnings

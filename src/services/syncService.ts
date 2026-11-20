@@ -3,7 +3,7 @@
  * Traite la queue d'opérations, gère retries, backoff exponentiel
  */
 
-import { documentsApi, assetsApi, type AssetUploadResponse, type DocumentV2, ApiError } from './api';
+import { documentsApi, assetsApi, API_BASE, type AssetUploadResponse, type DocumentV2, ApiError } from './api';
 import {
   getPendingOperations,
   updateSyncOperation,
@@ -15,7 +15,7 @@ import {
   deleteDocumentLocal,
   clearDocumentAssets
 } from './localDB';
-import type { PendingSyncOperation } from './localDB';
+import type { PendingSyncOperation, SyncOperationType } from './localDB';
 
 // Configuration
 const MAX_RETRIES = 5;
@@ -95,7 +95,7 @@ async function syncAssetUpload(op: PendingSyncOperation): Promise<void> {
   formData.append('document_id', documentId);
 
   const token = localStorage.getItem('scoutraider_token');
-  const response = await fetch(`${api.API_BASE}/api/assets`, {
+  const response = await fetch(`${API_BASE}/api/assets`, {
     method: 'POST',
     headers: { ...(token && { 'Authorization': `Bearer ${token}` }) },
     body: formData
@@ -115,13 +115,13 @@ async function syncAssetUpload(op: PendingSyncOperation): Promise<void> {
 async function syncDocSave(op: PendingSyncOperation): Promise<void> {
   const { document } = op.payload as { document: DocumentV2 };
 
-  const response = await api.documentsApi.update(document.id, document, document.version - 1);
+  const response = await documentsApi.update(document.id, document, document.version - 1);
   await markDocumentSynced(document.id, response.version);
 }
 
 async function syncDocDelete(op: PendingSyncOperation): Promise<void> {
   const { documentId } = op.payload;
-  await api.documentsApi.delete(documentId);
+  await documentsApi.delete(documentId);
   await deleteDocumentLocal(documentId);
   await clearDocumentAssets(documentId);
 }
@@ -132,7 +132,7 @@ async function syncDocImport(op: PendingSyncOperation): Promise<void> {
   formData.append('file', file);
 
   const token = localStorage.getItem('scoutraider_token');
-  const response = await fetch(`${api.API_BASE}/api/documents/import`, {
+  const response = await fetch(`${API_BASE}/api/documents/import`, {
     method: 'POST',
     headers: { ...(token && { 'Authorization': `Bearer ${token}` }) },
     body: formData
@@ -143,7 +143,7 @@ async function syncDocImport(op: PendingSyncOperation): Promise<void> {
 
 async function syncAssetDelete(op: PendingSyncOperation): Promise<void> {
   const { assetId } = op.payload;
-  await api.assetsApi.delete(assetId);
+  await assetsApi.delete(assetId);
 }
 
 // ─── Retry avec backoff exponentiel ────────────────────────────────────

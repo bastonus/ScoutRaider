@@ -202,7 +202,7 @@ export class ExportService {
                 subtitle: options.subtitle || '',
                 date: options.subtitle || new Date().toLocaleDateString('fr-FR'),
                 themeTitle: themeManager.getLabel('main_title', 'CARNET DE ROUTE'),
-                includeGeneralMap: options.includeGeneralMap,
+                includeGeneralMap: !!options.includeGeneralMap,
                 includeElevationProfile: includeElevation && !!elevationSvg,
                 elevationSvg,
                 elevationStats,
@@ -312,7 +312,7 @@ export class ExportService {
                     const ok = await this.saveHTML(htmlPayload, `${safeName}${suffix}.html`);
                     if (!ok) return false;
                 } else if (format === 'pdf') {
-                    const ok = await this.exportPDF(htmlPayload, `${safeName}${suffix}.pdf`, options.pdfEngine);
+                    const ok = await this.exportPDF(htmlPayload, `${safeName}${suffix}.pdf`, options.pdfEngine || 'auto');
                     if (!ok) return false;
                 } else if (format === 'docx') {
                     // DOCX: save as HTML for now (user can open in Word)

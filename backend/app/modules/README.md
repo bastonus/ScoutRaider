@@ -21,6 +21,14 @@ Raid puzzle and cryptography modules (Morse, Vigenere, Avocat, etc.) on the back
 - `[registry.py]   ModuleRegistry.load_from_base_dir()`
 - `[registry.py]   ModuleRegistry.execute()`
 - `[registry.py]   ModuleRegistry.package_module_to_zip()`
+- `[registry.py]   ModuleRegistry.compute_file_sha256()`
+- `[registry.py]   ModuleRegistry.list_by_capability()`
+- `[registry.py]   ModuleRegistry.resolve_trame_dependencies()`
+- `[registry.py]   ModuleRegistry.validate_manifest_payload()`
+- `[schema.py] class HubResourceMetadata`
+- `[schema.py] class DataCapability`
+- `[schema.py] class TrameDependencies`
+- `[schema.py] class CustomMapConfig`
 - `[sandbox.py] def normalize_text()`
 - `[sandbox.py] def encode_morse()`
 - `[sandbox.py] def encode_vigenere()`

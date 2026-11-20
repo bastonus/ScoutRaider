@@ -12,6 +12,9 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import DOMPurify from 'dompurify';
 import { Waves, Key, Grid, Hash, Flag, RotateCcw, Minus, Type } from 'lucide-react';
+import { ModuleLogic } from '../../logic/ModuleLogic';
+import { MODULE_META } from '../../logic/ModuleRegistry';
+import type { ModuleId } from '../../logic/types';
 
 interface MarkdownRendererProps {
     content: string;
@@ -153,41 +156,81 @@ function configureMarked() {
 /**
  * Protège les balises de chiffrement personnalisées avant le parsing marked
  */
-function protectCipherTags(raw: string): { protected: string; placeholders: Map<string, string> } {
+function protectCipherTags(raw: string, viewMode: 'participant' | 'solution' | 'edit' = 'participant'): { protected: string; placeholders: Map<string, string> } {
     const placeholders = new Map<string, string>();
     let protected_ = raw;
     let counter = 0;
 
-    const cipherTags = ['morse', 'templier', 'maritime', 'polybe', 'vigenere', 'avocat', 'cassis', 'code'];
+    const cipherTags = ['morse', 'templier', 'maritime', 'polybe', 'vigenere', 'avocat', 'cassis', 'drapeaux'];
 
     cipherTags.forEach(tag => {
         const regex = new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[\\/${tag}\\]`, 'gi');
-        protected_ = protected_.replace(regex, (match, content) => {
+        protected_ = protected_.replace(regex, (_match, content) => {
             const placeholder = `__CIPHER_${tag}_${counter++}__`;
-            placeholders.set(placeholder, `<span class="font-${tag}" data-cipher="${tag}">${content}</span>`);
+            let display = content;
+            if (viewMode === 'participant') {
+                try {
+                    display = ModuleLogic.encode(tag, content);
+                } catch {
+                    display = content;
+                }
+            }
+            placeholders.set(placeholder, `<span class="font-${tag} cipher-inline" data-cipher="${tag}" title="${escapeHtml(content)}">${escapeHtml(display)}</span>`);
             return placeholder;
         });
 
-        // Aussi supporter les balises XML-style
+        // Supporter aussi les balises XML-style <tag>...</tag>
         const xmlRegex = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'gi');
-        protected_ = protected_.replace(xmlRegex, (match, content) => {
+        protected_ = protected_.replace(xmlRegex, (_match, content) => {
             const placeholder = `__CIPHER_${tag}_${counter++}__`;
-            placeholders.set(placeholder, `<span class="font-${tag}" data-cipher="${tag}">${content}</span>`);
+            let display = content;
+            if (viewMode === 'participant') {
+                try {
+                    display = ModuleLogic.encode(tag, content);
+                } catch {
+                    display = content;
+                }
+            }
+            placeholders.set(placeholder, `<span class="font-${tag} cipher-inline" data-cipher="${tag}" title="${escapeHtml(content)}">${escapeHtml(display)}</span>`);
             return placeholder;
         });
     });
 
-    // Protéger aussi les blocs de code ```
+    // Blocs de code ```
     const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
-    protected_ = protected_.replace(codeBlockRegex, (match, lang, code) => {
+    protected_ = protected_.replace(codeBlockRegex, (_match, lang, code) => {
         const placeholder = `__CODEBLOCK_${counter++}__`;
-        placeholders.set(placeholder, `<pre class="code-block${lang ? ` language-${lang}` : ''}"><code>${escapeHtml(code)}</code></pre>`);
+        const lowerLang = (lang || '').toLowerCase().trim();
+        if (cipherTags.includes(lowerLang) || lowerLang === 'texte_clair') {
+            const meta = MODULE_META[lowerLang as ModuleId];
+            const color = meta?.color || '#6b7280';
+            const label = meta?.label || lowerLang.toUpperCase();
+            let bodyText = code.trim();
+            if (viewMode === 'participant') {
+                try {
+                    bodyText = ModuleLogic.encode(lowerLang, bodyText);
+                } catch {
+                    bodyText = code.trim();
+                }
+            }
+            placeholders.set(placeholder, `
+                <div class="cipher-card cipher-card-${lowerLang}" data-cipher="${lowerLang}">
+                    <div class="cipher-card-header">
+                        <span class="cipher-dot" style="background: ${color};"></span>
+                        <span class="cipher-title">${escapeHtml(label)}</span>
+                    </div>
+                    <div class="cipher-card-body font-${lowerLang}">${escapeHtml(bodyText)}</div>
+                </div>
+            `.trim());
+        } else {
+            placeholders.set(placeholder, `<pre class="code-block${lang ? ` language-${lang}` : ''}"><code>${escapeHtml(code)}</code></pre>`);
+        }
         return placeholder;
     });
 
     // Protéger code inline `
     const inlineCodeRegex = /`([^`\n]+)`/g;
-    protected_ = protected_.replace(inlineCodeRegex, (match, code) => {
+    protected_ = protected_.replace(inlineCodeRegex, (_match, code) => {
         const placeholder = `__INLINECODE_${counter++}__`;
         placeholders.set(placeholder, `<code class="inline-code">${escapeHtml(code)}</code>`);
         return placeholder;
@@ -198,10 +241,10 @@ function protectCipherTags(raw: string): { protected: string; placeholders: Map<
 
 function escapeHtml(text: string): string {
     return text
-        .replace(/&/g, '&')
-        .replace(/</g, '<')
-        .replace(/>/g, '>')
-        .replace(/"/g, '"')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 }
 
@@ -311,7 +354,7 @@ export default function MarkdownRenderer({
 
         try {
             // 1. Protéger les balises spéciales
-            const { protected: protectedContent, placeholders } = protectCipherTags(content);
+            const { protected: protectedContent, placeholders } = protectCipherTags(content, viewMode);
 
             // 2. Parser avec marked
             let html = marked.parse(protectedContent) as string;
@@ -415,8 +458,16 @@ export default function MarkdownRenderer({
         .markdown-renderer pre { background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1em; overflow: auto; margin: 1em 0; }
         .markdown-renderer pre code { background: transparent; padding: 0; font-size: 0.85em; }
         .markdown-renderer hr { border: none; border-top: 1px solid var(--border-subtle); margin: 1.5em 0; }
+        .markdown-renderer table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 13px; }
+        .markdown-renderer th, .markdown-renderer td { border: 1px solid var(--border-subtle); padding: 6px 10px; text-align: left; }
+        .markdown-renderer th { background: rgba(255,255,255,0.04); font-weight: 600; color: var(--text-primary); }
         .markdown-renderer .katex-block { margin: 1em 0; text-align: center; overflow: auto; }
         .markdown-renderer .katex { font-size: 1.1em !important; }
+        .markdown-renderer .cipher-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; margin: 10px 0; overflow: hidden; }
+        .markdown-renderer .cipher-card-header { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-subtle); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+        .markdown-renderer .cipher-card-body { padding: 10px 14px; line-height: 1.6; word-break: break-word; }
+        .markdown-renderer .cipher-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+        .markdown-renderer .cipher-inline { padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.04); border-bottom: 1px dashed var(--border-strong); }
         .markdown-renderer .font-morse { font-family: "Morse", "Courier New", monospace; font-size: 1.2em; letter-spacing: 0.12em; display: inline-block; }
         .markdown-renderer .font-templier { font-family: "TemplarsCipherPlus", "Times New Roman", serif; font-size: 1.25em; letter-spacing: 0.08em; display: inline-block; }
         .markdown-renderer .font-maritime { font-family: "Maritime", "Courier New", monospace; font-size: 1.3em; letter-spacing: 0.08em; display: inline-block; }

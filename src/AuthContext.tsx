@@ -49,6 +49,48 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * Helper to determine if a document state is empty / unmodified from initial state.
+ * Prevents auto-saving empty ghost projects on the cloud.
+ */
+export function isDocumentEmpty(state: any): boolean {
+    if (!state) return true;
+
+    // Check routes
+    if (Array.isArray(state.routes) && state.routes.length > 0) return false;
+
+    // Check stages
+    if (Array.isArray(state.stages) && state.stages.length > 0) return false;
+
+    // Check polygonal steps
+    if (Array.isArray(state.polygonal_steps) && state.polygonal_steps.length > 0) return false;
+
+    // Check annotations
+    if (Array.isArray(state.point_annotations) && state.point_annotations.length > 0) return false;
+    if (Array.isArray(state.area_annotations) && state.area_annotations.length > 0) return false;
+    if (Array.isArray(state.draw_annotations) && state.draw_annotations.length > 0) return false;
+    if (Array.isArray(state.text_annotations) && state.text_annotations.length > 0) return false;
+
+    // Check carnet
+    if (state.carnet_steps && typeof state.carnet_steps === 'object' && Object.keys(state.carnet_steps).length > 0) return false;
+
+    // Check itineraries
+    if (Array.isArray(state.itineraries)) {
+        for (const it of state.itineraries) {
+            if (!it) continue;
+            if (Array.isArray(it.stages) && it.stages.length > 0) return false;
+            if (Array.isArray(it.routes) && it.routes.length > 0) return false;
+            if (Array.isArray(it.polygonal_steps) && it.polygonal_steps.length > 0) return false;
+        }
+    }
+
+    // Check title: if user explicitly typed a non-default title, it's not empty
+    const title = typeof state.document_title === 'string' ? state.document_title.trim() : '';
+    if (title && title !== 'Document sans titre') return false;
+
+    return true;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { state, dispatch } = useApp();
 
@@ -228,7 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'NEW_PROJECT' });
         setCloudProjectId(presetId || null);
         setCurrentProjectRole('owner');
-        setShareToken(presetId && presetId.startsWith('doc_') ? presetId : null);
+        setShareToken(null);
         setCloudSyncStatus('idle');
         setLastSavedTime(null);
         setAccessDenied(null);
@@ -284,6 +326,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (currentProjectRole === 'viewer') {
+            return;
+        }
+
+        // Never auto-save an empty document that hasn't been saved to cloud yet
+        if (!cloudProjectId && isDocumentEmpty(state)) {
+            setCloudSyncStatus('idle');
             return;
         }
 
@@ -396,6 +444,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
+        // Do not auto-save if project hasn't been saved to cloud yet and document is empty
+        if (!cloudProjectId && isDocumentEmpty(state)) {
+            setCloudSyncStatus('idle');
+            return;
+        }
+
         // Debounce auto-save by 1.8 seconds after state mutation
         setCloudSyncStatus('saving');
         if (autoSaveTimerRef.current) {
@@ -423,6 +477,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isGuest,
         user,
         currentProjectRole,
+        cloudProjectId,
         saveToCloudNow
     ]);
 

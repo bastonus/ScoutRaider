@@ -14,9 +14,15 @@ import type {
   GilwellStep,
   NumberingBadgeShape,
   NumberingFormat,
+  NumberingPosition,
   PageFormat,
   PageFormatSpec,
   ScoutRaiderPolySegment,
+  FlowConnectorShape,
+  NodeStyle,
+  SubsequentStartMode,
+  ReadingDirection,
+  FontSizeMode,
 } from './types';
 
 export const PX_PER_CM = 38;
@@ -97,6 +103,24 @@ export const DEFAULT_GILWELL_STEPS: GilwellStep[] = [
   { id: 'step-19', azimut: 71, distance: 931 },
   { id: 'step-20', azimut: 341, distance: 589 },
 ];
+
+export const AXIS_LINE_STYLES: AxisLineStyle[] = ['dashed', 'dotted', 'solid', 'dash-dot', 'long-dash', 'double'];
+export const NODE_STYLES: NodeStyle[] = ['circle', 'ring', 'diamond', 'square', 'none'];
+export const FLOW_CONNECTOR_SHAPES: FlowConnectorShape[] = ['stepped', 'curved', 'diagonal'];
+export const FLOW_CONNECTOR_LINE_STYLES: Exclude<AxisLineStyle, 'double'>[] = ['dashed', 'dotted', 'solid', 'dash-dot', 'long-dash'];
+export const NUMBERING_FORMATS: NumberingFormat[] = ['arabic', 'alpha-upper', 'alpha-lower', 'roman'];
+export const NUMBERING_POSITIONS: NumberingPosition[] = ['auto', 'left', 'right'];
+export const NUMBERING_BADGE_SHAPES: NumberingBadgeShape[] = ['none', 'circle', 'rounded', 'square', 'diamond', 'hexagon'];
+export const SUBSEQUENT_START_MODES: SubsequentStartMode[] = ['repeat-start', 'suite'];
+export const READING_DIRECTIONS: ReadingDirection[] = ['ltr', 'rtl'];
+export const FONT_SIZE_MODES: FontSizeMode[] = ['auto', 'fixed'];
+
+export const stepsToPolySegments = (steps: GilwellStep[]) => GilwellEngine.toPolySegments(steps);
+export const polySegmentsToSteps = (segments: ScoutRaiderPolySegment[]) => GilwellEngine.fromPolySegments(segments);
+export const createDefaultGilwellConfig = (overrides?: Partial<GilwellConfig>): GilwellConfig => ({
+  ...DEFAULT_GILWELL_CONFIG,
+  ...overrides,
+});
 
 export const DEFAULT_GILWELL_CONFIG: GilwellConfig = {
   pageFormat: 'A4',

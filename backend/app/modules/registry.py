@@ -7,12 +7,21 @@ and execution dispatching.
 import os
 import io
 import json
+import hashlib
 import zipfile
 import shutil
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Union
 from pathlib import Path
 
-from .schema import ModuleMetadata, EncodedOutput
+from .schema import (
+    ModuleMetadata,
+    EncodedOutput,
+    DataCapability,
+    HubResourceMetadata,
+    TrameDependencies,
+    HubResourceType,
+    S3DistributionMeta
+)
 from .adapter import LegacyManifestAdapter
 from .sandbox import execute_builtin_transform
 
@@ -214,3 +223,127 @@ class ModuleRegistry:
                         zf.write(f, str(rel))
 
         return output_zip_path
+
+    # ─── Hub v2 & S3 Extensions ──────────────────────────────────────────────
+
+    @staticmethod
+    def compute_file_sha256(file_path: Path) -> str:
+        """Calculates the SHA-256 hash of a file."""
+        hasher = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            while chunk := f.read(65536):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+
+    def list_by_capability(self, capability: Union[str, DataCapability]) -> List[ModuleMetadata]:
+        """Filters registered modules by their DataCapability."""
+        cap_val = capability.value if isinstance(capability, DataCapability) else str(capability).lower()
+        results = []
+        for m in self._modules.values():
+            if m.data_capability and m.data_capability.value == cap_val:
+                results.append(m)
+        return results
+
+    def resolve_trame_dependencies(
+        self,
+        trame_id: str,
+        dependencies: Optional[TrameDependencies] = None
+    ) -> Dict[str, Any]:
+        """
+        Analyses dependencies declared by a Trame de Raid and determines
+        satisfied, fetchable from S3/Hub, or missing modules.
+        """
+        deps_list = []
+        if dependencies and dependencies.required_modules:
+            deps_list = dependencies.required_modules
+
+        satisfied = []
+        missing = []
+        to_download = []
+
+        for dep in deps_list:
+            mod_id = dep.id.lower().strip()
+            installed = self.get(mod_id)
+            if installed:
+                satisfied.append({
+                    "id": mod_id,
+                    "version": installed.version,
+                    "role": dep.role,
+                    "status": "installed"
+                })
+            else:
+                # Mock or resolve remote Hub S3 availability
+                download_candidate = {
+                    "id": mod_id,
+                    "version_req": dep.version_req,
+                    "role": dep.role,
+                    "optional": dep.optional,
+                    "s3_url": f"https://scoutraider.silverhorse.fr/hub/crypto_module/{mod_id}/{mod_id}-latest.zip"
+                }
+                if not dep.optional:
+                    to_download.append(download_candidate)
+                else:
+                    missing.append(download_candidate)
+
+        is_ready = len(to_download) == 0 and len([m for m in missing if not m.get("optional")]) == 0
+
+        return {
+            "trame_id": trame_id,
+            "status": "ready" if is_ready else "requires_resolution",
+            "satisfied": satisfied,
+            "to_download": to_download,
+            "missing": missing
+        }
+
+    @staticmethod
+    def validate_manifest_payload(manifest_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validates raw manifest JSON payload according to Schema v2 rules.
+        Returns a structured validation diagnostic for AI agents and human creators.
+        """
+        errors = []
+        warnings = []
+
+        m_id = manifest_data.get("id")
+        if not m_id or not isinstance(m_id, str):
+            errors.append("Field 'id' is required and must be a string.")
+        elif not m_id.islower() or " " in m_id:
+            errors.append("Field 'id' must be lowercase without spaces (kebab-case or snake_case).")
+
+        name = manifest_data.get("name")
+        if not name or len(name) < 2:
+            errors.append("Field 'name' is required (min 2 chars).")
+
+        res_type = manifest_data.get("resource_type", "crypto_module")
+        try:
+            HubResourceType(res_type)
+        except ValueError:
+            errors.append(f"Invalid 'resource_type': '{res_type}'. Allowed: {[t.value for t in HubResourceType]}.")
+
+        # Crypto module capability checks
+        if res_type == "crypto_module":
+            data_cap = manifest_data.get("data_capability")
+            if not data_cap:
+                warnings.append("Recommendation: Declare 'data_capability' (map_path, numeric, alphabetic, etc.).")
+            else:
+                try:
+                    DataCapability(data_cap)
+                except ValueError:
+                    errors.append(f"Invalid 'data_capability': '{data_cap}'. Allowed: {[c.value for c in DataCapability]}.")
+
+        # Constraints validation
+        constraints = manifest_data.get("constraints", {})
+        if constraints:
+            max_prop = constraints.get("max_proportion")
+            if max_prop is not None and (max_prop < 0.0 or max_prop > 1.0):
+                errors.append("Constraint 'max_proportion' must be between 0.0 and 1.0.")
+
+        is_valid = len(errors) == 0
+        return {
+            "valid": is_valid,
+            "resource_id": m_id or "unknown",
+            "resource_type": res_type,
+            "errors": errors,
+            "warnings": warnings,
+            "schema_version": manifest_data.get("schema_version", "2.0")
+        }

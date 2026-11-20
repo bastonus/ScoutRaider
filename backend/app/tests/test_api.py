@@ -244,6 +244,13 @@ def test_projects_crud_endpoints(client):
     token = login_data["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
+    # 0. Reject saving empty project with default title
+    empty_res = client.post("/api/projects", headers=headers, json={
+        "title": "Document sans titre",
+        "state": {}
+    })
+    assert empty_res.status_code == 400
+
     # 1. Save new project via POST /api/projects
     save_res = client.post("/api/projects", headers=headers, json={
         "title": "Mon Raid 2026",

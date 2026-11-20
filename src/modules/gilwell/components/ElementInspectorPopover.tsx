@@ -235,17 +235,17 @@ export default function ElementInspectorPopover({
         <Section title="Style global">
           <InputRow label="Format">
             <select value={config.numbering.format} onChange={(e) => handleNumberingChange('format', e.target.value as any)} className={selectStyles}>
-              {NUMBERING_FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
+              {NUMBERING_FORMATS.map((f: string) => <option key={f} value={f}>{f}</option>)}
             </select>
           </InputRow>
           <InputRow label="Position">
             <select value={config.numbering.position} onChange={(e) => handleNumberingChange('position', e.target.value as any)} className={selectStyles}>
-              {NUMBERING_POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+              {NUMBERING_POSITIONS.map((p: string) => <option key={p} value={p}>{p}</option>)}
             </select>
           </InputRow>
           <InputRow label="Badge">
             <select value={config.numbering.badgeShape} onChange={(e) => handleNumberingChange('badgeShape', e.target.value as any)} className={selectStyles}>
-              {NUMBERING_BADGE_SHAPES.map((b) => <option key={b} value={b}>{b}</option>)}
+              {NUMBERING_BADGE_SHAPES.map((b: string) => <option key={b} value={b}>{b}</option>)}
             </select>
           </InputRow>
           <InputRow label="Rempli">
@@ -326,7 +326,7 @@ export default function ElementInspectorPopover({
         <Section title="Style de ligne">
           <InputRow label="Type">
             <select value={config.axis.lineStyle} onChange={(e) => handleAxisChange('lineStyle', e.target.value as any)} className={selectStyles}>
-              {AXIS_LINE_STYLES.map((s) => <option key={s} value={s}>{s}</option>)}
+              {AXIS_LINE_STYLES.map((s: string) => <option key={s} value={s}>{s}</option>)}
             </select>
           </InputRow>
           <InputRow label="Épaisseur">
@@ -339,7 +339,7 @@ export default function ElementInspectorPopover({
         <Section title="Nœuds">
           <InputRow label="Style">
             <select value={config.axis.nodeStyle} onChange={(e) => handleAxisChange('nodeStyle', e.target.value as any)} className={selectStyles}>
-              {NODE_STYLES.map((n) => <option key={n} value={n}>{n}</option>)}
+              {NODE_STYLES.map((n: string) => <option key={n} value={n}>{n}</option>)}
             </select>
           </InputRow>
           <InputRow label="Taille">
@@ -414,12 +414,12 @@ export default function ElementInspectorPopover({
                 onUpdateConfig({ pageStartOverrides: next });
               }}
               className={inputStyles}
-              placeholder={isFirstSection ? config.startLabel : `Suite p.${column?.pageNumber ?? 1}`}
+              placeholder={isFirstSection ? config.startLabel : `Suite p.${(column as any)?.pageNumber ?? 1}`}
             />
           </InputRow>
           <InputRow label="Mode suite">
             <select value={config.subsequentStartMode} onChange={(e) => onUpdateConfig({ subsequentStartMode: e.target.value as any })} className={selectStyles}>
-              {SUBSEQUENT_START_MODES.map((m) => <option key={m} value={m}>{m === 'repeat-start' ? 'Répéter départ' : 'Suite'}</option>)}
+              {SUBSEQUENT_START_MODES.map((m: string) => <option key={m} value={m}>{m === 'repeat-start' ? 'Répéter départ' : 'Suite'}</option>)}
             </select>
           </InputRow>
           <InputRow label="Modèle suite">
@@ -465,12 +465,12 @@ export default function ElementInspectorPopover({
         <Section title="Forme">
           <InputRow label="Type">
             <select value={config.flowConnector.shape} onChange={(e) => handleFlowChange('shape', e.target.value as any)} className={selectStyles}>
-              {FLOW_CONNECTOR_SHAPES.map((s) => <option key={s} value={s}>{s === 'stepped' ? 'Échelons' : s === 'curved' ? 'Courbe' : 'Diagonale'}</option>)}
+              {FLOW_CONNECTOR_SHAPES.map((s: string) => <option key={s} value={s}>{s === 'stepped' ? 'Échelons' : s === 'curved' ? 'Courbe' : 'Diagonale'}</option>)}
             </select>
           </InputRow>
           <InputRow label="Ligne">
             <select value={config.flowConnector.lineStyle} onChange={(e) => handleFlowChange('lineStyle', e.target.value as any)} className={selectStyles}>
-              {FLOW_CONNECTOR_LINE_STYLES.map((s) => <option key={s} value={s}>{s}</option>)}
+              {FLOW_CONNECTOR_LINE_STYLES.map((s: string) => <option key={s} value={s}>{s}</option>)}
             </select>
           </InputRow>
           <InputRow label="Épaisseur">

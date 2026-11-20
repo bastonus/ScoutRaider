@@ -7,6 +7,10 @@ Ce dossier regroupe la documentation produit, technique, pédagogique et histori
 ## 🧭 Feuille de Route & Spécifications Actives
 
 - **[ROADMAP.md](./ROADMAP.md)** : Feuille de route produit et technique consolidée (objectifs court et moyen terme).
+- **[HUB_MODULE_STANDARD_SPECIFICATION.md](./HUB_MODULE_STANDARD_SPECIFICATION.md)** : **[NOUVEAU]** Spécification technique du standard de module v2.0 (format .zip, schéma de manifeste v2, typologie spatiale/altimétrique, compatibilité S3).
+- **[TRAMES_ET_DEPENDANCES.md](./TRAMES_ET_DEPENDANCES.md)** : **[NOUVEAU]** Spécification des Trames de Raid (ex-orchestrations), pédagogie scoute et graphe de dépendances déclaratives.
+- **[GUIDE_MIGRATION_MODULES.md](./GUIDE_MIGRATION_MODULES.md)** : **[NOUVEAU]** Guide technique de migration des anciens modules (Morse, Polybe, Templier, etc.) vers le standard moderne Gilwell.
+- **[MCP_AGENT_FIRST_SPECIFICATION.md](./MCP_AGENT_FIRST_SPECIFICATION.md)** : **[NOUVEAU]** Spécification d'exposition Agent-First et outils MCP pour la manipulation et la création autonome de modules par une IA.
 - **[PLAN_IMPLEMENTATION.md](../PLAN_IMPLEMENTATION.md)** : Plan d'action priorisé P0–P3 issu de l'audit de santé du code (sécurité, CI, tests, découpage modulaire).
 - **[PRODUCTION_TESTS.md](../PRODUCTION_TESTS.md)** : Rapport de recette des 31 tests d'intégration en production sur `scoutraider.silverhorse.fr`.
 - **[CHANGELOG.md](../CHANGELOG.md)** : Journal officiel des versions et historique des modifications.
