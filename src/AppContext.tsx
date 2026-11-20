@@ -1526,44 +1526,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'UPDATE_MANUAL_TEXT': {
             const _theme1 = themeManager.getTheme();
 
-            // Synchronisation du titre du document :
-            // Le premier bloc manuel édité devient le titre du document une seule fois.
-            // On nettoie le markdown (#, **, *, _, etc.) pour ne garder que le texte.
-            let newDocTitle = state.document_title;
-            const titleAlreadySynced = state.document_title_synced ?? false;
-
-            if (!titleAlreadySynced) {
-                // Trouver le premier bloc manuel de carnet_steps
-                const firstManual = state.carnet_steps.find(s => s.isManual);
-                if (firstManual && firstManual.id === action.stepId) {
-                    const cleanText = (action.text || '')
-                        .replace(/<[^>]+>/g, '')
-                        .replace(/&nbsp;/g, ' ')
-                        .trim();
-                    if (cleanText.length > 0) {
-                        const firstLine = cleanText.split('\n')[0].trim().slice(0, 60);
-                        if (firstLine.length > 0) {
-                            // Retirer la syntaxe markdown : # ## ### ** * _ ` ~
-                            const titleText = firstLine
-                                .replace(/^#+\s*/, '')           // # ## ### au début
-                                .replace(/\*\*(.*?)\*\*/g, '$1') // **gras**
-                                .replace(/\*(.*?)\*/g, '$1')     // *italique*
-                                .replace(/__(.*?)__/g, '$1')     // __gras__
-                                .replace(/_(.*?)_/g, '$1')       // _italique_
-                                .replace(/`(.*?)`/g, '$1')       // `code`
-                                .replace(/~~(.*?)~~/g, '$1')     // ~~barré~~
-                                .trim();
-                            if (titleText.length > 0) {
-                                newDocTitle = titleText;
-                            }
-                        }
-                    }
-                }
-            }
-
             return {
                 ...state,
-                document_title: newDocTitle,
                 carnet_steps: state.carnet_steps.map(s => {
                     if (s.id === action.stepId) {
                         const encoded = ModuleLogic.encode(s.moduleId, action.text, { key: _theme1.vigenere_key });
@@ -1587,9 +1551,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
 
         case 'LOCK_DOCUMENT_TITLE': {
-            if (state.document_title && state.document_title !== 'Document sans titre') {
-                return { ...state, document_title_synced: true };
-            }
             return state;
         }
 
@@ -1842,11 +1803,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'TOGGLE_POI': {
             if (action.segIdx !== undefined && state.segment_pois) {
                 const segPois = state.segment_pois[action.segIdx.toString()] || [];
+                // Sélection exclusive : un seul POI actif à la fois par segment
+                const wasSelected = segPois.find(p => p.id === action.poiId)?.selected;
                 const updatedPois = segPois.map(p =>
-                    p.id === action.poiId ? { ...p, selected: !p.selected } : p
+                    p.id === action.poiId
+                        ? { ...p, selected: !wasSelected }   // toggle le POI cliqué
+                        : { ...p, selected: false }          // désélectionne tous les autres
                 );
-                // Also update the fallback POI in polygonal_steps
-                const selected = updatedPois.find(p => p.selected) || updatedPois[0] || null;
+                // Mettre à jour le POI de référence dans polygonal_steps
+                const selected = updatedPois.find(p => p.selected) || null;
                 const newPolySteps = [...state.polygonal_steps];
                 if (newPolySteps[action.segIdx]) {
                     newPolySteps[action.segIdx] = {
@@ -1862,8 +1827,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
                     ...state,
                     carnet_steps: state.carnet_steps.map(s => {
                         if (s.id !== action.stepId || !s.pois) return s;
+                        const wasSelected = s.pois.find(p => p.id === action.poiId)?.selected;
                         const updatedPois = s.pois.map(p =>
-                            p.id === action.poiId ? { ...p, selected: !p.selected } : p
+                            p.id === action.poiId
+                                ? { ...p, selected: !wasSelected }
+                                : { ...p, selected: false }
                         );
                         return regenerateStepTexts({ ...s, pois: updatedPois }, state);
                     })
@@ -1945,7 +1913,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         case 'SET_DOCUMENT_TITLE':
             return {
                 ...state,
-                document_title: action.title.trim() || 'Document sans titre',
+                document_title: action.title !== undefined ? action.title : 'Document sans titre',
                 document_title_synced: true,
             };
 

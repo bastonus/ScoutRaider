@@ -15,7 +15,7 @@ import {
     Ruler, Layers, Lock, Unlock, Compass, AlertTriangle, X, SlidersHorizontal,
     CheckSquare, MoreVertical, Lightbulb, Copy, MoveUp, MoveDown, Copy as DuplicateIcon,
     Link2, Flag, Info, Heading1, Heading2, Heading3, List, Quote, Image,
-    FileText, Key, Sigma, Zap, Settings, Palette, ChevronRight
+    FileText, Key, Sigma, Zap, Settings, Palette, ChevronRight, MapPin
 } from 'lucide-react';
 
 import type { CarnetStep, ModuleId, CarnetView, NavLanguage } from '../../logic/types';
@@ -1091,13 +1091,13 @@ function ComputedStepLine({
                                 <>
                                     {/* Code chiffré */}
                                     <div style={{ fontFamily: font, fontSize: fontSize, color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', wordBreak: 'break-all', letterSpacing: step.moduleId === 'morse' ? '2px' : '0.02em', lineHeight: 1.4 }}>
-                                        <HighlightedText text={encodedLine} pois={pois} isEncoded={true} />
+                                        <HighlightedText text={encodedLine} pois={pois} isEncoded={true} sourceLine={solutionLine} onPoiToggle={onPoiToggle} />
                                     </div>
                                     {/* Ligne de solution affichée en colonne sous le code chiffré (au survol uniquement) */}
                                     {hovered && (
                                         <div style={{ fontSize: '11px', color: dangerColor || 'var(--semantic-green)', marginTop: '3px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                             <Lightbulb size={11} strokeWidth={2.4} color={dangerColor || 'var(--semantic-green)'} style={{ flexShrink: 0 }} />
-                                            <HighlightedText text={solutionLine} pois={pois} isEncoded={false} />
+                                            <HighlightedText text={solutionLine} pois={pois} isEncoded={false} onPoiToggle={onPoiToggle} />
                                         </div>
                                     )}
                                 </>
@@ -1106,7 +1106,7 @@ function ComputedStepLine({
                                 /* NB: MarkdownRenderer NE doit PAS être utilisé ici — les lignes calculées par l'itinéraire sont du texte brut,
                                    non du markdown. MarkdownRenderer génère des placeholders internes (CIPHER_xxx_0) qui fuient dans l'affichage. */
                                 <div style={{ fontSize: '13px', color: dangerColor || 'var(--text-primary)', fontWeight: dangerColor ? 700 : 'normal', lineHeight: 1.5 }}>
-                                    <HighlightedText text={encodedLine || solutionLine} pois={pois} isEncoded={false} />
+                                    <HighlightedText text={encodedLine || solutionLine} pois={pois} isEncoded={false} onPoiToggle={onPoiToggle} />
                                 </div>
                             )}
                         </div>
@@ -1119,7 +1119,7 @@ function ComputedStepLine({
                             {hovered && step.moduleId !== 'texte_clair' && !hasMap && solutionLine && (
                                 <div style={{ fontSize: '11.5px', color: 'var(--semantic-green)', marginTop: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <Lightbulb size={12} strokeWidth={2.4} color="var(--semantic-green)" style={{ flexShrink: 0 }} />
-                                    <HighlightedText text={solutionLine} pois={pois} isEncoded={false} />
+                                    <HighlightedText text={solutionLine} pois={pois} isEncoded={false} onPoiToggle={onPoiToggle} />
                                 </div>
                             )}
                         </div>
@@ -1134,14 +1134,204 @@ function ComputedStepLine({
 }
 
 // ─── HighlightedText — Mise en évidence syntaxique (POI, distances, azimuths) ───
+// Fonctionne même sur texte encodé (isEncoded=true) : on repère les patterns dans le texte
+// source (solutionLine) et on colorie les tokens correspondants dans l'encodedLine via les indices.
+
+// Helpers azimut
+function azimutToDegres(text: string): number | null {
+    const degMatch = text.match(/(\d+)\s*°/);
+    if (degMatch) return parseInt(degMatch[1], 10);
+    const dirs: Record<string, number> = {
+        'Nord': 0, 'Est': 90, 'Sud': 180, 'Ouest': 270,
+        'Nord-Est': 45, 'Sud-Est': 135, 'Sud-Ouest': 225, 'Nord-Ouest': 315,
+        'Nord-Nord-Est': 22, 'Est-Nord-Est': 67, 'Est-Sud-Est': 112, 'Sud-Sud-Est': 157,
+        'Sud-Sud-Ouest': 202, 'Ouest-Sud-Ouest': 247, 'Ouest-Nord-Ouest': 292, 'Nord-Nord-Ouest': 337,
+    };
+    for (const [k, v] of Object.entries(dirs)) {
+        if (text.toLowerCase().includes(k.toLowerCase())) return v;
+    }
+    const heureMatch = text.match(/(\d+)\s*heure/);
+    if (heureMatch) return ((parseInt(heureMatch[1], 10) % 12) / 12) * 360;
+    if (/tout droit|12h/i.test(text)) return 0; // relatif
+    if (/à droite/i.test(text)) return 90;
+    if (/à gauche/i.test(text)) return 270;
+    if (/demi.tour/i.test(text)) return 180;
+    return null;
+}
+
+function degreesToHoraire(deg: number): string {
+    const h = Math.round((deg / 360) * 12) % 12 || 12;
+    return `${h}h`;
+}
+function degreesToCardinal(deg: number): string {
+    const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
+    return dirs[Math.round(deg / 22.5) % 16];
+}
+
+// Popover azimut — supprimé, intégré directement dans AzimutToken
+
+// Token azimut — badge déroulant style POI avec fond bleu + flèche
+function AzimutToken({ children }: { children: string }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLSpanElement>(null);
+    const deg = azimutToDegres(children);
+
+    useEffect(() => {
+        if (!open) return;
+        const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, [open]);
+
+    const formats = deg !== null ? [
+        { label: `${deg}°`, title: 'Degrés', desc: 'Azimut en degrés' },
+        { label: degreesToHoraire(deg), title: 'Horaire', desc: 'Format horloge' },
+        { label: degreesToCardinal(deg), title: 'Cardinal', desc: 'Point cardinal' },
+    ] : [];
+
+    const rect = ref.current?.getBoundingClientRect();
+
+    return (
+        <span ref={ref} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <span
+                onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
+                style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '3px',
+                    background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.4)',
+                    borderRadius: '5px', padding: '1px 5px 1px 6px',
+                    color: '#60a5fa', fontWeight: 700, fontSize: 'inherit',
+                    cursor: 'pointer', userSelect: 'none',
+                    transition: 'background 80ms ease',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.25)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.15)')}
+                title="Cliquer pour afficher les conversions"
+            >
+                {children}
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ flexShrink: 0, marginLeft: '1px' }}>
+                    <path d="M1.5 3L4 5.5L6.5 3" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            </span>
+            {open && rect && (
+                <div onMouseDown={e => e.stopPropagation()} style={{
+                    position: 'fixed', left: rect.left, top: rect.bottom + 4, zIndex: 99999,
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
+                    borderRadius: '8px', padding: '5px', boxShadow: 'var(--shadow-lg)',
+                    minWidth: '150px',
+                    display: 'flex', flexDirection: 'column', gap: '2px',
+                    animation: 'popIn 100ms ease-out',
+                }}>
+                    <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 4px 4px' }}>Direction</div>
+                    {formats.map(f => (
+                        <div key={f.title} style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '5px 7px', borderRadius: '6px',
+                            background: 'transparent',
+                        }}>
+                            <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontWeight: 500 }}>{f.desc}</span>
+                            <span style={{
+                                background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.4)',
+                                borderRadius: '5px', padding: '2px 8px',
+                                fontSize: '11px', color: '#60a5fa', fontWeight: 700,
+                                fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+                            }}>{f.label}</span>
+                        </div>
+                    ))}
+                    {formats.length === 0 && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', padding: '5px 7px' }}>Direction relative</div>
+                    )}
+                </div>
+            )}
+        </span>
+    );
+}
+
+// Token POI — badge avec fond coloré + flèche déroulante
+function PoiToken({ pois, onPoiToggle }: { pois: Array<{ id: string; name: string; selected: boolean; type?: string }>; onPoiToggle?: (id: string) => void }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLSpanElement>(null);
+    const selectedPoi = pois.find(p => p.selected);
+    useEffect(() => {
+        if (!open) return;
+        const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, [open]);
+    const handleSelect = (id: string) => {
+        // Désélectionner l'actuel si différent, puis sélectionner le nouveau
+        if (selectedPoi && selectedPoi.id !== id) onPoiToggle?.(selectedPoi.id);
+        onPoiToggle?.(id);
+        setOpen(false);
+    };
+    const rect = ref.current?.getBoundingClientRect();
+    return (
+        <span ref={ref} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <span
+                onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
+                style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '3px',
+                    background: 'rgba(251,191,36,0.18)', border: '1px solid rgba(251,191,36,0.45)',
+                    borderRadius: '5px', padding: '1px 5px 1px 6px',
+                    color: '#fbbf24', fontWeight: 700, fontSize: 'inherit',
+                    cursor: 'pointer', userSelect: 'none',
+                    transition: 'background 80ms ease',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251,191,36,0.28)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(251,191,36,0.18)')}
+                title={selectedPoi ? `POI : ${selectedPoi.name}` : 'Choisir un point d\'intérêt'}
+            >
+                {selectedPoi ? selectedPoi.name : '…'}
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ flexShrink: 0, marginLeft: '1px' }}>
+                    <path d="M1.5 3L4 5.5L6.5 3" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            </span>
+            {open && rect && (
+                <div onMouseDown={e => e.stopPropagation()} style={{
+                    position: 'fixed', left: rect.left, top: rect.bottom + 4, zIndex: 99999,
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
+                    borderRadius: '8px', padding: '5px', boxShadow: 'var(--shadow-lg)',
+                    minWidth: '160px', maxHeight: '220px', overflowY: 'auto',
+                    display: 'flex', flexDirection: 'column', gap: '2px',
+                    animation: 'popIn 100ms ease-out',
+                }}>
+                    <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 4px 4px' }}>Points d'intérêt</div>
+                    {pois.map(poi => (
+                        <button key={poi.id} type="button" onClick={() => handleSelect(poi.id)} style={{
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            padding: '5px 7px', borderRadius: '6px', border: 'none',
+                            background: poi.selected ? 'rgba(251,191,36,0.15)' : 'transparent',
+                            color: poi.selected ? '#fbbf24' : 'var(--text-primary)',
+                            fontSize: '11px', fontWeight: poi.selected ? 700 : 400,
+                            cursor: 'pointer', textAlign: 'left', width: '100%',
+                            transition: 'background 70ms ease',
+                        }}
+                            onMouseEnter={e => { if (!poi.selected) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                            onMouseLeave={e => { if (!poi.selected) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                            <MapPin size={10} color={poi.selected ? '#fbbf24' : 'var(--text-dim)'} />
+                            {poi.name}
+                            {poi.selected && <Check size={10} style={{ marginLeft: 'auto', flexShrink: 0 }} />}
+                        </button>
+                    ))}
+                    {pois.length === 0 && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', padding: '5px 7px' }}>Aucun POI disponible</div>
+                    )}
+                </div>
+            )}
+        </span>
+    );
+}
 
 interface HighlightedTextProps {
     text: string;
-    pois?: any[];
+    pois?: Array<{ id: string; name: string; selected: boolean; type?: string }>;
     isEncoded: boolean;
+    /** Pour le texte encodé, le texte source (non encodé) pour situer les patterns */
+    sourceLine?: string;
+    onPoiToggle?: (poiId: string) => void;
 }
 
-const HighlightedText = ({ text, pois, isEncoded }: HighlightedTextProps) => {
+const HighlightedText = ({ text, pois, isEncoded, sourceLine, onPoiToggle }: HighlightedTextProps) => {
     if (!text) return null;
 
     // Pattern pour balises personnalisées : [morse]...[/morse], etc.
@@ -1156,7 +1346,7 @@ const HighlightedText = ({ text, pois, isEncoded }: HighlightedTextProps) => {
         while ((match = customTagRegex.exec(text)) !== null) {
             const before = text.substring(lastIndex, match.index);
             if (before) {
-                segments.push(<HighlightedTextCore key={`before-${lastIndex}`} text={before} pois={pois} isEncoded={isEncoded} />);
+                segments.push(<HighlightedTextCore key={`before-${lastIndex}`} text={before} pois={pois} isEncoded={isEncoded} onPoiToggle={onPoiToggle} />);
             }
 
             const tagName = (match[2] || match[4] || '').toLowerCase();
@@ -1189,23 +1379,34 @@ const HighlightedText = ({ text, pois, isEncoded }: HighlightedTextProps) => {
 
         const remaining = text.substring(lastIndex);
         if (remaining) {
-            segments.push(<HighlightedTextCore key={`after-${lastIndex}`} text={remaining} pois={pois} isEncoded={isEncoded} />);
+            segments.push(<HighlightedTextCore key={`after-${lastIndex}`} text={remaining} pois={pois} isEncoded={isEncoded} onPoiToggle={onPoiToggle} />);
         }
 
         return <>{segments}</>;
     }
 
-    return <HighlightedTextCore text={text} pois={pois} isEncoded={isEncoded} />;
+    return <HighlightedTextCore text={text} pois={pois} isEncoded={isEncoded} sourceLine={sourceLine} onPoiToggle={onPoiToggle} />;
 }
 
 interface HighlightedTextCoreProps {
     text: string;
-    pois?: any[];
+    pois?: Array<{ id: string; name: string; selected: boolean; type?: string }>;
     isEncoded: boolean;
+    sourceLine?: string;
+    onPoiToggle?: (poiId: string) => void;
 }
 
-const HighlightedTextCore = ({ text, pois, isEncoded }: HighlightedTextCoreProps) => {
-    if (!text || isEncoded) return <>{text}</>;
+const HighlightedTextCore = ({ text, pois, isEncoded, sourceLine, onPoiToggle }: HighlightedTextCoreProps) => {
+    if (!text) return null;
+
+    // Pour texte encodé : on affiche le texte encodé brut mais on insère des marqueurs
+    // colorés positionnels en superposant les segments détectés dans la ligne source (sourceLine).
+    // Si pas de sourceLine, on affiche tel quel (pas de couleurs sur encodé sans référence).
+    if (isEncoded) {
+        if (!sourceLine) return <>{text}</>;
+        // On va colorer le texte encodé par segments de même longueur que les tokens source
+        return <EncodedHighlightedText encoded={text} source={sourceLine} pois={pois} onPoiToggle={onPoiToggle} />;
+    }
 
     const selectedPoi = pois?.find(p => p.selected);
     const poiName = selectedPoi ? selectedPoi.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : null;
@@ -1223,12 +1424,12 @@ const HighlightedTextCore = ({ text, pois, isEncoded }: HighlightedTextCoreProps
         '\\d+\\s+heure(?:s)?(?:\\s+\\(.*?\\))?',
     ].join('|');
 
-    const patterns = [];
+    const patterns: string[] = [];
     if (poiName) patterns.push(poiName);
     patterns.push(distanceRegex);
     patterns.push(azimuthRegex);
 
-    const regex = new RegExp(`(${patterns.join('|')})`, 'g');
+    const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
     const parts = text.split(regex);
 
     return (
@@ -1236,18 +1437,107 @@ const HighlightedTextCore = ({ text, pois, isEncoded }: HighlightedTextCoreProps
             {parts.map((part, i) => {
                 if (!part) return null;
 
-                if (poiName && part.toLowerCase() === selectedPoi?.name.toLowerCase()) {
-                    return <span key={i} style={{ color: '#fbbf24', fontWeight: 700 }}>{part}</span>;
+                // POI : badge déroulant avec tous les POIs disponibles
+                if (pois && pois.length > 0 && poiName && part.toLowerCase() === selectedPoi?.name.toLowerCase()) {
+                    return <PoiToken key={i} pois={pois} onPoiToggle={onPoiToggle} />;
                 }
-                if (new RegExp(`^${distanceRegex}$`).test(part)) {
+                // Distance : colorée en vert
+                if (new RegExp(`^${distanceRegex}$`, 'i').test(part)) {
                     return <span key={i} style={{ color: '#34d399', fontWeight: 700 }}>{part}</span>;
                 }
-                if (new RegExp(`^${azimuthRegex}$`).test(part)) {
-                    return <span key={i} style={{ color: '#60a5fa', fontWeight: 700 }}>{part}</span>;
+                // Azimut : token cliquable avec popover multi-format
+                if (new RegExp(`^(${azimuthRegex})$`, 'i').test(part)) {
+                    return <AzimutToken key={i}>{part}</AzimutToken>;
                 }
 
                 return <span key={i}>{part}</span>;
             })}
         </>
     );
+}
+
+// Coloration positionnelle sur texte encodé :
+// On détecte les tokens dans la source, on calcule leur position relative dans le texte encodé
+// par rapport à la longueur totale, et on applique la couleur sur la tranche correspondante.
+function EncodedHighlightedText({
+    encoded, source, pois, onPoiToggle
+}: {
+    encoded: string;
+    source: string;
+    pois?: Array<{ id: string; name: string; selected: boolean; type?: string }>;
+    onPoiToggle?: (id: string) => void;
+}) {
+    if (!encoded || !source) return <>{encoded}</>;
+
+    const selectedPoi = pois?.find(p => p.selected);
+    const poiNameRe = selectedPoi ? selectedPoi.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : null;
+
+    const distanceRegex = '\\d+(?:\\.\\d+)?\\s*(?:pas|mètres|km|kilomètres)';
+    const azimuthRegex = [
+        'au\\s+\\d+°','\\d+°',
+        'du\\s+(?:Nord|Sud|Est|Ouest)(?:-(?:Nord|Sud|Est|Ouest)(?:-(?:Nord|Sud|Est|Ouest))?)?',
+        'en direction du\\s+(?:Nord|Sud|Est|Ouest)(?:-(?:Nord|Sud|Est|Ouest)(?:-(?:Nord|Sud|Est|Ouest))?)?',
+        '(?:Nord|Sud|Est|Ouest)(?:-(?:Nord|Sud|Est|Ouest)(?:-(?:Nord|Sud|Est|Ouest))?)?(?=\\b|$)',
+        '(?:tournez\\s+)?légèrement\\s+à\\s+(?:droite|gauche)',
+        '(?:tournez\\s+)?à\\s+(?:droite|gauche)',
+        'faites\\s+un\\s+demi-tour(?:\\s+à\\s+(?:droite|gauche))?','demi-tour',
+        'continuez\\s+tout\\s+droit','tout\\s+droit(?:\\s+\\(12h\\))?',
+        '\\d+\\s+heure(?:s)?(?:\\s+\\(.*?\\))?',
+    ].join('|');
+
+    const patterns: string[] = [];
+    if (poiNameRe) patterns.push(poiNameRe);
+    patterns.push(distanceRegex);
+    patterns.push(azimuthRegex);
+
+    const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
+
+    // Identifier les spans dans la source avec leur type et position relative
+    interface Span { start: number; end: number; type: 'poi' | 'distance' | 'azimut'; text: string; }
+    const spans: Span[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = regex.exec(source)) !== null) {
+        const part = m[0];
+        let type: 'poi' | 'distance' | 'azimut' = 'azimut';
+        if (poiNameRe && part.toLowerCase() === selectedPoi?.name.toLowerCase()) type = 'poi';
+        else if (new RegExp(`^${distanceRegex}$`, 'i').test(part)) type = 'distance';
+        spans.push({ start: m.index, end: m.index + part.length, type, text: part });
+    }
+
+    if (spans.length === 0) return <>{encoded}</>;
+
+    // Mapper positions source → positions encodées proportionnellement
+    const srcLen = source.length;
+    const encLen = encoded.length;
+    const toEnc = (srcPos: number) => Math.round((srcPos / srcLen) * encLen);
+
+    // Construire les segments du texte encodé avec colorisation
+    const segments: React.ReactNode[] = [];
+    let encCursor = 0;
+
+    for (let si = 0; si < spans.length; si++) {
+        const span = spans[si];
+        const eStart = Math.max(encCursor, toEnc(span.start));
+        const eEnd = Math.min(encLen, toEnc(span.end));
+
+        if (eStart > encCursor) {
+            segments.push(<span key={`pre-${si}`}>{encoded.slice(encCursor, eStart)}</span>);
+        }
+        if (eEnd > eStart) {
+            const slice = encoded.slice(eStart, eEnd);
+            if (span.type === 'poi') {
+                segments.push(<PoiToken key={`poi-${si}`} pois={pois || []} onPoiToggle={onPoiToggle} />);
+            } else if (span.type === 'distance') {
+                segments.push(<span key={`dist-${si}`} style={{ color: '#34d399', fontWeight: 700 }}>{slice}</span>);
+            } else {
+                segments.push(<AzimutToken key={`az-${si}`}>{slice}</AzimutToken>);
+            }
+        }
+        encCursor = eEnd;
+    }
+    if (encCursor < encLen) {
+        segments.push(<span key="tail">{encoded.slice(encCursor)}</span>);
+    }
+
+    return <>{segments}</>;
 }
