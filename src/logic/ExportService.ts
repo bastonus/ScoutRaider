@@ -127,12 +127,45 @@ export class ExportService {
 
             if (includeElevation) {
                 const allCoords: [number, number][] = [];
+                // 1. Essayer depuis state.routes
                 for (const r of (state.routes || [])) {
                     if (!r) continue;
                     const geom = r.geojson?.geometry || r.geojson;
                     const pts = geom?.coordinates || [];
                     for (const pt of pts) {
                         if (Array.isArray(pt) && pt.length >= 2) allCoords.push([pt[0], pt[1]]);
+                    }
+                }
+                // 2. Fallback depuis state.carnet_steps
+                if (allCoords.length < 2 && state.carnet_steps && state.carnet_steps.length > 0) {
+                    for (const s of state.carnet_steps) {
+                        for (const pt of (s.coords || [])) {
+                            if (Array.isArray(pt) && pt.length >= 2) {
+                                const lon = (pt[0] > 35 && pt[0] < 55) ? pt[1] : pt[0];
+                                const lat = (pt[0] > 35 && pt[0] < 55) ? pt[0] : pt[1];
+                                allCoords.push([lon, lat]);
+                            }
+                        }
+                    }
+                }
+                // 3. Fallback depuis state.polygonal_steps
+                if (allCoords.length < 2 && state.polygonal_steps && state.polygonal_steps.length > 0) {
+                    for (const seg of state.polygonal_steps) {
+                        for (const pt of (seg.coords || [])) {
+                            if (Array.isArray(pt) && pt.length >= 2) {
+                                const lon = (pt[0] > 35 && pt[0] < 55) ? pt[1] : pt[0];
+                                const lat = (pt[0] > 35 && pt[0] < 55) ? pt[0] : pt[1];
+                                allCoords.push([lon, lat]);
+                            }
+                        }
+                    }
+                }
+                // 4. Fallback depuis state.stages
+                if (allCoords.length < 2 && state.stages && state.stages.length >= 2) {
+                    for (const st of state.stages) {
+                        if (st.coords && st.coords.length >= 2) {
+                            allCoords.push([st.coords[1], st.coords[0]]); // [lat, lon] -> [lon, lat]
+                        }
                     }
                 }
                 if (allCoords.length >= 2) {
@@ -226,58 +259,41 @@ export class ExportService {
             const api = getElectronAPI();
             const fontsBase64: Record<string, string> = {};
             
-            const usedModules = new Set(state.carnet_steps.map(s => s.moduleId));
-            if (usedModules.has('morse')) {
+            const loadFontData = async (relPath: string, webPath: string): Promise<string | null> => {
                 if (api?.readFileBase64) {
-                    const base64 = await api.readFileBase64('public/fonts/morse.ttf');
-                    if (base64) fontsBase64.morse = base64;
-                } else {
                     try {
-                        const res = await fetch('/fonts/morse.ttf');
+                        const b64 = await api.readFileBase64(relPath);
+                        if (b64) return b64;
+                    } catch (e) {
+                        console.warn(`[ExportService] Error reading ${relPath} via Electron:`, e);
+                    }
+                }
+                // Fallback via web fetch
+                try {
+                    const res = await fetch(webPath);
+                    if (res.ok) {
                         const buffer = await res.arrayBuffer();
                         const bytes = new Uint8Array(buffer);
                         let binary = '';
                         for (let i = 0; i < bytes.byteLength; i++) {
                             binary += String.fromCharCode(bytes[i]);
                         }
-                        fontsBase64.morse = btoa(binary);
-                    } catch (e) { console.warn('Could not fetch morse font', e); }
+                        return btoa(binary);
+                    }
+                } catch (e) {
+                    console.warn(`[ExportService] Could not fetch ${webPath}:`, e);
                 }
-            }
-            if (usedModules.has('templier')) {
-                if (api?.readFileBase64) {
-                    const base64 = await api.readFileBase64('public/fonts/TemplarsCipherPlus.ttf');
-                    if (base64) fontsBase64.templier = base64;
-                } else {
-                    try {
-                        const res = await fetch('/fonts/TemplarsCipherPlus.ttf');
-                        const buffer = await res.arrayBuffer();
-                        const bytes = new Uint8Array(buffer);
-                        let binary = '';
-                        for (let i = 0; i < bytes.byteLength; i++) {
-                            binary += String.fromCharCode(bytes[i]);
-                        }
-                        fontsBase64.templier = btoa(binary);
-                    } catch (e) { console.warn('Could not fetch templier font', e); }
-                }
-            }
-            if (usedModules.has('drapeaux') || usedModules.has('maritime')) {
-                if (api?.readFileBase64) {
-                    const base64 = await api.readFileBase64('public/fonts/mari-01.ttf');
-                    if (base64) fontsBase64.maritime = base64;
-                } else {
-                    try {
-                        const res = await fetch('/fonts/mari-01.ttf');
-                        const buffer = await res.arrayBuffer();
-                        const bytes = new Uint8Array(buffer);
-                        let binary = '';
-                        for (let i = 0; i < bytes.byteLength; i++) {
-                            binary += String.fromCharCode(bytes[i]);
-                        }
-                        fontsBase64.maritime = btoa(binary);
-                    } catch (e) { console.warn('Could not fetch maritime font', e); }
-                }
-            }
+                return null;
+            };
+
+            const [morseB64, templierB64, maritimeB64] = await Promise.all([
+                loadFontData('public/fonts/morse.ttf', '/fonts/morse.ttf'),
+                loadFontData('public/fonts/TemplarsCipherPlus.ttf', '/fonts/TemplarsCipherPlus.ttf'),
+                loadFontData('public/fonts/mari-01.ttf', '/fonts/mari-01.ttf'),
+            ]);
+            if (morseB64) fontsBase64.morse = morseB64;
+            if (templierB64) fontsBase64.templier = templierB64;
+            if (maritimeB64) fontsBase64.maritime = maritimeB64;
 
             // 4. Determine which versions to generate
             const versions: { label: string; isSolution: boolean }[] = [];

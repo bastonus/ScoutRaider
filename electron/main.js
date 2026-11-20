@@ -398,17 +398,35 @@ ipcMain.handle('open-scoutproj', async () => {
 });
 
 // Raw file IO
+const resolveFilePath = (filePath) => {
+  if (path.isAbsolute(filePath)) return filePath;
+  return path.resolve(__dirname, '..', filePath);
+};
+
 ipcMain.handle('read-file', async (event, filePath) => {
-  return await fs.readFile(filePath, 'utf-8');
+  const resolved = resolveFilePath(filePath);
+  try {
+    return await fs.readFile(resolved, 'utf-8');
+  } catch {
+    return await fs.readFile(path.resolve(process.cwd(), filePath), 'utf-8');
+  }
 });
 
 ipcMain.handle('read-file-base64', async (event, filePath) => {
-  try {
-    const data = await fs.readFile(filePath);
-    return data.toString('base64');
-  } catch (e) {
-    return null;
+  const candidates = [
+    resolveFilePath(filePath),
+    path.resolve(process.cwd(), filePath),
+    path.resolve(__dirname, filePath),
+  ];
+  for (const c of candidates) {
+    try {
+      const data = await fs.readFile(c);
+      return data.toString('base64');
+    } catch {
+      // try next
+    }
   }
+  return null;
 });
 
 ipcMain.handle('write-file', async (event, filePath, data) => {

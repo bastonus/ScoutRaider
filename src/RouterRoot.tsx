@@ -54,6 +54,7 @@ export default function RouterRoot() {
 
             {/* Projects home — accessible to both authenticated and guests */}
             <Route path="/projects" element={<ProjectsHomePage />} />
+            <Route path="/projets" element={<ProjectsHomePage />} />
 
             {/* Marketplace — standalone community modules page */}
             <Route path="/marketplace" element={<MarketplacePage />} />

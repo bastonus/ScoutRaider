@@ -278,7 +278,7 @@ class ModuleRegistry:
                     "version_req": dep.version_req,
                     "role": dep.role,
                     "optional": dep.optional,
-                    "s3_url": f"https://scoutraider.silverhorse.fr/hub/crypto_module/{mod_id}/{mod_id}-latest.zip"
+                    "s3_url": f"https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/{mod_id}-2.0.0.zip"
                 }
                 if not dep.optional:
                     to_download.append(download_candidate)
@@ -347,3 +347,15 @@ class ModuleRegistry:
             "warnings": warnings,
             "schema_version": manifest_data.get("schema_version", "2.0")
         }
+
+
+# Global singleton instance
+module_registry = ModuleRegistry()
+
+
+# Default singleton instance for application use
+module_registry = ModuleRegistry()
+_legacy_dir = Path(__file__).resolve().parents[3] / "legacy" / "modules"
+if _legacy_dir.exists():
+    module_registry.load_from_base_dir(_legacy_dir)
+

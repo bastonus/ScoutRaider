@@ -9,6 +9,7 @@ import type { CsvColumnKey, ExportPipelineOptions } from '../../logic/ExportServ
 import { ExportHTMLRenderer } from '../../logic/ExportHTMLRenderer';
 import { themeManager } from '../../logic/ThemeManager';
 import { IGNClient } from '../../logic/IGNClient';
+import { ElevationService } from '../../logic/ElevationService';
 import { useApp } from '../../AppContext';
 
 type ExportFormatId = 'pdf' | 'docx' | 'html' | 'csv' | 'tsv';
@@ -103,6 +104,100 @@ export default function ExportModal({ onClose }: ExportModalProps) {
     ExportService.checkWeasyPrint().then(r => setWpStatus({ checked: true, ...r }));
   }, []);
 
+  const [previewElevation, setPreviewElevation] = useState<{ svg?: string; stats?: any }>({});
+  const [previewFonts, setPreviewFonts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let active = true;
+    const computeAlti = async () => {
+      const allCoords: [number, number][] = [];
+      // 1. Depuis state.routes
+      for (const r of (state.routes || [])) {
+        if (!r) continue;
+        const pts = (r.geojson?.geometry || r.geojson)?.coordinates || [];
+        for (const pt of pts) {
+          if (Array.isArray(pt) && pt.length >= 2) allCoords.push([pt[0], pt[1]]);
+        }
+      }
+      // 2. Fallback depuis state.carnet_steps
+      if (allCoords.length < 2 && state.carnet_steps) {
+        for (const s of state.carnet_steps) {
+          for (const pt of (s.coords || [])) {
+            if (Array.isArray(pt) && pt.length >= 2) {
+              const lon = (pt[0] > 35 && pt[0] < 55) ? pt[1] : pt[0];
+              const lat = (pt[0] > 35 && pt[0] < 55) ? pt[0] : pt[1];
+              allCoords.push([lon, lat]);
+            }
+          }
+        }
+      }
+      // 3. Fallback depuis state.stages
+      if (allCoords.length < 2 && state.stages && state.stages.length >= 2) {
+        for (const st of state.stages) {
+          if (st.coords && st.coords.length >= 2) {
+            allCoords.push([st.coords[1], st.coords[0]]);
+          }
+        }
+      }
+      if (allCoords.length >= 2) {
+        try {
+          const stages = (state.stages || []).map(s => ({ label: s.label, coords: s.coords }));
+          const prof = await ElevationService.computeProfile(allCoords, 'lonlat', stages);
+          if (prof && active) {
+            const svg = ElevationService.generateSvg(prof, { width: 720, height: 160, accentColor: '#0e7490', isDarkTheme: false });
+            setPreviewElevation({
+              svg,
+              stats: {
+                ascend_m: prof.ascend_m,
+                descend_m: prof.descend_m,
+                min_alt_m: prof.min_alt_m,
+                max_alt_m: prof.max_alt_m,
+                duration_min: prof.estimated_duration_min
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Could not compute elevation for preview', e);
+        }
+      }
+    };
+    computeAlti();
+
+    const loadFonts = async () => {
+      const fonts: Record<string, string> = {};
+      const fontList = [
+        { key: 'morse', path: 'public/fonts/morse.ttf', url: '/fonts/morse.ttf' },
+        { key: 'templier', path: 'public/fonts/TemplarsCipherPlus.ttf', url: '/fonts/TemplarsCipherPlus.ttf' },
+        { key: 'maritime', path: 'public/fonts/mari-01.ttf', url: '/fonts/mari-01.ttf' },
+      ];
+      const api = (window as any).electronAPI;
+      for (const f of fontList) {
+        if (!active) return;
+        let b64: string | null = null;
+        if (api?.readFileBase64) {
+          try { b64 = await api.readFileBase64(f.path); } catch {}
+        }
+        if (!b64) {
+          try {
+            const res = await fetch(f.url);
+            if (res.ok) {
+              const buf = await res.arrayBuffer();
+              const bytes = new Uint8Array(buf);
+              let binary = '';
+              for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+              b64 = btoa(binary);
+            }
+          } catch {}
+        }
+        if (b64) fonts[f.key] = b64;
+      }
+      if (active) setPreviewFonts(fonts);
+    };
+    loadFonts();
+
+    return () => { active = false; };
+  }, [state.routes, state.carnet_steps, state.stages]);
+
   useEffect(() => {
     let active = true;
     const run = async () => {
@@ -133,8 +228,8 @@ export default function ExportModal({ onClose }: ExportModalProps) {
           isSolution: version === 'solution',
           includeGeneralMap: !!state.carnet_include_general_map,
           includeElevationProfile: includeElevation,
-          elevationSvg: state.elevation_profile_svg,
-          elevationStats: state.elevation_profile_stats,
+          elevationSvg: previewElevation.svg || state.elevation_profile_svg,
+          elevationStats: previewElevation.stats || state.elevation_profile_stats,
           includeMapPagination: includeMapPagination,
           includeAnnexes,
           vigenereKey: themeManager.currentTheme?.vigenere_key || 'SCOUT',
@@ -142,13 +237,14 @@ export default function ExportModal({ onClose }: ExportModalProps) {
           areaAnnotations: state.area_annotations || [],
           itineraries: state.itineraries || [],
           paperSize: 'A4'
-        }
+        },
+        previewFonts
       );
     } catch (err) {
       console.error('ExportHTMLRenderer error in preview:', err);
       return `<div style="padding: 24px; color: #ef4444; font-family: sans-serif;"><h3>Aperçu indisponible</h3><p>${err instanceof Error ? err.message : 'Erreur de génération'}</p></div>`;
     }
-  }, [activeFormat, docTitle, version, includeAnnexes, includeElevation, includeMapPagination, state.carnet_steps, state.stages, state.theme_id, state.carnet_include_general_map, state.elevation_profile_svg, state.elevation_profile_stats, state.point_annotations, state.area_annotations, state.itineraries]);
+  }, [activeFormat, docTitle, version, includeAnnexes, includeElevation, includeMapPagination, state.carnet_steps, state.stages, state.theme_id, state.carnet_include_general_map, state.elevation_profile_svg, state.elevation_profile_stats, state.point_annotations, state.area_annotations, state.itineraries, previewElevation, previewFonts]);
 
   const csvRawText = useMemo(() => {
     if (activeFormat !== 'csv' && activeFormat !== 'tsv') return '';

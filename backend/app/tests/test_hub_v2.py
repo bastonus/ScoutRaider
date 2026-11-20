@@ -152,3 +152,83 @@ def test_mcp_hub_tools():
     })
     assert tmpl["module_id"] == "code_braille"
     assert "manifest.json" in tmpl
+
+
+def test_routing_engine_and_path_provider_modules():
+    """Verify that routing_engine and path_provider modules validate properly."""
+    from app.modules.schema import RoutingEngineConfig, PathProviderConfig
+
+    # 1. Routing Engine
+    brouter = HubResourceMetadata(
+        id="routing_brouter",
+        name="Moteur BRouter Randonnée",
+        version="2.0.0",
+        resource_type=HubResourceType.ROUTING_ENGINE,
+        description="Calcul d'itinéraires pédestres et de randonnée",
+        routing_config=RoutingEngineConfig(
+            supported_profiles=["hiking", "trekking", "pedestrian"],
+            default_profile="hiking",
+            elevation_support=True
+        )
+    )
+    assert brouter.resource_type == HubResourceType.ROUTING_ENGINE
+    assert brouter.routing_config.default_profile == "hiking"
+    assert "trekking" in brouter.routing_config.supported_profiles
+
+    # 2. Path Provider
+    gpx_loader = HubResourceMetadata(
+        id="loader_gpx",
+        name="Chargeur GPX Universel",
+        version="2.0.0",
+        resource_type=HubResourceType.PATH_PROVIDER,
+        description="Importateur et analyseur de traces GPX",
+        path_provider_config=PathProviderConfig(
+            supported_formats=["gpx", "xml"],
+            extracts_elevation=True,
+            extracts_waypoints=True
+        )
+    )
+    assert gpx_loader.resource_type == HubResourceType.PATH_PROVIDER
+    assert "gpx" in gpx_loader.path_provider_config.supported_formats
+    assert gpx_loader.path_provider_config.extracts_elevation is True
+
+
+@pytest.mark.asyncio
+async def test_s3_module_storage_and_catalog(monkeypatch):
+    """Verify Garage S3 module URL formatting, upload, download, and catalog index retrieval."""
+    from app.services.s3_client import garage_client
+    from app.config import settings
+    from unittest.mock import MagicMock
+
+    # 1. URL formatting
+    s3_url = garage_client.get_module_url("morse", "2.0.0")
+    expected_url = f"{garage_client.public_url}/{garage_client.bucket}/modules/morse-2.0.0.zip"
+    assert s3_url == expected_url
+
+    # 2. Upload test package (mocked S3 put_object)
+    mock_s3 = MagicMock()
+    mock_s3.put_object.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    mock_s3.get_object.return_value = {"Body": MagicMock(read=lambda: b"PK\x05\x06" + b"\x00" * 18)}
+    mock_s3.delete_object.return_value = {"ResponseMetadata": {"HTTPStatusCode": 204}}
+
+    monkeypatch.setattr(garage_client, "s3", mock_s3)
+
+    test_zip_content = b"PK\x05\x06" + b"\x00" * 18  # Empty zip header
+    uploaded_url = await garage_client.upload_module_package(
+        module_id="test_unit_mod",
+        version="1.0.0",
+        data=test_zip_content
+    )
+    assert "test_unit_mod-1.0.0.zip" in uploaded_url
+    assert mock_s3.put_object.called
+
+    # 3. Download back
+    downloaded = await garage_client.download_module_package("test_unit_mod", "1.0.0")
+    assert downloaded == test_zip_content
+    assert mock_s3.get_object.called
+
+    # 4. Clean up test package
+    deleted = await garage_client.delete_asset("test_unit_mod-1.0.0.zip", asset_type="module")
+    assert deleted is True
+    assert mock_s3.delete_object.called
+

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "routing_direct",
+  "name": "Moteur Azimut Direct & Vol d'Oiseau",
+  "version": "2.0.0",
+  "resource_type": "routing_engine",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Calcul de tracés directs à vol d'oiseau pour progression hors-sentier, navigation boussole et franchissements.",
+  "entrypoint": "index.ts",
+  "routing_config": {
+    "supported_profiles": ["direct", "compass"],
+    "default_profile": "direct",
+    "offline_capable": true,
+    "elevation_support": false,
+    "requires_api_key": false
+  },
+  "tags": [
+    "routing",
+    "azimut",
+    "direct",
+    "boussole",
+    "offline"
+  ]
+}

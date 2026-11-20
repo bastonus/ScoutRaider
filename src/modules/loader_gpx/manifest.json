@@ -1,0 +1,27 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "loader_gpx",
+  "name": "Chargeur Universel GPX (Traces & Waypoints)",
+  "version": "2.0.0",
+  "resource_type": "path_provider",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Importateur et analyseur de traces GPS au standard XML GPX (1.0 / 1.1). Extrait tracés, altitudes, chronos et waypoints d'étapes.",
+  "entrypoint": "index.ts",
+  "path_provider_config": {
+    "supported_formats": ["gpx", "xml"],
+    "import_types": ["file_upload", "url_fetch"],
+    "extracts_elevation": true,
+    "extracts_waypoints": true,
+    "requires_auth": false
+  },
+  "tags": [
+    "loader",
+    "chemins",
+    "gpx",
+    "traces",
+    "waypoints",
+    "gps"
+  ]
+}

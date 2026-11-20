@@ -665,12 +665,14 @@ function CarnetDocumentTitle() {
                 flexDirection: 'row',
                 alignItems: 'flex-start',
                 width: '100%',
-                paddingLeft: '38px', // Alignement strict avec le contenu des étapes (26px gutter + 12px margin)
-                marginBottom: '16px',
-                marginTop: '6px',
+                marginBottom: '20px',
+                marginTop: '28px',
                 boxSizing: 'border-box'
             }}
         >
+            {/* Spacer identique au gutter des blocs : 26px + 12px marginRight */}
+            <div style={{ width: '26px', marginRight: '12px', flexShrink: 0 }} />
+
             <textarea
                 ref={textareaRef}
                 value={title}
@@ -681,22 +683,22 @@ function CarnetDocumentTitle() {
                 rows={1}
                 spellCheck={false}
                 style={{
-                    width: '100%',
+                    flex: 1,
+                    minWidth: 0,
                     background: 'transparent',
                     border: 'none',
                     outline: 'none',
                     resize: 'none',
                     overflow: 'hidden',
-                    fontSize: 'clamp(24px, 3.4vw, 34px)',
+                    fontSize: 'clamp(22px, 3.2vw, 32px)',
                     fontWeight: 800,
                     letterSpacing: '-0.025em',
                     color: 'var(--text-primary)',
                     fontFamily: 'var(--font-heading, "Plus Jakarta Sans", sans-serif)',
-                    lineHeight: 1.25,
-                    padding: '2px 0',
+                    lineHeight: 1.2,
+                    padding: 0,
                     margin: 0,
                     boxSizing: 'border-box',
-                    transition: 'color 0.15s ease'
                 }}
             />
         </div>

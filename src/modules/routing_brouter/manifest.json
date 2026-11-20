@@ -1,0 +1,28 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "routing_brouter",
+  "name": "Moteur de Routage BRouter (Pédestre & Randonnée)",
+  "version": "2.0.0",
+  "resource_type": "routing_engine",
+  "author": "ScoutRaider Team & BRouter OSS",
+  "license": "MIT",
+  "description": "Calcul d'itinéraires pédestres haute précision optimisé pour les sentiers de randonnée (GR, PR), évitant les axes routiers dangereux.",
+  "entrypoint": "index.ts",
+  "routing_config": {
+    "supported_profiles": ["hiking", "trekking", "pedestrian", "safety"],
+    "default_profile": "hiking",
+    "offline_capable": false,
+    "elevation_support": true,
+    "requires_api_key": false,
+    "api_endpoint": "https://brouter.de/brouter"
+  },
+  "tags": [
+    "routing",
+    "chemins",
+    "brouter",
+    "randonnee",
+    "pedestre",
+    "topo"
+  ]
+}

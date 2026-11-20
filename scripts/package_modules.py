@@ -18,8 +18,12 @@ from pathlib import Path
 # Add project root to path for backend module imports
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
-from backend.app.modules.schema import HubResourceMetadata
+from app.modules.schema import HubResourceMetadata
+from app.config import settings
+from app.services.s3_client import garage_client
+import asyncio
 
 
 def compute_sha256(filepath: Path) -> str:
@@ -73,11 +77,15 @@ def package_module(module_dir: Path, output_dir: Path, s3_base_url: str = "https
 
 
 def main():
+    default_s3_url = f"{settings.GARAGE_PUBLIC_URL.rstrip('/')}/{settings.GARAGE_BUCKET}/modules/"
+
     parser = argparse.ArgumentParser(description="Package ScoutRaider Hub modules into zip archives.")
     parser.add_argument("--modules-dir", default=str(PROJECT_ROOT / "src" / "modules"), help="Path to modules directory")
-    parser.add_argument("--output-dir", default=str(PROJECT_ROOT / "dist" / "packages"), help="Target output directory")
+    parser.add_argument("--output-dir", default=str(PROJECT_ROOT / "packages"), help="Target output directory")
     parser.add_argument("--validate-only", action="store_true", help="Only validate manifests without creating zip archives")
-    parser.add_argument("--s3-url", default="https://s3.scoutraider.local/modules/", help="Base URL for S3 distribution")
+    parser.add_argument("--s3-url", default=default_s3_url, help="Base URL for S3 distribution")
+    parser.add_argument("--upload-s3", action="store_true", default=True, help="Directly upload packaged zips and catalog to Garage S3")
+    parser.add_argument("--no-upload-s3", dest="upload_s3", action="store_false", help="Skip S3 upload")
     args = parser.parse_args()
 
     modules_path = Path(args.modules_dir)
@@ -94,11 +102,14 @@ def main():
     errors = []
 
     print(f"\n=======================================================")
-    print(f"  ScoutRaider Hub v2.0 — Module Packaging Pipeline")
+    print(f"  ScoutRaider Hub v2.0 — Module Packaging & S3 Pipeline")
     print(f"=======================================================\n")
-    print(f"Scanning modules in: {modules_path}")
+    print(f"Modules source:      {modules_path}")
     if not args.validate_only:
-        print(f"Output directory:    {output_path}\n")
+        print(f"Local package dir:   {output_path}")
+        print(f"Garage S3 bucket:    {settings.GARAGE_BUCKET} @ {settings.GARAGE_ENDPOINT}")
+        print(f"S3 Distribution URL: {args.s3_url}")
+        print(f"Upload to S3:        {args.upload_s3}\n")
 
     for entry in sorted(modules_path.iterdir()):
         if entry.is_dir() and (entry / "manifest.json").exists():
@@ -112,21 +123,40 @@ def main():
                 else:
                     item_meta = package_module(entry, output_path, args.s3_url)
                     catalog.append(item_meta)
+                    zip_name = f"{item_meta['id']}-{item_meta['version']}.zip"
                     print(f"  [OK] Packaged: {mod_id.ljust(22)} -> {item_meta['distribution']['archive_url']} ({item_meta['distribution']['byte_size']} bytes)")
+
+                    if args.upload_s3:
+                        zip_file_path = output_path / zip_name
+                        with open(zip_file_path, "rb") as zf:
+                            zip_bytes = zf.read()
+                        uploaded_url = asyncio.run(garage_client.upload_module_package(
+                            module_id=item_meta['id'],
+                            version=item_meta['version'],
+                            data=zip_bytes
+                        ))
+                        print(f"       -> S3 Uploaded: {uploaded_url}")
             except Exception as e:
                 print(f"  [FAIL] {mod_id}: {e}")
                 errors.append((mod_id, str(e)))
 
     if not args.validate_only and catalog:
+        catalog_dict = {
+            "hub_version": "2.0.0",
+            "generated_at": "2026-11-20T19:00:00Z",
+            "resources_count": len(catalog),
+            "resources": catalog
+        }
+        catalog_bytes = json.dumps(catalog_dict, indent=2, ensure_ascii=False).encode("utf-8")
+
         catalog_file = output_path / "catalog_v2.json"
-        with open(catalog_file, "w", encoding="utf-8") as f:
-            json.dump({
-                "hub_version": "2.0.0",
-                "generated_at": "2026-11-20T19:00:00Z",
-                "resources_count": len(catalog),
-                "resources": catalog
-            }, f, indent=2, ensure_ascii=False)
+        with open(catalog_file, "wb") as f:
+            f.write(catalog_bytes)
         print(f"\nCatalog index generated: {catalog_file} ({len(catalog)} resources)")
+
+        if args.upload_s3:
+            uploaded_cat_url = asyncio.run(garage_client.upload_catalog_index(catalog_bytes))
+            print(f"Catalog S3 uploaded: {uploaded_cat_url}")
 
     print(f"\nSummary:")
     print(f"  - Successfully processed: {len(catalog) if not args.validate_only else 'all valid'}")

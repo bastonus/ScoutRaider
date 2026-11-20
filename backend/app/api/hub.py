@@ -7,6 +7,10 @@ custom map registration, and AI-first template generation.
 from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from typing import List, Optional, Dict, Any
 from pathlib import Path
+import io
+import json
+import zipfile
+import hashlib
 
 from app.modules.schema import (
     HubResourceType,
@@ -17,6 +21,8 @@ from app.modules.schema import (
     S3DistributionMeta
 )
 from app.modules.registry import ModuleRegistry
+from app.services.s3_client import garage_client
+from app.config import settings
 
 router = APIRouter(prefix="/hub", tags=["hub"])
 
@@ -76,7 +82,7 @@ async def list_catalog(
             "description": m.description,
             "author": m.author,
             "is_installed": True,
-            "s3_download_url": f"https://scoutraider.silverhorse.fr/hub/crypto_module/{m.id}/{m.id}-{m.version}.zip"
+            "s3_download_url": garage_client.get_module_url(m.id, m.version)
         })
 
     # Add virtual/default Trames & Maps to catalog for unified visibility
@@ -146,9 +152,9 @@ async def get_resource_detail(
     return {
         "manifest": meta.model_dump(),
         "s3_distribution": {
-            "s3_key": f"hub/crypto_module/{meta.id}/{meta.id}-{meta.version}.zip",
+            "s3_key": f"modules/{meta.id}-{meta.version}.zip",
             "checksum_sha256": "calculated_on_publish",
-            "download_url": f"https://scoutraider.silverhorse.fr/hub/crypto_module/{meta.id}/{meta.id}-{meta.version}.zip"
+            "download_url": garage_client.get_module_url(meta.id, meta.version)
         }
     }
 
@@ -272,3 +278,105 @@ export function transform(plainText: string): {{ encoded_text: string }} {{
             "README.md": f"# {name}\n\nModule conforme au Standard ScoutRaider Hub v2.0."
         }
     }
+
+
+# ─── 7. Module Registration & Direct S3 Storage Publication ──────────────────
+
+@router.post("/publish")
+async def publish_module_to_s3(
+    payload: Dict[str, Any] = Body(...),
+    registry: ModuleRegistry = Depends(get_hub_registry)
+) -> Dict[str, Any]:
+    """
+    Enregistre et publie un module directement dans le bucket S3 Garage (scoutraider-assets/modules/).
+    Prend en entrée le manifeste v2 et d'éventuels fichiers sources (logic/index.ts, README.md, assets).
+    Valide les règles de sécurité, archive au format ZIP conforme, calcule le SHA-256 et publie sur S3.
+    """
+    manifest_data = payload.get("manifest")
+    if not manifest_data or not isinstance(manifest_data, dict):
+        raise HTTPException(status_code=400, detail="Champ 'manifest' obligatoire et valide.")
+
+    # Validation du manifeste selon Hub v2
+    try:
+        validated_meta = HubResourceMetadata.model_validate(manifest_data)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Manifeste invalide: {e}")
+
+    mod_id = validated_meta.id
+    mod_version = validated_meta.version
+    zip_filename = f"{mod_id}-{mod_version}.zip"
+
+    # Construction de l'archive ZIP en mémoire
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        # 1. Écrire le manifest.json
+        zf.writestr("manifest.json", validated_meta.model_dump_json(indent=2))
+
+        # 2. Écrire les fichiers additionnels fournis ou par défaut
+        files = payload.get("files") or {}
+        if not files:
+            # Squelette par défaut
+            default_ts = f"/**\n * {validated_meta.name} v{mod_version}\n */\nexport function transform(text: string) {{ return {{ encoded_text: text }}; }}\n"
+            zf.writestr(validated_meta.entrypoint or "logic/index.ts", default_ts)
+            zf.writestr("README.md", f"# {validated_meta.name}\n\n{validated_meta.description}")
+        else:
+            for file_path, file_content in files.items():
+                if isinstance(file_content, str):
+                    zf.writestr(file_path, file_content)
+                elif isinstance(file_content, bytes):
+                    zf.writestr(file_path, file_content)
+
+    zip_bytes = zip_buffer.getvalue()
+
+    # Calcul SHA-256 et taille
+    sha256 = hashlib.sha256(zip_bytes).hexdigest()
+    byte_size = len(zip_bytes)
+
+    # Upload direct sur Garage S3
+    try:
+        s3_url = await garage_client.upload_module_package(
+            module_id=mod_id,
+            version=mod_version,
+            data=zip_bytes,
+            metadata={
+                "module_id": mod_id,
+                "version": mod_version,
+                "sha256": sha256,
+                "author": validated_meta.author
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Échec de l'upload vers Garage S3: {e}")
+
+    return {
+        "status": "success",
+        "action": "registered_and_stored_in_s3",
+        "module_id": mod_id,
+        "version": mod_version,
+        "bucket": garage_client.bucket,
+        "s3_key": f"modules/{zip_filename}",
+        "s3_url": s3_url,
+        "sha256": sha256,
+        "byte_size": byte_size,
+        "distribution": {
+            "archive_url": s3_url,
+            "sha256": sha256,
+            "byte_size": byte_size,
+            "signature": f"sig_sha256_{sha256[:16]}"
+        }
+    }
+
+
+@router.get("/catalog/s3")
+async def get_s3_catalog_index() -> Dict[str, Any]:
+    """
+    Récupère l'index global catalog_v2.json hébergé sur le bucket Garage S3.
+    """
+    try:
+        data = await garage_client.download_asset("catalog_v2.json", asset_type="catalog")
+        return json.loads(data.decode("utf-8"))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Index catalog_v2.json introuvable sur Garage S3.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la lecture du catalogue S3: {e}")
+

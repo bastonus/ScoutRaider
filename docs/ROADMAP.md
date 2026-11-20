@@ -53,12 +53,18 @@ Synthèse du plan d'action d'audit de code ([PLAN_IMPLEMENTATION.md](../PLAN_IMP
 - [x] **Exposition Agent-First & MCP** : Intégration de 5 outils MCP pour permettre aux agents IA de requêter, valider et créer des modules de manière autonome.
 - [ ] **Implémentation complète du catalogue des codes scoutes** : Intégration progressive de tous les codes recensés dans le document de référence Google Docs (chiffres historiques, grilles, signaux optiques et acoustiques).
 - [ ] **Migration des anciens modules** : Application du plan de conversion pas-à-pas (Morse, Vigenère, Polybe, Templier, Avocat, etc.) vers le standard v2 sans ReportLab.
-- [ ] **Stockage distant S3 Garage** : Mise en place de la synchronisation bidirectionnelle du catalogue et téléchargement automatisé des paquets `.zip`.
+- [x] **Stockage distant S3 Garage** : Infrastructure Garage S3 opérationnelle en production (`https://s3-scoutraider.silverhorse.fr`), bucket `scoutraider-assets` initialisé et validé par santé Coolify et tests unitaires.
 - [ ] **Édition WYSIWYG des blocs de carnet** : Enrichissement des options de mise en page textuelle (polices additionnelles, lettrines, notes de bas de page).
 
 ### 3. Collaboration & Partage
 - [ ] **Export d'archive `.srproj`** : Export et import sans perte incluant les images compressées (WebP), polices intégrées et métadonnées complètes.
 - [ ] **Gestion des droits de partage** : Liens en lecture seule pour les participants, liens d'édition pour les co-organisateurs.
+
+### 4. IA Copilot, MCP & Hub de Connecteurs (Finalisé)
+- [x] **Service IA Multi-Fournisseurs** : Gemini, Claude, OpenAI et Ollama avec détection dynamique sur `localhost:11434` et fallback déterministe hors-ligne.
+- [x] **Serveur Model Context Protocol (MCP)** : 11 outils, 2 ressources et 1 prompt exposés en transport stdio et transport HTTP JSON-RPC (`/api/mcp`).
+- [x] **Hub de Connecteurs Externes** : Connecteurs OpenStreetMap Overpass, Base Mérimée POP, Météo-France / Open-Meteo et Pédagogie Scoute.
+- [x] **Cache Hors-Ligne & Raid Pack Autonome** : Cache disque et mémoire pour camp en forêt, export d'archives ZIP autonomes (`/api/documents/{id}/export/raid-pack`).
 
 ---
 

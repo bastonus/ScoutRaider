@@ -29,13 +29,16 @@ FastAPI REST API router endpoints handling auth, documents, assets, export, and 
 - `[export.py] def get_asset_image_data_uri()`
 - `[export.py] def build_export_html()`
 - `[export.py] def build_export_css()`
-- `[hub.py] def list_catalog()`
-- `[hub.py] def get_resource_detail()`
-- `[hub.py] def validate_manifest()`
-- `[hub.py] def resolve_dependencies()`
-- `[hub.py] def register_custom_map()`
-- `[hub.py] def generate_template()`
-- *(and 14 more exported symbols)*
+- `[hub.py] def list_catalog()` — `GET /api/hub/catalog` : liste le catalogue depuis le registre local
+- `[hub.py] def get_resource_detail()` — `GET /api/hub/resources/{id}` : détail d'un module
+- `[hub.py] def validate_manifest()` — `POST /api/hub/validate` : valide un manifeste JSON
+- `[hub.py] def resolve_dependencies()` — `POST /api/hub/resolve` : résolution du graphe de dépendances
+- `[hub.py] def register_custom_map()` — `POST /api/hub/maps/register` : enregistre un fond de carte personnalisé
+- `[hub.py] def generate_template()` — `GET /api/hub/template/{type}` : génère un squelette de module
+- `[hub.py] def publish_module()` — `POST /api/hub/publish` : valide le manifeste, construit le ZIP et l'upload vers Garage S3 (`scoutraider-assets/modules/{id}-{version}.zip`)
+- `[hub.py] def get_s3_catalog()` — `GET /api/hub/catalog/s3` : lit le catalogue global `catalog_v2.json` depuis Garage S3 et le retourne
+- `[mcp.py] def mcp_catalog()` — `GET /api/mcp/catalog` : catalogue exposé aux clients MCP (URLs S3 Garage incluses)
+- *(and other exported symbols)*
 
 ## Invariants
 - [assets.py] Enforces: HTTPException(status_code=400, detail="Format d'image non supporté")
@@ -49,6 +52,7 @@ FastAPI REST API router endpoints handling auth, documents, assets, export, and 
 
 ## Side Effects
 - Database state mutations (commit/execute)
+- **S3 Garage** : `POST /hub/publish` écrit un ZIP et met à jour `catalog_v2.json` dans le bucket `scoutraider-assets` (endpoint `https://s3-scoutraider.silverhorse.fr`)
 
 ## Verification
 - Run: `pytest tests/ -v`

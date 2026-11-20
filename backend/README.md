@@ -88,14 +88,16 @@ DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASS}@localhost:5432/scoutraid
 SECRET_KEY=your-32-char-min-secret-key
 ALGORITHM=HS256
 
-# Garage S3
-GARAGE_ENDPOINT=http://localhost:3900
-GARAGE_PUBLIC_URL=http://localhost:3900
+# Garage S3 (Local MinIO/Garage ou distant Coolify)
+GARAGE_ENDPOINT=https://s3-scoutraider.silverhorse.fr
+GARAGE_PUBLIC_URL=https://s3-scoutraider.silverhorse.fr
 GARAGE_ACCESS_KEY=your_access_key
 GARAGE_SECRET_KEY=your_secret_key
 GARAGE_BUCKET=scoutraider-assets
 GARAGE_REGION=garage
 ```
+
+> **Note Production (Coolify)** : En production, l'endpoint public et interne est `https://s3-scoutraider.silverhorse.fr` avec addressing style `path`. La connectivité S3 peut être vérifiée instantanément via la route `/health/s3`.
 
 ### Garage S3 local (MinIO compatible)
 

@@ -1,0 +1,837 @@
+{
+  "hub_version": "2.0.0",
+  "generated_at": "2026-11-20T19:00:00Z",
+  "resources_count": 15,
+  "resources": [
+    {
+      "id": "apercu_carte",
+      "name": "Aperçu Synoptique de Carte",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "crypto_module",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Cartouche cartographique général de synthèse du raid avec tracé global, points de contrôle numérotés, rose des vents et coordonnées d'urgence.",
+      "data_capability": "map_overview",
+      "supported_inputs": [
+        "full_itinerary_track",
+        "waypoints"
+      ],
+      "render_type": "map",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {
+        "recommended_levels": [
+          "louveteaux",
+          "seconde_classe",
+          "premiere_classe",
+          "raider"
+        ],
+        "difficulty_weight": 1.0
+      },
+      "constraints": {
+        "max_proportion": 0.2,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/apercu_carte-2.0.0.zip",
+        "sha256": "b98c0a8c5a762de787e8c72b1dd5310faf9079f1d090e2b9af83e0df783cbf1b",
+        "byte_size": 1272,
+        "signature": "sig_sha256_b98c0a8c5a762de7"
+      }
+    },
+    {
+      "id": "avocat",
+      "name": "Code Avocat (A = K)",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "crypto_module",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Chiffre de César à décalage fixe de 10 lettres (A devient K, B devient L...).",
+      "data_capability": "alphabetic",
+      "supported_inputs": [
+        "raw_text"
+      ],
+      "render_type": "text",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {
+        "recommended_levels": [
+          "louveteaux",
+          "seconde_classe"
+        ],
+        "difficulty_weight": 1.5
+      },
+      "constraints": {
+        "max_proportion": 0.2,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/avocat-2.0.0.zip",
+        "sha256": "6d379aeae84d317896600b5312e995f596ff0d3caf2e607348c9cb69c2467a68",
+        "byte_size": 1283,
+        "signature": "sig_sha256_6d379aeae84d3178"
+      }
+    },
+    {
+      "id": "cassis",
+      "name": "Code Cassis (K = 6)",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "crypto_module",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Chiffre de César basé sur la correspondance phonétique K = 6 (décalage de 21 lettres).",
+      "data_capability": "alphabetic",
+      "supported_inputs": [
+        "raw_text"
+      ],
+      "render_type": "text",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {
+        "recommended_levels": [
+          "louveteaux",
+          "seconde_classe"
+        ],
+        "difficulty_weight": 1.5
+      },
+      "constraints": {
+        "max_proportion": 0.2,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/cassis-2.0.0.zip",
+        "sha256": "8a5f2b61e1a326139739206f88aba3ee27233847269ed4954f19a75889a0b07e",
+        "byte_size": 1277,
+        "signature": "sig_sha256_8a5f2b61e1a32613"
+      }
+    },
+    {
+      "id": "gilwell",
+      "name": "Piste Gilwell (Azimuts & Métrages)",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "crypto_module",
+      "author": "ScoutRaider Team",
+      "license": "MIT",
+      "description": "Générateur et éditeur WYSIWYG de schémas d'azimuts (piste Gilwell) avec pagination multi-colonnes, connecteurs de lecture, export vectoriel SVG et matriciel PNG haute résolution.",
+      "data_capability": "map_path",
+      "supported_inputs": [
+        "poly_segments",
+        "azimut_distance_list"
+      ],
+      "render_type": "svg",
+      "entrypoint": "index.ts",
+      "ui_component": "components/GilwellSheet.tsx",
+      "pedagogy": {
+        "recommended_levels": [
+          "premiere_classe",
+          "raider"
+        ],
+        "difficulty_weight": 4.5,
+        "rules_explanation": "Épreuve d'orientation de précision : la patrouille doit reporter les azimuts et métrages sur le terrain ou sur table sans boussole erratique."
+      },
+      "constraints": {
+        "max_proportion": 0.25,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 500.0,
+        "max_distance_m": 8000.0,
+        "max_azimuts": 25,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [
+        "topo",
+        "orientation",
+        "azimut",
+        "wysiwyg",
+        "gilwell",
+        "map_path"
+      ],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/gilwell-2.0.0.zip",
+        "sha256": "e901f71dd57eed8d9aa938158717515c6290d5b582b1b116d845d5885c9e066e",
+        "byte_size": 53231,
+        "signature": "sig_sha256_e901f71dd57eed8d"
+      }
+    },
+    {
+      "id": "loader_geojson",
+      "name": "Chargeur Vectoriel GeoJSON / TopoJSON",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "path_provider",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Importateur universel de tracés vectoriels et couches SIG au format GeoJSON, FeatureCollection et KML normalisé.",
+      "data_capability": null,
+      "supported_inputs": [],
+      "render_type": "text",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {},
+      "constraints": {
+        "max_proportion": 0.4,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": {
+        "supported_formats": [
+          "geojson",
+          "json",
+          "kml"
+        ],
+        "import_types": [
+          "file_upload",
+          "url_fetch"
+        ],
+        "extracts_elevation": true,
+        "extracts_waypoints": true,
+        "requires_auth": false,
+        "auth_provider": null
+      },
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [
+        "loader",
+        "chemins",
+        "geojson",
+        "sig",
+        "vectoriel",
+        "kml"
+      ],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/loader_geojson-2.0.0.zip",
+        "sha256": "fca1ee773a9098964b879619fa420ffecade2ab4a4ed31c2f0c66bd8b4672255",
+        "byte_size": 1839,
+        "signature": "sig_sha256_fca1ee773a909896"
+      }
+    },
+    {
+      "id": "loader_gpx",
+      "name": "Chargeur Universel GPX (Traces & Waypoints)",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "path_provider",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Importateur et analyseur de traces GPS au standard XML GPX (1.0 / 1.1). Extrait tracés, altitudes, chronos et waypoints d'étapes.",
+      "data_capability": null,
+      "supported_inputs": [],
+      "render_type": "text",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {},
+      "constraints": {
+        "max_proportion": 0.4,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": {
+        "supported_formats": [
+          "gpx",
+          "xml"
+        ],
+        "import_types": [
+          "file_upload",
+          "url_fetch"
+        ],
+        "extracts_elevation": true,
+        "extracts_waypoints": true,
+        "requires_auth": false,
+        "auth_provider": null
+      },
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [
+        "loader",
+        "chemins",
+        "gpx",
+        "traces",
+        "waypoints",
+        "gps"
+      ],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/loader_gpx-2.0.0.zip",
+        "sha256": "700391364240d85315b97e7d0f4af3e0a520d6ce42b63b0a7030edb58db045b4",
+        "byte_size": 2088,
+        "signature": "sig_sha256_700391364240d853"
+      }
+    },
+    {
+      "id": "maritime",
+      "name": "Pavillons Maritimes",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "crypto_module",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Alphabet international du code des signaux maritimes et pavillons de transmission.",
+      "data_capability": "symbolic_visual",
+      "supported_inputs": [
+        "raw_text"
+      ],
+      "render_type": "image",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {
+        "recommended_levels": [
+          "seconde_classe",
+          "premiere_classe",
+          "raider"
+        ],
+        "difficulty_weight": 3.0
+      },
+      "constraints": {
+        "max_proportion": 0.25,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/maritime-2.0.0.zip",
+        "sha256": "d2c8c235c86868229d8859d371a61db5144fc153200b46f35f9aa9ca2987c985",
+        "byte_size": 1570,
+        "signature": "sig_sha256_d2c8c235c8686822"
+      }
+    },
+    {
+      "id": "morse",
+      "name": "Code Morse International",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "crypto_module",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Transmission par signaux sonores, lumineux ou tracés sous forme de points et de traits.",
+      "data_capability": "alphabetic",
+      "supported_inputs": [
+        "raw_text"
+      ],
+      "render_type": "text",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {
+        "recommended_levels": [
+          "louveteaux",
+          "seconde_classe",
+          "premiere_classe",
+          "raider"
+        ],
+        "difficulty_weight": 2.0,
+        "rules_explanation": "Codes écrits : Pour ne pas saturer l'attention de la patrouille, évitez d'enchaîner plus de 3 messages cryptés consécutifs."
+      },
+      "constraints": {
+        "max_proportion": 0.3,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": 2,
+        "max_occurrences": null,
+        "forbidden_zones": [
+          "high_poi_density"
+        ],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [
+        {
+          "id": "alphabet_morse",
+          "title": "Alphabet Morse & Mnémoniques",
+          "file": "assets/alphabet_morse.html"
+        }
+      ],
+      "assets": [],
+      "tags": [],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/morse-2.0.0.zip",
+        "sha256": "e942ab4e73bb51f75d386d5c6ef1a76dbf8c6c657ee3fbc297c08cae2b607468",
+        "byte_size": 1949,
+        "signature": "sig_sha256_e942ab4e73bb51f7"
+      }
+    },
+    {
+      "id": "polybe",
+      "name": "Carré de Polybe",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "crypto_module",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Chiffrement par substitution matricielle dans une grille 6×6.",
+      "data_capability": "alphanumeric",
+      "supported_inputs": [
+        "raw_text"
+      ],
+      "render_type": "grid",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {
+        "recommended_levels": [
+          "seconde_classe",
+          "premiere_classe"
+        ],
+        "difficulty_weight": 2.5
+      },
+      "constraints": {
+        "max_proportion": 0.25,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/polybe-2.0.0.zip",
+        "sha256": "5148bbabda8a0af4db1e8f9090827a08ddda01eb250b80f0b376829f80c388e8",
+        "byte_size": 1360,
+        "signature": "sig_sha256_5148bbabda8a0af4"
+      }
+    },
+    {
+      "id": "profil_altimetrique",
+      "name": "Profil Altimétrique & Dénivelé",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "crypto_module",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Calcul et restitution vectorielle SVG du profil altimétrique (altitudes min/max, dénivelés D+/D-, pentes et jalons topographiques).",
+      "data_capability": "elevation_profile",
+      "supported_inputs": [
+        "elevation_points",
+        "poly_segments"
+      ],
+      "render_type": "svg",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {
+        "recommended_levels": [
+          "louveteaux",
+          "seconde_classe",
+          "premiere_classe",
+          "raider"
+        ],
+        "difficulty_weight": 1.0,
+        "rules_explanation": "Aide visuelle essentielle pour anticiper les efforts physiques et les points d'eau."
+      },
+      "constraints": {
+        "max_proportion": 0.2,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/profil_altimetrique-2.0.0.zip",
+        "sha256": "293dabb4913594499746c5d02270985f0fcd8005962a4e1eb409f73678b17f97",
+        "byte_size": 1959,
+        "signature": "sig_sha256_293dabb491359449"
+      }
+    },
+    {
+      "id": "routing_brouter",
+      "name": "Moteur de Routage BRouter (Pédestre & Randonnée)",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "routing_engine",
+      "author": "ScoutRaider Team & BRouter OSS",
+      "license": "MIT",
+      "description": "Calcul d'itinéraires pédestres haute précision optimisé pour les sentiers de randonnée (GR, PR), évitant les axes routiers dangereux.",
+      "data_capability": null,
+      "supported_inputs": [],
+      "render_type": "text",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {},
+      "constraints": {
+        "max_proportion": 0.4,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": {
+        "supported_profiles": [
+          "hiking",
+          "trekking",
+          "pedestrian",
+          "safety"
+        ],
+        "default_profile": "hiking",
+        "offline_capable": false,
+        "elevation_support": true,
+        "requires_api_key": false,
+        "api_endpoint": "https://brouter.de/brouter",
+        "custom_options": {}
+      },
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [
+        "routing",
+        "chemins",
+        "brouter",
+        "randonnee",
+        "pedestre",
+        "topo"
+      ],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/routing_brouter-2.0.0.zip",
+        "sha256": "f0f165a1eccbf2ab2460f0c656cf9f05496fd1fff41dcaf7606b6d3c645c64b3",
+        "byte_size": 1826,
+        "signature": "sig_sha256_f0f165a1eccbf2ab"
+      }
+    },
+    {
+      "id": "routing_direct",
+      "name": "Moteur Azimut Direct & Vol d'Oiseau",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "routing_engine",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Calcul de tracés directs à vol d'oiseau pour progression hors-sentier, navigation boussole et franchissements.",
+      "data_capability": null,
+      "supported_inputs": [],
+      "render_type": "text",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {},
+      "constraints": {
+        "max_proportion": 0.4,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": {
+        "supported_profiles": [
+          "direct",
+          "compass"
+        ],
+        "default_profile": "direct",
+        "offline_capable": true,
+        "elevation_support": false,
+        "requires_api_key": false,
+        "api_endpoint": null,
+        "custom_options": {}
+      },
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [
+        "routing",
+        "azimut",
+        "direct",
+        "boussole",
+        "offline"
+      ],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/routing_direct-2.0.0.zip",
+        "sha256": "17684db21c5756faff03923043f46e9929e0f6144faf1e01f7425f0950a41fd4",
+        "byte_size": 1532,
+        "signature": "sig_sha256_17684db21c5756fa"
+      }
+    },
+    {
+      "id": "routing_valhalla_ign",
+      "name": "Moteur BD TOPO Valhalla (IGN Géoplateforme)",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "routing_engine",
+      "author": "IGN France & ScoutRaider Team",
+      "license": "Etalab-2.0",
+      "description": "Calcul d'itinéraires sur la base de données officielle BD TOPO de l'IGN. Intègre le réseau des sentiers balisés nationaux français.",
+      "data_capability": null,
+      "supported_inputs": [],
+      "render_type": "text",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {},
+      "constraints": {
+        "max_proportion": 0.4,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": {
+        "supported_profiles": [
+          "pedestrian",
+          "hiking"
+        ],
+        "default_profile": "pedestrian",
+        "offline_capable": false,
+        "elevation_support": true,
+        "requires_api_key": false,
+        "api_endpoint": "https://data.geopf.fr/navigation/itineraire",
+        "custom_options": {}
+      },
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [],
+      "tags": [
+        "routing",
+        "chemins",
+        "ign",
+        "valhalla",
+        "bd_topo",
+        "france"
+      ],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/routing_valhalla_ign-2.0.0.zip",
+        "sha256": "a8f9b28488ffa56aee09f634c8d0813a4a1244f61dcffad32ec781ed5263eda4",
+        "byte_size": 1722,
+        "signature": "sig_sha256_a8f9b28488ffa56a"
+      }
+    },
+    {
+      "id": "templier",
+      "name": "Croix des Templiers",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "crypto_module",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Chiffre maçonnique / pigpen traditionnel basé sur la croix templière et la police TemplarsCipherPlus.",
+      "data_capability": "symbolic_visual",
+      "supported_inputs": [
+        "raw_text"
+      ],
+      "render_type": "text",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {
+        "recommended_levels": [
+          "seconde_classe",
+          "premiere_classe"
+        ],
+        "difficulty_weight": 3.0,
+        "rules_explanation": "Idéal pour les messages solennels, le désert spirituel ou les enveloppes scellées."
+      },
+      "constraints": {
+        "max_proportion": 0.25,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": null,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [],
+      "assets": [
+        "assets/fonts/TemplarsCipherPlus.ttf"
+      ],
+      "tags": [],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/templier-2.0.0.zip",
+        "sha256": "f7bfea50abc1d192e0b6660ee35881ed756e01c69211eca729dc02f66969419f",
+        "byte_size": 1311,
+        "signature": "sig_sha256_f7bfea50abc1d192"
+      }
+    },
+    {
+      "id": "vigenere",
+      "name": "Chiffre de Vigenère",
+      "version": "2.0.0",
+      "schema_version": "2.0",
+      "resource_type": "crypto_module",
+      "author": "ScoutRaider Core Team",
+      "license": "MIT",
+      "description": "Cryptage polyalphabétique historique basé sur un mot-clé secret.",
+      "data_capability": "alphanumeric",
+      "supported_inputs": [
+        "raw_text",
+        "secret_key"
+      ],
+      "render_type": "grid",
+      "entrypoint": "index.ts",
+      "ui_component": null,
+      "pedagogy": {
+        "recommended_levels": [
+          "premiere_classe",
+          "raider"
+        ],
+        "difficulty_weight": 4.5,
+        "rules_explanation": "Technique difficile : limitée à 1 seule occurrence par carnet pour préserver la dynamique de marche."
+      },
+      "constraints": {
+        "max_proportion": 0.15,
+        "allow_consecutive": false,
+        "max_consecutive_same_category": 3,
+        "min_distance_m": 0.0,
+        "max_distance_m": null,
+        "max_azimuts": null,
+        "max_occurrences": 1,
+        "forbidden_zones": [],
+        "priority_override": null
+      },
+      "dependencies": null,
+      "map_config": null,
+      "routing_config": null,
+      "path_provider_config": null,
+      "s3": null,
+      "annexes": [
+        {
+          "id": "tableau_vigenere",
+          "title": "Table de Vigenère (Tabula Recta)",
+          "file": "assets/tableau_vigenere.html"
+        }
+      ],
+      "assets": [],
+      "tags": [],
+      "distribution": {
+        "archive_url": "https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/vigenere-2.0.0.zip",
+        "sha256": "e3da2e6d05b2d86fb67839d32f4bf4effbaed48739f01fcd4f1520d274ce8675",
+        "byte_size": 1719,
+        "signature": "sig_sha256_e3da2e6d05b2d86f"
+      }
+    }
+  ]
+}

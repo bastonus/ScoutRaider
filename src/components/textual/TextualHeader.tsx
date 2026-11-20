@@ -198,6 +198,24 @@ function handleFormat(format: string, arg?: string) {
     } catch {}
 }
 
+const DEFAULT_ITEM_WIDTHS: Record<string, number> = {
+    undo: 35,
+    redo: 35,
+    bold: 35,
+    italic: 35,
+    underline: 35,
+    code: 35,
+    h1: 35,
+    list: 35,
+    'list-ordered': 35,
+    quote: 35,
+    cipher: 95,
+    theme: 175,
+};
+const TOOLBAR_CONTAINER_PADDING = 12; // 2 * 4px padding + 2px bordure + marge
+const OVERFLOW_BTN_RESERVED = 38;     // Bouton "..." (32px) + gap
+const HYSTERESIS_BUFFER = 20;         // Marge tampon anti-battement : empêche tout clignotement / cycle infini au seuil
+
 interface ToolbarItem {
     id: string;
     priority: number;
@@ -320,10 +338,10 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         </button>
     ), []);
 
-    const cipherTrigger = useCallback(() => (
+    const cipherTrigger = useCallback((isOverflow = false) => (
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <button
-                ref={(el) => { if (el) itemRefs.current.set('cipher', el); else itemRefs.current.delete('cipher'); }}
+                ref={!isOverflow ? (el) => { if (el) itemRefs.current.set('cipher', el); else itemRefs.current.delete('cipher'); } : undefined}
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setCipherMenuOpen(v => !v); setThemePickerOpen(false); }}
                 title="Appliquer un codage cryptographique"
@@ -376,12 +394,12 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                 </div>
             )}
         </div>
-    ), [cipherMenuOpen, selectedCipher]);
+    ), [cipherMenuOpen, selectedCipher, applyCipherWithExtras]);
 
-    const themeTrigger = useCallback(() => (
+    const themeTrigger = useCallback((isOverflow = false) => (
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <button
-                ref={(el) => { if (el) itemRefs.current.set('theme', el); else itemRefs.current.delete('theme'); }}
+                ref={!isOverflow ? (el) => { if (el) itemRefs.current.set('theme', el); else itemRefs.current.delete('theme'); } : undefined}
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setThemePickerOpen(v => !v); setCipherMenuOpen(false); }}
                 title={`Thème narratif : ${state.theme_id}`}
@@ -450,24 +468,29 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
     // ─── Items barre (ordre de priorité croissante = masqués en premier) ────
     const toolbarItems = useMemo<ToolbarItem[]>(() => {
         const items: ToolbarItem[] = [
-            { id: 'undo', priority: 0, minWidth: 32, render: () => toolBtn('undo', 'Annuler (Ctrl+Z)', <Undo2 size={13} strokeWidth={2.2} />) },
-            { id: 'redo', priority: 0, minWidth: 32, render: () => toolBtn('redo', 'Rétablir (Ctrl+Y)', <Redo2 size={13} strokeWidth={2.2} />) },
-            { id: 'bold', priority: 1, minWidth: 32, render: () => toolBtn('bold', 'Gras (Ctrl+B)', <Bold size={13} strokeWidth={2.4} />) },
-            { id: 'italic', priority: 1, minWidth: 32, render: () => toolBtn('italic', 'Italique (Ctrl+I)', <Italic size={13} strokeWidth={2.4} />) },
-            { id: 'underline', priority: 2, minWidth: 32, render: () => toolBtn('underline', 'Souligné (Ctrl+U)', <Underline size={13} strokeWidth={2.4} />) },
-            { id: 'code', priority: 2, minWidth: 32, render: () => toolBtn('code', 'Code en ligne', <Code size={13} strokeWidth={2.2} />) },
-            { id: 'h1', priority: 3, minWidth: 32, render: () => toolBtn('h1', 'Titre de section', <Heading size={13} strokeWidth={2.2} />) },
-            { id: 'list', priority: 3, minWidth: 32, render: () => toolBtn('list', 'Liste à puces', <List size={13} strokeWidth={2.2} />) },
-            { id: 'list-ordered', priority: 3, minWidth: 32, render: () => toolBtn('list-ordered', 'Liste numérotée', <ListOrdered size={13} strokeWidth={2.2} />) },
-            { id: 'quote', priority: 3, minWidth: 32, render: () => toolBtn('quote', 'Citation', <Quote size={13} strokeWidth={2.2} />) },
-            { id: 'cipher', priority: 4, minWidth: 80, render: cipherTrigger },
-            { id: 'theme', priority: 5, minWidth: 160, render: themeTrigger },
+            { id: 'undo', priority: 0, minWidth: 35, render: () => toolBtn('undo', 'Annuler (Ctrl+Z)', <Undo2 size={13} strokeWidth={2.2} />) },
+            { id: 'redo', priority: 0, minWidth: 35, render: () => toolBtn('redo', 'Rétablir (Ctrl+Y)', <Redo2 size={13} strokeWidth={2.2} />) },
+            { id: 'bold', priority: 1, minWidth: 35, render: () => toolBtn('bold', 'Gras (Ctrl+B)', <Bold size={13} strokeWidth={2.4} />) },
+            { id: 'italic', priority: 1, minWidth: 35, render: () => toolBtn('italic', 'Italique (Ctrl+I)', <Italic size={13} strokeWidth={2.4} />) },
+            { id: 'underline', priority: 2, minWidth: 35, render: () => toolBtn('underline', 'Souligné (Ctrl+U)', <Underline size={13} strokeWidth={2.4} />) },
+            { id: 'code', priority: 2, minWidth: 35, render: () => toolBtn('code', 'Code en ligne', <Code size={13} strokeWidth={2.2} />) },
+            { id: 'h1', priority: 3, minWidth: 35, render: () => toolBtn('h1', 'Titre de section', <Heading size={13} strokeWidth={2.2} />) },
+            { id: 'list', priority: 3, minWidth: 35, render: () => toolBtn('list', 'Liste à puces', <List size={13} strokeWidth={2.2} />) },
+            { id: 'list-ordered', priority: 3, minWidth: 35, render: () => toolBtn('list-ordered', 'Liste numérotée', <ListOrdered size={13} strokeWidth={2.2} />) },
+            { id: 'quote', priority: 3, minWidth: 35, render: () => toolBtn('quote', 'Citation', <Quote size={13} strokeWidth={2.2} />) },
+            { id: 'cipher', priority: 4, minWidth: 95, render: () => cipherTrigger(false) },
+            { id: 'theme', priority: 5, minWidth: 175, render: () => themeTrigger(false) },
         ];
         return items.sort((a, b) => a.priority - b.priority);
-    }, [state.theme_id, currentAccent, currentTheme, isSolution, cipherMenuOpen, themePickerOpen, selectedCipher, allThemeIds, toolBtn, cipherTrigger, themeTrigger]);
+    }, [toolBtn, cipherTrigger, themeTrigger]);
 
-    // ─── État visibleItems (pour mesure overflow) ───────────────────────────
-    const [visibleItems, setVisibleItems] = useState<Set<string>>(new Set());
+    // ─── État visibleItems (initialisé avec tous les items pour éviter le flash) ────
+    const [visibleItems, setVisibleItems] = useState<Set<string>>(() => new Set(['undo', 'redo', 'bold', 'italic', 'underline', 'code', 'h1', 'list', 'list-ordered', 'quote', 'cipher', 'theme']));
+    const visibleItemsRef = useRef<Set<string>>(visibleItems);
+    visibleItemsRef.current = visibleItems;
+
+    // Cache persistant des largeurs réelles mesurées (ne retombe jamais à 0 quand masqué)
+    const knownWidthsRef = useRef<Record<string, number>>({ ...DEFAULT_ITEM_WIDTHS });
 
     // ─── Items overflow (après visibleItems) ────────────────────────────────
     const isItemVisible = (id: string) => visibleItems.has(id);
@@ -533,43 +556,135 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
         }
     }, [state.theme_id, selectedCipher]);
 
-    // ─── Mesure dynamique overflow ──────────────────────────────────────────
+    // ─── Mesure dynamique anti-clignotement avec Hystérèse ─────────────────────
+    const measureOverflow = useCallback(() => {
+        const toolbar = toolbarRef.current;
+        const parent = toolbar?.parentElement;
+        if (!toolbar || !parent) return;
+
+        // Mesure basée strictement sur la largeur du conteneur parent externe (insensible aux fluctuations de la toolbar)
+        const parentRect = parent.getBoundingClientRect();
+        const availableWidth = parentRect.width > 0 ? parentRect.width : parent.clientWidth;
+        if (availableWidth <= 0) return;
+
+        // Mettre à jour les dimensions réelles connues des éléments montés dans la barre
+        for (const item of toolbarItems) {
+            const el = itemRefs.current.get(item.id);
+            if (el && el.offsetWidth > 0) {
+                // Largeur du bouton + séparateur (5px) + gap flex (2px)
+                const realW = el.offsetWidth + 7;
+                if (realW > (knownWidthsRef.current[item.id] || 0)) {
+                    knownWidthsRef.current[item.id] = realW;
+                }
+            }
+        }
+
+        // 1. Tester si l'intégralité des items rentre sans bouton overflow
+        let totalAllWidth = TOOLBAR_CONTAINER_PADDING;
+        for (const item of toolbarItems) {
+            totalAllWidth += knownWidthsRef.current[item.id] || DEFAULT_ITEM_WIDTHS[item.id] || 35;
+        }
+
+        if (totalAllWidth <= availableWidth) {
+            const allSet = new Set(toolbarItems.map(i => i.id));
+            setVisibleItems(prev => {
+                if (prev.size === allSet.size) {
+                    let same = true;
+                    for (const id of allSet) {
+                        if (!prev.has(id)) { same = false; break; }
+                    }
+                    if (same) return prev;
+                }
+                return allSet;
+            });
+            return;
+        }
+
+        // 2. Si tout ne rentre pas, le bouton "..." overflow est requis
+        const maxBudget = availableWidth - TOOLBAR_CONTAINER_PADDING - OVERFLOW_BTN_RESERVED;
+        let usedWidth = 0;
+        const nextVisible = new Set<string>();
+
+        for (const item of toolbarItems) {
+            const cost = knownWidthsRef.current[item.id] || DEFAULT_ITEM_WIDTHS[item.id] || 35;
+            const wasVisible = visibleItemsRef.current.has(item.id);
+
+            // RÈGLE D'HYSTÉRÈSE STRICTE ANTI-CLIGNOTEMENT :
+            // Pour réintégrer un bouton masqué (wasVisible = false), on exige une marge tampon
+            // supplémentaire de HYSTERESIS_BUFFER px.
+            // S'il était déjà affiché, on le conserve tant qu'il ne dépasse pas le budget réel.
+            // Cela rend mathématiquement impossible tout battement/oscillation infini.
+            const neededSpace = wasVisible ? cost : cost + HYSTERESIS_BUFFER;
+
+            if (usedWidth + neededSpace <= maxBudget) {
+                nextVisible.add(item.id);
+                usedWidth += cost;
+            } else {
+                // Dès qu'un item de cette priorité ne rentre plus, tous les suivants vont en overflow
+                break;
+            }
+        }
+
+        setVisibleItems(prev => {
+            if (prev.size === nextVisible.size) {
+                let same = true;
+                for (const id of nextVisible) {
+                    if (!prev.has(id)) { same = false; break; }
+                }
+                if (same) return prev; // Même état -> pas de re-render !
+            }
+            return nextVisible;
+        });
+    }, [toolbarItems]);
+
+    // ResizeObserver attaché UNIQUEMENT au conteneur parent (jamais à la toolbar)
     useLayoutEffect(() => {
         const toolbar = toolbarRef.current;
-        const overflowBtn = overflowBtnRef.current;
-        if (!toolbar) return;
+        const parent = toolbar?.parentElement;
+        if (!toolbar || !parent) return;
 
-        const measure = () => {
-            const containerRect = toolbar.parentElement?.getBoundingClientRect();
-            const availableWidth = containerRect ? containerRect.width - 32 : toolbar.clientWidth;
-            let usedWidth = 0;
-            const gap = 2;
-            const overflowBtnWidth = overflowBtn?.offsetWidth || 40;
-            const visible = new Set<string>();
-
-            for (const item of toolbarItems) {
-                const el = itemRefs.current.get(item.id);
-                const itemWidth = el?.offsetWidth || item.minWidth;
-                const neededWidth = usedWidth === 0 ? itemWidth : usedWidth + gap + itemWidth;
-                const remainingItems = toolbarItems.filter(i => i.priority > item.priority || (i.priority === item.priority && i.id !== item.id));
-                const willNeedOverflow = remainingItems.length > 0;
-                const maxAllowed = availableWidth - (willNeedOverflow ? overflowBtnWidth + gap : 0);
-
-                if (neededWidth <= maxAllowed) {
-                    visible.add(item.id);
-                    usedWidth = neededWidth;
-                } else break;
-            }
-            setVisibleItems(visible);
+        let rafId: number | null = null;
+        const scheduleMeasure = () => {
+            if (rafId !== null) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+                measureOverflow();
+                rafId = null;
+            });
         };
 
-        measure();
-        const ro = new ResizeObserver(() => measure());
-        ro.observe(toolbar);
-        if (toolbar.parentElement) ro.observe(toolbar.parentElement);
-        requestAnimationFrame(measure);
-        return () => ro.disconnect();
-    }, [toolbarItems]);
+        const ro = new ResizeObserver(() => {
+            scheduleMeasure();
+        });
+
+        // IMPORTANT : On observe seulement le parent externe
+        ro.observe(parent);
+        scheduleMeasure();
+
+        return () => {
+            if (rafId !== null) cancelAnimationFrame(rafId);
+            ro.disconnect();
+        };
+    }, [measureOverflow]);
+
+    // Recalcul sécurisé après rendu si un libellé ou un élément est plus large qu'anticipé
+    useLayoutEffect(() => {
+        let hasLargerMeasure = false;
+        for (const item of toolbarItems) {
+            if (visibleItems.has(item.id)) {
+                const el = itemRefs.current.get(item.id);
+                if (el && el.offsetWidth > 0) {
+                    const realW = el.offsetWidth + 7;
+                    if (realW > (knownWidthsRef.current[item.id] || 0)) {
+                        knownWidthsRef.current[item.id] = realW;
+                        hasLargerMeasure = true;
+                    }
+                }
+            }
+        }
+        if (hasLargerMeasure) {
+            measureOverflow();
+        }
+    }, [visibleItems, toolbarItems, measureOverflow]);
 
     // ─── Fermeture menus au clic extérieur ──────────────────────────────────
     useEffect(() => {
@@ -623,6 +738,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                     padding: '3px 4px', boxShadow: 'var(--shadow-md)',
                     userSelect: 'none', position: 'relative',
                     boxSizing: 'border-box', pointerEvents: 'all',
+                    maxWidth: '100%', flexShrink: 0,
                 }}
             >
                 {toolbarItems.map(item =>
@@ -637,7 +753,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                 )}
 
                 {overflowItems.length > 0 && (
-                    <div style={{ position: 'relative' }}>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                         <button
                             ref={overflowBtnRef}
                             type="button"
@@ -665,9 +781,9 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                                 <div style={dropdownHeaderStyle}>Outils supplémentaires</div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                     {overflowItems.map(item => {
-                                        // Pour cipher et theme : rendre le VRAI trigger (avec son dropdown)
-                                        if (item.id === 'cipher') return <div key="cipher">{cipherTrigger()}</div>;
-                                        if (item.id === 'theme') return <div key="theme">{themeTrigger()}</div>;
+                                        // Pour cipher et theme : rendre le VRAI trigger (avec son dropdown, en mode overflow)
+                                        if (item.id === 'cipher') return <div key="cipher">{cipherTrigger(true)}</div>;
+                                        if (item.id === 'theme') return <div key="theme">{themeTrigger(true)}</div>;
                                         // Pour les autres : bouton simple
                                         return (
                                             <button

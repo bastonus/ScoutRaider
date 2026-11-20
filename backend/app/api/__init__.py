@@ -8,6 +8,9 @@ from app.api.import_export import router as import_export_router
 from app.api.health import router as health_router
 from app.api.projects import router as projects_router
 from app.api.hub import router as hub_router
+from app.api.ai import router as ai_router
+from app.api.connectors import router as connectors_router
+from app.api.mcp import router as mcp_router
 
 __all__ = [
     "auth_router",
@@ -19,4 +22,7 @@ __all__ = [
     "health_router",
     "projects_router",
     "hub_router",
+    "ai_router",
+    "connectors_router",
+    "mcp_router",
 ]

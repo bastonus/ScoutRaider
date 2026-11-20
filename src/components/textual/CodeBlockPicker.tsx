@@ -17,6 +17,7 @@ const TEXTUAL_MODULES: { id: ModuleId; description: string }[] = [
     { id: 'cassis', description: 'Décalage César K=6' },
     { id: 'polybe', description: 'Grille de substitution 6×6' },
     { id: 'templier', description: 'Chiffre maçonnique / pigpen' },
+    { id: 'maritime', description: 'Pavillons & alphabet NATO' },
     { id: 'texte_clair', description: 'Texte lisible en clair' },
 ];
 
@@ -27,12 +28,13 @@ const MODULE_FONT: Record<string, string> = {
     templier: '"TemplarsCipherPlus", "Times New Roman", serif',
     cassis: '"Kalam", cursive, sans-serif',
     avocat: '"Kalam", cursive, sans-serif',
+    maritime: '"Courier New", monospace',
     texte_clair: '"Segoe UI", sans-serif',
 };
 
 const MODULE_FONT_SIZE: Record<string, string> = {
     morse: '22px', templier: '26px', cassis: '15px', avocat: '15px',
-    vigenere: '13px', polybe: '13px', default: '13px',
+    vigenere: '13px', polybe: '13px', maritime: '13px', default: '13px',
 };
 
 interface CodeBlockPickerProps {

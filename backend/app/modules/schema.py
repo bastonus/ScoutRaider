@@ -33,6 +33,8 @@ class RenderType(str, Enum):
 class HubResourceType(str, Enum):
     CRYPTO_MODULE = "crypto_module"         # Modules de chiffrement, encodage & topographie
     MAP_PROVIDER = "map_provider"           # Fonds de cartes intégrés ou personnalisés
+    ROUTING_ENGINE = "routing_engine"       # Moteurs de calcul d'itinéraire (BRouter, Valhalla, OSRM, Azimut)
+    PATH_PROVIDER = "path_provider"         # Chargeurs & connecteurs de traces/chemins (GPX, GeoJSON, KML, Strava)
     RAID_TRAME = "raid_trame"               # Trames de Raid (scénarios pédagogiques, ex-orchestrations)
     THEME_STYLE = "theme_style"             # Thèmes graphiques, styles d'export WeasyPrint
     SYNTAX_EXTENSION = "syntax_extension"   # Extensions de blocs pour l'éditeur
@@ -75,6 +77,42 @@ class CustomMapConfig(BaseModel):
     auth_param_name: Optional[str] = Field(default=None, description="Nom du paramètre de clé dans l'URL")
     auth_token: Optional[str] = Field(default=None, description="Clé API ou jeton d'accès")
     custom_headers: Dict[str, str] = Field(default_factory=dict)
+
+
+# ─── Routing Engines & Path Loaders ─────────────────────────────────────────
+
+class RoutingEngineConfig(BaseModel):
+    """
+    Paramètres techniques pour un moteur de calcul d'itinéraire (ex: BRouter, Valhalla IGN, OSRM).
+    """
+    supported_profiles: List[str] = Field(
+        default_factory=lambda: ["pedestrian", "hiking", "trekking", "direct"],
+        description="Profils de déplacement supportés ('pedestrian', 'hiking', 'direct', 'cycling', etc.)"
+    )
+    default_profile: str = Field(default="hiking")
+    offline_capable: bool = Field(default=False, description="Capacité à calculer des tracés sans connexion Internet")
+    elevation_support: bool = Field(default=True, description="Fournit les profils d'élévation sur la géométrie calculée")
+    requires_api_key: bool = Field(default=False)
+    api_endpoint: Optional[str] = Field(default=None, description="Endpoint de l'API de routage")
+    custom_options: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PathProviderConfig(BaseModel):
+    """
+    Paramètres pour un connecteur / chargeur de fichiers et d'APIs de chemins (GPX, GeoJSON, KML, Strava).
+    """
+    supported_formats: List[str] = Field(
+        default_factory=lambda: ["gpx", "geojson"],
+        description="Extensions et formats supportés ('gpx', 'geojson', 'kml', 'tcx', 'fit')"
+    )
+    import_types: List[str] = Field(
+        default_factory=lambda: ["file_upload", "url_fetch"],
+        description="Types d'importation acceptés ('file_upload', 'url_fetch', 'cloud_sync')"
+    )
+    extracts_elevation: bool = Field(default=True, description="Extrait les altitudes et dénivelés (D+/D-)")
+    extracts_waypoints: bool = Field(default=True, description="Extrait les POIs et balises associées")
+    requires_auth: bool = Field(default=False)
+    auth_provider: Optional[str] = Field(default=None, description="Nom du provider d'authentification (ex: 'strava', 'ign')")
 
 
 # ─── Dependencies Graph ─────────────────────────────────────────────────────
@@ -230,6 +268,12 @@ class HubResourceMetadata(BaseModel):
 
     # Configuration cartographique (pour map_provider)
     map_config: Optional[CustomMapConfig] = None
+
+    # Configuration moteur de routage (pour routing_engine)
+    routing_config: Optional[RoutingEngineConfig] = None
+
+    # Configuration chargeur de chemins (pour path_provider)
+    path_provider_config: Optional[PathProviderConfig] = None
 
     # Métadonnées de distribution S3
     s3: Optional[S3DistributionMeta] = None

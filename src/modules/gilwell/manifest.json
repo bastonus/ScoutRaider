@@ -1,15 +1,30 @@
 {
-  "manifest_version": "2.0.0",
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
   "id": "gilwell",
   "name": "Piste Gilwell (Azimuts & Métrages)",
   "version": "2.0.0",
-  "resource_type": "code",
-  "data_capability": "map_path",
-  "category": "graphic",
-  "description": "Générateur et éditeur WYSIWYG de schémas d'azimuts (piste Gilwell) avec pagination multi-colonnes, connecteurs de lecture, export vectoriel SVG et matriciel PNG haute résolution.",
+  "resource_type": "crypto_module",
   "author": "ScoutRaider Team",
   "license": "MIT",
-  "entry_point": "index.ts",
+  "description": "Générateur et éditeur WYSIWYG de schémas d'azimuts (piste Gilwell) avec pagination multi-colonnes, connecteurs de lecture, export vectoriel SVG et matriciel PNG haute résolution.",
+  "data_capability": "map_path",
+  "supported_inputs": ["poly_segments", "azimut_distance_list"],
+  "render_type": "svg",
+  "entrypoint": "index.ts",
+  "ui_component": "components/GilwellSheet.tsx",
+  "pedagogy": {
+    "recommended_levels": ["premiere_classe", "raider"],
+    "difficulty_weight": 4.5,
+    "rules_explanation": "Épreuve d'orientation de précision : la patrouille doit reporter les azimuts et métrages sur le terrain ou sur table sans boussole erratique."
+  },
+  "constraints": {
+    "max_proportion": 0.25,
+    "allow_consecutive": false,
+    "max_azimuts": 25,
+    "min_distance_m": 500,
+    "max_distance_m": 8000
+  },
   "tags": [
     "topo",
     "orientation",
@@ -17,17 +32,5 @@
     "wysiwyg",
     "gilwell",
     "map_path"
-  ],
-  "engine_type": "react",
-  "capabilities": {
-    "wysiwyg": true,
-    "inPlaceEditing": true,
-    "dragRotate": true,
-    "multiColumn": true,
-    "pagination": true,
-    "flowConnectors": true,
-    "svgExport": true,
-    "pngExport": true,
-    "scoutRaiderSync": true
-  }
+  ]
 }

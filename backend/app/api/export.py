@@ -13,7 +13,7 @@ from app.database import get_db
 from app.models.document import Document, Asset
 from app.services.pdf_generator import pdf_generator
 from app.services.archive import archive_service
-from app.api.auth import get_current_user_dependency
+from app.api.auth import get_current_user_dependency, get_current_user_optional
 from app.schemas.document import ExportOptions
 from app.models.user import User
 
@@ -123,6 +123,54 @@ async def export_srproj(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur création archive: {e}")
+
+
+@router.get("/{document_id}/export/raid-pack")
+async def export_raid_pack(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
+):
+    """
+    Exporte un paquet autonome 'Raid Pack' hors-ligne (ZIP).
+    Contient le carnet HTML autonome, les données du raid et le cache POIs/sécurité.
+    """
+    result = await db.execute(select(Document).where(Document.id == document_id))
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document non trouvé")
+
+    import zipfile
+    import io
+
+    # Generate standalone HTML
+    standalone_html = build_export_html(document, version="participant")
+
+    # Generate ZIP buffer
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("carnet_autonome.html", standalone_html)
+        zf.writestr("projet.json", json.dumps(document.json_data, ensure_ascii=False, indent=2))
+        
+        # Offline README
+        readme_text = (
+            f"=== SCOUTRAIDER RAID PACK HORS-LIGNE ===\n\n"
+            f"Projet : {document.title}\n"
+            f"Généré pour usage autonome en camp isolé / forêt.\n\n"
+            f"Fichiers inclus :\n"
+            f"- carnet_autonome.html : Carnet vectoriel complet (ouvrable dans n'importe quel navigateur sans connexion internet)\n"
+            f"- projet.json : Données brutes du projet (tracé, coordonnées, étapes)\n"
+            f"- Règles de sécurité : 112 (Europe), 15 (SAMU), 18 (Pompiers)\n"
+        )
+        zf.writestr("README_HORS_LIGNE.txt", readme_text)
+
+    zip_bytes = zip_buffer.getvalue()
+    filename = f"RaidPack_{document.title.replace(' ', '_')}.zip"
+    return StreamingResponse(
+        iter([zip_bytes]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 # Import garage_client pour l'export

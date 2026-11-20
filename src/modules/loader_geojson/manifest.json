@@ -1,0 +1,27 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "loader_geojson",
+  "name": "Chargeur Vectoriel GeoJSON / TopoJSON",
+  "version": "2.0.0",
+  "resource_type": "path_provider",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Importateur universel de tracés vectoriels et couches SIG au format GeoJSON, FeatureCollection et KML normalisé.",
+  "entrypoint": "index.ts",
+  "path_provider_config": {
+    "supported_formats": ["geojson", "json", "kml"],
+    "import_types": ["file_upload", "url_fetch"],
+    "extracts_elevation": true,
+    "extracts_waypoints": true,
+    "requires_auth": false
+  },
+  "tags": [
+    "loader",
+    "chemins",
+    "geojson",
+    "sig",
+    "vectoriel",
+    "kml"
+  ]
+}

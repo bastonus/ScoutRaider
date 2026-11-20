@@ -31,8 +31,77 @@ class GarageClient:
 
     def _get_object_key(self, asset_id: str, asset_type: str = "image") -> str:
         """Génère la clé S3 selon le type d'asset."""
-        prefix = {"font": "fonts", "image": "images", "map": "maps"}.get(asset_type, "assets")
+        prefix = {
+            "font": "fonts",
+            "image": "images",
+            "map": "maps",
+            "module": "modules",
+            "package": "modules",
+            "catalog": "modules"
+        }.get(asset_type, "assets")
         return f"{prefix}/{asset_id}"
+
+    def get_module_url(self, module_id: str, version: str) -> str:
+        """Retourne l'URL S3 publique directe d'un module Hub v2."""
+        return f"{self.public_url}/{self.bucket}/modules/{module_id}-{version}.zip"
+
+    async def upload_module_package(
+        self,
+        module_id: str,
+        version: str,
+        data: bytes,
+        metadata: Optional[dict] = None
+    ) -> str:
+        """Upload une archive ZIP de module Hub v2 vers Garage S3."""
+        filename = f"{module_id}-{version}.zip"
+        key = f"modules/{filename}"
+        try:
+            self.s3.put_object(
+                Bucket=self.bucket,
+                Key=key,
+                Body=data,
+                ContentType="application/zip",
+                Metadata=metadata or {
+                    "module_id": module_id,
+                    "version": version
+                },
+                CacheControl="max-age=86400, public"
+            )
+            logger.info("module_uploaded_to_s3", module_id=module_id, version=version, key=key, size=len(data))
+            return f"{self.public_url}/{self.bucket}/{key}"
+        except ClientError as e:
+            logger.error("module_upload_to_s3_failed", module_id=module_id, error=str(e))
+            raise
+
+    async def upload_catalog_index(self, data: bytes, filename: str = "catalog_v2.json") -> str:
+        """Upload le catalogue global v2 (JSON) vers Garage S3."""
+        key = f"modules/{filename}"
+        try:
+            self.s3.put_object(
+                Bucket=self.bucket,
+                Key=key,
+                Body=data,
+                ContentType="application/json; charset=utf-8",
+                CacheControl="max-age=300, public"
+            )
+            logger.info("catalog_index_uploaded_to_s3", key=key, size=len(data))
+            return f"{self.public_url}/{self.bucket}/{key}"
+        except ClientError as e:
+            logger.error("catalog_index_upload_to_s3_failed", error=str(e))
+            raise
+
+    async def download_module_package(self, module_id: str, version: str) -> bytes:
+        """Télécharge l'archive ZIP d'un module depuis Garage S3."""
+        filename = f"{module_id}-{version}.zip"
+        key = f"modules/{filename}"
+        try:
+            response = self.s3.get_object(Bucket=self.bucket, Key=key)
+            return response["Body"].read()
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchKey":
+                raise FileNotFoundError(f"Module {module_id} v{version} not found in S3 bucket {self.bucket}")
+            logger.error("module_download_from_s3_failed", module_id=module_id, error=str(e))
+            raise
 
     async def upload_asset(
         self,

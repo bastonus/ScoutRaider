@@ -654,9 +654,9 @@ function parseCustomCipherTags(text: string): string {
 }
 
     const fontClass = getModuleFontClass(step.moduleId);
-    const rawDisplayText = isSolution ? step.solutionText : step.encodedText;
+    const rawDisplayText = isSolution ? step.solutionText : (step.encodedText || step.solutionText);
     const displayText = parseCustomCipherTags(rawDisplayText || '');
-    const isEncoded = !isSolution && step.moduleId !== 'texte_clair' && displayText !== step.solutionText;
+    const isEncoded = !isSolution && step.moduleId !== 'texte_clair';
 
     let textContent = '';
     if (!['carte_ign', 'carte_simple', 'gilwell'].includes(step.moduleId) && displayText) {

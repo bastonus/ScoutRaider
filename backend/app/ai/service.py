@@ -268,3 +268,43 @@ class AIService:
                 water_points_advice="Prévoir au minimum 1.5L à 2L d'eau par personne et repérer les points d'eau potable.",
                 emergency_contacts_needed=["SAMU (15)", "Numéro d'urgence européen (112)", "Gendarmerie locale"]
             )
+
+    async def check_provider_status(self) -> Dict[str, Any]:
+        """
+        Detects available AI backends, including local Ollama instance on localhost:11434
+        for offline resilience.
+        """
+        ollama_endpoint = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        ollama_available = False
+        ollama_models = []
+
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                res = await client.get(f"{ollama_endpoint.rstrip('/')}/api/tags")
+                if res.status_code == 200:
+                    ollama_available = True
+                    models_data = res.json().get("models", [])
+                    ollama_models = [m.get("name") for m in models_data]
+        except Exception:
+            pass
+
+        return {
+            "offline_mode_ready": True,  # Deterministic template generators are always ready
+            "ollama": {
+                "available": ollama_available,
+                "endpoint": ollama_endpoint,
+                "models": ollama_models
+            },
+            "gemini": {
+                "configured": bool(os.getenv("GEMINI_API_KEY"))
+            },
+            "claude": {
+                "configured": bool(os.getenv("ANTHROPIC_API_KEY"))
+            },
+            "openai": {
+                "configured": bool(os.getenv("OPENAI_API_KEY"))
+            }
+        }
+
+
+ai_service = AIService()

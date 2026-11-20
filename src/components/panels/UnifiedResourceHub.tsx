@@ -27,7 +27,8 @@ import {
   Key, 
   ShieldCheck, 
   Zap, 
-  Globe 
+  Globe,
+  Cloud
 } from 'lucide-react';
 import { useApp } from '../../AppContext';
 import { useAuth } from '../../AuthContext';
@@ -44,13 +45,13 @@ import ThemeEditorModal from './ThemeEditorModal';
 import ModuleEditorModal from './ModuleEditorModal';
 import PreferencesModal from './PreferencesModal';
 
-export type UnifiedCategory = 'all' | 'maps' | 'code' | 'orchestration' | 'theme' | 'my_library';
+export type UnifiedCategory = 'all' | 'maps' | 'routing' | 'code' | 'orchestration' | 'theme' | 'my_library';
 export type UnifiedScope = 'all' | 'installed' | 'community';
 
 export interface UnifiedResourceItem {
   id: string;
   name: string;
-  category: 'maps' | 'code' | 'orchestration' | 'theme';
+  category: 'maps' | 'routing' | 'code' | 'orchestration' | 'theme';
   categoryLabel: string;
   description: string;
   badge?: string;
@@ -70,6 +71,7 @@ export interface UnifiedResourceItem {
   keyLabel?: string;
   author?: string;
   version?: string;
+  s3_download_url?: string;
   rawModule?: MarketplaceModule;
   metaDetails?: Record<string, any>;
   onApply: () => void;
@@ -116,8 +118,9 @@ function ResourceHubCard({
   onDragStart
 }: ResourceHubCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
-
+  const isMap = item.category === 'maps';
   const hasBanner = !!item.previewBannerComponent || (!!item.previewImage && !imageFailed);
+  const color = item.color || '#3b82f6';
 
   return (
     <div
@@ -130,15 +133,15 @@ function ResourceHubCard({
         border: '1px solid',
         borderColor: isActive ? 'var(--accent-default)' : 'rgba(255, 255, 255, 0.08)',
         overflow: 'hidden',
-        boxShadow: isActive ? '0 0 0 1px var(--accent-default), 0 8px 24px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.2)',
-        transition: 'all 0.3s ease',
+        boxShadow: isActive ? '0 0 0 1px var(--accent-default), 0 8px 24px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.15)',
+        transition: 'all 0.2s ease',
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
         cursor: onDragStart ? 'grab' : 'pointer',
         boxSizing: 'border-box',
         width: '100%',
-        minHeight: hasBanner ? '285px' : '110px',
+        minHeight: hasBanner && isMap ? '285px' : '110px',
         position: 'relative'
       }}
       onMouseEnter={e => {
@@ -154,15 +157,20 @@ function ResourceHubCard({
         }
       }}
     >
-      {/* ── CARD BANNER (140px) ─────────────────────────────────── */}
-      {hasBanner && (
+      {/* Top accent line if no banner (non-map cards) */}
+      {(!isMap || !hasBanner) && (
+        <div style={{ width: '100%', height: '3px', background: color, opacity: 0.8 }} />
+      )}
+
+      {/* Map Banner — full 140px with provider logo watermark */}
+      {isMap && hasBanner && (
         <div style={{
           width: '100%',
           height: '140px',
           minHeight: '140px',
+          flexShrink: 0,
           position: 'relative',
           overflow: 'hidden',
-          flexShrink: 0,
           background: '#0a0b0e'
         }}>
           {item.previewBannerComponent ? (
@@ -172,176 +180,178 @@ function ResourceHubCard({
               src={item.previewImage}
               alt={item.name}
               onError={() => setImageFailed(true)}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }}
             />
           ) : null}
 
-          {/* Badges Overlay (ROW top-left) */}
-          <div style={{ position: 'absolute', top: '12px', left: '12px', display: 'flex', flexWrap: 'wrap', gap: '6px', zIndex: 5 }}>
+          {/* Overlay badges — top left */}
+          <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
             {item.needsKey && !item.hasKey && (
               <div style={{
-                background: 'rgba(239, 68, 68, 0.95)',
-                padding: '4px 8px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.4)',
-                border: '1px solid rgba(0,0,0,0.1)'
+                background: 'rgba(239, 68, 68, 0.95)', padding: '3px 7px', borderRadius: '6px',
+                display: 'flex', alignItems: 'center', gap: '5px',
+                color: '#fff', fontSize: '10px', fontWeight: 800
               }}>
-                <Lock size={12} color="#fff" fill="#fff" fillOpacity={0.1} strokeWidth={2.5} />
-                <span style={{ fontSize: '10px', fontWeight: 800, color: '#fff', letterSpacing: '0.3px' }}>Bloqué</span>
+                <Lock size={11} strokeWidth={2.5} />
+                <span>Bloqué</span>
               </div>
             )}
-
             {item.isFavorite && (
               <div style={{
-                background: 'rgba(251, 191, 36, 0.95)',
-                padding: '4px 8px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.4)',
-                border: '1px solid rgba(0,0,0,0.1)'
+                background: 'rgba(251, 191, 36, 0.9)', padding: '3px 7px', borderRadius: '6px',
+                display: 'flex', alignItems: 'center', gap: '4px',
+                color: '#000', fontSize: '10px', fontWeight: 800
               }}>
-                <Star size={12} color="#000" fill="#000" strokeWidth={2.5} />
-                <span style={{ fontSize: '10px', fontWeight: 800, color: '#000', letterSpacing: '0.3px' }}>Favori</span>
+                <Star size={10} fill="currentColor" />
+                <span>Favori</span>
               </div>
             )}
-
             {item.isSatellite && (
               <div style={{
-                background: 'rgba(168, 85, 247, 0.95)',
-                padding: '4px 8px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.4)',
-                border: '1px solid rgba(0,0,0,0.1)'
+                background: 'rgba(139, 92, 246, 0.9)', padding: '3px 7px', borderRadius: '6px',
+                display: 'flex', alignItems: 'center', gap: '4px',
+                color: '#fff', fontSize: '10px', fontWeight: 800
               }}>
-                <Satellite size={12} color="#fff" strokeWidth={2.5} />
-                <span style={{ fontSize: '10px', fontWeight: 800, color: '#fff', letterSpacing: '0.3px' }}>Satellite</span>
+                <Satellite size={10} />
+                <span>Satellite</span>
               </div>
             )}
-
-            {item.badge && !item.isFavorite && !item.isSatellite && (
+            {item.badge && (
               <div style={{
-                background: 'rgba(0, 0, 0, 0.75)',
-                padding: '4px 8px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.4)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                color: item.color || '#fff'
+                background: 'rgba(0,0,0,0.6)', padding: '3px 7px', borderRadius: '6px',
+                color: '#fff', fontSize: '10px', fontWeight: 700,
+                backdropFilter: 'blur(4px)'
               }}>
-                <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-                  {item.badge}
-                </span>
+                {item.badge}
               </div>
             )}
           </div>
 
-          {/* Watermark in bottom-right over gradient */}
+          {/* Provider logo watermark — bottom right with gradient */}
           <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            padding: '12px',
-            background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            alignItems: 'flex-end',
-            pointerEvents: 'none',
-            zIndex: 4
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
+            padding: '20px 10px 8px',
+            display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end'
           }}>
             {item.logoImage ? (
               <img
                 src={item.logoImage}
-                alt="Logo"
-                style={{ maxHeight: '24px', maxWidth: '40%', filter: 'brightness(1.1) drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}
+                alt={`Logo ${item.name}`}
+                style={{ height: '20px', maxWidth: '70px', objectFit: 'contain', opacity: 0.9 }}
               />
-            ) : (item.category === 'maps' && item.categoryLabel?.toUpperCase().includes('IGN')) ? (
-              <span style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.5px', color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
-                IGN
-              </span>
             ) : item.author ? (
-              <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+              <span style={{
+                fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.7)',
+                fontFamily: 'monospace', letterSpacing: '0.5px'
+              }}>
                 @{item.author}
               </span>
-            ) : null}
+            ) : (
+              <span style={{
+                fontSize: '11px', fontWeight: 900, color: 'rgba(255,255,255,0.7)',
+                fontFamily: 'monospace', letterSpacing: '1px'
+              }}>
+                IGN
+              </span>
+            )}
           </div>
         </div>
       )}
 
-      {/* ── CARD CONTENT BODY (16px) ────────────────────────────── */}
+      {/* Card Content Body */}
       <div style={{
-        padding: '16px',
+        padding: isMap && hasBanner ? '10px' : '16px',
         display: 'flex',
         flexDirection: 'column',
         flex: 1,
-        justifyContent: 'space-between'
+        justifyContent: 'space-between',
+        gap: '12px',
+        marginTop: isMap && hasBanner ? '0' : undefined
       }}>
         <div>
-          {/* Title row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#fff', textTransform: 'uppercase' }}>
-                  {item.name}
-                </div>
-                {isActive && (
-                  <div style={{
-                    background: 'rgba(110, 201, 126, 0.2)',
-                    color: 'var(--accent-default)',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    fontSize: '9px',
-                    fontWeight: 800,
-                    border: '1px solid rgba(110, 201, 126, 0.3)',
-                    textTransform: 'uppercase'
-                  }}>
-                    Actif
-                  </div>
-                )}
-              </div>
+          {/* Header row: Icon + Name + Version + Badges + Edit */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
-                fontSize: '10px',
-                color: 'var(--accent-default)',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                marginTop: '2px',
-                letterSpacing: '0.5px'
+                width: '32px', height: '32px', borderRadius: '9px',
+                background: `${color}18`, border: `1px solid ${color}35`,
+                color: color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0
               }}>
-                {item.categoryLabel}
+                {item.icon}
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#f4f4f5' }}>
+                    {item.name}
+                  </span>
+                  {item.version && (
+                    <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#71717a' }}>
+                      v{item.version}
+                    </span>
+                  )}
+                  {isActive && (
+                    <span style={{
+                      background: 'rgba(110, 201, 126, 0.15)',
+                      color: 'var(--accent-default)',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      border: '1px solid rgba(110, 201, 126, 0.3)'
+                    }}>
+                      Actif
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '11px', color: '#a1a1aa', fontWeight: 500, marginTop: '2px' }}>
+                  {item.categoryLabel}
+                </div>
               </div>
             </div>
 
-            {/* External link or quick edit */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={e => e.stopPropagation()}>
-              {item.websiteUrl && (
+            {/* Top right badges & Edit button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
+              {/* Badge texte — affiché en body seulement pour les non-maps (pour les maps, il est en overlay bannière) */}
+              {item.badge && !item.isFavorite && !(isMap && hasBanner) && (
+                <span style={{
+                  fontSize: '9.5px', fontWeight: 700, padding: '2px 6px', borderRadius: '5px',
+                  background: 'rgba(255, 255, 255, 0.05)', color: color,
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                }}>
+                  {item.badge}
+                </span>
+              )}
+              {item.s3_download_url && (
                 <a
-                  href={item.websiteUrl}
+                  href={item.s3_download_url}
                   target="_blank"
-                  rel="noreferrer"
-                  style={{ color: 'rgba(255,255,255,0.2)', transition: 'color 0.2s', padding: '4px', display: 'flex' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                  onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  title={`Télécharger depuis S3 Garage: ${item.s3_download_url}`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '3px',
+                    fontSize: '9px', fontWeight: 700, padding: '2px 5px',
+                    borderRadius: '5px', background: 'rgba(56, 189, 248, 0.1)',
+                    color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)',
+                    textDecoration: 'none'
+                  }}
                 >
-                  <ExternalLink size={14} />
+                  <Cloud size={9} />
+                  <span>S3</span>
                 </a>
               )}
               {onEdit && (
                 <button
                   onClick={onEdit}
-                  title="Modifier"
-                  style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.2)', padding: '4px', cursor: 'pointer', display: 'flex' }}
+                  title="Modifier le module"
+                  style={{
+                    background: 'transparent', border: 'none', color: '#71717a',
+                    padding: '4px', cursor: 'pointer', display: 'flex', borderRadius: '4px'
+                  }}
                   onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                  onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#71717a'}
                 >
                   <Pencil size={13} />
                 </button>
@@ -351,122 +361,122 @@ function ResourceHubCard({
 
           {/* Description */}
           <p style={{
-            fontSize: '11px',
-            color: 'rgba(255,255,255,0.5)',
-            lineHeight: 1.6,
-            margin: '8px 0 0'
+            margin: '10px 0 0',
+            fontSize: '12px',
+            color: 'rgba(255, 255, 255, 0.55)',
+            lineHeight: 1.5,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden'
           }}>
             {item.description}
           </p>
         </div>
 
-        {/* ── CARD ACTION BUTTONS ───────────────────────────────── */}
-        {/* Blocked Button (Exact same style as the original map library) */}
-        {item.needsKey && !item.hasKey ? (
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              onApply();
-            }}
-            style={{
-              width: '100%',
-              padding: '10px',
-              background: 'rgba(251, 191, 36, 0.1)',
-              border: '1px solid rgba(251, 191, 36, 0.2)',
-              borderRadius: '10px',
-              color: '#fbbf24',
-              fontSize: '12px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: '16px',
-              transition: 'all 0.2s ease',
-              cursor: 'pointer'
-            }}
-          >
-            <Lock size={14} color="#fbbf24" fill="#fbbf24" fillOpacity={0.2} style={{ marginRight: '8px' }} />
-            <span style={{ display: 'inline-block', lineHeight: '1.2' }}>
-              Débloquer avec une clé {item.badge || item.categoryLabel}
-            </span>
-          </div>
-        ) : (
-          /* Action Button for all active resources */
-          <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }} onClick={e => e.stopPropagation()}>
+        {/* Management & Action Bar */}
+        <div style={{
+          paddingTop: isMap && hasBanner ? '0' : '10px',
+          borderTop: isMap && hasBanner ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
+          marginTop: isMap && hasBanner ? '16px' : undefined,
+          display: 'flex',
+          flexDirection: isMap && hasBanner ? 'column' : 'row',
+          alignItems: isMap && hasBanner ? 'stretch' : 'center',
+          justifyContent: 'space-between',
+          gap: '8px'
+        }} onClick={e => e.stopPropagation()}>
+          
+          {/* Library Status Toggle */}
+          {onToggleLibrary ? (
+            <button
+              onClick={onToggleLibrary}
+              title={item.isInLibrary ? 'Actif dans votre carnet (cliquer pour désactiver)' : 'Désactivé (cliquer pour activer)'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 10px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 600,
+                background: item.isInLibrary ? 'rgba(110, 201, 126, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                border: item.isInLibrary ? '1px solid rgba(110, 201, 126, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+                color: item.isInLibrary ? '#6EC97E' : '#71717a',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <BookmarkCheck size={13} strokeWidth={item.isInLibrary ? 2.5 : 1.8} />
+              <span>{item.isInLibrary ? 'Dans la bibliothèque' : 'Inactif'}</span>
+            </button>
+          ) : <div />}
+
+          {/* Action button */}
+          {item.needsKey && !item.hasKey ? (
             <button
               onClick={onApply}
               style={{
-                flex: 1,
-                padding: '10px',
-                background: isActive ? 'rgba(110, 201, 126, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                border: isActive ? '1px solid rgba(110, 201, 126, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '10px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                padding: '5px 12px',
+                borderRadius: '8px', background: 'rgba(251, 191, 36, 0.12)',
+                border: '1px solid rgba(251, 191, 36, 0.3)', color: '#fbbf24',
+                fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+                width: isMap && hasBanner ? '100%' : undefined
+              }}
+            >
+              <Lock size={12} />
+              <span>Débloquer</span>
+            </button>
+          ) : (
+            <button
+              onClick={onApply}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                padding: isMap && hasBanner ? '8px 14px' : '5px 14px',
+                borderRadius: '8px',
+                background: isActive ? 'rgba(110, 201, 126, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                border: isActive ? '1px solid rgba(110, 201, 126, 0.3)' : '1px solid rgba(255, 255, 255, 0.12)',
                 color: isActive ? 'var(--accent-default)' : '#fff',
-                fontSize: '12px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
+                fontSize: '11.5px', fontWeight: 600, cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                width: isMap && hasBanner ? '100%' : undefined
               }}
               onMouseEnter={e => {
-                if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
               }}
               onMouseLeave={e => {
-                if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
               }}
             >
               {isActive ? (
                 <>
-                  <Check size={14} strokeWidth={2.5} />
+                  <Check size={13} strokeWidth={2.5} />
                   <span>Sélectionné</span>
                 </>
               ) : item.category === 'code' ? (
                 <>
-                  <Play size={13} fill="#fff" />
-                  <span>Tester / Insérer</span>
+                  <Play size={12} fill="#fff" />
+                  <span>Tester</span>
                 </>
               ) : item.category === 'maps' ? (
                 <>
-                  <MapIcon size={13} />
-                  <span>Activer la carte</span>
+                  <MapIcon size={12} />
+                  <span>Activer</span>
+                </>
+              ) : item.category === 'routing' ? (
+                <>
+                  <Zap size={12} />
+                  <span>Sélectionner</span>
                 </>
               ) : (
                 <>
-                  <Play size={13} />
+                  <Play size={12} />
                   <span>Appliquer</span>
                 </>
               )}
             </button>
-
-            {onToggleLibrary && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleLibrary();
-                }}
-                title={item.isInLibrary ? 'Actif dans Ma Bibliothèque (cliquer pour désactiver)' : 'Inactif (cliquer pour ajouter à Ma Bibliothèque)'}
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: item.isInLibrary ? 'rgba(110, 201, 126, 0.12)' : 'rgba(255, 255, 255, 0.05)',
-                  border: item.isInLibrary ? '1px solid rgba(110, 201, 126, 0.35)' : '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '10px',
-                  color: item.isInLibrary ? 'var(--accent-default)' : 'rgba(255, 255, 255, 0.4)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <BookmarkCheck size={15} strokeWidth={item.isInLibrary ? 2.5 : 1.8} />
-              </button>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -777,6 +787,7 @@ export default function UnifiedResourceHub({
         isActive: false,
         isBuiltIn: true,
         isInLibrary: !disabledLibraryIds.has(mId),
+        s3_download_url: `https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/${mId}-2.0.0.zip`,
         onApply: () => {
           setPreviewTestModule({ id: mId, name: meta.label });
           try {
@@ -845,6 +856,128 @@ export default function UnifiedResourceHub({
 
     return [...baseItems, ...topoItems];
   }, [disabledLibraryIds]);
+
+  // ── 2b. Moteurs de routage & Chargeurs de chemins (v2.0 Modular Standard) ──
+  const [activeRoutingEngine, setActiveRoutingEngine] = useState<string>(() => {
+    return localStorage.getItem('scoutraider_active_routing_engine') || 'routing_brouter';
+  });
+
+  const routingItems = useMemo<UnifiedResourceItem[]>(() => {
+    const items: UnifiedResourceItem[] = [
+      {
+        id: 'routing_brouter',
+        name: 'Moteur BRouter Randonnée',
+        category: 'routing' as const,
+        categoryLabel: 'Moteur de Routage Pédestre',
+        description: 'Calcul d\'itinéraires pédestres haute précision optimisé pour les sentiers de randonnée (GR, PR), évitant les axes routiers dangereux.',
+        badge: 'Sentiers / Randonnée',
+        color: '#10b981',
+        icon: <Compass size={16} />,
+        isActive: activeRoutingEngine === 'routing_brouter',
+        isBuiltIn: true,
+        isInLibrary: !disabledLibraryIds.has('routing_brouter'),
+        s3_download_url: 'https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/routing_brouter-2.0.0.zip',
+        onApply: () => {
+          setActiveRoutingEngine('routing_brouter');
+          localStorage.setItem('scoutraider_active_routing_engine', 'routing_brouter');
+          dispatch({
+            type: 'ADD_NOTIFICATION',
+            message: 'Moteur BRouter sélectionné comme moteur de routage par défaut.',
+            notifType: 'info'
+          });
+        }
+      },
+      {
+        id: 'routing_valhalla_ign',
+        name: 'Moteur Valhalla BD TOPO IGN',
+        category: 'routing' as const,
+        categoryLabel: 'Moteur Souverain Géoplateforme',
+        description: 'Calcul d\'itinéraires sur la base de données officielle BD TOPO de l\'IGN. Intègre le réseau des sentiers balisés nationaux français.',
+        badge: 'IGN France / Valhalla',
+        color: '#0284c7',
+        icon: <ShieldCheck size={16} />,
+        isActive: activeRoutingEngine === 'routing_valhalla_ign',
+        isBuiltIn: true,
+        isInLibrary: !disabledLibraryIds.has('routing_valhalla_ign'),
+        s3_download_url: 'https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/routing_valhalla_ign-2.0.0.zip',
+        onApply: () => {
+          setActiveRoutingEngine('routing_valhalla_ign');
+          localStorage.setItem('scoutraider_active_routing_engine', 'routing_valhalla_ign');
+          dispatch({
+            type: 'ADD_NOTIFICATION',
+            message: 'Moteur IGN Géoplateforme BD TOPO sélectionné pour le routage.',
+            notifType: 'info'
+          });
+        }
+      },
+      {
+        id: 'routing_direct',
+        name: 'Azimut Direct & Vol d\'Oiseau',
+        category: 'routing' as const,
+        categoryLabel: 'Moteur Hors-Piste & Boussole',
+        description: 'Calcul de tracés directs à vol d\'oiseau pour progression hors-sentier, navigation boussole et franchissements.',
+        badge: '100% Hors-ligne',
+        color: '#f59e0b',
+        icon: <Zap size={16} />,
+        isActive: activeRoutingEngine === 'routing_direct',
+        isBuiltIn: true,
+        isInLibrary: !disabledLibraryIds.has('routing_direct'),
+        s3_download_url: 'https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/routing_direct-2.0.0.zip',
+        onApply: () => {
+          setActiveRoutingEngine('routing_direct');
+          localStorage.setItem('scoutraider_active_routing_engine', 'routing_direct');
+          dispatch({
+            type: 'ADD_NOTIFICATION',
+            message: 'Mode azimut direct (vol d\'oiseau) sélectionné.',
+            notifType: 'info'
+          });
+        }
+      },
+      {
+        id: 'loader_gpx',
+        name: 'Chargeur GPX Universel',
+        category: 'routing' as const,
+        categoryLabel: 'Connecteur & Import de Traces',
+        description: 'Importateur et analyseur de traces GPS au standard XML GPX (1.0 / 1.1). Extrait tracés, altitudes, chronos et waypoints d\'étapes.',
+        badge: 'GPX / Garmin / Montres',
+        color: '#8b5cf6',
+        icon: <MapIcon size={16} />,
+        isActive: false,
+        isBuiltIn: true,
+        isInLibrary: !disabledLibraryIds.has('loader_gpx'),
+        s3_download_url: 'https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/loader_gpx-2.0.0.zip',
+        onApply: () => {
+          dispatch({
+            type: 'ADD_NOTIFICATION',
+            message: 'Chargeur GPX prêt : glissez un fichier .gpx sur la carte ou ouvrez le gestionnaire de traces.',
+            notifType: 'info'
+          });
+        }
+      },
+      {
+        id: 'loader_geojson',
+        name: 'Chargeur Vectoriel GeoJSON SIG',
+        category: 'routing' as const,
+        categoryLabel: 'Connecteur Données Vectorielles',
+        description: 'Importateur universel de tracés vectoriels et couches SIG au format GeoJSON, FeatureCollection et KML normalisé.',
+        badge: 'GeoJSON / SIG / KML',
+        color: '#ec4899',
+        icon: <Globe size={16} />,
+        isActive: false,
+        isBuiltIn: true,
+        isInLibrary: !disabledLibraryIds.has('loader_geojson'),
+        s3_download_url: 'https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/loader_geojson-2.0.0.zip',
+        onApply: () => {
+          dispatch({
+            type: 'ADD_NOTIFICATION',
+            message: 'Chargeur GeoJSON prêt : compatible QGIS, Overpass OSM et Leaflet.',
+            notifType: 'info'
+          });
+        }
+      }
+    ];
+    return items;
+  }, [activeRoutingEngine, disabledLibraryIds, dispatch]);
 
   // ── 3. Règles de raid (Declined Rich Visual Banner) ─────────────────────────
   const orchestrationItems = useMemo<UnifiedResourceItem[]>(() => {
@@ -1084,8 +1217,8 @@ export default function UnifiedResourceHub({
   }, [cloudModules, isInLibrary]);
 
   const allItems = useMemo<UnifiedResourceItem[]>(() => {
-    return [...mapItems, ...codeItems, ...orchestrationItems, ...themeItems, ...cloudItems];
-  }, [mapItems, codeItems, orchestrationItems, themeItems, cloudItems]);
+    return [...mapItems, ...routingItems, ...codeItems, ...orchestrationItems, ...themeItems, ...cloudItems];
+  }, [mapItems, routingItems, codeItems, orchestrationItems, themeItems, cloudItems]);
 
   const filteredItems = useMemo(() => {
     return allItems.filter(item => {
@@ -1118,11 +1251,12 @@ export default function UnifiedResourceHub({
   const categories = useMemo(() => [
     { id: 'all' as UnifiedCategory, label: 'Tout', icon: <Sparkles size={13} />, count: allItems.length },
     { id: 'maps' as UnifiedCategory, label: 'Fonds de carte', icon: <MapIcon size={13} />, count: mapItems.length },
+    { id: 'routing' as UnifiedCategory, label: 'Routage & Chemins', icon: <Compass size={13} />, count: routingItems.length },
     { id: 'code' as UnifiedCategory, label: 'Codes & Énigmes', icon: <Code size={13} />, count: codeItems.length },
     { id: 'orchestration' as UnifiedCategory, label: 'Trames de Raid', icon: <Sliders size={13} />, count: orchestrationItems.length },
     { id: 'theme' as UnifiedCategory, label: 'Thèmes & Récits', icon: <Palette size={13} />, count: themeItems.length },
     { id: 'my_library' as UnifiedCategory, label: 'Ma Bibliothèque', icon: <BookmarkCheck size={13} />, count: allItems.filter(i => i.isInLibrary).length }
-  ], [allItems, mapItems, codeItems, orchestrationItems, themeItems]);
+  ], [allItems, mapItems, routingItems, codeItems, orchestrationItems, themeItems]);
 
   return (
     <div style={{

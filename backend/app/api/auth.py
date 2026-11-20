@@ -35,6 +35,26 @@ async def get_current_user_dependency(
     return user
 
 
+async def get_current_user_optional(
+    authorization: Annotated[str | None, Header()] = None,
+    db: AsyncSession = Depends(get_db)
+) -> User | None:
+    """Récupère l'utilisateur s'il est authentifié, sinon None (accès invité/public)."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+
+    token = authorization.split(" ")[1]
+    payload = decode_token(token)
+    if not payload or payload.type != "access":
+        return None
+
+    user = await get_user_by_id(db, payload.sub)
+    if not user or not user.is_active:
+        return None
+
+    return user
+
+
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     """Inscription d'un nouvel utilisateur."""

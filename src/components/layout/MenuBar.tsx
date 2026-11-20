@@ -493,6 +493,52 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
                                 >
                                     {isGuest ? <CloudOff size={13} /> : cloudSyncStatus === 'saving' ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : cloudSyncStatus === 'error' ? <CloudOff size={13} /> : <Cloud size={13} />}
                                 </div>
+                                {currentProjectRole === 'viewer' && (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginLeft: '2px' }}>
+                                        <div
+                                            title="Ce projet est partagé en lecture seule"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                height: '20px',
+                                                padding: '0 6px',
+                                                borderRadius: 'var(--radius-pill)',
+                                                background: 'rgba(245, 158, 11, 0.12)',
+                                                border: '1px solid rgba(245, 158, 11, 0.28)',
+                                                color: '#FCD34D',
+                                                fontSize: '10.5px',
+                                                fontWeight: 600,
+                                                userSelect: 'none'
+                                            }}
+                                        >
+                                            <Eye size={11} strokeWidth={2.2} />
+                                            {!isMobile && <span>Lecture seule</span>}
+                                        </div>
+                                        <button
+                                            onClick={makeEditableCopy}
+                                            title="Créer une copie modifiable"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                height: '20px',
+                                                padding: '0 7px',
+                                                borderRadius: 'var(--radius-pill)',
+                                                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.22) 0%, rgba(21, 128, 61, 0.32) 100%)',
+                                                border: '1px solid rgba(74, 222, 128, 0.4)',
+                                                color: '#bbf7d0',
+                                                fontSize: '10.5px',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                        >
+                                            <Copy size={11} strokeWidth={2.2} />
+                                            <span>Copie</span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -637,6 +683,80 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
                         >
                             {isGuest ? <CloudOff size={13} /> : cloudSyncStatus === 'saving' ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : cloudSyncStatus === 'error' ? <CloudOff size={13} /> : <Cloud size={13} />}
                         </div>
+                        {currentProjectRole === 'viewer' && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: '2px' }}>
+                                <div
+                                    title="Ce projet est actuellement ouvert en lecture seule"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        height: '22px',
+                                        padding: '0 8px',
+                                        borderRadius: 'var(--radius-pill)',
+                                        background: 'rgba(245, 158, 11, 0.12)',
+                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                        color: '#FCD34D',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        letterSpacing: '0.01em',
+                                        userSelect: 'none',
+                                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.25)',
+                                        backdropFilter: 'blur(4px)'
+                                    }}
+                                >
+                                    <Eye size={12} strokeWidth={2.2} style={{ opacity: 0.95 }} />
+                                    <span>Lecture seule</span>
+                                </div>
+                                <button
+                                    onClick={makeEditableCopy}
+                                    title="Créer une copie modifiable dans vos documents"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        height: '22px',
+                                        padding: '0 10px',
+                                        borderRadius: 'var(--radius-pill)',
+                                        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.22) 0%, rgba(21, 128, 61, 0.35) 100%)',
+                                        border: '1px solid rgba(74, 222, 128, 0.45)',
+                                        color: '#bbf7d0',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+                                        outline: 'none',
+                                        userSelect: 'none',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'linear-gradient(135deg, rgba(34, 197, 94, 0.38) 0%, rgba(21, 128, 61, 0.5) 100%)';
+                                        e.currentTarget.style.borderColor = 'rgba(134, 239, 172, 0.7)';
+                                        e.currentTarget.style.color = '#ffffff';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(34, 197, 94, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3)';
+                                        e.currentTarget.style.transform = 'translateY(-0.5px)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'linear-gradient(135deg, rgba(34, 197, 94, 0.22) 0%, rgba(21, 128, 61, 0.35) 100%)';
+                                        e.currentTarget.style.borderColor = 'rgba(74, 222, 128, 0.45)';
+                                        e.currentTarget.style.color = '#bbf7d0';
+                                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15)';
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                    }}
+                                    onMouseDown={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0.5px)';
+                                        e.currentTarget.style.boxShadow = 'inset 0 1px 2px rgba(0, 0, 0, 0.4)';
+                                    }}
+                                    onMouseUp={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-0.5px)';
+                                    }}
+                                >
+                                    <Copy size={11} strokeWidth={2.2} />
+                                    <span>Créer une copie</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
                     <nav style={{ display: 'flex', gap: '2px', fontSize: '11.5px', fontWeight: 500, color: 'var(--text-dim)', marginLeft: '-4px' }}>
                         {Object.entries(menus).map(([name, items]) => (
@@ -683,13 +803,6 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
 
             {/* ═══ DESKTOP RIGHT: Controls ═══ */}
             <div style={{ display: 'flex', alignItems: 'center', gap: isTablet ? '4px' : '8px', WebkitAppRegion: 'no-drag' } as any}>
-                {currentProjectRole === 'viewer' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 10px', borderRadius: 'var(--radius-pill)', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', fontSize: '11px', fontWeight: 600 }}>
-                        <Eye size={13} />
-                        {!isTablet && <span>Lecture seule</span>}
-                        <button onClick={makeEditableCopy} title="Créer une copie modifiable" style={{ background: '#2e7d47', color: '#fff', border: 'none', borderRadius: 'var(--radius-pill)', padding: '2px 8px', fontSize: '10px', fontWeight: 600, cursor: 'pointer', marginLeft: '4px' }}>Créer une copie</button>
-                    </div>
-                )}
                 <button
                     onClick={() => { if (isGuest) setAuthModalOpen(true); else setShareModalOpen(true); }}
                     title="Partager ce document"

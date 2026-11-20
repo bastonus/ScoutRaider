@@ -1,0 +1,28 @@
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "routing_valhalla_ign",
+  "name": "Moteur BD TOPO Valhalla (IGN Géoplateforme)",
+  "version": "2.0.0",
+  "resource_type": "routing_engine",
+  "author": "IGN France & ScoutRaider Team",
+  "license": "Etalab-2.0",
+  "description": "Calcul d'itinéraires sur la base de données officielle BD TOPO de l'IGN. Intègre le réseau des sentiers balisés nationaux français.",
+  "entrypoint": "index.ts",
+  "routing_config": {
+    "supported_profiles": ["pedestrian", "hiking"],
+    "default_profile": "pedestrian",
+    "offline_capable": false,
+    "elevation_support": true,
+    "requires_api_key": false,
+    "api_endpoint": "https://data.geopf.fr/navigation/itineraire"
+  },
+  "tags": [
+    "routing",
+    "chemins",
+    "ign",
+    "valhalla",
+    "bd_topo",
+    "france"
+  ]
+}

@@ -71,7 +71,15 @@ export interface ConnectorInfo {
 const LOCAL_STORAGE_KEY = 'scoutraider_ai_config';
 
 export class AIService {
-    private static baseUrl = 'http://localhost:8000';
+    private static getBaseUrl(): string {
+        if (typeof window !== 'undefined') {
+            const host = window.location.hostname;
+            if (host && host !== 'localhost' && host !== '127.0.0.1') {
+                return ''; // Relative requests handled by reverse proxy (e.g. nginx in production)
+            }
+        }
+        return 'http://localhost:8000';
+    }
 
     static getConfig(): AIConfig {
         try {
@@ -97,7 +105,7 @@ export class AIService {
         scoutBranch: 'louveteaux' | 'eclaireurs' | 'ainés' | 'patrouille_libre' = 'eclaireurs'
     ): Promise<NarrativeResponse> {
         const config = this.getConfig();
-        const res = await fetch(`${this.baseUrl}/api/ai/narrative`, {
+        const res = await fetch(`${this.getBaseUrl()}/api/ai/narrative`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -123,7 +131,7 @@ export class AIService {
         difficulty: 'easy' | 'medium' | 'hard' = 'medium'
     ): Promise<RiddleResponse> {
         const config = this.getConfig();
-        const res = await fetch(`${this.baseUrl}/api/ai/riddle`, {
+        const res = await fetch(`${this.getBaseUrl()}/api/ai/riddle`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -149,7 +157,7 @@ export class AIService {
         ageCategory: 'louveteaux' | 'eclaireurs' | 'ainés' = 'eclaireurs'
     ): Promise<SafetyAuditResponse> {
         const config = this.getConfig();
-        const res = await fetch(`${this.baseUrl}/api/ai/safety-audit`, {
+        const res = await fetch(`${this.getBaseUrl()}/api/ai/safety-audit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -168,13 +176,13 @@ export class AIService {
     }
 
     static async listConnectors(): Promise<ConnectorInfo[]> {
-        const res = await fetch(`${this.baseUrl}/api/connectors`);
+        const res = await fetch(`${this.getBaseUrl()}/api/connectors`);
         if (!res.ok) return [];
         return await res.json();
     }
 
     static async callMCP(method: string, params: Record<string, any> = {}): Promise<any> {
-        const res = await fetch(`${this.baseUrl}/api/mcp`, {
+        const res = await fetch(`${this.getBaseUrl()}/api/mcp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -185,6 +193,41 @@ export class AIService {
             })
         });
         if (!res.ok) throw new Error(`MCP Call Failed: ${res.statusText}`);
+        return await res.json();
+    }
+
+    static async searchPOIs(latitude: number, longitude: number, radiusMeters: number = 2000, categories?: string[]): Promise<any> {
+        const res = await fetch(`${this.getBaseUrl()}/api/connectors/search-pois`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                latitude,
+                longitude,
+                radius_meters: radiusMeters,
+                categories
+            })
+        });
+        if (!res.ok) return { pois: [], count: 0 };
+        return await res.json();
+    }
+
+    static async getWeatherRisk(latitude: number, longitude: number, days: number = 3): Promise<any> {
+        const res = await fetch(`${this.getBaseUrl()}/api/connectors/weather-risk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                latitude,
+                longitude,
+                days
+            })
+        });
+        if (!res.ok) return { status: 'error', warnings: [] };
+        return await res.json();
+    }
+
+    static async checkAIStatus(): Promise<any> {
+        const res = await fetch(`${this.getBaseUrl()}/api/ai/status`);
+        if (!res.ok) return { offline_mode_ready: true };
         return await res.json();
     }
 }

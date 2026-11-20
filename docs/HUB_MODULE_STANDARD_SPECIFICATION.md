@@ -57,12 +57,14 @@ Le serveur du Hub applique les contrôles de sécurité suivants lors de la vali
 
 ## 3. Typologie Complète des Ressources du Hub
 
-Le Hub ScoutRaider réunit 5 familles de ressources sous un modèle de données unifié :
+Le Hub ScoutRaider réunit 7 familles de ressources modulaires sous un modèle de données unifié :
 
 | Type de Ressource (`resource_type`) | Description | Capacités / Spécificités |
 | :--- | :--- | :--- |
 | **`crypto_module`** | Modules de chiffrement, d'encodage, de guidage et de restitution topographique | Déclare une capacité d'entrée/sortie (`data_capability`) : `map_path`, `elevation_profile`, `map_overview`, `panoramic_sketch`, `numeric`, `alphabetic`, `alphanumeric`, `symbolic_visual`. |
 | **`map_provider`** | Fonds de cartes et couches topographiques | Tuiles raster/vectorielles (`xyz`, `wmts`, `tms`, `wms`), paramètres d'accès, clés API, projections. |
+| **`routing_engine`** | Moteurs de calcul d'itinéraires et de routage des étapes | Calculs de cheminements pédestres (BRouter, Valhalla BD TOPO IGN, OSRM, Azimut direct vol d'oiseau), détection d'évitement routier, profils randonnée. |
+| **`path_provider`** | Chargeurs, analyseurs et connecteurs de chemins et traces | Import/export de fichiers GPS (GPX, GeoJSON, KML, TopoJSON) et connecteurs d'APIs cloud (IGN Calcul Itinéraire, Strava, Garmin). |
 | **`raid_trame`** | Trames de Raid (anciennement « Orchestrations ») | Règles pédagogiques de progression scoute, contraintes de diffraction, graphe de dépendances vers les modules requis. |
 | **`theme_style`** | Thèmes graphiques, styles d'export et gabarits | Palettes, typographies, règles CSS d'impression WeasyPrint, habillage narratif. |
 | **`syntax_extension`** | Extensions de blocs pour l'éditeur de carnet | Nouveaux blocs WYSIWYG (croquis panoramique, rapport météo, méditation spirituelle). |
@@ -213,7 +215,68 @@ Permet d'ajouter des couches cartographiques soit intégrées (IGN, OpenStreetMa
 
 ---
 
-### 4.3 Trames de Raid (`raid_trame` — anciennement « Orchestrations »)
+### 4.3 Moteurs de Routage & Calcul d'Itinéraire (`routing_engine`)
+
+Les moteurs de calcul de tracés ne sont plus codés en dur dans l'application, mais distribués comme des modules interchangeables déclarant leurs capacités d'optimisation pédestre, d'évitement routier et d'extraction altimétrique.
+
+#### Exemple de `manifest.json` pour un Moteur de Routage (BRouter) :
+```json
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "routing_brouter",
+  "name": "Moteur BRouter Randonnée Pédestre",
+  "version": "2.0.0",
+  "resource_type": "routing_engine",
+  "author": "ScoutRaider Team & BRouter OSS",
+  "license": "MIT",
+  "description": "Calcul d'itinéraires pédestres haute précision optimisé pour les sentiers de randonnée (GR, PR) et l'évitement des axes dangereux.",
+  "entrypoint": "index.ts",
+  "routing_config": {
+    "supported_profiles": ["hiking", "trekking", "pedestrian", "safety"],
+    "default_profile": "hiking",
+    "offline_capable": false,
+    "elevation_support": true,
+    "requires_api_key": false,
+    "api_endpoint": "https://brouter.de/brouter"
+  },
+  "tags": ["routing", "chemins", "brouter", "randonnee", "pedestre"]
+}
+```
+
+---
+
+### 4.4 Fournisseurs & Chargeurs de Chemins (`path_provider`)
+
+Permet de charger, parser et convertir des traces GPS et géométries vectorielles externes (GPX, GeoJSON, KML, flux cloud) en structures de données exploitables par l'éditeur de raid.
+
+#### Exemple de `manifest.json` pour un Chargeur de Traces GPX :
+```json
+{
+  "$schema": "https://scoutraider.org/schemas/v2/module.schema.json",
+  "schema_version": "2.0",
+  "id": "loader_gpx",
+  "name": "Chargeur Universel GPX (Traces & Waypoints)",
+  "version": "2.0.0",
+  "resource_type": "path_provider",
+  "author": "ScoutRaider Core Team",
+  "license": "MIT",
+  "description": "Importateur et analyseur de traces GPS au standard XML GPX (1.0 / 1.1) avec extraction de waypoints et courbes altimétriques.",
+  "entrypoint": "index.ts",
+  "path_provider_config": {
+    "supported_formats": ["gpx", "xml"],
+    "import_types": ["file_upload", "url_fetch"],
+    "extracts_elevation": true,
+    "extracts_waypoints": true,
+    "requires_auth": false
+  },
+  "tags": ["loader", "chemins", "gpx", "traces", "waypoints"]
+}
+```
+
+---
+
+### 4.5 Trames de Raid (`raid_trame` — anciennement « Orchestrations »)
 
 Une Trame de Raid définit les règles d'agencement des étapes et déclare ses dépendances strictes envers les modules de chiffrement nécessaires à sa réalisation.
 
@@ -291,22 +354,39 @@ Définit la feuille de style CSS et les métadonnées de mise en page pour l'exp
 ### 5.1 Architecture de Stockage (Garage S3)
 Les archives de modules sont hébergées de manière immuable sur le bucket S3 ScoutRaider (`GarageClient`) :
 
+| Paramètre | Valeur |
+|:---|:---|
+| **Endpoint** | `https://s3-scoutraider.silverhorse.fr` |
+| **Bucket** | `scoutraider-assets` |
+| **Région** | `garage` |
+| **Préfixe modules** | `modules/` |
+| **Index global** | `modules/catalog_v2.json` |
+
 ```text
-s3://<GARAGE_BUCKET>/
-├── hub/
-│   ├── catalog.json                 # Index complet du Hub (mis à jour à chaque publication)
-│   ├── crypto_module/
-│   │   ├── gilwell/
-│   │   │   ├── gilwell-2.0.0.zip
-│   │   │   └── gilwell-1.0.0.zip
-│   │   └── morse/
-│   │       └── morse-1.1.0.zip
-│   ├── raid_trame/
-│   │   └── raid_premiere_classe/
-│   │       └── raid_premiere_classe-2.0.0.zip
-│   └── map_provider/
-│       └── swiss_topo_custom/
-│           └── swiss_topo_custom-1.0.0.zip
+s3://scoutraider-assets/
+└── modules/
+    ├── catalog_v2.json              # Index global (mis à jour à chaque publication)
+    ├── gilwell-2.0.0.zip
+    ├── morse-2.0.0.zip
+    ├── braille-2.0.0.zip
+    ├── semaphore-2.0.0.zip
+    └── ...                          # {module_id}-{version}.zip
+```
+
+**URL publique de téléchargement :**
+```
+https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/{module_id}-{version}.zip
+```
+
+**Publication via l'API backend :**
+```
+POST /api/hub/publish
+```
+Valide le manifeste Pydantic, construit le ZIP en mémoire, uploade sur Garage S3, et met à jour `catalog_v2.json`.
+
+**Script de publication en batch (15 modules builtin) :**
+```bash
+python scripts/package_modules.py
 ```
 
 ### 5.2 Métadonnées S3 et Somme de Contrôle (SHA-256)

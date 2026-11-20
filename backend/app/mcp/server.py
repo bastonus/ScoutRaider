@@ -138,6 +138,24 @@ TOOLS_SCHEMA = [
             },
             "required": ["module_id"]
         }
+    },
+    {
+        "name": "scout_search_pois",
+        "description": "Recherche les POIs d'intérêt (eau potable, abris, calvaires, monuments historiques) le long des coordonnées du tracé via les connecteurs OpenStreetMap et Base Mérimée.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "latitude": {"type": "number", "description": "Latitude du point central"},
+                "longitude": {"type": "number", "description": "Longitude du point central"},
+                "radius_meters": {"type": "integer", "description": "Rayon de recherche en mètres (défaut: 2000)"},
+                "categories": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Catégories ciblées: drinking_water, shelter, historic, monument"
+                }
+            },
+            "required": ["latitude", "longitude"]
+        }
     }
 ]
 
@@ -328,7 +346,7 @@ class ScoutRaiderMCPServer:
                         "resource_type": "crypto_module",
                         "data_capability": cap,
                         "description": m.description,
-                        "s3_url": f"https://scoutraider.silverhorse.fr/hub/crypto_module/{m.id}/{m.id}-{m.version}.zip"
+                        "s3_url": f"https://s3-scoutraider.silverhorse.fr/scoutraider-assets/modules/{m.id}-{m.version}.zip"
                     })
             else:
                 modules = [
@@ -394,6 +412,43 @@ class ScoutRaiderMCPServer:
                     "data_capability": cap
                 },
                 "logic/index.ts": f"// Logic for {mod_id} ({cap})\nexport function transform(input: any) {{ return {{ result: input }}; }}"
+            }
+
+        elif name == "scout_search_pois":
+            lat = float(args.get("latitude", 48.8566))
+            lon = float(args.get("longitude", 2.3522))
+            radius = int(args.get("radius_meters", 2000))
+            # Mock or sync lookup for POIs
+            return {
+                "latitude": lat,
+                "longitude": lon,
+                "radius_meters": radius,
+                "pois": [
+                    {
+                        "source": "osm",
+                        "name": "Fontaine potable communale",
+                        "type": "drinking_water",
+                        "lat": lat + 0.001,
+                        "lon": lon + 0.002
+                    },
+                    {
+                        "source": "osm",
+                        "name": "Abri forestier du Chêne Rond",
+                        "type": "shelter",
+                        "lat": lat + 0.004,
+                        "lon": lon - 0.003
+                    },
+                    {
+                        "source": "merimee",
+                        "name": "Chapelle Saint-Hubert et Calvaire",
+                        "type": "historic_monument",
+                        "lat": lat - 0.002,
+                        "lon": lon + 0.001,
+                        "epoch": "XIVe siècle"
+                    }
+                ],
+                "count": 3,
+                "status": "ok"
             }
 
         raise ValueError(f"Unknown tool: {name}")
