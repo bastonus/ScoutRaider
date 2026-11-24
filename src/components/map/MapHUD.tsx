@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { useApp } from '../../AppContext';
-import { Loader2, Navigation, AlertTriangle, AlertOctagon, Info } from 'lucide-react';
+import React from 'react';
+import { useRoutes, useUI } from '../../hooks';
+import { Loader2, Navigation } from 'lucide-react';
 
 export default function MapHUD() {
-    const { state } = useApp();
+    const { routes } = useRoutes();
+    const { isLoading, loadingText } = useUI();
 
     // Calc total distance from routes
-    const totalDist = state.routes.reduce((acc, r) => acc + (r?.distance_m || 0), 0) / 1000;
+    const totalDist = routes.reduce((acc, r) => acc + (r?.distance_m || 0), 0) / 1000;
 
     return (
         <div style={{
@@ -26,11 +27,11 @@ export default function MapHUD() {
                     boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
                     pointerEvents: 'auto'
                 }}>
-                    {state.is_loading ? (
+                    {isLoading ? (
                         <>
                             <Loader2 size={16} className="spin" style={{ color: 'var(--semantic-green)' }} />
                             <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-bright)' }}>
-                                {state.loading_text || "Calculs en cours..."}
+                                {loadingText || "Calculs en cours..."}
                             </span>
                         </>
                     ) : (

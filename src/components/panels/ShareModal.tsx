@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, UserPlus, Link, Copy, Check, Users, Shield, Globe, Lock, Trash2, ShieldCheck, Eye, Edit3, Inbox } from 'lucide-react';
 import { CloudAuthService, type ProjectSharingDetails } from '../../logic/CloudAuthService';
 import { useAuth } from '../../AuthContext';
-import { useApp } from '../../AppContext';
+import { useUI } from '../../hooks';
 
 interface ShareModalProps {
     projectId?: string | null;
@@ -12,10 +12,10 @@ interface ShareModalProps {
 
 export default function ShareModal({ projectId: propProjectId, projectTitle: propProjectTitle, onClose }: ShareModalProps) {
     const { cloudProjectId, user, saveToCloudNow } = useAuth();
-    const { state, dispatch } = useApp();
+    const { documentTitle: uiDocumentTitle, dispatch } = useUI();
 
     const activeProjectId = propProjectId || cloudProjectId;
-    const documentTitle = propProjectTitle || state.document_title || 'Document sans titre';
+    const documentTitle = propProjectTitle || uiDocumentTitle || 'Document sans titre';
 
     const [loading, setLoading] = useState(true);
     const [sharingDetails, setSharingDetails] = useState<ProjectSharingDetails | null>(null);

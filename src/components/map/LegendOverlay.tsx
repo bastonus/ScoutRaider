@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { Plus, X } from 'lucide-react';
-import { useApp } from '../../AppContext';
+import { useRoutes } from '../../hooks';
 import { ALL_MODULE_IDS, MODULE_META } from '../../logic/ModuleRegistry';
 import type { ModuleId } from '../../logic/types';
 import { MODULE_DRAG_TYPE } from '../layout/MetroTimeline';
 
 export default function LegendOverlay() {
-  const { state } = useApp();
+  const { polygonalSteps } = useRoutes();
   const [showPicker, setShowPicker] = useState(false);
   
   // Find which modules are actually used in the current route
   const usedModuleIds = new Set<string>();
-  if (state.polygonal_steps) {
-    for (const seg of state.polygonal_steps) {
+  if (polygonalSteps) {
+    for (const seg of polygonalSteps) {
       if (seg.assigned_module && seg.assigned_module !== 'unassigned') {
         usedModuleIds.add(seg.assigned_module);
       }

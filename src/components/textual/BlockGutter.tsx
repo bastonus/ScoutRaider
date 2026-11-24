@@ -16,7 +16,6 @@ import { ModuleManagementService } from '../../logic/ModuleManagementService';
 import { CIPHER_FONTS, CIPHER_FONT_SIZES, CIPHER_ICONS } from './MarkdownRenderer';
 import UnifiedContextMenu from './UnifiedContextMenu';
 import type { ModuleId, CarnetStep, NavLanguage } from '../../logic/types';
-import { useApp } from '../../AppContext';
 
 // ─── Largeur fixe du gutter ──────────────────────────────────────────────
 export const GUTTER_WIDTH = 26; // Colonne latérale épurée pour l'icône interactive du module
@@ -198,7 +197,6 @@ export default function BlockGutter({
     containerRef,
     isComputedBlock = false
 }: BlockGutterProps) {
-    const { dispatch } = useApp();
     const indicator = getBlockIndicator(blockType, blockData, moduleId, isTitle);
     const meta = moduleId ? MODULE_META[moduleId] : null;
     const triggerRef = useRef<HTMLButtonElement>(null);

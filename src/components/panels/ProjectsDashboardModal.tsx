@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { CloudAuthService, type CloudProjectSummary } from '../../logic/CloudAuthService';
 import { useAuth } from '../../AuthContext';
-import { useApp } from '../../AppContext';
+import { useUI } from '../../hooks';
 import { StateManager } from '../../logic/StateManager';
 import ShareModal from './ShareModal';
 
@@ -18,7 +18,7 @@ type TabType = 'all' | 'owned' | 'shared';
 
 export default function ProjectsDashboardModal({ onClose }: ProjectsDashboardModalProps) {
     const { user, loadFromCloud, cloudProjectId } = useAuth();
-    const { dispatch } = useApp();
+    const { dispatch } = useUI();
 
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
 

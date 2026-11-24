@@ -1,10 +1,11 @@
 import React from 'react';
 import { Ruler, Loader2 } from 'lucide-react';
-import { useApp } from '../../AppContext';
+import { useRoutes, useUI } from '../../hooks';
 
 export default function InfoPills() {
-  const { state } = useApp();
-  const totalDist = state.polygonal_steps.reduce((acc, seg) => acc + (seg.distance || 0), 0) / 1000;
+  const { polygonalSteps } = useRoutes();
+  const { isLoading, loadingText } = useUI();
+  const totalDist = (polygonalSteps || []).reduce((acc, seg) => acc + (seg.distance || 0), 0) / 1000;
 
   return (
     <div id="info-pills" style={{
@@ -31,10 +32,10 @@ export default function InfoPills() {
         gap: '8px',
         pointerEvents: 'all'
       }}>
-        {state.is_loading ? (
+        {isLoading ? (
             <>
                 <Loader2 size={14} className="spin" color="var(--accent-default)" style={{ animation: 'spin 1s linear infinite' }} />
-                <span>{state.loading_text || "Calculs en cours..."}</span>
+                <span>{loadingText || "Calculs en cours..."}</span>
             </>
         ) : (
             <>

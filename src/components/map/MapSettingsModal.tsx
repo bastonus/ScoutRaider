@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { X, Layers, Key, HelpCircle, ExternalLink, Info, Check, ChevronUp, Map as MapIcon } from 'lucide-react';
-import { useApp } from '../../AppContext';
+import { useUI } from '../../hooks';
 import { MAP_LAYERS, PROVIDERS } from '../../logic/MapConfig';
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -9,13 +9,13 @@ interface MapSettingsModalProps {
 }
 
 export default function MapSettingsModal({ onClose }: MapSettingsModalProps) {
-    const { state, dispatch } = useApp();
+    const { activeIgnLayer, mapyApiKey, ignApiKey, dispatch } = useUI();
     const [activeTab, setActiveTab] = useState<'layers' | 'keys' | 'help'>('layers');
     const [isLayerSelectorOpen, setIsLayerSelectorOpen] = useState(false);
     const selectorRef = useRef<HTMLDivElement>(null);
 
     // Current layer info
-    const currentLayerId = state.active_ign_layer || 'PLAN.IGN';
+    const currentLayerId = activeIgnLayer || 'PLAN.IGN';
     const currentLayer = MAP_LAYERS[currentLayerId] || MAP_LAYERS['PLAN.IGN'];
     
     // Map category to provider metadata
@@ -231,13 +231,13 @@ export default function MapSettingsModal({ onClose }: MapSettingsModalProps) {
                                     <div style={{ position: 'relative' }}>
                                         <input 
                                             type="password" 
-                                            value={state.mapy_api_key || ''} 
+                                            value={mapyApiKey || ''} 
                                             onChange={e => handleKeyChange('mapy', e.target.value)}
                                             placeholder="votre_cle_api_mapy_cz"
                                             style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '14px 16px', color: '#fff', outline: 'none', fontSize: '14px', fontFamily: 'monospace' }}
                                         />
-                                        <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: state.mapy_api_key ? 'var(--accent-default)' : 'rgba(255,255,255,0.2)' }}>
-                                            {state.mapy_api_key ? <Check size={18} /> : <Key size={18} />}
+                                        <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: mapyApiKey ? 'var(--accent-default)' : 'rgba(255,255,255,0.2)' }}>
+                                            {mapyApiKey ? <Check size={18} /> : <Key size={18} />}
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>
@@ -251,13 +251,13 @@ export default function MapSettingsModal({ onClose }: MapSettingsModalProps) {
                                     <div style={{ position: 'relative' }}>
                                         <input 
                                             type="password" 
-                                            value={state.ign_api_key || ''} 
+                                            value={ignApiKey || ''} 
                                             onChange={e => handleKeyChange('ign', e.target.value)}
                                             placeholder="votre_cle_hash_ign"
                                             style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '14px 16px', color: '#fff', outline: 'none', fontSize: '14px', fontFamily: 'monospace' }}
                                         />
-                                        <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: state.ign_api_key ? 'var(--accent-default)' : 'rgba(255,255,255,0.2)' }}>
-                                            {state.ign_api_key ? <Check size={18} /> : <Key size={18} />}
+                                        <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: ignApiKey ? 'var(--accent-default)' : 'rgba(255,255,255,0.2)' }}>
+                                            {ignApiKey ? <Check size={18} /> : <Key size={18} />}
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>

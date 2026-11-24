@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, AlertOctagon, Info, CheckCircle2 } from 'lucide-react';
-import { useApp } from '../../AppContext';
+import { useUI } from '../../hooks';
 
 export default function NotificationOverlay() {
-  const { state, dispatch } = useApp();
+  const { notifications } = useUI();
   const [currentTime, setCurrentTime] = useState(Date.now());
   const lastProcessedId = React.useRef<string | null>(null);
 
@@ -14,8 +14,8 @@ export default function NotificationOverlay() {
   }, []);
 
   useEffect(() => {
-      if (state.notifications.length === 0) return;
-      const latest = state.notifications[state.notifications.length - 1];
+      if (notifications.length === 0) return;
+      const latest = notifications[notifications.length - 1];
       if (latest.id !== lastProcessedId.current) {
           lastProcessedId.current = latest.id;
           if (document.visibilityState === 'hidden' && Notification.permission === 'granted') {
@@ -28,9 +28,9 @@ export default function NotificationOverlay() {
               });
           }
       }
-  }, [state.notifications]);
+  }, [notifications]);
 
-  const activeNotifs = state.notifications.filter(n => n.expiresAt > currentTime);
+  const activeNotifs = notifications.filter(n => n.expiresAt > currentTime);
 
   return (
     <div style={{

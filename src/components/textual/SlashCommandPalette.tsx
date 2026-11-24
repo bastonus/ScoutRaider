@@ -10,7 +10,6 @@ import {
     Eye, Sparkles, Zap, Link, ChevronDown, ChevronUp,
     CheckSquare, MapPin, Sigma, ListTodo
 } from 'lucide-react';
-import { useApp } from '../../AppContext';
 import { MODULE_META, ALL_MODULE_IDS } from '../../logic/ModuleRegistry';
 import type { ModuleId } from '../../logic/types';
 
@@ -31,7 +30,6 @@ export default function SlashCommandPalette({
     anchorRef,
     triggerPosition
 }: SlashCommandPaletteProps) {
-    const { state } = useApp();
     const [query, setQuery] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [showAll, setShowAll] = useState(false);

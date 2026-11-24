@@ -7,22 +7,23 @@
  */
 import React, { useEffect, useState, useMemo } from 'react';
 import { Mountain, ArrowUpRight, ArrowDownRight, Clock, RefreshCw } from 'lucide-react';
-import { useApp } from '../../AppContext';
+import { useCarnet, useRoutes } from '../../hooks';
 import { ElevationService, ElevationProfileResult } from '../../logic/ElevationService';
 
 export default function CarnetElevationBlock() {
-    const { state, dispatch } = useApp();
+    const { carnetIncludeElevationProfile, carnetView, dispatch } = useCarnet();
+    const { routes, polygonalSteps, stages } = useRoutes();
     const [profile, setProfile] = useState<ElevationProfileResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const isIncluded = state.carnet_include_elevation_profile !== false;
+    const isIncluded = carnetIncludeElevationProfile !== false;
 
     // Extract all route coordinates in [lon, lat] format
     const allCoordsLonLat = useMemo(() => {
         const coords: [number, number][] = [];
-        if (state.routes && state.routes.length > 0) {
-            for (const r of state.routes) {
+        if (routes && routes.length > 0) {
+            for (const r of routes) {
                 if (!r) continue;
                 const geom = r.geojson?.geometry || r.geojson;
                 const pts = geom?.coordinates || [];
@@ -33,8 +34,8 @@ export default function CarnetElevationBlock() {
                 }
             }
         }
-        if (coords.length < 2 && state.polygonal_steps && state.polygonal_steps.length > 0) {
-            for (const seg of state.polygonal_steps) {
+        if (coords.length < 2 && polygonalSteps && polygonalSteps.length > 0) {
+            for (const seg of polygonalSteps) {
                 for (const pt of (seg.coords || [])) {
                     if (Array.isArray(pt) && pt.length >= 2) {
                         const lon = pt[0] > 35 && pt[0] < 55 ? pt[1] : pt[0];
@@ -45,14 +46,14 @@ export default function CarnetElevationBlock() {
             }
         }
         return coords;
-    }, [state.routes, state.polygonal_steps]);
+    }, [routes, polygonalSteps]);
 
     const stagesForProfile = useMemo(() => {
-        return (state.stages || []).map(s => ({
+        return (stages || []).map(s => ({
             label: s.label,
             coords: s.coords // [lat, lon]
         }));
-    }, [state.stages]);
+    }, [stages]);
 
     useEffect(() => {
         let active = true;
@@ -86,7 +87,7 @@ export default function CarnetElevationBlock() {
 
     const accentCyan = '#06b6d4';
     const accentGreen = '#5cbd6e';
-    const isSolution = state.carnet_view === 'solution';
+    const isSolution = carnetView === 'solution';
 
     return (
         <div style={{

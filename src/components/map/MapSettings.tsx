@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Layers, Settings, HelpCircle, ExternalLink, Key, Check, Info } from 'lucide-react';
-import { useApp } from '../../AppContext';
+import { useUI } from '../../hooks';
 
 const LAYERS = [
     { id: 'PLAN.IGN', name: 'IGN Plan (Gratuit)', provider: 'IGN' },
@@ -12,7 +12,7 @@ const LAYERS = [
 ];
 
 export default function MapSettings() {
-    const { state, dispatch } = useApp();
+    const { activeIgnLayer, mapyApiKey, ignApiKey, dispatch } = useUI();
     const [isOpen, setIsOpen] = useState(false);
     const [showTutorial, setShowTutorial] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -104,9 +104,9 @@ export default function MapSettings() {
                                 padding: '8px 12px',
                                 borderRadius: '8px',
                                 cursor: 'pointer',
-                                background: state.active_ign_layer === l.id ? 'rgba(110, 201, 126, 0.15)' : 'transparent',
+                                background: activeIgnLayer === l.id ? 'rgba(110, 201, 126, 0.15)' : 'transparent',
                                 border: '1px solid',
-                                borderColor: state.active_ign_layer === l.id ? 'rgba(110, 201, 126, 0.3)' : 'transparent',
+                                borderColor: activeIgnLayer === l.id ? 'rgba(110, 201, 126, 0.3)' : 'transparent',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
@@ -114,12 +114,12 @@ export default function MapSettings() {
                             }}
                         >
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontSize: '12px', color: state.active_ign_layer === l.id ? 'var(--accent-default)' : 'var(--text-primary)', fontWeight: state.active_ign_layer === l.id ? 600 : 400 }}>
+                                <span style={{ fontSize: '12px', color: activeIgnLayer === l.id ? 'var(--accent-default)' : 'var(--text-primary)', fontWeight: activeIgnLayer === l.id ? 600 : 400 }}>
                                     {l.name}
                                 </span>
                                 <span style={{ fontSize: '10px', color: 'var(--text-dim)', opacity: 0.7 }}>{l.provider}</span>
                             </div>
-                            {state.active_ign_layer === l.id && <Check size={14} color="var(--accent-default)" />}
+                            {activeIgnLayer === l.id && <Check size={14} color="var(--accent-default)" />}
                         </div>
                     ))}
                 </div>
@@ -149,7 +149,7 @@ export default function MapSettings() {
                             <label style={{ fontSize: '10px', color: 'var(--text-dim)', marginLeft: '4px' }}>Mapy.cz API Key</label>
                             <input
                                 type="password"
-                                value={state.mapy_api_key || ''}
+                                value={mapyApiKey || ''}
                                 onChange={(e) => handleKeyChange('mapy', e.target.value)}
                                 placeholder="votre_cle_mapy_cz"
                                 style={{
@@ -168,7 +168,7 @@ export default function MapSettings() {
                             <label style={{ fontSize: '10px', color: 'var(--text-dim)', marginLeft: '4px' }}>IGN Hash (Scan 25)</label>
                             <input
                                 type="password"
-                                value={state.ign_api_key || ''}
+                                value={ignApiKey || ''}
                                 onChange={(e) => handleKeyChange('ign', e.target.value)}
                                 placeholder="votre_cle_ign_hash"
                                 style={{

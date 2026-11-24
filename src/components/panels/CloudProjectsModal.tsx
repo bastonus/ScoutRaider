@@ -6,11 +6,11 @@ import React, { useEffect, useState } from 'react';
 import { X, Cloud, FolderOpen, Trash2, Plus, Clock, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
 import { CloudAuthService, type CloudProjectSummary } from '../../logic/CloudAuthService';
-import { useApp } from '../../AppContext';
+import { useUI } from '../../hooks';
 
 export default function CloudProjectsModal({ onClose }: { onClose: () => void }) {
     const { user, loadFromCloud, saveToCloudNow } = useAuth();
-    const { dispatch } = useApp();
+    const { dispatch } = useUI();
 
     const [projects, setProjects] = useState<CloudProjectSummary[]>([]);
     const [loading, setLoading] = useState(true);

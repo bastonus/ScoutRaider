@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { mapRef } from './MapComponent';
 import HelpModal from './HelpModal';
-import { useApp } from '../../AppContext';
 
 export default function ControlToolbar() {
-    const { state, dispatch } = useApp();
     const [helpOpen, setHelpOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 

@@ -8,7 +8,7 @@ import { MODULE_META } from '../../logic/ModuleRegistry';
 import type { ModuleId } from '../../logic/types';
 import { ModuleLogic } from '../../logic/ModuleLogic';
 import { themeManager } from '../../logic/ThemeManager';
-import { useApp } from '../../AppContext';
+import { useUI } from '../../hooks';
 
 const TEXTUAL_MODULES: { id: ModuleId; description: string }[] = [
     { id: 'morse', description: 'Points & traits sonores' },
@@ -52,11 +52,11 @@ export default function CodeBlockPicker({
     initialModuleId = 'morse',
     onClose
 }: CodeBlockPickerProps) {
-    const { state, dispatch } = useApp();
+    const { themeId, dispatch } = useUI();
     const [selectedModule, setSelectedModule] = useState<ModuleId>(initialModuleId);
     const [content, setContent] = useState(initialContent);
 
-    const theme = useMemo(() => themeManager.getTheme(state.theme_id), [state.theme_id]);
+    const theme = useMemo(() => themeManager.getTheme(themeId), [themeId]);
     const meta = MODULE_META[selectedModule];
     const accentColor = meta?.color || '#3b82f6';
     const font = MODULE_FONT[selectedModule] || MODULE_FONT.default;

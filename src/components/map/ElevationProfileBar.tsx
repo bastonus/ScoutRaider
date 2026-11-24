@@ -5,12 +5,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Mountain, ChevronDown, ChevronUp, ArrowUpRight, ArrowDownRight, Clock, X } from 'lucide-react';
 import L from 'leaflet';
-import { useApp } from '../../AppContext';
+import { useRoutes } from '../../hooks';
 import { ElevationService, ElevationProfileResult, ElevationPoint } from '../../logic/ElevationService';
 import { mapRef } from './MapComponent';
 
 export default function ElevationProfileBar() {
-    const { state } = useApp();
+    const { routes, stages } = useRoutes();
     const [isOpen, setIsOpen] = useState(false);
     const [profile, setProfile] = useState<ElevationProfileResult | null>(null);
     const [hoverPoint, setHoverPoint] = useState<ElevationPoint | null>(null);
@@ -22,8 +22,8 @@ export default function ElevationProfileBar() {
     // Extract all route coordinates in [lon, lat] format
     const allCoordsLonLat = useMemo(() => {
         const coords: [number, number][] = [];
-        if (state.routes && state.routes.length > 0) {
-            for (const r of state.routes) {
+        if (routes && routes.length > 0) {
+            for (const r of routes) {
                 if (!r) continue;
                 const geom = r.geojson?.geometry || r.geojson;
                 const pts = geom?.coordinates || [];
@@ -35,14 +35,14 @@ export default function ElevationProfileBar() {
             }
         }
         return coords;
-    }, [state.routes]);
+    }, [routes]);
 
     const stagesForProfile = useMemo(() => {
-        return (state.stages || []).map(s => ({
+        return (stages || []).map(s => ({
             label: s.label,
             coords: s.coords
         }));
-    }, [state.stages]);
+    }, [stages]);
 
     // Fetch / compute profile when route changes
     useEffect(() => {

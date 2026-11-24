@@ -4,7 +4,7 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { Check } from 'lucide-react';
-import { useApp } from '../../AppContext';
+import { useCarnet } from '../../hooks';
 
 interface InlineEditorProps {
     stepId: string;
@@ -15,7 +15,7 @@ interface InlineEditorProps {
 }
 
 export default function InlineEditor({ stepId, solutionText, lineIdx, onClose }: InlineEditorProps) {
-    const { dispatch } = useApp();
+    const { dispatch } = useCarnet();
     const [text, setText] = useState(solutionText);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
