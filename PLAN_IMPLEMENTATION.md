@@ -218,9 +218,10 @@ src/
 - [x] Supprimer `appReducer` monolithique (divisé en 4 sous-réducteurs), `historyStack` extrait dans `historyManager.ts`
 
 ### Tâche 4.4 : Migrer les 60 appels `useApp()` vers sélecteurs ciblés
-- [ ] Audit : `grep -r "useApp()" src/` → lister les 45 fichiers
-- [ ] Par fichier : remplacer `const { state, dispatch } = useApp()` par `useRoutes()`, `useAnnotations()`, etc.
-- [ ] Vérifier que plus aucun composant ne re-render globalement
+- [x] Audit : `grep -r "useApp()" src/` → ~60 appels recensés
+- [x] Lot 1 (15 composants migrés) : `ControlToolbar`, `ElevationProfileBar`, `InfoPills`, `LegendOverlay`, `MapHUD`, `MapSettings`, `MapSettingsModal`, `NotificationOverlay`, `CloudProjectsModal`, `ProjectsDashboardModal`, `ShareModal`, `BlockGutter`, `CarnetElevationBlock`, `CodeBlockPicker`, `InlineEditor`, `SlashCommandPalette`
+- [ ] Lot 2 (Composants couches carte & panneaux) : `DrawAnnotationsLayer`, `TextAnnotationsLayer`, `InactiveItinerariesLayer`, `CursorPreviewLine`, `LeftSidebarPanel`, `RoutePanel`
+- [ ] Lot 3 (Éditeur carnet & composants principaux) : `CarnetStepBlock`, `TextualView`, `MapComponent`, `App`
 
 ### Tâche 4.5 : Undo/Redo — déplacer dans logique
 - [x] Créer `src/logic/historyManager.ts` (gestion centralisée pushHistory, popUndo, popRedo)
