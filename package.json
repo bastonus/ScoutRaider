@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "electron": "electron .",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
@@ -76,8 +78,8 @@
     "@blocknote/react": "^0.57.0",
     "@ckeditor/ckeditor5-build-classic": "^41.4.2",
     "@ckeditor/ckeditor5-react": "^11.1.2",
-    "@mantine/core": "^7.17.8",
-    "@mantine/hooks": "^7.17.8",
+    "@mantine/core": "^8.3.18",
+    "@mantine/hooks": "^8.3.18",
     "@tiptap/extension-placeholder": "^3.23.1",
     "@tiptap/pm": "^3.23.1",
     "@tiptap/react": "^3.23.1",
@@ -117,6 +119,11 @@
     "vite": "^5.2.0",
     "vite-plugin-electron": "^0.29.1",
     "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^2.1.9",
     "wait-on": "^7.2.0"
+  },
+  "allowScripts": {
+    "electron@29.4.6": true,
+    "esbuild@0.21.5": true
   }
 }

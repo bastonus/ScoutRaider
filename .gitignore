@@ -36,4 +36,7 @@ usage.json
 craft.json
 build-activity.log
 .opencode/
+.claude/
+*.figcraft
+
 

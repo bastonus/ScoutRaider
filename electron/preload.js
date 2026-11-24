@@ -19,18 +19,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('show-open-dialog', filters),
 
     // ─── Export (HTML / PDF) ──────────────────────────────────────────
-    exportFile: (html, format, outputPath) =>
-        ipcRenderer.invoke('export-file', html, format, outputPath),
+    exportFile: (html, format, outputPath, engine) =>
+        ipcRenderer.invoke('export-file', html, format, outputPath, engine),
 
     showExportDialog: (defaultName, format) =>
         ipcRenderer.invoke('show-export-dialog', defaultName, format),
 
-    // ─── WeasyPrint ───────────────────────────────────────────────────
+    // ─── WeasyPrint / Chromium PDF ────────────────────────────────────
     checkWeasyPrint: () =>
         ipcRenderer.invoke('check-weasyprint'),
 
-    convertHtmlToPdf: (html, outputPath) =>
-        ipcRenderer.invoke('convert-html-to-pdf', html, outputPath),
+    convertHtmlToPdf: (html, outputPath, engine) =>
+        ipcRenderer.invoke('convert-html-to-pdf', html, outputPath, engine),
+
+    printToPdf: (html, outputPath) =>
+        ipcRenderer.invoke('print-to-pdf', html, outputPath),
 
     // ─── Raw file I/O ─────────────────────────────────────────────────
     readFile: (path) =>

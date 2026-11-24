@@ -497,8 +497,76 @@ async function renderHtmlToPdfWithWeasyPrint(html, outputPath) {
   }
 }
 
+// Chromium native printToPDF fallback
+async function renderHtmlToPdfWithChromium(html, outputPath) {
+  const tmpDir = os.tmpdir();
+  const tmpHtml = path.join(tmpDir, `scoutraider_print_${Date.now()}_${Math.random().toString(36).substring(7)}.html`);
+
+  let printWin = null;
+  try {
+    await fs.writeFile(tmpHtml, html, 'utf-8');
+
+    printWin = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        offscreen: true,
+        sandbox: false,
+      },
+    });
+
+    await printWin.loadFile(tmpHtml);
+
+    // Wait a brief moment for fonts and layouts to settle
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    const pdfBuffer = await printWin.webContents.printToPDF({
+      printBackground: true,
+      preferCSSPageSize: true,
+      pageSize: 'A4',
+      margins: {
+        marginType: 'none',
+      },
+    });
+
+    await fs.writeFile(outputPath, pdfBuffer);
+    logToFileSync('info', `Chromium printToPDF généré avec succès (${pdfBuffer.length} octets) → ${outputPath}`);
+
+    try { await fs.unlink(tmpHtml); } catch { /* ignore */ }
+    if (printWin && !printWin.isDestroyed()) printWin.close();
+
+    return { success: true };
+  } catch (err) {
+    logToFileSync('error', `Chromium printToPDF échoué: ${err.message}`);
+    try { await fs.unlink(tmpHtml); } catch { /* ignore */ }
+    if (printWin && !printWin.isDestroyed()) printWin.close();
+    return { success: false, error: err.message };
+  }
+}
+
+// Unified HTML to PDF renderer with engine choice and auto fallback
+async function renderHtmlToPdf(html, outputPath, engine = 'auto') {
+  if (engine === 'electron') {
+    logToFileSync('info', 'Export PDF demandé via le moteur Chromium printToPDF...');
+    return await renderHtmlToPdfWithChromium(html, outputPath);
+  }
+
+  if (engine === 'weasyprint') {
+    logToFileSync('info', 'Export PDF demandé via le moteur WeasyPrint...');
+    return await renderHtmlToPdfWithWeasyPrint(html, outputPath);
+  }
+
+  // Engine 'auto' : essayer WeasyPrint en priorité, fallback sur Chromium
+  const weasyResult = await renderHtmlToPdfWithWeasyPrint(html, outputPath);
+  if (weasyResult.success) {
+    return weasyResult;
+  }
+
+  logToFileSync('warn', `WeasyPrint indisponible (${weasyResult.error}) — Bascule sur le repli natif Chromium printToPDF...`);
+  return await renderHtmlToPdfWithChromium(html, outputPath);
+}
+
 // Export File (PDF / HTML)
-ipcMain.handle('export-file', async (event, html, format, outputPath) => {
+ipcMain.handle('export-file', async (event, html, format, outputPath, engine = 'auto') => {
   try {
     if (format === 'html') {
       await fs.writeFile(outputPath, html, 'utf-8');
@@ -506,11 +574,11 @@ ipcMain.handle('export-file', async (event, html, format, outputPath) => {
     } 
     
     if (format === 'pdf') {
-      const res = await renderHtmlToPdfWithWeasyPrint(html, outputPath);
+      const res = await renderHtmlToPdf(html, outputPath, engine);
       if (res.success) {
         return true;
       }
-      throw new Error(`WeasyPrint export failed: ${res.error}`);
+      throw new Error(`Export PDF échoué : ${res.error}`);
     }
     
     return false;
@@ -541,9 +609,14 @@ ipcMain.handle('check-weasyprint', async () => {
   return { available: false };
 });
 
-// Convert HTML to PDF via WeasyPrint
-ipcMain.handle('convert-html-to-pdf', async (event, html, outputPath) => {
-  return await renderHtmlToPdfWithWeasyPrint(html, outputPath);
+// Convert HTML to PDF via WeasyPrint or Chromium
+ipcMain.handle('convert-html-to-pdf', async (event, html, outputPath, engine = 'auto') => {
+  return await renderHtmlToPdf(html, outputPath, engine);
+});
+
+// Direct Chromium print-to-pdf
+ipcMain.handle('print-to-pdf', async (event, html, outputPath) => {
+  return await renderHtmlToPdfWithChromium(html, outputPath);
 });
 
 // ─── Custom Logger ────────────────────────────────────────────────────────

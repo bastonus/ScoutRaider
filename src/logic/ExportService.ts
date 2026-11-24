@@ -66,11 +66,12 @@ export interface ExportPipelineOptions {
 
 interface ElectronExportAPI {
     showSaveDialog: (defaultName: string, ext: string) => Promise<string | null>;
-    exportFile: (html: string, format: string, outputPath: string) => Promise<boolean>;
+    exportFile: (html: string, format: string, outputPath: string, engine?: string) => Promise<boolean>;
     readFile: (path: string) => Promise<string>;
     readFileBase64?: (path: string) => Promise<string | null>;
     writeFile: (path: string, data: string) => Promise<boolean>;
-    convertHtmlToPdf?: (html: string, outputPath: string) => Promise<{ success: boolean; error?: string }>;
+    convertHtmlToPdf?: (html: string, outputPath: string, engine?: string) => Promise<{ success: boolean; error?: string }>;
+    printToPdf?: (html: string, outputPath: string) => Promise<{ success: boolean; error?: string }>;
     checkWeasyPrint?: () => Promise<{ available: boolean; version?: string }>;
 }
 
@@ -417,19 +418,19 @@ export class ExportService {
         const outputPath = await api.showSaveDialog(defaultFilename, 'pdf');
         if (!outputPath) return false; // Annulation utilisateur
 
-        // Compilation WeasyPrint native côté Electron
+        // Compilation PDF native côté Electron (WeasyPrint ou repli Chromium printToPDF)
         if (api.convertHtmlToPdf) {
-            console.log('[ExportService] Compilation du PDF via le moteur natif WeasyPrint...');
-            const result = await api.convertHtmlToPdf(html, outputPath);
+            console.log(`[ExportService] Compilation du PDF via le moteur natif (moteur: ${engine})...`);
+            const result = await api.convertHtmlToPdf(html, outputPath, engine);
             if (result.success) {
-                console.log(`[ExportService] PDF WeasyPrint enregistré avec succès : ${outputPath}`);
+                console.log(`[ExportService] PDF enregistré avec succès : ${outputPath}`);
                 return true;
             }
-            throw new Error(`Échec de la compilation WeasyPrint : ${result.error || 'Erreur inconnue'}`);
+            throw new Error(`Échec de la compilation PDF : ${result.error || 'Erreur inconnue'}`);
         }
 
-        // Relevé d'export direct (qui invoque également WeasyPrint dans main.js)
-        return await api.exportFile(html, 'pdf', outputPath);
+        // Relevé d'export direct (qui invoque également WeasyPrint ou printToPDF dans main.js)
+        return await api.exportFile(html, 'pdf', outputPath, engine);
     }
 
     // ─── CSV Export ───────────────────────────────────────────────────────────
