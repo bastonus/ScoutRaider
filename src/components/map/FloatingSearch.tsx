@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Search, Loader2, Route, ChevronUp, X } from 'lucide-react';
 import { mapRef } from './MapComponent';
 import L from 'leaflet';
-import { useApp } from '../../AppContext';
+import { useRoutes, useUI } from '../../hooks';
 import { MAP_LAYERS } from '../../logic/MapConfig';
 import RoutePanel from '../panels/RoutePanel';
 
@@ -56,7 +56,8 @@ interface FloatingSearchProps {
 }
 
 export default function FloatingSearch({ isSplitMode = false }: FloatingSearchProps) {
-    const { state, dispatch } = useApp();
+    const { routes = [], stages = [], dispatch } = useRoutes();
+    const { activeIgnLayer } = useUI();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [showResults, setShowResults] = useState(false);
@@ -80,22 +81,22 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
     }, []);
 
     useEffect(() => {
-        const layer = MAP_LAYERS[state.active_ign_layer || 'PLAN.IGN'];
+        const layer = MAP_LAYERS[activeIgnLayer || 'PLAN.IGN'];
         const isSat = layer?.isSatellite || false;
         setIsSatellite(isSat);
         
         if (isSat) {
-            localStorage.setItem('lastSatLayerId', state.active_ign_layer);
+            localStorage.setItem('lastSatLayerId', activeIgnLayer);
         } else {
-            localStorage.setItem('lastPlanLayerId', state.active_ign_layer);
+            localStorage.setItem('lastPlanLayerId', activeIgnLayer);
         }
-    }, [state.active_ign_layer]);
+    }, [activeIgnLayer]);
 
     const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
     const containerRef = useRef<HTMLDivElement>(null);
 
     const handleSatellite = () => {
-        const layer = MAP_LAYERS[state.active_ign_layer || 'PLAN.IGN'];
+        const layer = MAP_LAYERS[activeIgnLayer || 'PLAN.IGN'];
         const isSat = layer?.isSatellite || false;
         
         if (isSat) {
@@ -170,7 +171,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
     const totalDistanceKm = useMemo(() => {
         let total = 0;
         const R = 6371e3;
-        for (const leg of state.routes) {
+        for (const leg of routes) {
             if (!leg || !leg.geojson?.geometry) continue;
             const coords = leg.geojson.geometry.coordinates;
             if (!coords || coords.length < 2) continue;
@@ -184,7 +185,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
             }
         }
         return total > 0 ? (total / 1000).toFixed(1) : null;
-    }, [state.routes]);
+    }, [routes]);
 
     const geoIcon = () => {
         if (geoState === 'loading') {
@@ -247,7 +248,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         boxShadow: 'none',
     });
 
-    const hasStages = state.stages && state.stages.length > 0;
+    const hasStages = stages && stages.length > 0;
 
     return (
         <>
@@ -401,7 +402,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                                     lineHeight: 1.2,
                                     fontFamily: 'var(--font-mono)',
                                 }}>
-                                    {state.stages.length}
+                                    {stages.length}
                                 </span>
                             )}
                         </button>
@@ -551,7 +552,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                                     </div>
                                     <div style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>
                                         {hasStages
-                                            ? `${state.stages.length} étape${state.stages.length > 1 ? 's' : ''}${totalDistanceKm ? ` • ${totalDistanceKm} km` : ''}`
+                                            ? `${stages.length} étape${stages.length > 1 ? 's' : ''}${totalDistanceKm ? ` • ${totalDistanceKm} km` : ''}`
                                             : 'Aucune étape définie'}
                                     </div>
                                 </div>

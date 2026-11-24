@@ -8,7 +8,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Polyline, Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { useApp } from '../../AppContext';
+import { useRoutes, useUI } from '../../hooks';
 import { backgroundEngine } from '../../logic/BackgroundEngine';
 import { IGNClient } from '../../logic/IGNClient';
 
@@ -54,7 +54,8 @@ interface HoverState {
 }
 
 export default function RouteRubberbandLayer() {
-    const { state, dispatch } = useApp();
+    const { routes = [], stages = [], dispatch } = useRoutes();
+    const { activeTool, smallRoadsOnly } = useUI();
     const map = useMap();
     const [hover, setHover] = useState<HoverState | null>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -62,7 +63,6 @@ export default function RouteRubberbandLayer() {
     const markerRef = useRef<any>(null);
     const hideTimeoutRef = useRef<any>(null);
 
-    const activeTool = state.active_tool;
     const isToolAllowed = ['route', 'route_direct', 'select', 'pointer'].includes(activeTool) || !activeTool;
 
     // Reset when tool changes or stages change
@@ -71,7 +71,7 @@ export default function RouteRubberbandLayer() {
             setHover(null);
             setDragPos(null);
         }
-    }, [activeTool, state.stages.length]);
+    }, [activeTool, stages.length]);
 
     // Clear ghost handle on map click or zoom start
     useEffect(() => {
@@ -128,12 +128,12 @@ export default function RouteRubberbandLayer() {
 
         if (!currentHover) return;
         const legIdx = currentHover.legIdx;
-        const stageA = state.stages[legIdx];
-        const stageB = state.stages[legIdx + 1];
+        const stageA = stages[legIdx];
+        const stageB = stages[legIdx + 1];
         if (!stageA || !stageB) return;
 
-        const currentRoute = state.routes[legIdx];
-        const profile = currentRoute?.profile || (state.active_tool === 'route_direct' ? 'direct' : 'pedestrian');
+        const currentRoute = routes[legIdx];
+        const profile = currentRoute?.profile || (activeTool === 'route_direct' ? 'direct' : 'pedestrian');
 
         // 1. Insert new stage between legIdx and legIdx + 1
         const newStageId = `stage-${Date.now()}`;
@@ -161,7 +161,7 @@ export default function RouteRubberbandLayer() {
             p1: [stageA.coords[0], stageA.coords[1]],
             p2: [dropLat, dropLon],
             profile,
-            small_roads: state.small_roads_only,
+            small_roads: smallRoadsOnly,
             insertIdx: legIdx
         });
 
@@ -169,7 +169,7 @@ export default function RouteRubberbandLayer() {
             p1: [dropLat, dropLon],
             p2: [stageB.coords[0], stageB.coords[1]],
             profile,
-            small_roads: state.small_roads_only,
+            small_roads: smallRoadsOnly,
             insertIdx: legIdx + 1
         });
 
@@ -194,12 +194,10 @@ export default function RouteRubberbandLayer() {
             message: `Tracé dévié : nouvelle étape insérée.`,
             notifType: 'info'
         });
-    }, [hover, state.stages, state.routes, state.small_roads_only, state.active_tool, map, dispatch]);
+    }, [hover, stages, routes, smallRoadsOnly, activeTool, map, dispatch]);
 
     if (!isToolAllowed) return null;
 
-    const routes = state.routes || [];
-    const stages = state.stages || [];
     if (stages.length < 2 || routes.length === 0) return null;
 
     const activeLegIdx = hover?.legIdx ?? -1;

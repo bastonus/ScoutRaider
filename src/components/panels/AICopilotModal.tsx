@@ -16,7 +16,7 @@ import {
     Compass,
     Bot
 } from 'lucide-react';
-import { useApp } from '../../AppContext';
+import { useRoutes, useCarnet } from '../../hooks';
 import { AIService, AIConfig, NarrativeResponse, SafetyAuditResponse, RiddleResponse, ConnectorInfo } from '../../logic/AIService';
 
 interface AICopilotModalProps {
@@ -26,7 +26,8 @@ interface AICopilotModalProps {
 }
 
 export default function AICopilotModal({ isOpen, onClose, initialTab = 'narrative' }: AICopilotModalProps) {
-    const { state, dispatch } = useApp();
+    const { stages, dispatch } = useRoutes();
+    const { segmentPois } = useCarnet();
     const [activeTab, setActiveTab] = useState<'narrative' | 'riddles' | 'safety' | 'mcp' | 'config'>(initialTab);
 
     // AI Config State
@@ -41,7 +42,7 @@ export default function AICopilotModal({ isOpen, onClose, initialTab = 'narrativ
     const [narrativeResult, setNarrativeResult] = useState<NarrativeResponse | null>(null);
 
     // Riddles State
-    const firstPoi = Object.values(state.segment_pois || {}).flat()[0]?.name;
+    const firstPoi = Object.values(segmentPois || {}).flat()[0]?.name;
     const [selectedPoi, setSelectedPoi] = useState(firstPoi || 'Abbaye en ruines');
     const [riddleModule, setRiddleModule] = useState('morse');
     const [riddleDifficulty, setRiddleDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
@@ -79,7 +80,7 @@ export default function AICopilotModal({ isOpen, onClose, initialTab = 'narrativ
     if (!isOpen) return null;
 
     // Collect current stages info
-    const stagesPayload = (state.stages || []).map((st, idx) => ({
+    const stagesPayload = (stages || []).map((st, idx) => ({
         to_label: st.label || `Balise ${idx + 1}`,
         distance_m: 1200, // Estimated or calculated distance
         poi: (st as any).poi || st.address || null

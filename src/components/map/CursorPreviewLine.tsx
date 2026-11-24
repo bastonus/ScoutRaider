@@ -1,20 +1,20 @@
 import React from 'react';
 import { Polyline } from 'react-leaflet';
-import { useApp } from '../../AppContext';
+import { useRoutes, useAnnotations, useUI } from '../../hooks';
 
 export default function CursorPreviewLine({ cursorPos }: { cursorPos: [number, number] | null }) {
-    const { state } = useApp();
-    const stages = state.stages;
-    const anchorIdx = state.anchor_stage_idx;
+    const { stages, anchorStageIdx, activeItineraryId } = useRoutes();
+    const { selectedLayerId } = useAnnotations();
+    const { activeTool } = useUI();
 
     // Anchor stage: the one the next click will connect FROM
-    // If anchor_stage_idx is set and valid, use it; otherwise fall back to last stage
-    const anchorStage = (anchorIdx >= 0 && anchorIdx < stages.length)
-        ? stages[anchorIdx]
+    // If anchorStageIdx is set and valid, use it; otherwise fall back to last stage
+    const anchorStage = (anchorStageIdx >= 0 && anchorStageIdx < stages.length)
+        ? stages[anchorStageIdx]
         : stages.length > 0 ? stages[stages.length - 1] : null;
 
-    const isItinSelected = state.selected_layer_id === state.active_itinerary_id;
-    if (isItinSelected && (state.active_tool === 'route' || state.active_tool === 'route_direct') && cursorPos && anchorStage && !(window as any).__isHoveringCompatible) {
+    const isItinSelected = selectedLayerId === activeItineraryId;
+    if (isItinSelected && (activeTool === 'route' || activeTool === 'route_direct') && cursorPos && anchorStage && !(window as any).__isHoveringCompatible) {
         return (
             <Polyline 
                 positions={[anchorStage.coords as [number, number], cursorPos]} 

@@ -26,6 +26,7 @@ export interface UIContextValue {
     cloudProjectId: string | null;
     cloudShareToken: string | null;
     autosaveEnabled: boolean;
+    autoCheckUpdates?: boolean;
     dispatch: React.Dispatch<AppAction>;
 }
 

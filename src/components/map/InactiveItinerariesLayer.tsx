@@ -1,17 +1,16 @@
 import React from 'react';
 import { Polyline, Marker, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
-import { useApp } from '../../AppContext';
+import { useRoutes, useAnnotations, useUI } from '../../hooks';
 import { Itinerary } from '../../logic/types';
 import { layerPaneName } from '../../logic/LayerOrder';
 
 export default function InactiveItinerariesLayer() {
-    const { state, dispatch } = useApp();
-    const itineraries = state.itineraries || [];
-    const activeId = state.active_itinerary_id;
-    const selectedId = state.selected_layer_id;
+    const { itineraries = [], activeItineraryId: activeId, routes: activeRoutes, stages: activeStages, dispatch } = useRoutes();
+    const { selectedLayerId: selectedId } = useAnnotations();
+    const { activeTool } = useUI();
 
-    const isRouteTool = ['route', 'route_direct', 'node', 'azimut'].includes(state.active_tool);
+    const isRouteTool = ['route', 'route_direct', 'node', 'azimut'].includes(activeTool);
     // Active itinerary is focused ONLY if it is selected and tool is a route tool
     const isItinActiveAndSelected = selectedId === activeId;
     const hasFocusedItin = isRouteTool && isItinActiveAndSelected;
@@ -20,7 +19,7 @@ export default function InactiveItinerariesLayer() {
     const isCreationTool = [
         'route', 'route_direct', 'annotate_point', 'annotate_area', 
         'annotate_area_routed', 'annotate_draw', 'annotate_text', 'node'
-    ].includes(state.active_tool);
+    ].includes(activeTool);
 
     // All visible itineraries that are not currently in active-editing mode
     // (If user selected an Area/Point/Draw or no layer, ALL itineraries are dashed!)
@@ -44,8 +43,8 @@ export default function InactiveItinerariesLayer() {
         <>
             {dashedItineraries.map((itin: Itinerary) => {
                 const color = itin.color || '#2d8ceb';
-                const routes = (itin.id === activeId) ? state.routes : (itin.routes || []);
-                const stages = (itin.id === activeId) ? state.stages : (itin.stages || []);
+                const routes = (itin.id === activeId) ? activeRoutes : (itin.routes || []);
+                const stages = (itin.id === activeId) ? activeStages : (itin.stages || []);
 
                 // Collect polylines from routes
                 const polylines = routes.map((r: any) => {

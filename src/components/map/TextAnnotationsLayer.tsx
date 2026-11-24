@@ -14,19 +14,15 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { useApp } from '../../AppContext';
+import { useAnnotations, useUI } from '../../hooks';
 import type { TextAnnotation, TextItem } from '../../logic/types';
 import Transformer, { TransformerTarget } from './Transformer';
 
 export default function TextAnnotationsLayer() {
-    const { state, dispatch } = useApp();
+    const { textAnnotations: textLayers = [], selectedLayerId, selectedSublayerId, dispatch } = useAnnotations();
+    const { activeTool } = useUI();
     const map = useMap();
-    const activeTool = state.active_tool;
     const isTextTool = activeTool === 'annotate_text';
-
-    const textLayers: TextAnnotation[] = state.text_annotations || [];
-    const selectedLayerId = state.selected_layer_id;
-    const selectedSublayerId = state.selected_sublayer_id;
 
     // Active text layer being edited
     const activeTextIdRef = useRef<string | null>(null);

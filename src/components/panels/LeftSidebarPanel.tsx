@@ -1,6 +1,6 @@
 import React from 'react';
 import { Route, MapPin, Paintbrush, Layers } from 'lucide-react';
-import { useApp } from '../../AppContext';
+import { useRoutes, useAnnotations } from '../../hooks';
 import RoutePanel from './RoutePanel';
 import { calculatePolygonArea, formatArea } from '../../logic/GeoUtils';
 
@@ -35,20 +35,15 @@ function InfoCard({ label, value, sub }: { label: string; value: React.ReactNode
 }
 
 export default function LeftSidebarPanel() {
-    const { state } = useApp();
-    const selectedId = state.selected_layer_id;
-
-    const itineraries = state.itineraries || [];
-    const areas = state.area_annotations || [];
-    const points = state.point_annotations || [];
-    const draws = (state as any).draw_annotations || [];
+    const { itineraries = [], activeItineraryId } = useRoutes();
+    const { selectedLayerId: selectedId, areaAnnotations: areas = [], pointAnnotations: points = [], drawAnnotations: draws = [] } = useAnnotations();
 
     const selectedArea = areas.find(a => a.id === selectedId);
     const selectedPoint = points.find(p => p.id === selectedId);
     const selectedDraw = draws.find((d: any) => d.id === selectedId);
     
     // Si aucun POI/Zone/Dessin spécifique n'est ciblé, afficher par défaut l'itinéraire actif ou le premier itinéraire
-    const activeItin = itineraries.find(i => i.id === state.active_itinerary_id) || itineraries[0] || { id: 'default', name: 'Itinéraire principal', color: '#2d8ceb' };
+    const activeItin = itineraries.find(i => i.id === activeItineraryId) || itineraries[0] || { id: 'default', name: 'Itinéraire principal', color: '#2d8ceb' };
     const selectedItin = (!selectedArea && !selectedPoint && !selectedDraw)
         ? (itineraries.find(i => i.id === selectedId) || activeItin)
         : itineraries.find(i => i.id === selectedId);

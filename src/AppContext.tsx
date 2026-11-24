@@ -719,6 +719,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cloudProjectId: state.cloud_project_id,
         cloudShareToken: state.cloud_share_token,
         autosaveEnabled: state.autosave_enabled,
+        autoCheckUpdates: state.auto_check_updates,
         dispatch,
     }), [
         state.active_mode,
@@ -743,6 +744,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         state.cloud_project_id,
         state.cloud_share_token,
         state.autosave_enabled,
+        state.auto_check_updates,
         dispatch,
     ]);
 

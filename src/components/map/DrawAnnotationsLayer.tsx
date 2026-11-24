@@ -11,7 +11,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Polyline, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { useApp } from '../../AppContext';
+import { useAnnotations, useUI } from '../../hooks';
 import type { DrawAnnotation, DrawStroke } from '../../logic/types';
 import { layerPaneName } from '../../logic/LayerOrder';
 import Transformer, { TransformerTarget } from './Transformer';
@@ -19,14 +19,10 @@ import Transformer, { TransformerTarget } from './Transformer';
 const MIN_SAMPLE_PX = 4;
 
 export default function DrawAnnotationsLayer() {
-    const { state, dispatch } = useApp();
+    const { drawAnnotations: draws = [], selectedLayerId, selectedSublayerId, dispatch } = useAnnotations();
+    const { activeTool } = useUI();
     const map = useMap();
-    const activeTool = state.active_tool;
     const isDrawTool = activeTool === 'annotate_draw';
-
-    const draws: DrawAnnotation[] = state.draw_annotations || [];
-    const selectedLayerId = state.selected_layer_id;
-    const selectedSublayerId = state.selected_sublayer_id;
 
     // Active draw annotation id being drawn into
     const activeDrawIdRef = useRef<string | null>(null);
@@ -98,7 +94,7 @@ export default function DrawAnnotationsLayer() {
         const id = `draw-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         activeDrawIdRef.current = id;
         setActiveDrawId(id);
-        const drawCount = (state.draw_annotations?.length || 0) + 1;
+        const drawCount = draws.length + 1;
         const newDraw: DrawAnnotation = {
             id,
             type: 'draw' as const,
@@ -117,7 +113,7 @@ export default function DrawAnnotationsLayer() {
             draw: newDraw,
         });
         return newDraw;
-    }, [dispatch, state.draw_annotations?.length, draws, selectedLayerId]);
+    }, [dispatch, draws, selectedLayerId]);
 
     // ── Pointer events on map container (freehand drawing) ─────────────
     useEffect(() => {

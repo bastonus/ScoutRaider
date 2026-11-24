@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Key, HelpCircle, Map as MapIcon, ShieldCheck, ExternalLink, Settings } from 'lucide-react';
-import { useApp } from '../../AppContext';
+import { useUI } from '../../hooks';
 
 type PrefCategory = 'maps_api' | 'general';
 
@@ -21,7 +21,7 @@ interface PreferencesModalProps {
 }
 
 export default function PreferencesModal({ onClose, initialCategory = 'maps_api' }: PreferencesModalProps) {
-    const { state, dispatch } = useApp();
+    const { ignApiKey, mapyApiKey, autoCheckUpdates, dispatch } = useUI();
     const [activeCategory, setActiveCategory] = useState<PrefCategory>(initialCategory);
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
 
@@ -31,8 +31,8 @@ export default function PreferencesModal({ onClose, initialCategory = 'maps_api'
         return () => window.removeEventListener('resize', handleResize);
     }, []);
     
-    const [ignKey, setIgnKey] = useState(state.ign_api_key || '');
-    const [mapyKey, setMapyKey] = useState(state.mapy_api_key || '');
+    const [ignKey, setIgnKey] = useState(ignApiKey || '');
+    const [mapyKey, setMapyKey] = useState(mapyApiKey || '');
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -220,7 +220,7 @@ export default function PreferencesModal({ onClose, initialCategory = 'maps_api'
                                         </div>
                                         <input 
                                             type="checkbox" 
-                                            checked={state.auto_check_updates}
+                                            checked={autoCheckUpdates}
                                             onChange={(e) => dispatch({ type: 'SET_AUTO_CHECK_UPDATES', enabled: e.target.checked })}
                                             style={{ width: '18px', height: '18px', accentColor: 'var(--accent-default)', cursor: 'pointer' }}
                                         />
