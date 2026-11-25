@@ -408,8 +408,16 @@ export default function AnnotationsMapLayer() {
             const pt: [number, number] = anchorPt ?? [e.latlng.lat, e.latlng.lng];
 
             if (activeTool === 'annotate_point') {
-                const ptCount = (state.point_annotations?.length || 0) + 1;
                 const coords: [number, number] = pt;
+                // If the selected layer is a point stub (created by panel button), fill it in-place
+                const stubPoint = (state.point_annotations || []).find(
+                    p => p.id === state.selected_layer_id && !p.visible && p.coords[0] === 0 && p.coords[1] === 0
+                );
+                if (stubPoint) {
+                    dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: stubPoint.id, patch: { coords, visible: true } });
+                    return;
+                }
+                const ptCount = (state.point_annotations?.length || 0) + 1;
                 const newId = `poi-annot-${Date.now()}`;
                 dispatch({
                     type: 'ADD_POINT_ANNOTATION',
@@ -422,17 +430,23 @@ export default function AnnotationsMapLayer() {
                 const currentId = activeDrawingIdRef.current;
 
                 if (!currentId) {
-                    // Pas d'aire en cours de dessin → clic sur la zone de travail
-                    // démarre immédiatement une nouvelle aire.
-                    const newId = `area-annot-${Date.now()}`;
+                    // If the selected layer is an area stub (created by panel button), use it
+                    const stubArea = (state.area_annotations || []).find(
+                        a => a.id === state.selected_layer_id && !a.visible && a.coords.length === 0
+                    );
+                    const newId = stubArea ? stubArea.id : `area-annot-${Date.now()}`;
                     activeDrawingIdRef.current = newId;
                     setActiveDrawingId(newId);
                     setSelectedId(newId);
-                    const areaCount = (state.area_annotations?.length || 0) + 1;
-                    dispatch({
-                        type: 'ADD_AREA_ANNOTATION',
-                        area: { id: newId, type: 'area' as const, title: `Zone ${areaCount}`, text: '', layerId: 'layer-areas', coords: [pt], fillOpacity: 0.3, visible: true, followRoads: activeTool === 'annotate_area_routed', edgeRoutes: [] } as any
-                    });
+                    if (stubArea) {
+                        dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: stubArea.id, patch: { coords: [pt], visible: true, followRoads: activeTool === 'annotate_area_routed' } });
+                    } else {
+                        const areaCount = (state.area_annotations?.length || 0) + 1;
+                        dispatch({
+                            type: 'ADD_AREA_ANNOTATION',
+                            area: { id: newId, type: 'area' as const, title: `Zone ${areaCount}`, text: '', layerId: 'layer-areas', coords: [pt], fillOpacity: 0.3, visible: true, followRoads: activeTool === 'annotate_area_routed', edgeRoutes: [] } as any
+                        });
+                    }
                 } else {
                     const area = areaAnnotationsRef.current.find(a => a.id === currentId);
                     if (!area) return;

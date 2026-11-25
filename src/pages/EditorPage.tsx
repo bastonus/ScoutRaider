@@ -32,6 +32,8 @@ export default function EditorPage() {
     // Track which identifier has already been loaded to avoid double-loads
     const loadedIdentifier = useRef<string | null>(null);
     const syncInitialized = useRef<string | null>(null);
+    const stateRef = useRef(state);
+    stateRef.current = state;
 
     // ── Load document when identifier changes ────────────────────────────────
     useEffect(() => {
@@ -68,13 +70,13 @@ export default function EditorPage() {
             syncInitialized.current = docId;
             cloudSync.initialize({
                 documentId: docId,
-                getState: () => state,
+                getState: () => stateRef.current,
                 dispatch,
                 autosaveInterval: 5000
             });
             console.log('[EditorPage] CloudSync initialisé pour:', docId);
         }
-    }, [state.cloud_project_id, state.current_filepath, identifier, state, dispatch]);
+    }, [state.cloud_project_id, state.current_filepath, identifier, dispatch]);
 
     // ── After first save on /d/new: redirect to /d/<projectId> ───────────────
     useEffect(() => {

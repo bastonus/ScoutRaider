@@ -12,23 +12,27 @@ import EditorPage from './pages/EditorPage';
 import MarketplacePage from './pages/MarketplacePage';
 
 export default function RouterRoot() {
-    const { isAuthenticated, isGuest, isLoading } = useAuth();
+    const { isAuthenticated, isLoading } = useAuth();
 
     // Show nothing while auth state is resolving
     if (isLoading) {
         return (
-            <div style={{
-                minHeight: '100vh',
-                background: '#0d1511',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-            }}>
+            <div
+                role="status"
+                aria-label="Chargement de la session"
+                style={{
+                    minHeight: '100dvh',
+                    background: 'var(--bg-base)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}
+            >
                 <div style={{
                     width: '36px',
                     height: '36px',
-                    border: '3px solid rgba(110,201,126,0.2)',
-                    borderTopColor: '#6EC97E',
+                    border: '3px solid rgba(37, 99, 235, 0.2)',
+                    borderTopColor: 'var(--accent-primary)',
                     borderRadius: '50%',
                     animation: 'spin 0.8s linear infinite',
                 }} />

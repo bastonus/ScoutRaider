@@ -10,6 +10,13 @@ import { NavigationText } from '../../logic/NavigationText';
 import { PolygonalEngine } from '../../logic/PolygonalEngine';
 import { layerPaneName } from '../../logic/LayerOrder';
 
+/** Map routing mode to map stroke style: Route = solid, Sentier = dotted, Hors piste = dashed */
+function getProfileDashArray(profile?: string): string | undefined {
+    if (profile === 'car') return undefined;
+    if (profile === 'direct') return '10, 8';
+    return '2, 8';
+}
+
 /** Helper: Haversine distance in meters */
 const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3;
@@ -430,6 +437,8 @@ export default function ActiveRouteLayer() {
                                 color={itinColor}
                                 weight={6}
                                 opacity={0.85}
+                                dashArray={getProfileDashArray(r.profile)}
+                                lineCap="round"
                                 interactive={false}
                             />
                         </React.Fragment>
@@ -570,7 +579,15 @@ export default function ActiveRouteLayer() {
                         <Polyline 
                             positions={latLngs} 
                             pane={itinPane}
-                            pathOptions={{ color, weight, opacity: isDragOver ? 1 : 0.85 }}
+                            pathOptions={{
+                                color,
+                                weight,
+                                opacity: isDragOver ? 1 : 0.85,
+                                dashArray: getProfileDashArray(
+                                    state.routes.find((r: any) => r && r.id === (seg as any).leg_key)?.profile
+                                ),
+                                lineCap: 'round',
+                            }}
                             interactive={false}
                         />
 

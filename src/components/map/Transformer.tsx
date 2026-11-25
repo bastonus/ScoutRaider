@@ -251,7 +251,7 @@ export default function Transformer({ target, onUpdatePreview, onCommit, onDelet
     );
 
     return (
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1200 }}>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 960 }}>
             {/* SVG vector transformer layer */}
             <svg style={{ width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}>
                 {/* Bounding box outline */}

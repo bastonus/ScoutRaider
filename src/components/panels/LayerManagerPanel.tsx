@@ -1,447 +1,1020 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Eye, EyeOff, Trash2, Route, MapPin, Maximize2, Pencil, Check, X, GripVertical, Paintbrush, ChevronRight, ChevronDown, Type } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import {
+    Eye,
+    EyeOff,
+    Trash2,
+    Route,
+    MapPin,
+    Edit3,
+    Check,
+    Copy,
+    RotateCcw,
+    Pencil,
+    Pentagon,
+    ChevronRight,
+    ChevronDown,
+    Type,
+    Plus,
+} from 'lucide-react';
 import { useApp } from '../../AppContext';
 import { mapRef } from '../map/MapComponent';
 import { calculatePolygonArea, formatArea } from '../../logic/GeoUtils';
+import { formatDistanceFr, formatStageAddress } from '../../logic/geocoding';
 import { PRESET_COLORS } from '../map/AnnotationModals';
-import { Itinerary, PointAnnotation, AreaAnnotation, DrawAnnotation, DrawStroke, TextAnnotation, TextItem } from '../../logic/types';
+import {
+    Itinerary,
+    PointAnnotation,
+    AreaAnnotation,
+    DrawAnnotation,
+    DrawStroke,
+    TextAnnotation,
+} from '../../logic/types';
 import { computeLayerOrder, layerOrdersEqual, type LayerOrderItem } from '../../logic/LayerOrder';
 
-// ─── Types ───────────────────────────────────────────────────────────
 type OrderItem = LayerOrderItem;
 
-// ─── Icons ───────────────────────────────────────────────────────────
-function PolygonIcon({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
-    return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="12 2 20 8 17 18 7 18 4 8 12 2" />
-        </svg>
+const DEFAULT_LAYER_COLORS: Record<OrderItem['kind'], string> = {
+    itin: '#2d8ceb',
+    point: '#3b82f6',
+    area: '#10b981',
+    draw: '#ef4444',
+    text: '#38bdf8',
+};
+
+interface CtxMenuItem {
+    icon: React.ReactNode;
+    label: string;
+    danger?: boolean;
+    onClick: () => void;
+}
+interface CtxMenuSeparator {
+    separator: true;
+}
+
+function clampMenuPosition(x: number, y: number, estHeight = 130): { top: number; left: number } {
+    const menuWidth = 200;
+    const top = y + estHeight > window.innerHeight ? Math.max(8, y - estHeight) : y;
+    const left = Math.min(Math.max(8, x), window.innerWidth - menuWidth - 8);
+    return { top, left };
+}
+
+function LayerContextMenu({
+    x,
+    y,
+    items,
+    onClose,
+}: {
+    x: number;
+    y: number;
+    items: (CtxMenuItem | CtxMenuSeparator)[];
+    onClose: () => void;
+}) {
+    const ref = useRef<HTMLDivElement>(null);
+    const pos = clampMenuPosition(x, y);
+
+    useEffect(() => {
+        const handleDown = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+        };
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('mousedown', handleDown, true);
+        document.addEventListener('keydown', handleKey, true);
+        return () => {
+            document.removeEventListener('mousedown', handleDown, true);
+            document.removeEventListener('keydown', handleKey, true);
+        };
+    }, [onClose]);
+
+    return createPortal(
+        <div
+            ref={ref}
+            role="menu"
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{
+                position: 'fixed',
+                top: `${pos.top}px`,
+                left: `${pos.left}px`,
+                width: '200px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-strong)',
+                borderRadius: '10px',
+                boxShadow: 'var(--shadow-lg)',
+                padding: '4px',
+                zIndex: 9999,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1px',
+            }}
+        >
+            {items.map((item, i) =>
+                'separator' in item ? (
+                    <div key={`sep-${i}`} style={{ height: '1px', background: 'var(--border-subtle)', margin: '2px 4px' }} />
+                ) : (
+                    <button
+                        key={i}
+                        type="button"
+                        role="menuitem"
+                        className="sr-menu-item"
+                        style={{
+                            minHeight: '36px',
+                            fontSize: '12px',
+                            gap: '8px',
+                            padding: '0 10px',
+                            justifyContent: 'flex-start',
+                            textAlign: 'left',
+                            color: item.danger ? 'var(--semantic-danger)' : 'var(--text-primary)',
+                        }}
+                        onClick={() => {
+                            onClose();
+                            item.onClick();
+                        }}
+                    >
+                        {item.icon}
+                        <span>{item.label}</span>
+                    </button>
+                )
+            )}
+        </div>,
+        document.body
     );
 }
 
-// ─── Context Menu ────────────────────────────────────────────────────
-interface CtxMenuItem { icon?: React.ReactNode; label: string; shortcut?: string; danger?: boolean; onClick: () => void; }
-interface CtxMenuSeparator { separator: true; }
-
-function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: (CtxMenuItem | CtxMenuSeparator)[]; onClose: () => void; }) {
-    const ref = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState({ x, y });
-
-    useEffect(() => {
-        const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
-        const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        document.addEventListener('mousedown', handler, true);
-        document.addEventListener('keydown', esc);
-        return () => { document.removeEventListener('mousedown', handler, true); document.removeEventListener('keydown', esc); };
-    }, [onClose]);
+function InlineRename({
+    value,
+    onConfirm,
+    onCancel,
+}: {
+    value: string;
+    onConfirm: (v: string) => void;
+    onCancel: () => void;
+}) {
+    const [val, setVal] = useState(value);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (!ref.current) return;
-        const r = ref.current.getBoundingClientRect();
-        setPos({ x: r.right > window.innerWidth ? Math.max(0, x - r.width) : x, y: r.bottom > window.innerHeight ? Math.max(0, y - r.height) : y });
-    }, [x, y]);
+        inputRef.current?.focus();
+        inputRef.current?.select();
+    }, []);
+
+    const commit = () => {
+        const trimmed = val.trim();
+        if (trimmed) onConfirm(trimmed);
+        else onCancel();
+    };
 
     return (
-        <div ref={ref} onContextMenu={e => e.preventDefault()}
+        <div
+            onClick={(e) => e.stopPropagation()}
             style={{
-                position: 'fixed',
-                left: pos.x,
-                top: pos.y,
-                zIndex: 9999,
-                background: 'var(--bg-elevated)',
-                backdropFilter: 'blur(16px)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '14px',
-                padding: '6px',
-                minWidth: '200px',
-                boxShadow: '0 16px 36px rgba(0, 0, 0, 0.55), 0 0 1px rgba(255, 255, 255, 0.1)'
-            }}>
-            {items.map((item, i) => 'separator' in item
-                ? <div key={i} style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
-                : <button key={i} type="button" onClick={() => { item.onClick(); onClose(); }}
-                    onMouseEnter={e => {
-                        e.currentTarget.style.background = item.danger ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-hover)';
-                        if (item.danger) e.currentTarget.style.color = '#f87171';
-                    }}
-                    onMouseLeave={e => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = item.danger ? 'var(--semantic-danger)' : 'var(--text-primary)';
-                    }}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '8px',
-                        width: '100%',
-                        padding: '7px 10px',
-                        background: 'transparent',
-                        border: 'none',
-                        borderRadius: '8px',
-                        color: item.danger ? 'var(--semantic-danger)' : 'var(--text-primary)',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 100ms ease'
-                    }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {item.icon && <span style={{ opacity: 0.85, flexShrink: 0 }}>{item.icon}</span>}
-                        {item.label}
-                    </span>
-                    {item.shortcut && (
-                        <span style={{
-                            fontSize: '10px',
-                            color: 'var(--text-dim)',
-                            fontFamily: 'monospace',
-                            marginLeft: 'auto',
-                            padding: '2px 6px',
-                            background: 'rgba(255, 255, 255, 0.06)',
-                            borderRadius: '4px'
-                        }}>
-                            {item.shortcut}
-                        </span>
-                    )}
-                </button>
-            )}
+                display: 'flex',
+                alignItems: 'center',
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: '28px',
+                padding: '2px 4px 2px 6px',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid var(--border-strong)',
+                borderRadius: '7px',
+            }}
+        >
+            <input
+                ref={inputRef}
+                type="text"
+                value={val}
+                onChange={(e) => setVal(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        commit();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onCancel();
+                    }
+                }}
+                onBlur={commit}
+                style={{
+                    flex: 1,
+                    minWidth: 0,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    color: 'var(--text-primary)',
+                    fontSize: '12.5px',
+                    fontWeight: 500,
+                    fontFamily: 'var(--font-ui)',
+                }}
+            />
+            <button
+                type="button"
+                aria-label="Annuler le renommage"
+                title="Annuler"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onCancel();
+                }}
+                style={{
+                    width: '22px',
+                    height: '22px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#94A3B8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    borderRadius: '4px',
+                }}
+            >
+                <RotateCcw size={12} />
+            </button>
         </div>
     );
 }
 
-// ─── Color picker ────────────────────────────────────────────────────
-function ColorPickerPopup({ x, y, currentColor, onPick, onClose }: { x: number; y: number; currentColor: string; onPick: (c: string) => void; onClose: () => void; }) {
-    const ref = useRef<HTMLDivElement>(null);
-    useEffect(() => {
-        const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
-        document.addEventListener('mousedown', h, true);
-        return () => document.removeEventListener('mousedown', h, true);
-    }, [onClose]);
+function ColorSwatchBar({
+    currentColor,
+    defaultColor,
+    onPick,
+}: {
+    currentColor: string;
+    defaultColor: string;
+    onPick: (c: string) => void;
+}) {
+    const swatches = [
+        { label: 'Par défaut', value: defaultColor, isDefault: true },
+        ...PRESET_COLORS.filter((c) => c.value.toLowerCase() !== defaultColor.toLowerCase()).map((c) => ({
+            ...c,
+            isDefault: false,
+        })),
+    ].slice(0, 8);
+
     return (
-        <div ref={ref} onContextMenu={e => e.preventDefault()}
+        <div
+            role="group"
+            aria-label="Couleur du calque"
             style={{
-                position: 'fixed',
-                left: x,
-                top: y,
-                zIndex: 10000,
-                background: 'var(--bg-elevated)',
-                backdropFilter: 'blur(16px)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '14px',
-                padding: '10px',
-                boxShadow: '0 16px 36px rgba(0, 0, 0, 0.55)',
-                display: 'flex',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
                 flexWrap: 'wrap',
-                gap: '8px',
-                maxWidth: '180px'
-            }}>
-            {PRESET_COLORS.map(c => (
-                <div key={c.value} title={c.label} onClick={() => { onPick(c.value); onClose(); }}
-                    style={{
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '6px',
-                        background: c.value,
-                        cursor: 'pointer',
-                        boxShadow: currentColor === c.value ? '0 0 0 2px #fff' : 'none',
-                        transform: currentColor === c.value ? 'scale(1.15)' : 'scale(1)',
-                        transition: 'transform 100ms ease, box-shadow 100ms ease'
+            }}
+        >
+            {swatches.map((c) => {
+                const active = currentColor.toLowerCase() === c.value.toLowerCase();
+                return (
+                    <button
+                        key={c.value}
+                        type="button"
+                        title={c.isDefault ? `${c.label} (aucune teinte)` : c.label}
+                        aria-label={c.isDefault ? 'Couleur par défaut' : `Couleur ${c.label}`}
+                        aria-pressed={active}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onPick(c.value);
+                        }}
+                        style={{
+                            width: '16px',
+                            height: '16px',
+                            padding: 0,
+                            borderRadius: '999px',
+                            background: c.value,
+                            border: active ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.18)',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            transition: 'transform 100ms ease',
+                            transform: active ? 'scale(1.12)' : 'scale(1)',
+                            position: 'relative',
+                        }}
+                    />
+                );
+            })}
+        </div>
+    );
+}
+
+function ChipSelector<T extends number>({
+    label,
+    options,
+    value,
+    onChange,
+}: {
+    label: string;
+    options: { value: T; label: string }[];
+    value: T;
+    onChange: (v: T) => void;
+}) {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '11.5px', color: '#94A3B8', flexShrink: 0 }}>{label}</span>
+            <div
+                role="group"
+                aria-label={label}
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    height: '26px',
+                    padding: '2px',
+                    borderRadius: '7px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid var(--border-subtle)',
+                    gap: '2px',
+                }}
+            >
+                {options.map((opt) => {
+                    const active = opt.value === value;
+                    return (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onChange(opt.value);
+                            }}
+                            className="tabular-nums"
+                            style={{
+                                height: '100%',
+                                padding: '0 8px',
+                                borderRadius: '5px',
+                                border: 'none',
+                                background: active ? 'rgba(255, 255, 255, 0.14)' : 'transparent',
+                                color: active ? '#ffffff' : '#94A3B8',
+                                fontSize: '11px',
+                                fontWeight: active ? 600 : 500,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            {opt.label}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+interface LayerRowProps {
+    icon: React.ReactNode;
+    label: string;
+    rightText?: string;
+    color: string;
+    defaultColor: string;
+    visible: boolean;
+    isSelected: boolean;
+    isEditing: boolean;
+    isMobile: boolean;
+    isHoveredDrag?: boolean;
+    chevron?: React.ReactNode;
+    isMultiSelected?: boolean;
+    onSelect: (meta: { ctrl: boolean; shift: boolean }) => void;
+    onToggleVisible: () => void;
+    onStartRename: () => void;
+    onConfirmRename: (v: string) => void;
+    onCancelRename: () => void;
+    onContextMenu: (x: number, y: number) => void;
+    onColorPick: (c: string) => void;
+    onDelete: () => void;
+    detailSlot?: React.ReactNode;
+    hoverSubline?: React.ReactNode;
+    defaultSubline?: string;
+    dragProps: {
+        draggable: boolean;
+        onDragStart: () => void;
+        onDragOver: (e: React.DragEvent) => void;
+        onDrop: (e: React.DragEvent) => void;
+        onDragEnd: () => void;
+    };
+    rowRef?: (el: HTMLDivElement | null) => void;
+}
+
+function LayerRow({
+    icon,
+    label,
+    rightText,
+    color,
+    defaultColor,
+    visible,
+    isSelected,
+    isEditing,
+    isMobile,
+    chevron,
+    isMultiSelected,
+    onSelect,
+    onToggleVisible,
+    onStartRename,
+    onConfirmRename,
+    onCancelRename,
+    onContextMenu,
+    onColorPick,
+    onDelete,
+    detailSlot,
+    hoverSubline,
+    defaultSubline,
+    dragProps,
+    rowRef,
+}: LayerRowProps) {
+    const [isHovered, setIsHovered] = useState(false);
+    const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const touchOriginRef = useRef<{ x: number; y: number } | null>(null);
+    const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (longPressRef.current) clearTimeout(longPressRef.current);
+            if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+        };
+    }, []);
+
+    return (
+        <div
+            ref={rowRef}
+            role="option"
+            aria-selected={isSelected}
+            draggable={dragProps.draggable && !isEditing}
+            onDragStart={dragProps.onDragStart}
+            onDragOver={dragProps.onDragOver}
+            onDrop={dragProps.onDrop}
+            onDragEnd={dragProps.onDragEnd}
+            onClick={(e) => {
+                if (isEditing) return;
+                const ctrl = e.ctrlKey || e.metaKey;
+                const shift = e.shiftKey;
+                // Modifier clicks are immediate (no double-click ambiguity)
+                if (ctrl || shift) {
+                    if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+                    onSelect({ ctrl, shift });
+                    return;
+                }
+                if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+                clickTimerRef.current = setTimeout(() => {
+                    clickTimerRef.current = null;
+                    onSelect({ ctrl: false, shift: false });
+                }, 210);
+            }}
+            onDoubleClick={(e) => {
+                if (isEditing) return;
+                e.stopPropagation();
+                if (clickTimerRef.current) {
+                    clearTimeout(clickTimerRef.current);
+                    clickTimerRef.current = null;
+                }
+                onStartRename();
+            }}
+            onContextMenu={(e) => {
+                if (isEditing) return;
+                e.preventDefault();
+                e.stopPropagation();
+                onContextMenu(e.clientX, e.clientY);
+            }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            onTouchStart={(e) => {
+                if (isEditing || e.touches.length !== 1) return;
+                const t = e.touches[0];
+                touchOriginRef.current = { x: t.clientX, y: t.clientY };
+                if (longPressRef.current) clearTimeout(longPressRef.current);
+                longPressRef.current = setTimeout(() => {
+                    touchOriginRef.current = null;
+                    onContextMenu(t.clientX, t.clientY);
+                }, 500);
+            }}
+            onTouchMove={(e) => {
+                if (!longPressRef.current || !touchOriginRef.current || e.touches.length !== 1) return;
+                const dx = e.touches[0].clientX - touchOriginRef.current.x;
+                const dy = e.touches[0].clientY - touchOriginRef.current.y;
+                if (Math.hypot(dx, dy) > 8) {
+                    clearTimeout(longPressRef.current);
+                    longPressRef.current = null;
+                }
+            }}
+            onTouchEnd={() => {
+                if (longPressRef.current) {
+                    clearTimeout(longPressRef.current);
+                    longPressRef.current = null;
+                }
+            }}
+            style={{
+                borderBottom: '1px solid var(--border-subtle)',
+                background: (() => {
+                    const isCustomColor = color.toLowerCase() !== defaultColor.toLowerCase();
+                    const overlay = isSelected
+                        ? 'rgba(255, 255, 255, 0.06)'
+                        : isMultiSelected
+                          ? 'rgba(255, 255, 255, 0.045)'
+                          : isHovered
+                            ? 'rgba(255, 255, 255, 0.03)'
+                            : 'transparent';
+                    if (!isCustomColor) return overlay;
+                    const tintPct = visible ? 14 : 7;
+                    return `linear-gradient(${overlay}, ${overlay}), color-mix(in srgb, ${color} ${tintPct}%, transparent)`;
+                })(),
+                transition: 'background 120ms ease',
+                cursor: isEditing ? 'text' : 'grab',
+            }}
+        >
+            {/* Primary row */}
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: isSelected && !isEditing ? 'flex-start' : 'center',
+                    gap: '8px',
+                    padding: isEditing ? '6px 12px' : isSelected ? '10px 12px 0 12px' : '4px 12px',
+                    minHeight: isSelected ? undefined : isMobile ? '48px' : '40px',
+                }}
+            >
+                {/* Visibility Eye (neutral) */}
+                <button
+                    type="button"
+                    aria-label={visible ? 'Masquer le calque' : 'Afficher le calque'}
+                    title={visible ? 'Masquer' : 'Afficher'}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleVisible();
                     }}
-                />
+                    style={{
+                        width: '24px',
+                        height: '24px',
+                        marginTop: isSelected && !isEditing ? '-1px' : 0,
+                        border: 'none',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        color: visible ? '#94A3B8' : '#64748B',
+                        opacity: visible ? 1 : 0.45,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                    }}
+                >
+                    {visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
+
+                {/* Colored Type Icon (carries the object color directly) */}
+                <span
+                    aria-hidden="true"
+                    style={{
+                        width: '18px',
+                        height: '20px',
+                        marginTop: isSelected && !isEditing ? '1px' : 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color,
+                        opacity: visible ? 1 : 0.45,
+                        flexShrink: 0,
+                    }}
+                >
+                    {icon}
+                </span>
+
+                {/* Name + optional 2nd line (when selected) */}
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {isEditing ? (
+                        <InlineRename value={label} onConfirm={onConfirmRename} onCancel={onCancelRename} />
+                    ) : (
+                        <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                                <span
+                                    title={label}
+                                    style={{
+                                        fontSize: '12.5px',
+                                        fontWeight: isSelected ? 600 : 500,
+                                        color: 'var(--text-primary)',
+                                        opacity: visible ? 1 : 0.45,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        lineHeight: 1.3,
+                                        minWidth: 0,
+                                    }}
+                                >
+                                    {label}
+                                </span>
+                                {isHovered && (
+                                    <button
+                                        type="button"
+                                        aria-label="Renommer le calque"
+                                        title="Renommer"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onStartRename();
+                                        }}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            padding: '0 2px',
+                                            color: '#94A3B8',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            cursor: 'pointer',
+                                            flexShrink: 0,
+                                            lineHeight: 1,
+                                        }}
+                                    >
+                                        <Edit3 size={12} aria-hidden="true" />
+                                    </button>
+                                )}
+                            </div>
+                            {isSelected && (defaultSubline || hoverSubline) && (
+                                <div
+                                    style={{
+                                        height: '15px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        fontSize: '12px',
+                                        color: '#94A3B8',
+                                        lineHeight: 1.25,
+                                        overflow: 'hidden',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    {isHovered && hoverSubline ? (
+                                        hoverSubline
+                                    ) : (
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {defaultSubline}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* Right slot: short info + optional chevron */}
+                {!isEditing && (rightText || chevron) && (
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            flexShrink: 0,
+                            marginTop: isSelected ? '1px' : 0,
+                        }}
+                    >
+                        {rightText && (
+                            <span
+                                className="tabular-nums"
+                                style={{
+                                    fontSize: '12px',
+                                    color: '#94A3B8',
+                                    fontWeight: 500,
+                                    whiteSpace: 'nowrap',
+                                    opacity: visible ? 1 : 0.45,
+                                    maxWidth: '140px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                }}
+                            >
+                                {rightText}
+                            </span>
+                        )}
+                        {chevron}
+                    </div>
+                )}
+            </div>
+
+            {/* Animated open row: type detail + 8-color palette + isolated Delete */}
+            <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                    display: 'grid',
+                    gridTemplateRows: isSelected && !isEditing ? '1fr' : '0fr',
+                    opacity: isSelected && !isEditing ? 1 : 0,
+                    transition: 'grid-template-rows 150ms ease, opacity 150ms ease',
+                }}
+            >
+                <div style={{ overflow: 'hidden' }}>
+                    <div
+                        style={{
+                            padding: '10px 12px 10px 12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px',
+                        }}
+                    >
+                        {detailSlot}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                            <ColorSwatchBar currentColor={color} defaultColor={defaultColor} onPick={onColorPick} />
+                            <button
+                                type="button"
+                                aria-label="Supprimer le calque"
+                                title="Supprimer"
+                                onClick={onDelete}
+                                style={{
+                                    boxSizing: 'border-box',
+                                    marginLeft: 'auto',
+                                    width: isMobile ? '36px' : '30px',
+                                    height: isMobile ? '36px' : '30px',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    background: 'rgba(239, 68, 68, 0.12)',
+                                    color: 'var(--semantic-red)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <Trash2 size={12} aria-hidden="true" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export function LayerAddButtons({
+    variant = 'bar',
+    onCreated,
+}: {
+    variant?: 'bar' | 'sheet';
+    onCreated?: (id: string) => void;
+}) {
+    const { state, dispatch } = useApp();
+    const draws = ((state as any).draw_annotations as DrawAnnotation[]) || [];
+    const texts = ((state as any).text_annotations as TextAnnotation[]) || [];
+    const selectedId = state.selected_layer_id;
+    const isBar = variant === 'bar';
+
+    const items = [
+        {
+            kind: 'itin' as const,
+            label: 'Ajouter un tracé · P',
+            Icon: Route,
+            onTap: () => {
+                dispatch({ type: 'ADD_ITINERARY' });
+                dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
+            },
+        },
+        {
+            kind: 'point' as const,
+            label: 'Ajouter un repère · R',
+            Icon: MapPin,
+            onTap: () => {
+                const id = `poi-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                const ptCount = (state.point_annotations?.length || 0) + 1;
+                dispatch({
+                    type: 'ADD_POINT_ANNOTATION',
+                    point: { id, type: 'point' as const, title: `Repère ${ptCount}`, text: '', coords: [0, 0] as [number, number], color: DEFAULT_LAYER_COLORS.point, icon: 'pin' as const, layerId: 'layer-points', visible: false } as any
+                });
+                dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_point' });
+                onCreated?.(id);
+            },
+        },
+        {
+            kind: 'area' as const,
+            label: 'Ajouter une zone · Z',
+            Icon: Pentagon,
+            onTap: () => {
+                const id = `area-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                const areaCount = (state.area_annotations?.length || 0) + 1;
+                dispatch({
+                    type: 'ADD_AREA_ANNOTATION',
+                    area: { id, type: 'area' as const, title: `Zone ${areaCount}`, text: '', layerId: 'layer-areas', coords: [] as [number, number][], fillOpacity: 0.3, visible: false, followRoads: false, edgeRoutes: [] } as any
+                });
+                dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_area' });
+                onCreated?.(id);
+            },
+        },
+        {
+            kind: 'draw' as const,
+            label: 'Ajouter un dessin · B',
+            Icon: Pencil,
+            onTap: () => {
+                const id = `draw-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                const newDraw: DrawAnnotation = {
+                    id,
+                    type: 'draw',
+                    layerId: 'layer-draws',
+                    title: `Dessin ${draws.length + 1}`,
+                    visible: true,
+                    color: DEFAULT_LAYER_COLORS.draw,
+                    strokeWidth: 4,
+                    opacity: 1,
+                    strokes: [],
+                    createdAt: Date.now(),
+                };
+                dispatch({ type: 'ADD_DRAW_ANNOTATION', draw: newDraw } as any);
+                dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_draw' });
+                onCreated?.(id);
+            },
+        },
+        {
+            kind: 'text' as const,
+            label: 'Ajouter un texte · T',
+            Icon: Type,
+            onTap: () => {
+                const id = `text-annot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                const count = texts.length + 1;
+                const newText: TextAnnotation = {
+                    id,
+                    type: 'text',
+                    layerId: 'layer-texts',
+                    title: count === 1 ? 'Textes' : `Textes ${count}`,
+                    visible: true,
+                    color: DEFAULT_LAYER_COLORS.text,
+                    fontSize: 16,
+                    opacity: 1,
+                    texts: [],
+                    createdAt: Date.now(),
+                };
+                dispatch({ type: 'ADD_TEXT_ANNOTATION', text: newText } as any);
+                dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_text' });
+                onCreated?.(id);
+            },
+        },
+    ];
+
+    return (
+        <div
+            role="group"
+            aria-label="Ajouter un calque"
+            style={
+                isBar
+                    ? { display: 'flex', alignItems: 'center', gap: '2px' }
+                    : { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', width: '100%' }
+            }
+        >
+            {items.map(({ kind, label, Icon, onTap }) => (
+                <button
+                    key={kind}
+                    type="button"
+                    aria-label={label}
+                    title={label}
+                    onClick={onTap}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = isBar ? 'transparent' : 'rgba(255, 255, 255, 0.04)';
+                        e.currentTarget.style.color = '#94A3B8';
+                    }}
+                    style={{
+                        position: 'relative',
+                        width: isBar ? '32px' : undefined,
+                        height: isBar ? '32px' : '44px',
+                        borderRadius: isBar ? '10px' : '7px',
+                        border: 'none',
+                        background: isBar ? 'transparent' : 'rgba(255, 255, 255, 0.04)',
+                        color: '#94A3B8',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'background 120ms ease, color 120ms ease',
+                        flexShrink: 0,
+                    }}
+                >
+                    <Icon size={15} strokeWidth={2} aria-hidden="true" />
+                    <Plus
+                        size={8}
+                        strokeWidth={2.75}
+                        aria-hidden="true"
+                        style={{
+                            position: 'absolute',
+                            top: isBar ? '4px' : '8px',
+                            right: isBar ? '4px' : '10px',
+                            opacity: 0.9,
+                        }}
+                    />
+                </button>
             ))}
         </div>
     );
 }
 
-// ─── Inline rename ───────────────────────────────────────────────────
-function InlineRename({ value, onConfirm, onCancel }: { value: string; onConfirm: (v: string) => void; onCancel: () => void; }) {
-    const [v, setV] = useState(value);
-    const ref = useRef<HTMLInputElement>(null);
-    useEffect(() => { ref.current?.select(); }, []);
-    return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }} onClick={e => e.stopPropagation()}>
-            <input ref={ref} value={v} onChange={e => setV(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') onConfirm(v); if (e.key === 'Escape') onCancel(); }}
-                style={{
-                    flex: 1,
-                    minWidth: 0,
-                    background: 'var(--bg-dark)',
-                    border: '1px solid var(--accent-default)',
-                    borderRadius: '6px',
-                    padding: '3px 8px',
-                    color: '#fff',
-                    fontSize: '11.5px',
-                    fontWeight: 600,
-                    outline: 'none',
-                    boxShadow: 'none'
-                }}
-                autoFocus />
-            <button type="button" onClick={() => onConfirm(v)} style={{ background: 'var(--accent-transparent)', border: '1px solid var(--accent-default)', borderRadius: '6px', color: 'var(--accent-hover)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Check size={12} strokeWidth={2.5} />
-            </button>
-            <button type="button" onClick={onCancel} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={12} strokeWidth={2} />
-            </button>
-        </div>
-    );
-}
-
-// ─── Layer row ───────────────────────────────────────────────────────
-function LayerRow({
-    icon,
+// ── Layer Drag Preview Row ─────────────────────────────────────────────────────
+/** Ghost placeholder row shown at the insertion point during layer drag-and-drop. */
+function LayerPreviewRow({
+    item,
     label,
-    sublabel,
-    color,
-    visible,
-    isEditing,
-    isSelected,
-    isActiveItin,
-    onToggleVisible,
-    onContextMenu,
-    renameSlot,
-    dragHandleProps,
-    expandToggle
+    onDrop,
 }: {
-    icon: React.ReactNode;
+    item: OrderItem;
     label: string;
-    sublabel?: string;
-    color: string;
-    visible: boolean;
-    isEditing: boolean;
-    isSelected?: boolean;
-    isActiveItin?: boolean;
-    onToggleVisible: () => void;
-    onContextMenu: (e: React.MouseEvent) => void;
-    renameSlot?: React.ReactNode;
-    dragHandleProps?: React.HTMLAttributes<HTMLSpanElement>;
-    expandToggle?: React.ReactNode;
+    onDrop: () => void;
 }) {
-    const [isHovered, setIsHovered] = useState(false);
-
+    const iconMap: Record<OrderItem['kind'], React.ReactNode> = {
+        itin: <Route size={13} strokeWidth={2.2} />,
+        point: <MapPin size={13} strokeWidth={2.2} />,
+        area: <Pentagon size={13} strokeWidth={2.2} />,
+        draw: <Pencil size={13} strokeWidth={2.2} />,
+        text: <Type size={13} strokeWidth={2.2} />,
+    };
+    const color = DEFAULT_LAYER_COLORS[item.kind];
     return (
         <div
-            onContextMenu={onContextMenu}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            aria-hidden="true"
+            onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            }}
+            onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDrop();
+            }}
             style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '7px 10px',
-                borderRadius: '12px',
-                margin: '3px 8px',
-                background: isSelected
-                    ? 'var(--accent-transparent)'
-                    : isHovered
-                        ? 'var(--bg-hover)'
-                        : 'rgba(255, 255, 255, 0.02)',
-                border: isSelected
-                    ? '1px solid var(--accent-default)'
-                    : isHovered
-                        ? '1px solid rgba(255, 255, 255, 0.12)'
-                        : '1px solid var(--border-subtle)',
-                boxShadow: 'none',
-                cursor: 'pointer',
-                transition: 'all 120ms cubic-bezier(0.4, 0, 0.2, 1)',
+                gap: '10px',
+                margin: '2px 6px',
+                padding: '6px 10px',
+                minHeight: '34px',
+                borderRadius: '8px',
+                background: 'rgba(148, 163, 184, 0.07)',
+                border: '1.5px dashed rgba(148, 163, 184, 0.4)',
+                pointerEvents: 'auto',
             }}
         >
-            {/* Expand / collapse chevron (for groups) or drag handle */}
-            {expandToggle || (
-                <span
-                    {...dragHandleProps}
-                    onClick={e => e.stopPropagation()}
-                    title="Glisser pour réorganiser"
-                    style={{
-                        color: isHovered ? 'var(--text-dim)' : 'rgba(255, 255, 255, 0.2)',
-                        cursor: 'grab',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '14px',
-                        flexShrink: 0,
-                        touchAction: 'none',
-                        transition: 'color 120ms ease',
-                        ...dragHandleProps?.style
-                    }}
-                >
-                    <GripVertical size={13} />
-                </span>
-            )}
-
-            {/* Visibility Eye button */}
-            <button
-                type="button"
-                onClick={e => { e.stopPropagation(); onToggleVisible(); }}
-                title={visible ? "Masquer ce calque" : "Afficher ce calque"}
+            <span style={{ color, opacity: 0.6, flexShrink: 0, display: 'flex' }}>
+                {iconMap[item.kind]}
+            </span>
+            <span
                 style={{
-                    background: visible ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
-                    border: 'none',
-                    borderRadius: '7px',
-                    width: '24px',
-                    height: '24px',
-                    cursor: 'pointer',
-                    color: visible ? color : 'rgba(255, 255, 255, 0.25)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    transition: 'all 120ms ease'
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = visible ? 'rgba(255, 255, 255, 0.04)' : 'transparent'; }}
-            >
-                {visible ? <Eye size={13} strokeWidth={2.2} /> : <EyeOff size={13} strokeWidth={2} />}
-            </button>
-
-            {/* Color Dot */}
-            <div
-                style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: color,
-                    flexShrink: 0,
-                    boxShadow: 'none',
-                    opacity: visible ? 1 : 0.4,
-                    transition: 'all 120ms ease'
-                }}
-            />
-
-            {/* Type icon inside subtle pill */}
-            <div
-                style={{
-                    width: '22px',
-                    height: '22px',
-                    borderRadius: '6px',
-                    background: isSelected ? 'var(--accent-transparent)' : 'rgba(255, 255, 255, 0.04)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isSelected ? 'var(--accent-hover)' : 'var(--text-dim)',
-                    flexShrink: 0,
-                    transition: 'all 120ms ease'
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: '#94A3B8',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                 }}
             >
-                {icon}
-            </div>
-
-            {/* Label or rename */}
-            {isEditing && renameSlot ? (
-                renameSlot
-            ) : (
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{
-                            fontSize: '12px',
-                            fontWeight: isSelected ? 600 : 500,
-                            color: isSelected ? '#fff' : 'var(--text-primary)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                        }}>
-                            {label}
-                        </span>
-                        {isActiveItin && (
-                            <span style={{
-                                fontSize: '9px',
-                                fontWeight: 700,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.04em',
-                                padding: '1px 5px',
-                                borderRadius: '4px',
-                                background: 'var(--accent-transparent)',
-                                color: 'var(--accent-hover)',
-                                border: '1px solid var(--accent-default)',
-                                flexShrink: 0
-                            }}>
-                                Actif
-                            </span>
-                        )}
-                    </div>
-                    {sublabel && (
-                        <div style={{
-                            fontSize: '10.5px',
-                            color: 'var(--text-dim)',
-                            marginTop: '1px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                        }}>
-                            {sublabel}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Options button */}
-            {!isEditing && (
-                <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); onContextMenu(e); }}
-                    onMouseEnter={e => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                        e.currentTarget.style.color = 'var(--text-primary)';
-                    }}
-                    onMouseLeave={e => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = isHovered ? 'var(--text-dim)' : 'rgba(255, 255, 255, 0.2)';
-                    }}
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        color: isHovered ? 'var(--text-dim)' : 'rgba(255, 255, 255, 0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        transition: 'all 120ms ease'
-                    }}
-                    title="Options (clic droit)"
-                >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
-                    </svg>
-                </button>
-            )}
+                {label}
+            </span>
         </div>
     );
 }
 
-// ─── Main ────────────────────────────────────────────────────────────
-export default function LayerManagerPanel() {
+export default function LayerManagerPanel({
+    isMobile = false,
+}: {
+    isMobile?: boolean;
+    onClose?: () => void;
+}) {
     const { state, dispatch } = useApp();
 
-    const itineraries  = state.itineraries || [];
+    const itineraries = state.itineraries || [];
     const activeItinId = state.active_itinerary_id;
-    const points       = state.point_annotations || [];
-    const areas        = state.area_annotations  || [];
-    const draws        = (state as any).draw_annotations as DrawAnnotation[] || [];
-    const texts        = (state as any).text_annotations as TextAnnotation[] || [];
-    const selectedId   = state.selected_layer_id;
+    const points = state.point_annotations || [];
+    const areas = state.area_annotations || [];
+    const draws = ((state as any).draw_annotations as DrawAnnotation[]) || [];
+    const texts = ((state as any).text_annotations as TextAnnotation[]) || [];
+    const selectedId = state.selected_layer_id;
     const selectedSublayerId = state.selected_sublayer_id;
 
-    // ── Flat ordered list (local + store synchronized) ───────────────
-    const savedLayerOrder = (state as any).layer_order as OrderItem[] || [];
+    const savedLayerOrder = ((state as any).layer_order as OrderItem[]) || [];
     const [order, setOrder] = useState<OrderItem[]>([]);
     const [expandedDrawIds, setExpandedDrawIds] = useState<Set<string>>(new Set());
     const [expandedTextIds, setExpandedTextIds] = useState<Set<string>>(new Set());
-    const listRef = useRef<HTMLDivElement>(null);
+    const [renamingId, setRenamingId] = useState<string | null>(null);
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: (CtxMenuItem | CtxMenuSeparator)[] } | null>(null);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [copyToast, setCopyToast] = useState<{ text: string; key: number } | null>(null);
 
-    // Auto-expand draw group when selected
-    useEffect(() => {
-        if (selectedId && draws.some(d => d.id === selectedId)) {
-            setExpandedDrawIds(prev => new Set(prev).add(selectedId));
-        }
-    }, [selectedId, draws]);
+    const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+    const dragIdx = useRef<number | null>(null);
+    /** Reactive mirror of dragIdx.current for JSX rendering — updated alongside the ref. */
+    const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+    /** Insert index (0 = before first, N = after last). null = not dragging. */
+    const [dropInsert, setDropInsert] = useState<number | null>(null);
+    /** Multi-selection set (layer ids). When non-empty, single detail view is suppressed. */
+    const [multiSel, setMultiSel] = useState<Set<string>>(new Set());
+    /** Index of the last plain-clicked item, used as anchor for Shift-range. */
+    const lastSelIdx = useRef<number | null>(null);
 
-    // Auto-expand text group when selected
     useEffect(() => {
-        if (selectedId && texts.some(t => t.id === selectedId)) {
-            setExpandedTextIds(prev => new Set(prev).add(selectedId));
-        }
-    }, [selectedId, texts]);
+        if (!copyToast) return;
+        const t = setTimeout(() => setCopyToast(null), 2500);
+        return () => clearTimeout(t);
+    }, [copyToast]);
+
+    // Auto-scroll selected layer into view
+    useEffect(() => {
+        if (!selectedId) return;
+        const el = rowRefs.current.get(selectedId);
+        if (!el) return;
+        const t = setTimeout(() => {
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 60);
+        return () => clearTimeout(t);
+    }, [selectedId]);
 
     useEffect(() => {
         const next = computeLayerOrder({
@@ -454,405 +1027,750 @@ export default function LayerManagerPanel() {
             currentOrder: order,
             selectedId: state.selected_layer_id,
         });
-        setOrder(prev => layerOrdersEqual(prev, next) ? prev : next);
-        // Keep the persisted order in sync (without an undo entry) so the map
-        // applies the exact same z-order as the panel, including new layers.
+        setOrder((prev) => (layerOrdersEqual(prev, next) ? prev : next));
         if (!layerOrdersEqual(savedLayerOrder, next)) {
             dispatch({ type: 'SET_LAYER_ORDER', order: next, recordHistory: false });
         }
     }, [itineraries, points, areas, draws, texts, state.selected_layer_id, savedLayerOrder, order, dispatch]);
 
-    // ── Selecting a layer row ─────────────────────────────────────────
     const handleSelectRow = (item: OrderItem) => {
-        const isAlreadySelected = selectedId === item.id;
+        const isAlreadySelected = selectedId === item.id && !selectedSublayerId;
         const nextId = isAlreadySelected ? null : item.id;
         dispatch({ type: 'SET_SELECTED_LAYER', id: nextId });
 
-        if (nextId) {
-            if (item.kind === 'area') {
-                const area = areas.find(a => a.id === item.id);
-                // When an area is selected, ALWAYS activate area tool so sommets are visible and draggable!
-                const targetTool = area?.followRoads ? 'annotate_area_routed' : 'annotate_area';
-                if (state.active_tool !== targetTool) {
-                    dispatch({ type: 'SET_ACTIVE_TOOL', tool: targetTool });
-                }
-            } else if (item.kind === 'draw') {
-                if (state.active_tool !== 'annotate_draw') {
-                    dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_draw' });
-                }
-            } else if (item.kind === 'text') {
-                if (state.active_tool !== 'annotate_text') {
-                    dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_text' });
-                }
-            } else if (item.kind === 'itin') {
-                if (state.active_tool !== 'route') {
-                    dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
-                }
-            }
+        if (!nextId) return;
+        if (item.kind === 'area') {
+            const area = areas.find((a) => a.id === item.id);
+            const targetTool = area?.followRoads ? 'annotate_area_routed' : 'annotate_area';
+            if (state.active_tool !== targetTool) dispatch({ type: 'SET_ACTIVE_TOOL', tool: targetTool });
+        } else if (item.kind === 'draw') {
+            if (state.active_tool !== 'annotate_draw') dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_draw' });
+        } else if (item.kind === 'text') {
+            if (state.active_tool !== 'annotate_text') dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_text' });
+        } else if (item.kind === 'itin') {
+            if (state.active_tool !== 'route') dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
         }
     };
 
-    // ── Context menu + color picker + rename ──────────────────────────
-    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: (CtxMenuItem | CtxMenuSeparator)[] } | null>(null);
-    const [colorPicker, setColorPicker] = useState<{ x: number; y: number; currentColor: string; onPick: (c: string) => void } | null>(null);
-    const [renamingId, setRenamingId] = useState<string | null>(null);
-    const closeCtx   = useCallback(() => setCtxMenu(null), []);
-    const closeColor = useCallback(() => setColorPicker(null), []);
+    const handleCopyPointCoords = (pt: PointAnnotation) => {
+        const text = `${pt.coords[0].toFixed(4)}, ${pt.coords[1].toFixed(4)}`;
+        navigator.clipboard?.writeText(text).catch(() => {});
+        setCopiedId(pt.id);
+        setCopyToast({ text, key: Date.now() });
+        setTimeout(() => setCopiedId((prev) => (prev === pt.id ? null : prev)), 1500);
+    };
 
-    // ── Drag & drop ───────────────────────────────────────────────────
-    const dragIdx    = useRef<number | null>(null);
-    const [dropOver, setDropOver] = useState<number | null>(null);
-
-    const handleDragStart = (idx: number) => { dragIdx.current = idx; };
-    const handleDragOver  = (e: React.DragEvent, idx: number) => { e.preventDefault(); setDropOver(idx); };
-    const handleDrop      = (idx: number) => {
-        if (dragIdx.current === null || dragIdx.current === idx) { dragIdx.current = null; setDropOver(null); return; }
+    /**
+     * insertAt: the destination index in the original `order` array (0 = before first item, order.length = after last).
+     * After removing the dragged item, we insert before that adjusted position.
+     */
+    const handleDrop = (insertAt: number) => {
+        const from = dragIdx.current;
+        dragIdx.current = null;
+        setDraggingIdx(null);
+        setDropInsert(null);
+        if (from === null) return;
+        // Clamp to valid range
+        const target = Math.max(0, Math.min(insertAt, order.length));
+        if (from === target || from === target - 1) return; // no-op
         const next = [...order];
-        const [moved] = next.splice(dragIdx.current, 1);
-        next.splice(idx, 0, moved);
+        const [moved] = next.splice(from, 1);
+        // After removing `from`, insertion index shifts if target > from
+        const adjustedTarget = target > from ? target - 1 : target;
+        next.splice(adjustedTarget, 0, moved);
         setOrder(next);
         dispatch({ type: 'SET_LAYER_ORDER', order: next as any });
-        dragIdx.current = null;
-        setDropOver(null);
-    };
-    const handleDragEnd = () => { dragIdx.current = null; setDropOver(null); };
-
-    // ── Helpers ───────────────────────────────────────────────────────
-    const flyTo    = (coords: [number, number]) => mapRef.current?.flyTo(coords, Math.max(mapRef.current.getZoom(), 15), { duration: 0.8 });
-    const fitBounds = (coords: [number, number][]) => { if (coords.length > 0) mapRef.current?.fitBounds(coords, { padding: [40, 40], maxZoom: 16 }); };
-    const getItinKm = (itin: Itinerary) => {
-        const routes = itin.id === activeItinId ? state.routes : (itin.routes || []);
-        return routes.reduce((acc, r) => acc + (r?.distance_m || 0), 0) / 1000;
     };
 
-    // ── Keyboard shortcuts ────────────────────────────────────────────
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (renamingId) return; // Let InlineRename handle keys
-        const idx = order.findIndex(x => x.id === selectedId);
+    const getItinMeters = (itin: Itinerary) => {
+        const routes = itin.id === activeItinId ? state.routes : itin.routes || [];
+        return routes.reduce((acc, r) => acc + (r?.distance_m || 0), 0);
+    };
 
-        switch (e.key) {
-            case 'ArrowUp': {
-                e.preventDefault();
-                const nextItem = idx > 0 ? order[idx - 1] : order[order.length - 1];
-                if (nextItem) handleSelectRow(nextItem);
-                break;
-            }
-            case 'ArrowDown': {
-                e.preventDefault();
-                const nextItem = idx < order.length - 1 ? order[idx + 1] : order[0];
-                if (nextItem) handleSelectRow(nextItem);
-                break;
-            }
-            case 'F2':
-                e.preventDefault();
-                if (selectedId) setRenamingId(selectedId);
-                break;
-            case 'Delete':
-            case 'Backspace': {
-                e.preventDefault();
-                if (!selectedId) break;
-                const item = order.find(x => x.id === selectedId);
-                if (!item) break;
-                if (item.kind === 'itin') {
-                    const itin = itineraries.find(x => x.id === selectedId);
-                    if (itin && window.confirm(`Supprimer "${itin.name}" ?`))
-                        dispatch({ type: 'REMOVE_ITINERARY', id: selectedId });
-                } else if (item.kind === 'point') {
-                    dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: selectedId });
-                } else if (item.kind === 'area') {
-                    dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: selectedId });
-                } else if (item.kind === 'draw') {
-                    dispatch({ type: 'REMOVE_DRAW_ANNOTATION', id: selectedId } as any);
+    const visibleCount = order.filter((item) => {
+        if (item.kind === 'itin') return itineraries.find((x) => x.id === item.id)?.visible !== false;
+        if (item.kind === 'point') return points.find((x) => x.id === item.id)?.visible !== false;
+        if (item.kind === 'area') return areas.find((x) => x.id === item.id)?.visible !== false;
+        if (item.kind === 'draw') return draws.find((x) => x.id === item.id)?.visible !== false;
+        if (item.kind === 'text') return texts.find((x) => x.id === item.id)?.visible !== false;
+        return false;
+    }).length;
+
+    const handleToggleAllVisibility = useCallback(() => {
+        const hideAll = visibleCount > 0;
+        order.forEach((item) => {
+            if (item.kind === 'itin') {
+                const it = itineraries.find((x) => x.id === item.id);
+                if (it && (it.visible !== false) === hideAll) {
+                    dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: it.id });
                 }
-                dispatch({ type: 'SET_SELECTED_LAYER', id: null });
-                break;
+            } else if (item.kind === 'point') {
+                const pt = points.find((x) => x.id === item.id);
+                if (pt && pt.visible === hideAll) dispatch({ type: 'TOGGLE_POINT_VISIBILITY', id: pt.id });
+            } else if (item.kind === 'area') {
+                const area = areas.find((x) => x.id === item.id);
+                if (area && area.visible === hideAll) dispatch({ type: 'TOGGLE_AREA_VISIBILITY', id: area.id });
+            } else if (item.kind === 'draw') {
+                const draw = draws.find((x) => x.id === item.id);
+                if (draw && draw.visible === hideAll) dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: draw.id } as any);
+            } else if (item.kind === 'text') {
+                const text = texts.find((x) => x.id === item.id);
+                if (text && text.visible === hideAll) dispatch({ type: 'TOGGLE_TEXT_VISIBILITY', id: text.id } as any);
             }
-            case ' ': {
+        });
+    }, [dispatch, order, visibleCount, itineraries, points, areas, draws, texts]);
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'h') {
+                const tag = (document.activeElement as HTMLElement | null)?.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA') return;
                 e.preventDefault();
-                if (!selectedId) break;
-                const item2 = order.find(x => x.id === selectedId);
-                if (!item2) break;
-                if (item2.kind === 'itin')  dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: selectedId });
-                if (item2.kind === 'point') dispatch({ type: 'TOGGLE_POINT_VISIBILITY',    id: selectedId });
-                if (item2.kind === 'area')  dispatch({ type: 'TOGGLE_AREA_VISIBILITY',     id: selectedId });
-                if (item2.kind === 'draw')  dispatch({ type: 'TOGGLE_DRAW_VISIBILITY',     id: selectedId } as any);
-                break;
+                handleToggleAllVisibility();
             }
-            case 'Enter': {
-                if (selectedId) {
-                    const item3 = order.find(x => x.id === selectedId);
-                    if (item3?.kind === 'itin') dispatch({ type: 'SET_ACTIVE_ITINERARY', id: selectedId });
-                }
-                break;
-            }
-            case 'Escape':
-                dispatch({ type: 'SET_SELECTED_LAYER', id: null });
-                break;
-        }
-    };
-
-    // ── Context menu builders with shortcut hints ─────────────────────
-    const openItinCtx = (e: React.MouseEvent, itin: Itinerary) => {
-        e.preventDefault(); e.stopPropagation();
-        const isSelected = itin.id === selectedId;
-        setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-            { icon: <Pencil size={13} />, label: 'Renommer', shortcut: 'F2', onClick: () => setRenamingId(itin.id) },
-            { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: itin.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: itin.color, onPick: c => dispatch({ type: 'UPDATE_ITINERARY', id: itin.id, color: c }) }) },
-            { separator: true },
-            ...(!isSelected ? [{ icon: <Route size={13} />, label: 'Sélectionner', shortcut: 'Entrée', onClick: () => dispatch({ type: 'SET_SELECTED_LAYER', id: itin.id }) } as CtxMenuItem] : []),
-            { icon: <Eye size={13} />, label: (itin.visible !== false) ? 'Masquer' : 'Afficher', shortcut: 'Espace', onClick: () => dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: itin.id }) },
-            { separator: true },
-            { icon: <Trash2 size={13} />, label: 'Supprimer', shortcut: 'Suppr', danger: true, onClick: () => { if (window.confirm(`Supprimer "${itin.name}" ?`)) dispatch({ type: 'REMOVE_ITINERARY', id: itin.id }); } },
-        ]});
-    };
-
-    const openPointCtx = (e: React.MouseEvent, pt: PointAnnotation) => {
-        e.preventDefault(); e.stopPropagation();
-        setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-            { icon: <Pencil size={13} />, label: 'Renommer', shortcut: 'F2', onClick: () => setRenamingId(pt.id) },
-            { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: pt.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: pt.color, onPick: c => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: pt.id, patch: { color: c } }) }) },
-            { separator: true },
-            { icon: <Maximize2 size={13} />, label: 'Centrer la carte', shortcut: 'Entrée', onClick: () => flyTo(pt.coords) },
-            { icon: <Eye size={13} />, label: pt.visible ? 'Masquer' : 'Afficher', shortcut: 'Espace', onClick: () => dispatch({ type: 'TOGGLE_POINT_VISIBILITY', id: pt.id }) },
-            { separator: true },
-            { icon: <Trash2 size={13} />, label: 'Supprimer', shortcut: 'Suppr', danger: true, onClick: () => dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: pt.id }) },
-        ]});
-    };
-
-    const openAreaCtx = (e: React.MouseEvent, area: AreaAnnotation) => {
-        e.preventDefault(); e.stopPropagation();
-        const isComplete = area.coords.length >= 3;
-        setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-            { icon: <Pencil size={13} />, label: 'Renommer', shortcut: 'F2', onClick: () => setRenamingId(area.id) },
-            { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: area.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: area.color, onPick: c => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { color: c } }) }) },
-            { separator: true },
-            ...(isComplete ? [{ icon: <Maximize2 size={13} />, label: 'Cadrer la zone', shortcut: 'Entrée', onClick: () => fitBounds(area.coords) } as CtxMenuItem] : []),
-            { icon: <Eye size={13} />, label: area.visible ? 'Masquer' : 'Afficher', shortcut: 'Espace', onClick: () => dispatch({ type: 'TOGGLE_AREA_VISIBILITY', id: area.id }) },
-            { separator: true },
-            { icon: <Trash2 size={13} />, label: 'Supprimer', shortcut: 'Suppr', danger: true, onClick: () => dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: area.id }) },
-        ]});
-    };
-
-    const openDrawCtx = (e: React.MouseEvent, draw: DrawAnnotation) => {
-        e.preventDefault(); e.stopPropagation();
-        setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-            { icon: <Pencil size={13} />, label: 'Renommer', shortcut: 'F2', onClick: () => setRenamingId(draw.id) },
-            { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: draw.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: draw.color, onPick: c => dispatch({ type: 'UPDATE_DRAW_ANNOTATION', id: draw.id, patch: { color: c } } as any) }) },
-            { separator: true },
-            { icon: <Eye size={13} />, label: draw.visible ? 'Masquer' : 'Afficher', shortcut: 'Espace', onClick: () => dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: draw.id } as any) },
-            { separator: true },
-            { icon: <Trash2 size={13} />, label: 'Supprimer', shortcut: 'Suppr', danger: true, onClick: () => dispatch({ type: 'REMOVE_DRAW_ANNOTATION', id: draw.id } as any) },
-        ]});
-    };
-
-    const openTextCtx = (e: React.MouseEvent, text: TextAnnotation) => {
-        e.preventDefault(); e.stopPropagation();
-        setCtxMenu({ x: e.clientX, y: e.clientY, items: [
-            { icon: <Pencil size={13} />, label: 'Renommer', shortcut: 'F2', onClick: () => setRenamingId(text.id) },
-            { icon: <div style={{ width: 13, height: 13, borderRadius: 3, background: text.color }} />, label: 'Changer la couleur', onClick: () => setColorPicker({ x: e.clientX, y: e.clientY, currentColor: text.color, onPick: c => dispatch({ type: 'UPDATE_TEXT_ANNOTATION', id: text.id, patch: { color: c } } as any) }) },
-            { separator: true },
-            { icon: <Eye size={13} />, label: text.visible ? 'Masquer' : 'Afficher', shortcut: 'Espace', onClick: () => dispatch({ type: 'TOGGLE_TEXT_VISIBILITY', id: text.id } as any) },
-            { separator: true },
-            { icon: <Trash2 size={13} />, label: 'Supprimer', shortcut: 'Suppr', danger: true, onClick: () => dispatch({ type: 'REMOVE_TEXT_ANNOTATION', id: text.id } as any) },
-        ]});
-    };
-
-    // ── Render one item ───────────────────────────────────────────────
-    const renderItem = (item: OrderItem, idx: number) => {
-        const isDraggingOver = dropOver === idx;
-        const isSelected = selectedId === item.id;
-        const wrapStyle: React.CSSProperties = {
-            borderTop: isDraggingOver ? '2px solid var(--accent-default)' : '2px solid transparent',
-            transition: 'border-color 0.1s',
         };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [handleToggleAllVisibility]);
 
+    /** Delete a single layer item by kind+id. */
+    const deleteItem = useCallback((item: OrderItem) => {
+        if (item.kind === 'itin') dispatch({ type: 'REMOVE_ITINERARY', id: item.id });
+        else if (item.kind === 'point') dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: item.id });
+        else if (item.kind === 'area') dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: item.id });
+        else if (item.kind === 'draw') dispatch({ type: 'REMOVE_DRAW_ANNOTATION', id: item.id } as any);
+        else if (item.kind === 'text') dispatch({ type: 'REMOVE_TEXT_ANNOTATION', id: item.id } as any);
+    }, [dispatch]);
+
+    /** Toggle visibility for a single layer item. */
+    const toggleItemVisibility = useCallback((item: OrderItem) => {
+        if (item.kind === 'itin') dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: item.id });
+        else if (item.kind === 'point') dispatch({ type: 'TOGGLE_POINT_VISIBILITY', id: item.id });
+        else if (item.kind === 'area') dispatch({ type: 'TOGGLE_AREA_VISIBILITY', id: item.id });
+        else if (item.kind === 'draw') dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: item.id } as any);
+        else if (item.kind === 'text') dispatch({ type: 'TOGGLE_TEXT_VISIBILITY', id: item.id } as any);
+    }, [dispatch]);
+
+    // Escape → clear multi-selection; Delete → delete all selected
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            const tag = (document.activeElement as HTMLElement | null)?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            if (e.key === 'Escape') {
+                if (multiSel.size > 0) { e.preventDefault(); setMultiSel(new Set()); }
+                return;
+            }
+            if ((e.key === 'Delete' || e.key === 'Backspace') && multiSel.size > 0) {
+                e.preventDefault();
+                const items = order.filter((x) => multiSel.has(x.id));
+                if (!window.confirm(`Supprimer ${items.length} calque${items.length > 1 ? 's' : ''} ?`)) return;
+                items.forEach(deleteItem);
+                setMultiSel(new Set());
+                dispatch({ type: 'SET_SELECTED_LAYER', id: null });
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [multiSel, order, deleteItem, dispatch]);
+
+    const closeCtx = useCallback(() => setCtxMenu(null), []);
+
+    const setRowRef = (id: string) => (el: HTMLDivElement | null) => {
+        if (el) rowRefs.current.set(id, el);
+        else rowRefs.current.delete(id);
+    };
+
+    /**
+     * Unified click handler for all layer rows.
+     * - Plain click: clear multi-sel, do single-select (may expand).
+     * - Ctrl/Cmd click: toggle item in multi-sel without expanding.
+     * - Shift click: add range from lastSelIdx anchor without expanding.
+     * Returns true if the caller should proceed with single-select expand; false to skip.
+     */
+    const handleLayerClick = useCallback((
+        item: OrderItem,
+        idx: number,
+        meta: { ctrl: boolean; shift: boolean },
+        onPlainSelect: () => void,
+    ) => {
+        if (meta.ctrl) {
+            setMultiSel((prev) => {
+                const next = new Set(prev);
+                if (next.has(item.id)) next.delete(item.id);
+                else next.add(item.id);
+                return next;
+            });
+            lastSelIdx.current = idx;
+            return;
+        }
+        if (meta.shift && lastSelIdx.current !== null) {
+            const from = Math.min(lastSelIdx.current, idx);
+            const to = Math.max(lastSelIdx.current, idx);
+            setMultiSel(new Set(order.slice(from, to + 1).map((x) => x.id)));
+            return;
+        }
+        // Plain click: clear multi-sel and do normal select
+        setMultiSel(new Set());
+        lastSelIdx.current = idx;
+        onPlainSelect();
+    }, [order]);
+
+    const renderItem = (item: OrderItem, idx: number) => {
+        // In multi-select mode, only show highlight — no expand
+        const isInMultiSel = multiSel.has(item.id);
+        // "expanded" means the detail slot is visible: only when truly single-selected and not in multi-sel mode
+        const isExpanded = selectedId === item.id && multiSel.size === 0;
+        // Visual selection (highlight) = expanded OR multi-selected
+        const isSelected = isExpanded || isInMultiSel;
+
+        /** Build a multi-selection context menu (common actions for all selected items). */
+        const multiCtxItems = (): (CtxMenuItem | CtxMenuSeparator)[] => {
+            const selItems = order.filter((x) => multiSel.has(x.id));
+            const n = selItems.length;
+            const label = `${n} calque${n > 1 ? 's' : ''}`;
+            return [
+                {
+                    icon: <EyeOff size={13} />,
+                    label: `Masquer · ${label}`,
+                    onClick: () => { selItems.forEach(toggleItemVisibility); },
+                },
+                {
+                    icon: <Eye size={13} />,
+                    label: `Afficher · ${label}`,
+                    onClick: () => { selItems.forEach(toggleItemVisibility); },
+                },
+                { separator: true as const },
+                {
+                    icon: <Trash2 size={13} />,
+                    label: `Supprimer · ${label}`,
+                    danger: true,
+                    onClick: () => {
+                        if (window.confirm(`Supprimer ${n} calque${n > 1 ? 's' : ''} ?`)) {
+                            selItems.forEach(deleteItem);
+                            setMultiSel(new Set());
+                            dispatch({ type: 'SET_SELECTED_LAYER', id: null });
+                        }
+                    },
+                },
+            ];
+        };
         const dragProps = {
             draggable: true,
-            onDragStart: () => handleDragStart(idx),
-            onDragOver: (e: React.DragEvent) => handleDragOver(e, idx),
-            onDrop: () => handleDrop(idx),
-            onDragEnd: handleDragEnd,
-            onClick: () => handleSelectRow(item),
+            onDragStart: () => {
+                dragIdx.current = idx;
+                setDraggingIdx(idx);
+                setDropInsert(null);
+            },
+            onDragOver: (e: React.DragEvent) => {
+                e.preventDefault();
+                if (dragIdx.current === null) return;
+                // Insert before or after based on mouse Y relative to row midpoint
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                const insert = e.clientY < rect.top + rect.height / 2 ? idx : idx + 1;
+                setDropInsert(insert);
+            },
+            onDrop: (e?: React.DragEvent) => {
+                e?.preventDefault();
+                handleDrop(dropInsert ?? idx);
+            },
+            onDragEnd: () => {
+                dragIdx.current = null;
+                setDraggingIdx(null);
+                setDropInsert(null);
+            },
         };
 
         if (item.kind === 'itin') {
-            const itin = itineraries.find(x => x.id === item.id);
+            const itin = itineraries.find((x) => x.id === item.id);
             if (!itin) return null;
-            const isActive   = itin.id === activeItinId;
-            const km         = getItinKm(itin);
-            const stages     = isSelected ? state.stages.length : (itin.stages?.length || 0);
-            const isRenaming = renamingId === itin.id;
+            const meters = getItinMeters(itin);
+            const isActive = itin.id === activeItinId;
+            const visible = itin.visible !== false;
+
             return (
-                <div key={item.id} style={wrapStyle} {...dragProps}
-                    onClick={() => handleSelectRow(item)}>
-                    <LayerRow icon={<Route size={13} strokeWidth={2.2} />} label={itin.name}
-                        sublabel={`${km.toFixed(1)} km · ${stages} étape${stages !== 1 ? 's' : ''}`}
-                        color={itin.color} visible={itin.visible !== false}
-                        isEditing={isRenaming} isSelected={isSelected}
-                        isActiveItin={isActive}
+                <div key={item.id} style={{}}>
+                    <LayerRow
+                        rowRef={setRowRef(itin.id)}
+                        icon={<Route size={14} strokeWidth={2.2} />}
+                        label={itin.name}
+                        rightText={formatDistanceFr(meters)}
+                        color={itin.color}
+                        defaultColor={DEFAULT_LAYER_COLORS.itin}
+                        visible={visible}
+                        isSelected={isSelected}
+                        isMultiSelected={isInMultiSel && multiSel.size >= 2}
+                        isEditing={renamingId === itin.id}
+                        isMobile={isMobile}
+                        chevron={
+                            <button
+                                type="button"
+                                aria-label="Activer ce tracé"
+                                title={isActive ? 'Tracé actif' : 'Activer ce tracé'}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id });
+                                    dispatch({ type: 'SET_SELECTED_LAYER', id: itin.id });
+                                }}
+                                style={{
+                                    width: '20px',
+                                    height: '20px',
+                                    padding: 0,
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: isActive ? 'var(--text-primary)' : '#94A3B8',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <ChevronRight size={13} />
+                            </button>
+                        }
+                        onSelect={(meta) => handleLayerClick(item, idx, meta, () => {
+                            const wasSelected = selectedId === item.id && !selectedSublayerId;
+                            handleSelectRow(item);
+                            if (!wasSelected) dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id });
+                        })}
                         onToggleVisible={() => dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: itin.id })}
-                        onContextMenu={e => openItinCtx(e, itin)}
-                        dragHandleProps={{}}
-                        renameSlot={<InlineRename value={itin.name} onConfirm={v => { dispatch({ type: 'UPDATE_ITINERARY', id: itin.id, name: v }); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
+                        onStartRename={() => setRenamingId(itin.id)}
+                        onConfirmRename={(v) => {
+                            dispatch({ type: 'UPDATE_ITINERARY', id: itin.id, name: v });
+                            setRenamingId(null);
+                        }}
+                        onCancelRename={() => setRenamingId(null)}
+                        onColorPick={(c) => dispatch({ type: 'UPDATE_ITINERARY', id: itin.id, color: c })}
+                        onDelete={() => {
+                            if (window.confirm(`Supprimer « ${itin.name} » ?`)) {
+                                dispatch({ type: 'REMOVE_ITINERARY', id: itin.id });
+                            }
+                        }}
+                        onContextMenu={(x, y) =>
+                            setCtxMenu({
+                                x,
+                                y,
+                                items: isInMultiSel && multiSel.size >= 2 ? multiCtxItems() : [
+                                    { icon: <Edit3 size={13} />, label: 'Renommer', onClick: () => setRenamingId(itin.id) },
+                                    {
+                                        icon: visible ? <EyeOff size={13} /> : <Eye size={13} />,
+                                        label: visible ? 'Masquer' : 'Afficher',
+                                        onClick: () => dispatch({ type: 'TOGGLE_ITINERARY_VISIBILITY', id: itin.id }),
+                                    },
+                                    { separator: true },
+                                    {
+                                        icon: <Trash2 size={13} />,
+                                        label: 'Supprimer',
+                                        danger: true,
+                                        onClick: () => {
+                                            if (window.confirm(`Supprimer « ${itin.name} » ?`)) {
+                                                dispatch({ type: 'REMOVE_ITINERARY', id: itin.id });
+                                            }
+                                        },
+                                    },
+                                ],
+                            })
+                        }
+                        detailSlot={
+                            isExpanded && itineraries.length > 1 ? (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '54px' }}>
+                                    <span style={{ fontSize: '11.5px', color: '#94A3B8' }}>
+                                        {isActive ? 'Tracé actif dans Étapes' : 'Tracé secondaire'}
+                                    </span>
+                                    {!isActive && (
+                                        <button
+                                            type="button"
+                                            onClick={() => dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id })}
+                                            style={{
+                                                padding: '3px 8px',
+                                                borderRadius: '6px',
+                                                border: '1px solid var(--border-subtle)',
+                                                background: 'rgba(255,255,255,0.06)',
+                                                color: 'var(--text-primary)',
+                                                fontSize: '11px',
+                                                fontWeight: 500,
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            Définir comme actif
+                                        </button>
+                                    )}
+                                </div>
+                            ) : undefined
+                        }
+                        dragProps={dragProps}
                     />
                 </div>
             );
         }
 
         if (item.kind === 'point') {
-            const pt = points.find(x => x.id === item.id);
+            const pt = points.find((x) => x.id === item.id);
             if (!pt) return null;
-            const isRenaming = renamingId === pt.id;
+            const parsed = pt.address ? formatStageAddress(pt.address) : null;
+            const coordsText = `${pt.coords[0].toFixed(4)}, ${pt.coords[1].toFixed(4)}`;
+            const isCopied = copiedId === pt.id;
+
             return (
-                <div key={item.id} style={wrapStyle} {...dragProps}>
-                    <LayerRow icon={<MapPin size={13} strokeWidth={2.2} />} label={pt.title}
-                        sublabel={`${pt.coords[0].toFixed(4)}, ${pt.coords[1].toFixed(4)}`}
-                        color={pt.color} visible={pt.visible}
-                        isEditing={isRenaming} isSelected={isSelected}
+                <div key={item.id} style={{}}>
+                    <LayerRow
+                        rowRef={setRowRef(pt.id)}
+                        icon={<MapPin size={14} strokeWidth={2.2} />}
+                        label={pt.title}
+                        rightText={!isExpanded ? parsed?.primary || undefined : undefined}
+                        defaultSubline={parsed?.secondary || parsed?.primary || coordsText}
+                        hoverSubline={
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopyPointCoords(pt);
+                                }}
+                                title="Copier les coordonnées"
+                                aria-label="Copier les coordonnées"
+                                className="tabular-nums"
+                                style={{
+                                    padding: 0,
+                                    background: 'transparent',
+                                    border: 'none',
+                                    fontSize: '11.5px',
+                                    color: isCopied ? '#CBD5E1' : '#94A3B8',
+                                    fontFamily: 'var(--font-mono)',
+                                    lineHeight: 1.25,
+                                    whiteSpace: 'nowrap',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <span>{coordsText}</span>
+                                {isCopied ? <Check size={11} aria-hidden="true" /> : <Copy size={11} aria-hidden="true" />}
+                            </button>
+                        }
+                        color={pt.color}
+                        defaultColor={DEFAULT_LAYER_COLORS.point}
+                        visible={pt.visible}
+                        isSelected={isSelected}
+                        isMultiSelected={isInMultiSel && multiSel.size >= 2}
+                        isEditing={renamingId === pt.id}
+                        isMobile={isMobile}
+                        onSelect={(meta) => handleLayerClick(item, idx, meta, () => {
+                            handleSelectRow(item);
+                            mapRef.current?.flyTo(pt.coords, Math.max(mapRef.current.getZoom(), 15), { duration: 0.6 });
+                        })}
                         onToggleVisible={() => dispatch({ type: 'TOGGLE_POINT_VISIBILITY', id: pt.id })}
-                        onContextMenu={e => openPointCtx(e, pt)}
-                        dragHandleProps={{}}
-                        renameSlot={<InlineRename value={pt.title} onConfirm={v => { dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: pt.id, patch: { title: v } }); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
+                        onStartRename={() => setRenamingId(pt.id)}
+                        onConfirmRename={(v) => {
+                            dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: pt.id, patch: { title: v } });
+                            setRenamingId(null);
+                        }}
+                        onCancelRename={() => setRenamingId(null)}
+                        onColorPick={(c) => dispatch({ type: 'UPDATE_POINT_ANNOTATION', id: pt.id, patch: { color: c } })}
+                        onDelete={() => dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: pt.id })}
+                        onContextMenu={(x, y) =>
+                            setCtxMenu({
+                                x,
+                                y,
+                                items: isInMultiSel && multiSel.size >= 2 ? multiCtxItems() : [
+                                    { icon: <Edit3 size={13} />, label: 'Renommer', onClick: () => setRenamingId(pt.id) },
+                                    {
+                                        icon: <MapPin size={13} />,
+                                        label: 'Copier les coordonnées',
+                                        onClick: () => handleCopyPointCoords(pt),
+                                    },
+                                    { separator: true },
+                                    {
+                                        icon: <Trash2 size={13} />,
+                                        label: 'Supprimer',
+                                        danger: true,
+                                        onClick: () => dispatch({ type: 'REMOVE_POINT_ANNOTATION', id: pt.id }),
+                                    },
+                                ],
+                            })
+                        }
+                        dragProps={dragProps}
                     />
                 </div>
             );
         }
 
         if (item.kind === 'area') {
-            const area = areas.find(x => x.id === item.id);
+            const area = areas.find((x) => x.id === item.id);
             if (!area) return null;
             const isComplete = area.coords.length >= 3;
-            const surface    = area.formatted_area || (isComplete ? formatArea(calculatePolygonArea(area.coords)) : '—');
-            const isRenaming = renamingId === area.id;
+            const surface = area.formatted_area || (isComplete ? formatArea(calculatePolygonArea(area.coords)) : `${area.coords.length} pts`);
+
             return (
-                <div key={item.id} style={wrapStyle} {...dragProps}>
-                    <LayerRow icon={<PolygonIcon size={13} />} label={area.title}
-                        sublabel={isComplete ? surface : `${area.coords.length} sommet${area.coords.length > 1 ? 's' : ''} (en cours)`}
-                        color={area.color} visible={area.visible}
-                        isEditing={isRenaming} isSelected={isSelected}
+                <div key={item.id} style={{}}>
+                    <LayerRow
+                        rowRef={setRowRef(area.id)}
+                        icon={<Pentagon size={14} strokeWidth={2.2} />}
+                        label={area.title}
+                        rightText={surface}
+                        color={area.color}
+                        defaultColor={DEFAULT_LAYER_COLORS.area}
+                        visible={area.visible}
+                        isSelected={isSelected}
+                        isMultiSelected={isInMultiSel && multiSel.size >= 2}
+                        isEditing={renamingId === area.id}
+                        isMobile={isMobile}
+                        onSelect={(meta) => handleLayerClick(item, idx, meta, () => {
+                            handleSelectRow(item);
+                            if (isComplete) mapRef.current?.fitBounds(area.coords, { padding: [40, 40], maxZoom: 16 });
+                        })}
                         onToggleVisible={() => dispatch({ type: 'TOGGLE_AREA_VISIBILITY', id: area.id })}
-                        onContextMenu={e => openAreaCtx(e, area)}
-                        dragHandleProps={{}}
-                        renameSlot={<InlineRename value={area.title} onConfirm={v => { dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { title: v } }); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
+                        onStartRename={() => setRenamingId(area.id)}
+                        onConfirmRename={(v) => {
+                            dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { title: v } });
+                            setRenamingId(null);
+                        }}
+                        onCancelRename={() => setRenamingId(null)}
+                        onColorPick={(c) => dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { color: c } })}
+                        onDelete={() => dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: area.id })}
+                        onContextMenu={(x, y) =>
+                            setCtxMenu({
+                                x,
+                                y,
+                                items: isInMultiSel && multiSel.size >= 2 ? multiCtxItems() : [
+                                    { icon: <Edit3 size={13} />, label: 'Renommer', onClick: () => setRenamingId(area.id) },
+                                    {
+                                        icon: area.visible ? <EyeOff size={13} /> : <Eye size={13} />,
+                                        label: area.visible ? 'Masquer' : 'Afficher',
+                                        onClick: () => dispatch({ type: 'TOGGLE_AREA_VISIBILITY', id: area.id }),
+                                    },
+                                    { separator: true },
+                                    {
+                                        icon: <Trash2 size={13} />,
+                                        label: 'Supprimer',
+                                        danger: true,
+                                        onClick: () => dispatch({ type: 'REMOVE_AREA_ANNOTATION', id: area.id }),
+                                    },
+                                ],
+                            })
+                        }
+                        detailSlot={
+                            isExpanded ? <ChipSelector
+                                label="Remplissage"
+                                value={
+                                    area.fillOpacity <= 0.25 ? 0.2 : area.fillOpacity >= 0.5 ? 0.6 : 0.35
+                                }
+                                options={[
+                                    { value: 0.2, label: '20 %' },
+                                    { value: 0.35, label: '35 %' },
+                                    { value: 0.6, label: '60 %' },
+                                ]}
+                                onChange={(val) =>
+                                    dispatch({ type: 'UPDATE_AREA_ANNOTATION', id: area.id, patch: { fillOpacity: val } })
+                                }
+                            /> : undefined
+                        }
+                        dragProps={dragProps}
                     />
                 </div>
             );
         }
 
         if (item.kind === 'draw') {
-            const draw = draws.find(x => x.id === item.id);
+            const draw = draws.find((x) => x.id === item.id);
             if (!draw) return null;
-            const isRenaming = renamingId === draw.id;
             const strokes = (draw.strokes || []) as unknown as DrawStroke[];
-            const isExpanded = expandedDrawIds.has(draw.id);
-
-            const toggleExpand = (e: React.MouseEvent) => {
-                e.stopPropagation();
-                setExpandedDrawIds(prev => {
-                    const next = new Set(prev);
-                    if (next.has(draw.id)) next.delete(draw.id);
-                    else next.add(draw.id);
-                    return next;
-                });
-            };
+            const hasMultiple = strokes.length > 1;
+            const isDrawExpanded = hasMultiple && expandedDrawIds.has(draw.id);
+            const isLayerOnlySelected = isExpanded && !selectedSublayerId;
 
             return (
-                <div key={item.id} style={wrapStyle} {...dragProps}>
-                    <LayerRow icon={<Paintbrush size={13} strokeWidth={2.2} />} label={draw.title}
-                        sublabel={`${strokes.length} trait${strokes.length !== 1 ? 's' : ''}`}
-                        color={draw.color} visible={draw.visible}
-                        isEditing={isRenaming} isSelected={isSelected && !selectedSublayerId}
-                        expandToggle={strokes.length > 0 ? (
-                            <button
-                                type="button"
-                                onClick={toggleExpand}
-                                style={{ background: 'transparent', border: 'none', padding: '0 2px', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}
-                            >
-                                {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                            </button>
-                        ) : undefined}
+                <div key={item.id} style={{}}>
+                    <LayerRow
+                        rowRef={setRowRef(draw.id)}
+                        icon={<Pencil size={14} strokeWidth={2.2} />}
+                        label={draw.title}
+                        rightText={`${strokes.length} trait${strokes.length !== 1 ? 's' : ''}`}
+                        color={draw.color}
+                        defaultColor={DEFAULT_LAYER_COLORS.draw}
+                        visible={draw.visible}
+                        isSelected={isLayerOnlySelected || (isInMultiSel && multiSel.size < 2)}
+                        isMultiSelected={isInMultiSel && multiSel.size >= 2}
+                        isEditing={renamingId === draw.id}
+                        isMobile={isMobile}
+                        chevron={
+                            hasMultiple ? (
+                                <button
+                                    type="button"
+                                    aria-label={isDrawExpanded ? 'Replier les traits' : 'Déplier les traits'}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setExpandedDrawIds((prev) => {
+                                            const next = new Set(prev);
+                                            if (next.has(draw.id)) next.delete(draw.id);
+                                            else next.add(draw.id);
+                                            return next;
+                                        });
+                                    }}
+                                    style={{
+                                        width: '20px',
+                                        height: '20px',
+                                        padding: 0,
+                                        border: 'none',
+                                        background: 'transparent',
+                                        color: '#94A3B8',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    {isDrawExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                                </button>
+                            ) : undefined
+                        }
+                        onSelect={(meta) => handleLayerClick(item, idx, meta, () => handleSelectRow(item))}
                         onToggleVisible={() => dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: draw.id } as any)}
-                        onContextMenu={e => openDrawCtx(e, draw)}
-                        dragHandleProps={{}}
-                        renameSlot={<InlineRename value={draw.title} onConfirm={v => { dispatch({ type: 'UPDATE_DRAW_ANNOTATION', id: draw.id, patch: { title: v } } as any); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
+                        onStartRename={() => setRenamingId(draw.id)}
+                        onConfirmRename={(v) => {
+                            dispatch({ type: 'UPDATE_DRAW_ANNOTATION', id: draw.id, patch: { title: v } } as any);
+                            setRenamingId(null);
+                        }}
+                        onCancelRename={() => setRenamingId(null)}
+                        onColorPick={(c) => dispatch({ type: 'UPDATE_DRAW_ANNOTATION', id: draw.id, patch: { color: c } } as any)}
+                        onDelete={() => dispatch({ type: 'REMOVE_DRAW_ANNOTATION', id: draw.id } as any)}
+                        onContextMenu={(x, y) =>
+                            setCtxMenu({
+                                x,
+                                y,
+                                items: isInMultiSel && multiSel.size >= 2 ? multiCtxItems() : [
+                                    { icon: <Edit3 size={13} />, label: 'Renommer', onClick: () => setRenamingId(draw.id) },
+                                    {
+                                        icon: draw.visible ? <EyeOff size={13} /> : <Eye size={13} />,
+                                        label: draw.visible ? 'Masquer' : 'Afficher',
+                                        onClick: () => dispatch({ type: 'TOGGLE_DRAW_VISIBILITY', id: draw.id } as any),
+                                    },
+                                    { separator: true },
+                                    {
+                                        icon: <Trash2 size={13} />,
+                                        label: 'Supprimer',
+                                        danger: true,
+                                        onClick: () => dispatch({ type: 'REMOVE_DRAW_ANNOTATION', id: draw.id } as any),
+                                    },
+                                ],
+                            })
+                        }
+                        detailSlot={
+                            isExpanded && strokes.length === 1 ? (
+                                <ChipSelector
+                                    label="Épaisseur"
+                                    value={strokes[0].strokeWidth <= 2 ? 2 : strokes[0].strokeWidth >= 6 ? 6 : 4}
+                                    options={[
+                                        { value: 2, label: '2 px' },
+                                        { value: 4, label: '4 px' },
+                                        { value: 6, label: '6 px' },
+                                    ]}
+                                    onChange={(val) =>
+                                        dispatch({
+                                            type: 'UPDATE_DRAW_STROKE',
+                                            drawId: draw.id,
+                                            strokeId: strokes[0].id,
+                                            patch: { strokeWidth: val },
+                                        } as any)
+                                    }
+                                />
+                            ) : undefined
+                        }
+                        dragProps={dragProps}
                     />
-                    {/* ── Sub-stroke list (Group Hierarchy like Figma/tldraw) ── */}
-                    {isExpanded && strokes.length > 0 && (
-                        <div style={{
-                            marginLeft: '28px',
-                            marginRight: '8px',
-                            marginBottom: '4px',
-                            paddingLeft: '10px',
-                            borderLeft: '1px solid var(--border-subtle)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '2px'
-                        }}>
-                            {strokes.map((stroke, sIdx) => {
-                                const isSubSelected = isSelected && selectedSublayerId === stroke.id;
-                                return (
-                                    <div
-                                        key={stroke.id}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            dispatch({ type: 'SET_SELECTED_SUBLAYER', layerId: draw.id, sublayerId: stroke.id });
-                                        }}
+
+                    {/* Child strokes indented 24px + vertical guide line (only when >1 element) */}
+                    {isDrawExpanded && (
+                        <div style={{ marginLeft: '24px', borderLeft: '1px solid var(--border-subtle)', paddingLeft: '12px' }}>
+                        {strokes.map((stroke, sIdx) => {
+                            const isSubSelected = isLayerOnlySelected && selectedSublayerId === stroke.id;
+                            return (
+                                <div
+                                    key={stroke.id}
+                                    role="option"
+                                    aria-selected={isSubSelected}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        dispatch({
+                                            type: 'SET_SELECTED_SUBLAYER',
+                                            layerId: draw.id,
+                                            sublayerId: isSubSelected ? null : stroke.id,
+                                        } as any);
+                                    }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        minHeight: isMobile ? '40px' : '34px',
+                                        padding: '4px 12px 4px 8px',
+                                        borderBottom: '1px solid var(--border-subtle)',
+                                        background: isSubSelected ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    <span
+                                        aria-hidden="true"
                                         style={{
-                                            display: 'flex',
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '999px',
+                                            border: isSubSelected ? '1px solid rgba(255,255,255,0.3)' : '1px solid transparent',
+                                            background: isSubSelected ? 'rgba(255,255,255,0.08)' : 'transparent',
+                                            color: stroke.color,
+                                            display: 'inline-flex',
                                             alignItems: 'center',
-                                            gap: '8px',
-                                            padding: '5px 8px',
-                                            borderRadius: '8px',
-                                            background: isSubSelected ? 'var(--accent-transparent)' : 'transparent',
-                                            border: isSubSelected ? '1px solid var(--accent-default)' : '1px solid transparent',
-                                            cursor: 'pointer',
-                                            transition: 'all 100ms ease',
+                                            justifyContent: 'center',
+                                            flexShrink: 0,
                                         }}
-                                        onMouseEnter={e => { if (!isSubSelected) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                                        onMouseLeave={e => { if (!isSubSelected) e.currentTarget.style.background = 'transparent'; }}
                                     >
-                                        {/* Color dot (click triggers color picker) */}
-                                        <div
-                                            title="Changer la couleur"
-                                            onClick={e => {
-                                                e.stopPropagation();
-                                                setColorPicker({
-                                                    x: e.clientX, y: e.clientY,
-                                                    currentColor: stroke.color,
-                                                    onPick: (c) => dispatch({ type: 'UPDATE_DRAW_STROKE', drawId: draw.id, strokeId: stroke.id, patch: { color: c } } as any)
-                                                });
-                                            }}
-                                            style={{
-                                                width: '8px',
-                                                height: '8px',
-                                                borderRadius: '50%',
-                                                background: stroke.color,
-                                                flexShrink: 0,
-                                                cursor: 'pointer',
-                                                boxShadow: `0 0 4px ${stroke.color}80`
-                                            }}
-                                        />
-                                        <span style={{ fontSize: '11px', color: isSubSelected ? '#fff' : 'var(--text-primary)', flex: 1, fontWeight: isSubSelected ? 600 : 400 }}>
-                                            Trait {sIdx + 1}
-                                        </span>
-                                        {/* Stroke width badge */}
-                                        <span style={{ fontSize: '9.5px', color: 'var(--text-dim)', padding: '2px 5px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', fontWeight: 600 }}>
-                                            {stroke.strokeWidth}px
-                                        </span>
-                                        {/* Delete button */}
-                                        <button
-                                            type="button"
-                                            onClick={e => { e.stopPropagation(); dispatch({ type: 'REMOVE_DRAW_STROKE', drawId: draw.id, strokeId: stroke.id } as any); }}
-                                            title="Supprimer ce trait"
-                                            style={{ background: 'transparent', border: 'none', padding: '2px', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', borderRadius: '4px' }}
-                                            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-dim)'}
-                                        >
-                                            <Trash2 size={11} />
-                                        </button>
-                                    </div>
-                                );
-                            })}
+                                        <Pencil size={12} />
+                                    </span>
+                                    <span
+                                        style={{
+                                            flex: 1,
+                                            minWidth: 0,
+                                            fontSize: '12px',
+                                            fontWeight: isSubSelected ? 600 : 400,
+                                            color: 'var(--text-primary)',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                        }}
+                                    >
+                                        Trait {sIdx + 1}
+                                    </span>
+                                    {isSubSelected && (
+                                        <>
+                                            <span className="tabular-nums" style={{ fontSize: '11.5px', color: '#94A3B8' }}>
+                                                {stroke.strokeWidth}px
+                                            </span>
+                                            <button
+                                                type="button"
+                                                aria-label="Supprimer ce trait"
+                                                title="Supprimer ce trait"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    dispatch({ type: 'REMOVE_DRAW_STROKE', drawId: draw.id, strokeId: stroke.id } as any);
+                                                }}
+                                                style={{
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    background: 'rgba(239, 68, 68, 0.12)',
+                                                    color: 'var(--semantic-red)',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                <Trash2 size={11} />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
                         </div>
                     )}
                 </div>
@@ -860,115 +1778,206 @@ export default function LayerManagerPanel() {
         }
 
         if (item.kind === 'text') {
-            const text = texts.find(t => t.id === item.id);
+            const text = texts.find((t) => t.id === item.id);
             if (!text) return null;
-            const isRenaming = renamingId === text.id;
-            const isExpanded = expandedTextIds.has(text.id);
             const textItems = text.texts || [];
-            const toggleExpand = (e: React.MouseEvent) => {
-                e.stopPropagation();
-                setExpandedTextIds(prev => {
-                    const next = new Set(prev);
-                    if (next.has(text.id)) next.delete(text.id);
-                    else next.add(text.id);
-                    return next;
-                });
-            };
+            const hasMultiple = textItems.length > 1;
+            const isTextExpanded = hasMultiple && expandedTextIds.has(text.id);
+            const isLayerOnlySelected = isExpanded && !selectedSublayerId;
 
             return (
-                <div key={item.id} style={wrapStyle} {...dragProps}>
-                    <LayerRow icon={<Type size={13} strokeWidth={2.2} />} label={text.title}
-                        sublabel={`${textItems.length} texte${textItems.length !== 1 ? 's' : ''}`}
-                        color={text.color} visible={text.visible}
-                        isEditing={isRenaming} isSelected={isSelected && !selectedSublayerId}
-                        expandToggle={textItems.length > 0 ? (
-                            <button
-                                type="button"
-                                onClick={toggleExpand}
-                                style={{ background: 'transparent', border: 'none', padding: '0 2px', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}
-                            >
-                                {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                            </button>
-                        ) : undefined}
+                <div key={item.id} style={{}}>
+                    <LayerRow
+                        rowRef={setRowRef(text.id)}
+                        icon={<Type size={14} strokeWidth={2.2} />}
+                        label={text.title}
+                        rightText={`${textItems.length} texte${textItems.length !== 1 ? 's' : ''}`}
+                        color={text.color}
+                        defaultColor={DEFAULT_LAYER_COLORS.text}
+                        visible={text.visible}
+                        isSelected={isLayerOnlySelected || (isInMultiSel && multiSel.size < 2)}
+                        isMultiSelected={isInMultiSel && multiSel.size >= 2}
+                        isEditing={renamingId === text.id}
+                        isMobile={isMobile}
+                        chevron={
+                            hasMultiple ? (
+                                <button
+                                    type="button"
+                                    aria-label={isTextExpanded ? 'Replier les textes' : 'Déplier les textes'}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setExpandedTextIds((prev) => {
+                                            const next = new Set(prev);
+                                            if (next.has(text.id)) next.delete(text.id);
+                                            else next.add(text.id);
+                                            return next;
+                                        });
+                                    }}
+                                    style={{
+                                        width: '20px',
+                                        height: '20px',
+                                        padding: 0,
+                                        border: 'none',
+                                        background: 'transparent',
+                                        color: '#94A3B8',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    {isTextExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                                </button>
+                            ) : undefined
+                        }
+                        onSelect={(meta) => handleLayerClick(item, idx, meta, () => handleSelectRow(item))}
                         onToggleVisible={() => dispatch({ type: 'TOGGLE_TEXT_VISIBILITY', id: text.id } as any)}
-                        onContextMenu={e => openTextCtx(e, text)}
-                        dragHandleProps={{}}
-                        renameSlot={<InlineRename value={text.title} onConfirm={v => { dispatch({ type: 'UPDATE_TEXT_ANNOTATION', id: text.id, patch: { title: v } } as any); setRenamingId(null); }} onCancel={() => setRenamingId(null)} />}
+                        onStartRename={() => setRenamingId(text.id)}
+                        onConfirmRename={(v) => {
+                            dispatch({ type: 'UPDATE_TEXT_ANNOTATION', id: text.id, patch: { title: v } } as any);
+                            setRenamingId(null);
+                        }}
+                        onCancelRename={() => setRenamingId(null)}
+                        onColorPick={(c) => dispatch({ type: 'UPDATE_TEXT_ANNOTATION', id: text.id, patch: { color: c } } as any)}
+                        onDelete={() => dispatch({ type: 'REMOVE_TEXT_ANNOTATION', id: text.id } as any)}
+                        onContextMenu={(x, y) =>
+                            setCtxMenu({
+                                x,
+                                y,
+                                items: isInMultiSel && multiSel.size >= 2 ? multiCtxItems() : [
+                                    { icon: <Edit3 size={13} />, label: 'Renommer', onClick: () => setRenamingId(text.id) },
+                                    {
+                                        icon: text.visible ? <EyeOff size={13} /> : <Eye size={13} />,
+                                        label: text.visible ? 'Masquer' : 'Afficher',
+                                        onClick: () => dispatch({ type: 'TOGGLE_TEXT_VISIBILITY', id: text.id } as any),
+                                    },
+                                    { separator: true },
+                                    {
+                                        icon: <Trash2 size={13} />,
+                                        label: 'Supprimer',
+                                        danger: true,
+                                        onClick: () => dispatch({ type: 'REMOVE_TEXT_ANNOTATION', id: text.id } as any),
+                                    },
+                                ],
+                            })
+                        }
+                        detailSlot={
+                            isExpanded && textItems.length === 1 ? (
+                                <ChipSelector
+                                    label="Taille"
+                                    value={textItems[0].fontSize <= 13 ? 12 : textItems[0].fontSize >= 20 ? 22 : 16}
+                                    options={[
+                                        { value: 12, label: '12 px' },
+                                        { value: 16, label: '16 px' },
+                                        { value: 22, label: '22 px' },
+                                    ]}
+                                    onChange={(val) =>
+                                        dispatch({
+                                            type: 'UPDATE_TEXT_ITEM',
+                                            textId: text.id,
+                                            itemId: textItems[0].id,
+                                            patch: { fontSize: val },
+                                        } as any)
+                                    }
+                                />
+                            ) : undefined
+                        }
+                        dragProps={dragProps}
                     />
-                    {/* ── Sub-text item list ── */}
-                    {isExpanded && textItems.length > 0 && (
-                        <div style={{
-                            marginLeft: '28px',
-                            marginRight: '8px',
-                            marginBottom: '4px',
-                            paddingLeft: '10px',
-                            borderLeft: '1px solid var(--border-subtle)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '2px'
-                        }}>
-                            {textItems.map((tItem, tIdx) => {
-                                const isSubSelected = isSelected && selectedSublayerId === tItem.id;
-                                return (
-                                    <div
-                                        key={tItem.id}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            dispatch({ type: 'SET_SELECTED_SUBLAYER', layerId: text.id, sublayerId: tItem.id });
-                                        }}
+
+                    {/* Child text items indented 24px + vertical guide line (only when >1 element) */}
+                    {isTextExpanded && (
+                        <div style={{ marginLeft: '24px', borderLeft: '1px solid var(--border-subtle)', paddingLeft: '12px' }}>
+                        {textItems.map((tItem, tIdx) => {
+                            const isSubSelected = isLayerOnlySelected && selectedSublayerId === tItem.id;
+                            return (
+                                <div
+                                    key={tItem.id}
+                                    role="option"
+                                    aria-selected={isSubSelected}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        dispatch({
+                                            type: 'SET_SELECTED_SUBLAYER',
+                                            layerId: text.id,
+                                            sublayerId: isSubSelected ? null : tItem.id,
+                                        } as any);
+                                    }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        minHeight: isMobile ? '40px' : '34px',
+                                        padding: '4px 12px 4px 8px',
+                                        borderBottom: '1px solid var(--border-subtle)',
+                                        background: isSubSelected ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    <span
+                                        aria-hidden="true"
                                         style={{
-                                            display: 'flex',
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '999px',
+                                            border: isSubSelected ? '1px solid rgba(255,255,255,0.3)' : '1px solid transparent',
+                                            background: isSubSelected ? 'rgba(255,255,255,0.08)' : 'transparent',
+                                            color: tItem.color,
+                                            display: 'inline-flex',
                                             alignItems: 'center',
-                                            gap: '8px',
-                                            padding: '5px 8px',
-                                            borderRadius: '8px',
-                                            background: isSubSelected ? 'var(--accent-transparent)' : 'transparent',
-                                            border: isSubSelected ? '1px solid var(--accent-default)' : '1px solid transparent',
-                                            cursor: 'pointer',
-                                            transition: 'all 100ms ease',
+                                            justifyContent: 'center',
+                                            flexShrink: 0,
                                         }}
-                                        onMouseEnter={e => { if (!isSubSelected) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                                        onMouseLeave={e => { if (!isSubSelected) e.currentTarget.style.background = 'transparent'; }}
                                     >
-                                        <div
-                                            title="Changer la couleur"
-                                            onClick={e => {
-                                                e.stopPropagation();
-                                                setColorPicker({
-                                                    x: e.clientX, y: e.clientY,
-                                                    currentColor: tItem.color,
-                                                    onPick: (c) => dispatch({ type: 'UPDATE_TEXT_ITEM', textId: text.id, itemId: tItem.id, patch: { color: c } } as any)
-                                                });
-                                            }}
-                                            style={{
-                                                width: '8px',
-                                                height: '8px',
-                                                borderRadius: '50%',
-                                                background: tItem.color,
-                                                flexShrink: 0,
-                                                cursor: 'pointer',
-                                                boxShadow: `0 0 4px ${tItem.color}80`
-                                            }}
-                                        />
-                                        <span style={{ fontSize: '11px', color: isSubSelected ? '#fff' : 'var(--text-primary)', flex: 1, fontWeight: isSubSelected ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {tItem.text || `Texte ${tIdx + 1}`}
-                                        </span>
-                                        <span style={{ fontSize: '9.5px', color: 'var(--text-dim)', padding: '2px 5px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', fontWeight: 600 }}>
-                                            {tItem.fontSize}px
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={e => { e.stopPropagation(); dispatch({ type: 'REMOVE_TEXT_ITEM', textId: text.id, itemId: tItem.id } as any); }}
-                                            title="Supprimer ce texte"
-                                            style={{ background: 'transparent', border: 'none', padding: '2px', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', borderRadius: '4px' }}
-                                            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-dim)'}
-                                        >
-                                            <Trash2 size={11} />
-                                        </button>
-                                    </div>
-                                );
-                            })}
+                                        <Type size={12} />
+                                    </span>
+                                    <span
+                                        style={{
+                                            flex: 1,
+                                            minWidth: 0,
+                                            fontSize: '12px',
+                                            fontWeight: isSubSelected ? 600 : 400,
+                                            color: 'var(--text-primary)',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                        }}
+                                    >
+                                        {tItem.text || `Texte ${tIdx + 1}`}
+                                    </span>
+                                    {isSubSelected && (
+                                        <>
+                                            <span className="tabular-nums" style={{ fontSize: '11.5px', color: '#94A3B8' }}>
+                                                {tItem.fontSize}px
+                                            </span>
+                                            <button
+                                                type="button"
+                                                aria-label="Supprimer ce texte"
+                                                title="Supprimer ce texte"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    dispatch({ type: 'REMOVE_TEXT_ITEM', textId: text.id, itemId: tItem.id } as any);
+                                                }}
+                                                style={{
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    background: 'rgba(239, 68, 68, 0.12)',
+                                                    color: 'var(--semantic-red)',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                <Trash2 size={11} />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
                         </div>
                     )}
                 </div>
@@ -978,276 +1987,205 @@ export default function LayerManagerPanel() {
         return null;
     };
 
-    const isEmpty = itineraries.length === 0 && points.length === 0 && areas.length === 0 && draws.length === 0 && texts.length === 0;
+    const isEmpty = order.length === 0;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', userSelect: 'none', fontSize: '12px', color: 'var(--text-primary)' }}>
-
-            {/* ── Flat layer list ── */}
-            <div ref={listRef} tabIndex={0}
-                title="Le premier calque de la liste est affiché au premier plan sur la carte."
-                style={{ flex: 1, overflowY: 'auto', outline: 'none', padding: '4px 0' }}
-                onKeyDown={handleKeyDown}>
+        <div
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                flex: 1,
+                minHeight: 0,
+                background: 'transparent',
+                userSelect: 'none',
+                fontSize: '12px',
+                color: 'var(--text-primary)',
+            }}
+        >
+            {/* Scrollable layer list */}
+            <div
+                role="listbox"
+                aria-label="Liste des calques"
+                style={{
+                    flex: 1,
+                    minHeight: 0,
+                    overflowY: 'auto',
+                    overscrollBehavior: 'contain',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}
+            >
                 {isEmpty ? (
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '36px 20px',
-                        textAlign: 'center',
-                        height: '100%'
-                    }}>
-                        <div style={{
-                            width: '44px',
-                            height: '44px',
-                            borderRadius: '14px',
-                            background: 'var(--bg-elevated)',
-                            border: '1px solid var(--border-subtle)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginBottom: '12px',
-                            color: 'var(--text-dim)'
-                        }}>
-                            <Route size={20} strokeWidth={1.8} />
-                        </div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                            Aucun calque sur la carte
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', lineHeight: 1.4, maxWidth: '220px' }}>
-                            Tracez un itinéraire ou ajoutez un repère avec la barre ci-dessous.
-                        </div>
+                    <div
+                        style={{
+                            padding: '28px 16px',
+                            textAlign: 'center',
+                            color: '#94A3B8',
+                            fontSize: '12px',
+                            lineHeight: 1.5,
+                        }}
+                    >
+                        Aucun calque sur la carte. Utilisez la barre d&apos;outils en bas pour créer un tracé, repère ou dessin.
                     </div>
                 ) : (
-                    order.map((item, idx) => renderItem(item, idx))
+                    <>
+                        {order.map((item, idx) => {
+                            const showPreviewBefore =
+                                draggingIdx !== null &&
+                                dropInsert === idx &&
+                                draggingIdx > idx;
+                            const showPreviewAfter =
+                                draggingIdx !== null &&
+                                dropInsert === idx + 1 &&
+                                draggingIdx !== idx &&
+                                draggingIdx !== idx + 1;
+                            const draggedItem = draggingIdx !== null ? order[draggingIdx] : null;
+                            const getLabel = (it: OrderItem) => {
+                                if (it.kind === 'itin') return itineraries.find((x) => x.id === it.id)?.name ?? 'Tracé';
+                                if (it.kind === 'point') return points.find((x) => x.id === it.id)?.title ?? 'Repère';
+                                if (it.kind === 'area') return areas.find((x) => x.id === it.id)?.title ?? 'Zone';
+                                if (it.kind === 'draw') return draws.find((x) => x.id === it.id)?.title ?? 'Dessin';
+                                if (it.kind === 'text') return texts.find((x) => x.id === it.id)?.title ?? 'Texte';
+                                return '';
+                            };
+                            return (
+                                <React.Fragment key={item.id}>
+                                    {showPreviewBefore && draggedItem && (
+                                        <LayerPreviewRow
+                                            item={draggedItem}
+                                            label={getLabel(draggedItem)}
+                                            onDrop={() => handleDrop(idx)}
+                                        />
+                                    )}
+                                    {renderItem(item, idx)}
+                                    {showPreviewAfter && draggedItem && (
+                                        <LayerPreviewRow
+                                            item={draggedItem}
+                                            label={getLabel(draggedItem)}
+                                            onDrop={() => handleDrop(idx + 1)}
+                                        />
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
+                        {/* Bottom sentinel: allows dropping after the last item */}
+                        {draggingIdx !== null && (() => {
+                            return (
+                                <>
+                                    <div
+                                        aria-hidden="true"
+                                        style={{ flex: 1, minHeight: '40px' }}
+                                        onDragOver={(e) => {
+                                            e.preventDefault();
+                                            setDropInsert(order.length);
+                                        }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            handleDrop(order.length);
+                                        }}
+                                    />
+                                </>
+                            );
+                        })()}
+                    </>
                 )}
             </div>
 
-            {/* ── Bottom toolbar (Island style matching FloatingToolbar) ── */}
-            <div style={{
-                padding: '8px 10px',
-                borderTop: '1px solid var(--border-subtle)',
-                background: 'var(--bg-dark)',
-                flexShrink: 0
-            }}>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '12px',
-                    padding: '3px',
-                }}>
+            {/* Multi-selection summary bar */}
+            {multiSel.size >= 2 && (
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '7px 12px',
+                        borderTop: '1px solid var(--border-subtle)',
+                        background: 'rgba(255,255,255,0.04)',
+                        flexShrink: 0,
+                    }}
+                >
+                    <span style={{ flex: 1, fontSize: '12px', color: '#94A3B8', fontWeight: 500 }}>
+                        {multiSel.size} calques sélectionnés
+                    </span>
                     <button
                         type="button"
-                        onClick={() => {
-                            dispatch({ type: 'ADD_ITINERARY' });
-                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
-                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouvel itinéraire créé.', notifType: 'info' });
-                        }}
-                        title="Créer un itinéraire (P)"
-                        style={{
-                            flex: 1,
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            border: (state.active_tool === 'route' && selectedId === state.active_itinerary_id)
-                                ? '1px solid var(--accent-default)'
-                                : '1px solid transparent',
-                            borderRadius: '8px',
-                            background: (state.active_tool === 'route' && selectedId === state.active_itinerary_id)
-                                ? 'var(--accent-transparent)'
-                                : 'transparent',
-                            color: (state.active_tool === 'route' && selectedId === state.active_itinerary_id)
-                                ? 'var(--accent-hover)'
-                                : 'var(--text-dim)',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            transition: 'all 120ms ease'
-                        }}
-                        onMouseEnter={e => {
-                            if (!(state.active_tool === 'route' && selectedId === state.active_itinerary_id)) {
-                                e.currentTarget.style.background = 'var(--bg-hover)';
-                                e.currentTarget.style.color = 'var(--text-primary)';
-                            }
-                        }}
-                        onMouseLeave={e => {
-                            if (!(state.active_tool === 'route' && selectedId === state.active_itinerary_id)) {
-                                e.currentTarget.style.background = 'transparent';
-                                e.currentTarget.style.color = 'var(--text-dim)';
-                            }
-                        }}
+                        title="Masquer/Afficher la sélection"
+                        aria-label="Basculer visibilité de la sélection"
+                        onClick={() => order.filter((x) => multiSel.has(x.id)).forEach(toggleItemVisibility)}
+                        style={{ padding: '4px 6px', border: 'none', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', color: '#94A3B8', cursor: 'pointer', display: 'inline-flex' }}
                     >
-                        <Route size={13} strokeWidth={2.2} />
-                        <span>Tracé</span>
+                        <Eye size={13} />
                     </button>
                     <button
                         type="button"
+                        title={`Supprimer ${multiSel.size} calques`}
+                        aria-label={`Supprimer ${multiSel.size} calques`}
                         onClick={() => {
-                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_point' });
-                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour placer un repère.', notifType: 'info' });
+                            const items = order.filter((x) => multiSel.has(x.id));
+                            if (!window.confirm(`Supprimer ${items.length} calque${items.length > 1 ? 's' : ''} ?`)) return;
+                            items.forEach(deleteItem);
+                            setMultiSel(new Set());
+                            dispatch({ type: 'SET_SELECTED_LAYER', id: null });
                         }}
-                        title="Activer l'outil Repère"
-                        style={{
-                            flex: 1,
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            border: state.active_tool === 'annotate_point' ? '1px solid var(--accent-default)' : '1px solid transparent',
-                            borderRadius: '8px',
-                            background: state.active_tool === 'annotate_point' ? 'var(--accent-transparent)' : 'transparent',
-                            color: state.active_tool === 'annotate_point' ? 'var(--accent-hover)' : 'var(--text-dim)',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            transition: 'all 120ms ease'
-                        }}
-                        onMouseEnter={e => {
-                            if (state.active_tool !== 'annotate_point') {
-                                e.currentTarget.style.background = 'var(--bg-hover)';
-                                e.currentTarget.style.color = 'var(--text-primary)';
-                            }
-                        }}
-                        onMouseLeave={e => {
-                            if (state.active_tool !== 'annotate_point') {
-                                e.currentTarget.style.background = 'transparent';
-                                e.currentTarget.style.color = 'var(--text-dim)';
-                            }
-                        }}
+                        style={{ padding: '4px 6px', border: 'none', borderRadius: '6px', background: 'rgba(239,68,68,0.12)', color: 'var(--semantic-red)', cursor: 'pointer', display: 'inline-flex' }}
                     >
-                        <MapPin size={13} strokeWidth={2.2} />
-                        <span>Repère</span>
+                        <Trash2 size={13} />
                     </button>
                     <button
                         type="button"
-                        onClick={() => {
-                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_area' });
-                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour tracer les sommets.', notifType: 'info' });
-                        }}
-                        title="Activer l'outil Zone"
-                        style={{
-                            flex: 1,
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            border: (state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '1px solid #10b981' : '1px solid transparent',
-                            borderRadius: '8px',
-                            background: (state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? 'rgba(16,185,129,0.15)' : 'transparent',
-                            color: (state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#34d399' : 'var(--text-dim)',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            transition: 'all 120ms ease'
-                        }}
-                        onMouseEnter={e => {
-                            if (!(state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed')) {
-                                e.currentTarget.style.background = 'var(--bg-hover)';
-                                e.currentTarget.style.color = 'var(--text-primary)';
-                            }
-                        }}
-                        onMouseLeave={e => {
-                            if (!(state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed')) {
-                                e.currentTarget.style.background = 'transparent';
-                                e.currentTarget.style.color = 'var(--text-dim)';
-                            }
-                        }}
+                        title="Désélectionner · Échap"
+                        aria-label="Annuler la sélection"
+                        onClick={() => setMultiSel(new Set())}
+                        style={{ padding: '4px 6px', border: 'none', borderRadius: '6px', background: 'transparent', color: '#64748B', cursor: 'pointer', display: 'inline-flex' }}
                     >
-                        <PolygonIcon size={13} color={(state.active_tool === 'annotate_area' || state.active_tool === 'annotate_area_routed') ? '#34d399' : 'currentColor'} />
-                        <span>Zone</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_draw' });
-                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Dessinez librement sur la carte.', notifType: 'info' });
-                        }}
-                        title="Activer l'outil Dessin (B)"
-                        style={{
-                            flex: 1,
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            border: state.active_tool === 'annotate_draw' ? '1px solid #f59e0b' : '1px solid transparent',
-                            borderRadius: '8px',
-                            background: state.active_tool === 'annotate_draw' ? 'rgba(245,158,11,0.15)' : 'transparent',
-                            color: state.active_tool === 'annotate_draw' ? '#fbbf24' : 'var(--text-dim)',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            transition: 'all 120ms ease'
-                        }}
-                        onMouseEnter={e => {
-                            if (state.active_tool !== 'annotate_draw') {
-                                e.currentTarget.style.background = 'var(--bg-hover)';
-                                e.currentTarget.style.color = 'var(--text-primary)';
-                            }
-                        }}
-                        onMouseLeave={e => {
-                            if (state.active_tool !== 'annotate_draw') {
-                                e.currentTarget.style.background = 'transparent';
-                                e.currentTarget.style.color = 'var(--text-dim)';
-                            }
-                        }}
-                    >
-                        <Paintbrush size={13} strokeWidth={2.2} />
-                        <span>Dessin</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'annotate_text' });
-                            dispatch({ type: 'ADD_NOTIFICATION', message: 'Cliquez sur la carte pour placer un texte.', notifType: 'info' });
-                        }}
-                        title="Activer l'outil Texte (T)"
-                        style={{
-                            flex: 1,
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            border: state.active_tool === 'annotate_text' ? '1px solid #38bdf8' : '1px solid transparent',
-                            borderRadius: '8px',
-                            background: state.active_tool === 'annotate_text' ? 'rgba(56,189,248,0.15)' : 'transparent',
-                            color: state.active_tool === 'annotate_text' ? '#38bdf8' : 'var(--text-dim)',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            transition: 'all 120ms ease'
-                        }}
-                        onMouseEnter={e => {
-                            if (state.active_tool !== 'annotate_text') {
-                                e.currentTarget.style.background = 'var(--bg-hover)';
-                                e.currentTarget.style.color = 'var(--text-primary)';
-                            }
-                        }}
-                        onMouseLeave={e => {
-                            if (state.active_tool !== 'annotate_text') {
-                                e.currentTarget.style.background = 'transparent';
-                                e.currentTarget.style.color = 'var(--text-dim)';
-                            }
-                        }}
-                    >
-                        <Type size={13} strokeWidth={2.2} />
-                        <span>Texte</span>
+                        ✕
                     </button>
                 </div>
-            </div>
+            )}
 
-            {/* Portals */}
-            {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={closeCtx} />}
-            {colorPicker && <ColorPickerPopup x={colorPicker.x} y={colorPicker.y} currentColor={colorPicker.currentColor} onPick={colorPicker.onPick} onClose={closeColor} />}
+            {/* Mobile sheet footer: 5 equal-width creation buttons (on desktop they align with Calques in bottom-right bar) */}
+            {isMobile && (
+                <div
+                    style={{
+                        padding: '8px 10px',
+                        borderTop: '1px solid var(--border-subtle)',
+                        flexShrink: 0,
+                    }}
+                >
+                    <LayerAddButtons variant="sheet" onCreated={setRenamingId} />
+                </div>
+            )}
+
+            {ctxMenu && <LayerContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={closeCtx} />}
+
+            {copyToast &&
+                createPortal(
+                    <div
+                        role="status"
+                        className="tabular-nums"
+                        style={{
+                            position: 'fixed',
+                            bottom: '24px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            zIndex: 9999,
+                            background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border-strong)',
+                            borderRadius: '12px',
+                            boxShadow: 'var(--shadow-lg)',
+                            padding: '8px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '12.5px',
+                            color: 'var(--text-primary)',
+                        }}
+                    >
+                        <Check size={13} style={{ color: 'var(--semantic-green)', flexShrink: 0 }} aria-hidden="true" />
+                        <span>{copyToast.text} copié</span>
+                    </div>,
+                    document.body
+                )}
         </div>
     );
 }

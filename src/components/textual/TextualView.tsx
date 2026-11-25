@@ -1457,7 +1457,7 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                                             <img
                                                 src="/assets/images/code_templier.jpg"
                                                 alt="Code Templier"
-                                                style={{ maxWidth: '100%', maxHeight: '320px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border-subtle)', objectFit: 'contain' }}
+                                                style={{ maxWidth: '100%', maxHeight: '320px', borderRadius: 'var(--radius-xs)', outline: '1px solid oklch(1 0 0 / 0.1)', outlineOffset: '-1px', objectFit: 'contain' }}
                                             />
                                         </div>
                                     </div>
@@ -1516,9 +1516,9 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                 id="textual-floating-bar-container"
                 style={{
                     position: 'absolute',
-                    top: '16px',
-                    left: '16px',
-                    right: onViewModeChange && !isMobile ? '88px' : '16px', // 16px marge + ~72px maximize+sync
+                    top: isMobile ? '12px' : '16px',
+                    left: isMobile ? '12px' : '16px',
+                    right: onViewModeChange && !isMobile ? '88px' : (isMobile ? '12px' : '16px'), // 16px marge + ~72px maximize+sync
                     zIndex: 1100,
                     pointerEvents: 'none',
                     display: 'flex',

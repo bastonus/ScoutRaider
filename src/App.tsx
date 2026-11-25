@@ -13,16 +13,9 @@ import ProjectsDashboardModal from './components/panels/ProjectsDashboardModal';
 import ShareModal from './components/panels/ShareModal';
 import DocAccessDeniedModal from './components/panels/DocAccessDeniedModal';
 import CommandPalette from './components/layout/CommandPalette';
-import { 
-  PanelRightClose, 
-  PanelRightOpen,
-  PanelRight,
-  FileText,
-  Layers,
-  X
-} from 'lucide-react';
 import { useApp } from './AppContext';
 import { useAuth } from './AuthContext';
+import { useViewport } from './hooks';
 
 export type ViewMode = 'map' | 'text' | 'split';
 
@@ -30,11 +23,10 @@ export type SectionId = 'layers' | 'orchestration' | 'themes' | 'modules' | 'map
 
 function App() {
   const navigate = useNavigate();
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-  const isMobileOrTablet = windowWidth < 1024;
+  const { isTablet: isMobileOrTablet } = useViewport();
 
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
-  const [activeRightSection, setActiveRightSection] = useState<SectionId>('layers');
+  const [, setActiveRightSection] = useState<SectionId>('layers');
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
@@ -54,14 +46,6 @@ function App() {
 
   const [rightWidth, setRightWidth] = useState(460);
   const rightResizing = useRef(false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const prevMobileRef = useRef(isMobileOrTablet);
   useEffect(() => {
@@ -94,7 +78,7 @@ function App() {
 
   // Keep document title synchronized with package version
   useEffect(() => {
-    const version = typeof __APP_VERSION__ !== 'undefined' ? `v${__APP_VERSION__}` : 'v0.3.3-beta';
+    const version = typeof __APP_VERSION__ !== 'undefined' ? `v${__APP_VERSION__}` : 'v0.3.14';
     const title = state.document_title || 'Document sans titre';
     document.title = `${title} — ScoutRaider ${version}`;
   }, [state.document_title]);
@@ -141,6 +125,12 @@ function App() {
     setExportModalOpen(true);
   }, []);
 
+  useEffect(() => {
+    const h = () => setExportModalOpen(true);
+    window.addEventListener('scoutraider:open-export', h);
+    return () => window.removeEventListener('scoutraider:open-export', h);
+  }, []);
+
   // Global Ctrl+E
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -153,10 +143,10 @@ function App() {
     return () => window.removeEventListener('keydown', h);
   }, []);
 
-  // Global Ctrl+P
+  // Global Ctrl+, (Preferences)
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+      if ((e.ctrlKey || e.metaKey) && e.key === ',') {
         e.preventDefault();
         setPreferencesModalOpen(true);
       }
@@ -258,50 +248,6 @@ function App() {
     return () => window.removeEventListener('keydown', h);
   }, [dispatch, state.carnet_view]);
 
-  // Floating panel toggle button style on map
-  // Height 40px, width 40px, radius 12px, top 16px to align perfectly with FloatingSearch (height 40px, top 16px)
-  const mapPanelToggleStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: '16px',
-    zIndex: 900,
-    width: '40px',
-    height: '40px',
-    padding: 0,
-    background: 'var(--bg-elevated)',
-    border: '1px solid var(--border-subtle)',
-    borderRadius: '12px',
-    boxShadow: 'none',
-    color: 'var(--text-dim)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 100ms ease',
-  };
-
-  // Inline header bar toggle button style (in text / split mode)
-  // Height 28px, width 28px, radius 6px to fit within the 40px header bar
-  const inlinePanelToggleStyle: React.CSSProperties = {
-    width: '28px',
-    height: '28px',
-    padding: 0,
-    background: 'var(--bg-surface)',
-    border: '1px solid var(--border-subtle)',
-    borderRadius: 'var(--radius-xs)',
-    color: 'var(--text-dim)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 100ms ease',
-    flexShrink: 0,
-  };
-
-  // In text/split mode the toggle buttons sit outside the map, so we don't need
-  // absolute-positioned overlays. We show them inline in the header band instead.
-  const isTextMode = viewMode === 'text';
-  const isSplitMode = viewMode === 'split';
-
   return (
     <div className="app-shell" style={{ 
       height: '100dvh', 
@@ -326,7 +272,7 @@ function App() {
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
 
         {/* MAIN WORKSPACE */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', position: 'relative' }}>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', position: 'relative' }}>
           <ProjectWorkspace 
             onExport={handleExportRequest} 
             viewMode={viewMode} 
@@ -334,19 +280,34 @@ function App() {
             onToggleSidebar={toggleSidebar} 
             rightSidebarOpen={rightSidebarOpen} 
           />
-        </div>
+        </main>
 
         {/* DESKTOP RIGHT SIDEBAR: Marketplace & Ressources */}
         {!isMobileOrTablet && rightSidebarOpen && (
           <>
             {/* Right Resizer */}
-            <div 
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Redimensionner le panneau Ressources"
+              aria-valuenow={rightWidth}
+              aria-valuemin={200}
+              aria-valuemax={600}
+              tabIndex={0}
               onMouseDown={(e) => { e.preventDefault(); rightResizing.current = true; document.body.style.cursor = 'col-resize'; }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowLeft') { e.preventDefault(); setRightWidth(w => Math.min(600, w + 24)); }
+                if (e.key === 'ArrowRight') { e.preventDefault(); setRightWidth(w => Math.max(200, w - 24)); }
+              }}
               style={{ width: '4px', cursor: 'col-resize', background: 'var(--bg-border)', zIndex: 10, marginLeft: '-2px', marginRight: '-2px' }}
             />
             <RightSidebar 
               width={rightWidth} 
               onClose={() => setRightSidebarOpen(false)}
+              onMarketplaceOpen={() => {
+                setRightSidebarOpen(false);
+                setMarketplaceModalOpen(true);
+              }}
               onPreferencesOpen={() => setPreferencesModalOpen(true)}
             />
           </>
@@ -357,12 +318,18 @@ function App() {
       {/* MOBILE / TABLET BOTTOM SHEET (CALQUES PURE: NO TITLES, NO BUTTONS, NO DIVIDERS ABOVE) */}
       {isMobileOrTablet && rightSidebarOpen && (
         <>
-          <div className="bottom-sheet-backdrop" onClick={() => setRightSidebarOpen(false)} />
-          <div className="bottom-sheet-panel">
-            <div className="bottom-sheet-handle-zone" onClick={() => setRightSidebarOpen(false)} role="button" aria-label="Fermer le volet">
+          <div className="bottom-sheet-backdrop" onClick={() => setRightSidebarOpen(false)} aria-hidden="true" />
+          <div className="bottom-sheet-panel" role="dialog" aria-modal="true" aria-label="Marketplace et Ressources">
+            <button
+              type="button"
+              className="bottom-sheet-handle-zone"
+              onClick={() => setRightSidebarOpen(false)}
+              aria-label="Fermer le volet"
+              style={{ width: '100%', background: 'transparent', border: 'none' }}
+            >
               <div className="bottom-sheet-handle-bar" />
-            </div>
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+            </button>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
               <RightSidebar width="100%" />
             </div>
           </div>
@@ -372,12 +339,18 @@ function App() {
       {/* MOBILE MARKETPLACE BOTTOM SHEET (DÉROULANT DU BAS SUR MOBILE) */}
       {isMobileOrTablet && mobileMarketplaceOpen && (
         <>
-          <div className="bottom-sheet-backdrop" onClick={() => setMobileMarketplaceOpen(false)} />
-          <div className="bottom-sheet-panel" style={{ height: '80vh', maxHeight: '88vh' }}>
-            <div className="bottom-sheet-handle-zone" onClick={() => setMobileMarketplaceOpen(false)} role="button" aria-label="Fermer le volet">
+          <div className="bottom-sheet-backdrop" onClick={() => setMobileMarketplaceOpen(false)} aria-hidden="true" />
+          <div className="bottom-sheet-panel" role="dialog" aria-modal="true" aria-label="Marketplace" style={{ height: '80dvh', maxHeight: '88dvh' }}>
+            <button
+              type="button"
+              className="bottom-sheet-handle-zone"
+              onClick={() => setMobileMarketplaceOpen(false)}
+              aria-label="Fermer le volet"
+              style={{ width: '100%', background: 'transparent', border: 'none' }}
+            >
               <div className="bottom-sheet-handle-bar" />
-            </div>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            </button>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
               <UnifiedResourceHub
                 initialCategory="all"
                 isCompact={false}

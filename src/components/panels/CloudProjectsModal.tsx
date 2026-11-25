@@ -3,10 +3,12 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { X, Cloud, FolderOpen, Trash2, Plus, Clock, RefreshCw } from 'lucide-react';
+import { Cloud, FolderOpen, Trash2, Plus, Clock, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
 import { CloudAuthService, type CloudProjectSummary } from '../../logic/CloudAuthService';
 import { useUI } from '../../hooks';
+import Modal from '../common/Modal';
+import ConfirmDialog from '../common/ConfirmDialog';
 
 export default function CloudProjectsModal({ onClose }: { onClose: () => void }) {
     const { user, loadFromCloud, saveToCloudNow } = useAuth();
@@ -15,6 +17,7 @@ export default function CloudProjectsModal({ onClose }: { onClose: () => void })
     const [projects, setProjects] = useState<CloudProjectSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
     const fetchProjects = async () => {
         setLoading(true);
@@ -33,18 +36,23 @@ export default function CloudProjectsModal({ onClose }: { onClose: () => void })
         fetchProjects();
     }, []);
 
-    const handleDelete = async (id: string, e: React.MouseEvent) => {
+    const handleDelete = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!window.confirm('Voulez-vous vraiment supprimer ce projet du cloud ?')) return;
+        setPendingDeleteId(id);
+    };
 
+    const confirmDelete = async () => {
+        if (!pendingDeleteId) return;
+        const id = pendingDeleteId;
+        setPendingDeleteId(null);
         try {
             const ok = await CloudAuthService.deleteProject(id);
             if (ok) {
                 setProjects(prev => prev.filter(p => p.id !== id));
                 dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet supprimé du cloud.', notifType: 'info' });
             }
-        } catch (err: any) {
-            alert('Erreur lors de la suppression.');
+        } catch {
+            dispatch({ type: 'ADD_NOTIFICATION', message: 'Erreur lors de la suppression du projet.', notifType: 'error' });
         }
     };
 
@@ -55,115 +63,71 @@ export default function CloudProjectsModal({ onClose }: { onClose: () => void })
     };
 
     return (
-        <div 
-            style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 999999,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(0,0,0,0.75)',
-                backdropFilter: 'blur(8px)',
-                padding: '20px'
-            }}
-            onClick={onClose}
+        <>
+        <Modal
+            title={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <Cloud size={16} color="var(--accent-hover)" aria-hidden="true" />
+                    Mes Projets Cloud
+                </span>
+            }
+            onClose={onClose}
+            maxWidth="560px"
+            maxHeight="80dvh"
         >
-            <div 
-                onClick={e => e.stopPropagation()}
-                style={{
-                    width: '100%',
-                    maxWidth: '560px',
-                    maxHeight: '80vh',
-                    background: '#0d1310',
-                    border: '1px solid rgba(110, 201, 126, 0.2)',
-                    borderRadius: '16px',
-                    boxShadow: '0 30px 80px rgba(0,0,0,0.85)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden'
-                }}
-            >
-                {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '16px 20px',
-                    borderBottom: '1px solid rgba(255,255,255,0.06)'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Cloud size={18} color="var(--accent-default)" />
-                        <span style={{ fontSize: '15px', fontWeight: 800, color: '#fff' }}>
-                            Mes projets dans le cloud
-                        </span>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                {/* Subheader action */}
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
+                        <span>Sauvegardés sur votre serveur PostgreSQL.</span>
                         {user && (
-                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '12px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-primary)', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '2px 8px', borderRadius: '12px' }}>
                                 {user.username}
                             </span>
                         )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button
-                            onClick={fetchProjects}
-                            title="Actualiser"
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'rgba(255,255,255,0.4)',
-                                cursor: 'pointer',
-                                padding: '4px',
-                                display: 'flex',
-                                alignItems: 'center'
-                            }}
-                        >
-                            <RefreshCw size={15} />
-                        </button>
-                        <button 
-                            onClick={onClose}
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'rgba(255,255,255,0.4)',
-                                cursor: 'pointer',
-                                padding: '4px',
-                                display: 'flex',
-                                alignItems: 'center'
-                            }}
-                        >
-                            <X size={18} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Subheader action */}
-                <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
-                        Sauvegardés automatiquement sur votre serveur Coolify PostgreSQL.
-                    </div>
                     <button
+                        type="button"
+                        onClick={fetchProjects}
+                        title="Actualiser"
+                        aria-label="Actualiser la liste des projets"
+                        style={{
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 'var(--radius-xs)',
+                            color: 'var(--text-dim)',
+                            cursor: 'pointer',
+                            padding: '5px',
+                            display: 'flex',
+                            alignItems: 'center'
+                        }}
+                    >
+                        <RefreshCw size={14} aria-hidden="true" />
+                    </button>
+                    <button
+                        type="button"
                         onClick={handleCreateNew}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
                             padding: '6px 12px',
-                            background: 'rgba(110, 201, 126, 0.15)',
-                            border: '1px solid rgba(110, 201, 126, 0.25)',
-                            color: 'var(--accent-default)',
-                            borderRadius: '6px',
+                            background: 'var(--accent-primary)',
+                            border: '1px solid var(--accent-primary)',
+                            color: '#FFFFFF',
+                            borderRadius: 'var(--radius-xs)',
                             fontSize: '11.5px',
-                            fontWeight: 700,
+                            fontWeight: 600,
                             cursor: 'pointer'
                         }}
                     >
-                        <Plus size={14} />
+                        <Plus size={14} aria-hidden="true" />
                         Nouveau projet
                     </button>
                 </div>
 
                 {/* Project List */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {loading && (
                         <div style={{ padding: '30px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
                             Chargement des projets...
@@ -226,26 +190,35 @@ export default function CloudProjectsModal({ onClose }: { onClose: () => void })
                             </div>
 
                             <button
+                                type="button"
                                 onClick={e => handleDelete(proj.id, e)}
                                 title="Supprimer ce projet"
+                                aria-label={`Supprimer ${proj.title}`}
                                 style={{
                                     background: 'transparent',
                                     border: 'none',
-                                    color: 'rgba(239, 68, 68, 0.6)',
+                                    color: 'var(--semantic-danger)',
                                     cursor: 'pointer',
                                     padding: '6px',
                                     borderRadius: '6px',
-                                    transition: 'color 0.15s ease'
                                 }}
-                                onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                                onMouseLeave={e => e.currentTarget.style.color = 'rgba(239, 68, 68, 0.6)'}
                             >
-                                <Trash2 size={15} />
+                                <Trash2 size={15} aria-hidden="true" />
                             </button>
                         </div>
                     ))}
                 </div>
             </div>
-        </div>
+        </Modal>
+        {pendingDeleteId && (
+            <ConfirmDialog
+                title="Supprimer ce projet du cloud ?"
+                message="Ce projet sera définitivement supprimé de votre espace cloud. Cette action est irréversible."
+                confirmLabel="Supprimer le projet"
+                onConfirm={confirmDelete}
+                onCancel={() => setPendingDeleteId(null)}
+            />
+        )}
+        </>
     );
 }

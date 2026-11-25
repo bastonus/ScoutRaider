@@ -12,6 +12,7 @@ Ce dossier regroupe la documentation produit, technique, pédagogique et histori
 - **[GUIDE_MIGRATION_MODULES.md](./GUIDE_MIGRATION_MODULES.md)** : **[NOUVEAU]** Guide technique de migration des anciens modules (Morse, Polybe, Templier, etc.) vers le standard moderne Gilwell.
 - **[MCP_AGENT_FIRST_SPECIFICATION.md](./MCP_AGENT_FIRST_SPECIFICATION.md)** : **[NOUVEAU]** Spécification d'exposition Agent-First et outils MCP pour la manipulation et la création autonome de modules par une IA.
 - **[PLAN_IMPLEMENTATION.md](../PLAN_IMPLEMENTATION.md)** : Plan d'action priorisé P0–P3 issu de l'audit de santé du code (sécurité, CI, tests, découpage modulaire).
+- **[AUDIT_ET_PLAN.md](./AUDIT_ET_PLAN.md)** : Audit complet UI, Frontend, Electron et Backend (sécurité, accessibilité, dette technique) et plan de remédiation en 3 phases.
 - **[PRODUCTION_TESTS.md](../PRODUCTION_TESTS.md)** : Rapport de recette des 31 tests d'intégration en production sur `scoutraider.silverhorse.fr`.
 - **[CHANGELOG.md](../CHANGELOG.md)** : Journal officiel des versions et historique des modifications.
 

@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import MapWorkspace from '../map/MapWorkspace';
 import TextualView from '../textual/TextualView';
+import ErrorBoundary from '../common/ErrorBoundary';
+import { useViewport } from '../../hooks';
 import type { ViewMode } from '../../App';
 
 interface ProjectWorkspaceProps {
@@ -13,14 +15,8 @@ interface ProjectWorkspaceProps {
 
 export default function ProjectWorkspace({ onExport, viewMode = 'map', onViewModeChange, onToggleSidebar, rightSidebarOpen }: ProjectWorkspaceProps) {
     const [mapWidthRatio, setMapWidthRatio] = useState(50);
-    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+    const { isMobile } = useViewport();
     const resizing = useRef(false);
-
-    useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth < 768);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
@@ -73,20 +69,42 @@ export default function ProjectWorkspace({ onExport, viewMode = 'map', onViewMod
                         position: 'relative', 
                         flexShrink: 0 
                     }}>
-                        <MapWorkspace 
-                            isSplitMode={viewMode === 'split'} 
-                            onViewModeChange={onViewModeChange}
-                            onToggleSidebar={onToggleSidebar} 
-                        />
+                        <ErrorBoundary fallbackTitle="Erreur dans l'espace cartographique">
+                            <MapWorkspace 
+                                isSplitMode={viewMode === 'split'} 
+                                onViewModeChange={onViewModeChange}
+                                onToggleSidebar={onToggleSidebar} 
+                            />
+                        </ErrorBoundary>
                     </div>
                 )}
                 
                 {viewMode === 'split' && (
-                    <div 
+                    <div
+                        role="separator"
+                        aria-orientation={isMobile ? 'horizontal' : 'vertical'}
+                        aria-label="Redimensionner la vue scindée"
+                        aria-valuenow={Math.round(mapWidthRatio)}
+                        aria-valuemin={20}
+                        aria-valuemax={80}
+                        tabIndex={0}
                         onMouseDown={(e) => { 
                             e.preventDefault(); 
                             resizing.current = true; 
                             document.body.style.cursor = isMobile ? 'row-resize' : 'col-resize'; 
+                        }}
+                        onKeyDown={(e) => {
+                            const dec = isMobile ? 'ArrowUp' : 'ArrowLeft';
+                            const inc = isMobile ? 'ArrowDown' : 'ArrowRight';
+                            if (e.key === dec) {
+                                e.preventDefault();
+                                setMapWidthRatio(r => Math.max(20, r - 5));
+                                window.dispatchEvent(new Event('resize'));
+                            } else if (e.key === inc) {
+                                e.preventDefault();
+                                setMapWidthRatio(r => Math.min(80, r + 5));
+                                window.dispatchEvent(new Event('resize'));
+                            }
                         }}
                         style={{ 
                             width: isMobile ? '100%' : '4px', 
@@ -107,16 +125,19 @@ export default function ProjectWorkspace({ onExport, viewMode = 'map', onViewMod
                         background: 'var(--bg-dark)',
                         borderLeft: (!isMobile && viewMode === 'split') ? '1px solid var(--border-subtle)' : 'none',
                         borderTop: (isMobile && viewMode === 'split') ? '1px solid var(--border-subtle)' : 'none',
+                        minWidth: 0,
                         minHeight: 0,
                         overflow: 'hidden'
                     }}>
-                        <TextualView 
-                            onExport={onExport} 
-                            viewMode={viewMode} 
-                            onViewModeChange={onViewModeChange}
-                            onToggleSidebar={onToggleSidebar} 
-                            rightSidebarOpen={rightSidebarOpen} 
-                        />
+                        <ErrorBoundary fallbackTitle="Erreur dans l'éditeur de carnet">
+                            <TextualView 
+                                onExport={onExport} 
+                                viewMode={viewMode} 
+                                onViewModeChange={onViewModeChange}
+                                onToggleSidebar={onToggleSidebar} 
+                                rightSidebarOpen={rightSidebarOpen} 
+                            />
+                        </ErrorBoundary>
                     </div>
                 )}
             </div>

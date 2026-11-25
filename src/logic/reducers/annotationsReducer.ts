@@ -31,9 +31,16 @@ export function annotationsReducer(state: AppState, action: AppAction): AppState
                 visible: action.point.visible !== undefined ? action.point.visible : true,
                 createdAt: Date.now()
             };
+            const newPointOrderItem = { kind: 'point' as const, id: newPoint.id };
+            const prevOrder = state.layer_order || [];
+            const selIdx = prevOrder.findIndex(o => o.id === state.selected_layer_id);
+            const pointOrder = selIdx >= 0
+                ? [...prevOrder.slice(0, selIdx), newPointOrderItem, ...prevOrder.slice(selIdx)]
+                : [...prevOrder, newPointOrderItem];
             return {
                 ...state,
                 point_annotations: [...(state.point_annotations || []), newPoint],
+                layer_order: pointOrder,
                 selected_layer_id: newPoint.id,
             };
         }
@@ -90,9 +97,16 @@ export function annotationsReducer(state: AppState, action: AppAction): AppState
                 formatted_area: formatArea(m2),
                 createdAt: Date.now()
             };
+            const newAreaOrderItem = { kind: 'area' as const, id: newArea.id };
+            const prevAreaOrder = state.layer_order || [];
+            const selAreaIdx = prevAreaOrder.findIndex(o => o.id === state.selected_layer_id);
+            const areaOrder = selAreaIdx >= 0
+                ? [...prevAreaOrder.slice(0, selAreaIdx), newAreaOrderItem, ...prevAreaOrder.slice(selAreaIdx)]
+                : [...prevAreaOrder, newAreaOrderItem];
             return {
                 ...state,
                 area_annotations: [...(state.area_annotations || []), newArea],
+                layer_order: areaOrder,
                 selected_layer_id: newArea.id,
             };
         }
@@ -176,9 +190,16 @@ export function annotationsReducer(state: AppState, action: AppAction): AppState
                 createdAt: Date.now(),
                 strokes: action.draw.strokes ?? [],
             };
+            const newDrawOrderItem = { kind: 'draw' as const, id: newDraw.id };
+            const prevDrawOrder = state.layer_order || [];
+            const selDrawIdx = prevDrawOrder.findIndex(o => o.id === state.selected_layer_id);
+            const drawOrder = selDrawIdx >= 0
+                ? [...prevDrawOrder.slice(0, selDrawIdx), newDrawOrderItem, ...prevDrawOrder.slice(selDrawIdx)]
+                : [...prevDrawOrder, newDrawOrderItem];
             return {
                 ...state,
                 draw_annotations: [...(state.draw_annotations || []), newDraw],
+                layer_order: drawOrder,
                 selected_layer_id: newDraw.id,
             };
         }
@@ -260,9 +281,16 @@ export function annotationsReducer(state: AppState, action: AppAction): AppState
                 createdAt: Date.now(),
                 texts: action.text.texts ?? [],
             };
+            const newTextOrderItem = { kind: 'text' as const, id: newText.id };
+            const prevTextOrder = state.layer_order || [];
+            const selTextIdx = prevTextOrder.findIndex(o => o.id === state.selected_layer_id);
+            const textOrder = selTextIdx >= 0
+                ? [...prevTextOrder.slice(0, selTextIdx), newTextOrderItem, ...prevTextOrder.slice(selTextIdx)]
+                : [...prevTextOrder, newTextOrderItem];
             return {
                 ...state,
                 text_annotations: [...(state.text_annotations || []), newText],
+                layer_order: textOrder,
                 selected_layer_id: newText.id,
             };
         }

@@ -735,7 +735,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                     display: 'flex', alignItems: 'center', gap: '2px',
                     height: '40px', background: 'var(--bg-elevated)',
                     border: '1px solid var(--border-subtle)', borderRadius: '14px',
-                    padding: '3px 4px', boxShadow: 'var(--shadow-md)',
+                    padding: '3px 4px', boxShadow: 'none',
                     userSelect: 'none', position: 'relative',
                     boxSizing: 'border-box', pointerEvents: 'all',
                     maxWidth: '100%', flexShrink: 0,
@@ -757,6 +757,8 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                         <button
                             ref={overflowBtnRef}
                             type="button"
+                            aria-label="Outils supplémentaires"
+                            aria-expanded={overflowMenuOpen}
                             onClick={(e) => { e.stopPropagation(); setOverflowMenuOpen(v => !v); }}
                             title={`${overflowItems.length} outil${overflowItems.length > 1 ? 's' : ''} supplémentaire${overflowItems.length > 1 ? 's' : ''}`}
                             style={{
@@ -766,10 +768,8 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                                 background: overflowMenuOpen ? 'var(--bg-hover)' : 'transparent',
                                 color: overflowMenuOpen ? 'var(--accent-hover)' : 'var(--text-secondary)',
                             }}
-                            onMouseEnter={e => { if (!overflowMenuOpen) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                            onMouseLeave={e => { if (!overflowMenuOpen) e.currentTarget.style.background = 'transparent'; }}
                         >
-                            <MoreHorizontal size={16} strokeWidth={2.2} />
+                            <MoreHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
                         </button>
                         {overflowMenuOpen && (
                             <div style={{
@@ -777,6 +777,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                                 background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
                                 borderRadius: '12px', boxShadow: 'var(--shadow-lg)', padding: '6px',
                                 minWidth: '200px', animation: 'popIn 140ms ease-out',
+                                overscrollBehavior: 'contain',
                             }}>
                                 <div style={dropdownHeaderStyle}>Outils supplémentaires</div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>

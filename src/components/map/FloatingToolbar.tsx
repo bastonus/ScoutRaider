@@ -254,6 +254,7 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
 
       <div
         id="toolbar-container"
+        className="hide-scrollbar-webkit"
         style={{
           position: 'absolute',
           bottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
@@ -265,8 +266,9 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
           gap: '6px',
           pointerEvents: 'none',
           background: 'transparent',
-          maxWidth: 'calc(100% - 20px)',
-          overflow: 'visible',
+          maxWidth: 'calc(100% - 16px)',
+          overflowX: isMobile ? 'auto' : 'visible',
+          overflowY: 'visible',
           padding: '4px',
         }}
       >

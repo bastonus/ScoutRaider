@@ -5,6 +5,32 @@ Tous les changements notables apportés à ce projet seront documentés dans ce 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-11-25
+
+### Refactoring majeur — Architecture modulaire AppContext & hooks spécialisés
+
+#### Architecture
+
+- **AppContext modularisé** : découpage de l'AppContext monolithique en réducteurs et contextes indépendants (`routesReducer`, `annotationsReducer`, `carnetReducer`, `uiReducer`) avec hooks d'accès spécialisés (`useRoutes`, `useCarnet`, `useUI`).
+- **Lot 1 — Migration 15 composants** : `MenuBar`, `ProjectWorkspace`, `RightSidebar`, `MapWorkspace`, `MapHUD`, `LayerManagerPanel`, `RoutePanel`, `UnifiedResourceHub`, `AuthModal`, `CloudProjectsModal`, `MarketplaceModal`, `PreferencesModal`, `LeftSidebarPanel`, `EditorPage`, `ProjectsHomePage` migrés vers les hooks spécialisés.
+- **Lot 2 — Migration 9 composants** : `ActiveRouteLayer`, `AnnotationsMapLayer`, `FloatingSearch`, `InteractiveStages`, `MapSettings`, `Transformer`, `CarnetStepBlock`, `TextualHeader`, `TextualView` migrés.
+- **Tests Vitest + CI GitHub Actions** : suite de tests configurée, CI autodeploy via webhook Coolify sur push `main`.
+- **Repli PDF Electron natif** : fallback PDF via l'API Electron native en cas d'indisponibilité du service backend.
+
+#### Nouveaux composants & hooks
+
+- `src/components/common/ConfirmDialog.tsx` — dialog de confirmation générique réutilisable.
+- `src/components/common/ErrorBoundary.tsx` — boundary d'erreur React.
+- `src/components/common/Modal.tsx` — composant modal de base.
+- `src/hooks/useViewport.ts` — hook viewport/dimensions de fenêtre.
+- `src/logic/geocoding.ts` — service de géocodage extrait.
+
+#### Infrastructure
+
+- Webhook Coolify intégré (token direct) — autodeploy sur push `main`.
+- Build Vite mis à jour (`dist/assets`).
+- `docs/AUDIT_ET_PLAN.md` : plan d'audit et roadmap de migration.
+
 ## [0.3.14] - 2026-11-20
 
 ### Ajouté — Carnet textuel : badges interactifs, chiffrement visuel, bibliothèque modules

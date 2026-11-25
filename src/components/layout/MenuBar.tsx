@@ -35,6 +35,7 @@ import FleurDeLysLogo from './FleurDeLysLogo';
 import AICopilotModal from '../panels/AICopilotModal';
 import { useApp } from '../../AppContext';
 import { useAuth } from '../../AuthContext';
+import { useViewport } from '../../hooks';
 import { StateManager } from '../../logic/StateManager';
 import type { ViewMode, SectionId } from '../../App';
 
@@ -83,21 +84,11 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
     const [titleInput, setTitleInput] = useState(state.document_title || 'Document sans titre');
     const [titleWidth, setTitleWidth] = useState(180);
 
-    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-    const [isTablet, setIsTablet] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+    const { isMobile, isTablet } = useViewport();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [expandedMobileMenu, setExpandedMobileMenu] = useState<string | null>(null);
     const [aiModalOpen, setAiModalOpen] = useState(false);
     const [aiModalTab, setAiModalTab] = useState<'narrative' | 'riddles' | 'safety' | 'mcp' | 'config'>('narrative');
-
-    useEffect(() => {
-        const handleResize = () => {
-            setIsMobile(window.innerWidth < 768);
-            setIsTablet(window.innerWidth < 1024);
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
 
     useEffect(() => {
         setTitleInput(state.document_title || 'Document sans titre');
@@ -479,7 +470,7 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
                                     }}
                                     onMouseEnter={(e) => { if (document.activeElement !== e.currentTarget) { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.22)'; e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; } }}
                                     onMouseLeave={(e) => { if (document.activeElement !== e.currentTarget) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; } }}
-                                    onFocusCapture={(e) => { e.currentTarget.style.borderColor = 'var(--accent-default)'; e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.35)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(110, 201, 126, 0.18)'; e.currentTarget.style.cursor = 'text'; }}
+                                    onFocusCapture={(e) => { e.currentTarget.style.borderColor = 'var(--accent-default)'; e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.35)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.25)'; e.currentTarget.style.cursor = 'text'; }}
                                     onBlurCapture={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.cursor = 'pointer'; }}
                                 />
                                 <div
@@ -651,13 +642,15 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
                 <>
             {/* ═══ DESKTOP LEFT: Logo + Title + Menus ═══ */}
             <div style={{ display: 'flex', alignItems: 'center', gap: isTablet ? '8px' : '12px', flexShrink: 0, WebkitAppRegion: 'no-drag' } as any} ref={menuRef}>
-                <div
+                <button
+                    type="button"
                     title="Retour à l'accueil"
+                    aria-label="Retour à l'accueil"
                     onClick={() => navigate('/projects')}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', flexShrink: 0, borderRadius: '6px', padding: '2px', transition: 'background 0.15s' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', flexShrink: 0, borderRadius: '8px', padding: '2px', background: 'transparent', border: 'none' }}
                 >
-                    <FleurDeLysLogo size={30} style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))', borderRadius: '6px' }} />
-                </div>
+                    <FleurDeLysLogo size={28} color="var(--accent-primary)" />
+                </button>
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span ref={measureSpanRef} style={{ position: 'absolute', visibility: 'hidden', height: 0, overflow: 'hidden', whiteSpace: 'pre', fontSize: '15px', fontWeight: 600, fontFamily: 'inherit', pointerEvents: 'none' }}>
@@ -673,7 +666,7 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
                             style={{ width: `${titleWidth}px`, maxWidth: '320px', height: '22px', background: 'transparent', border: '1px solid transparent', borderRadius: '4px', color: '#ffffff', fontSize: '15px', fontWeight: 600, lineHeight: '20px', padding: '1px 4px', outline: 'none', cursor: 'pointer', transition: 'all 0.15s ease', textOverflow: 'ellipsis' }}
                             onMouseEnter={(e) => { if (document.activeElement !== e.currentTarget) { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.22)'; e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; } }}
                             onMouseLeave={(e) => { if (document.activeElement !== e.currentTarget) { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; } }}
-                            onFocusCapture={(e) => { e.currentTarget.style.borderColor = 'var(--accent-default)'; e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.35)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(110, 201, 126, 0.18)'; e.currentTarget.style.cursor = 'text'; }}
+                            onFocusCapture={(e) => { e.currentTarget.style.borderColor = 'var(--accent-default)'; e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.35)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.25)'; e.currentTarget.style.cursor = 'text'; }}
                             onBlurCapture={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.cursor = 'pointer'; }}
                         />
                         <div
@@ -758,24 +751,39 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
                             </div>
                         )}
                     </div>
-                    <nav style={{ display: 'flex', gap: '2px', fontSize: '11.5px', fontWeight: 500, color: 'var(--text-dim)', marginLeft: '-4px' }}>
+                    <nav aria-label="Menu principal" style={{ display: 'flex', gap: '2px', marginLeft: '-4px' }}>
                         {Object.entries(menus).map(([name, items]) => (
                             <div key={name} style={{ position: 'relative' }}>
-                                <span className="menu-btn" onClick={() => toggleMenu(name)} onMouseEnter={() => openMenu && setOpenMenu(name)}
-                                    style={{ padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', background: openMenu === name ? 'rgba(255, 255, 255, 0.05)' : 'transparent', color: openMenu === name ? 'var(--text-primary)' : 'var(--text-dim)' }}>
+                                <button
+                                    type="button"
+                                    className="sr-menu-trigger"
+                                    aria-haspopup="menu"
+                                    aria-expanded={openMenu === name}
+                                    onClick={() => toggleMenu(name)}
+                                    onMouseEnter={() => openMenu && setOpenMenu(name)}
+                                >
                                     {name}
-                                </span>
+                                </button>
                                 {openMenu === name && (
-                                    <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: '6px', boxShadow: 'var(--shadow-glass)', minWidth: '220px', padding: '4px 0', zIndex: 3000 }}>
+                                    <div
+                                        role="menu"
+                                        aria-label={name}
+                                        style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xs)', boxShadow: 'var(--shadow-lg)', minWidth: '220px', padding: '4px 0', zIndex: 3000, overscrollBehavior: 'contain' }}
+                                    >
                                         {items.map((item, idx) =>
                                             (item as any).divider ? (
-                                                <div key={idx} style={{ height: '1px', background: 'var(--bg-border)', margin: '4px 0' }} />
+                                                <div key={idx} role="separator" style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
                                             ) : (
-                                                <div key={idx} className="menu-item-hover" onClick={() => handleAction((item as any).action as () => void)}
-                                                    style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 16px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '12px', fontWeight: 500 }}>
+                                                <button
+                                                    key={idx}
+                                                    type="button"
+                                                    role="menuitem"
+                                                    className="sr-menu-item"
+                                                    onClick={() => handleAction((item as any).action as () => void)}
+                                                >
                                                     <span>{(item as any).label}</span>
-                                                    {(item as any).shortcut && <span style={{ color: 'var(--text-dim)', fontSize: '11px' }}>{(item as any).shortcut}</span>}
-                                                </div>
+                                                    {(item as any).shortcut && <span style={{ color: 'var(--text-dim)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{(item as any).shortcut}</span>}
+                                                </button>
                                             )
                                         )}
                                     </div>
@@ -789,13 +797,14 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
             {/* ═══ DESKTOP CENTER: Command Palette ═══ */}
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', WebkitAppRegion: 'drag' } as any}>
                 {!isTablet && onOpenCommandPalette && (
-                    <button onClick={onOpenCommandPalette}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0 12px', height: '28px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-pill)', color: 'var(--text-dim)', fontSize: '11.5px', fontWeight: 400, cursor: 'pointer', transition: 'all 100ms ease', WebkitAppRegion: 'no-drag', maxWidth: '260px', width: '100%' } as any}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--text-dim)'; }}
+                    <button
+                        type="button"
+                        onClick={onOpenCommandPalette}
+                        aria-label="Ouvrir la palette de commandes (Ctrl+K)"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0 12px', height: '28px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-dim)', fontSize: '11.5px', fontWeight: 400, cursor: 'pointer', transition: 'all 100ms ease', WebkitAppRegion: 'no-drag', maxWidth: '260px', width: '100%' } as any}
                         title="Ouvrir la palette de commandes (Ctrl+K)">
-                        <Search size={12} color="var(--text-dim)" />
-                        <span style={{ flex: 1, textAlign: 'left' }}>Commandes...</span>
+                        <Search size={12} color="var(--text-dim)" aria-hidden="true" />
+                        <span style={{ flex: 1, textAlign: 'left' }}>Commandes…</span>
                         <kbd style={{ fontSize: '9px', padding: '0 4px', height: '16px', borderRadius: '4px' }}>Ctrl K</kbd>
                     </button>
                 )}
@@ -804,71 +813,89 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
             {/* ═══ DESKTOP RIGHT: Controls ═══ */}
             <div style={{ display: 'flex', alignItems: 'center', gap: isTablet ? '4px' : '8px', WebkitAppRegion: 'no-drag' } as any}>
                 <button
+                    type="button"
+                    className="sr-btn-secondary"
+                    onClick={() => onToggleSidebar?.('right')}
+                    title="Marketplace & Ressources (Ctrl+])"
+                    aria-label="Marketplace et Ressources"
+                    aria-pressed={rightSidebarOpen}
+                    style={{
+                        padding: isTablet ? '0 8px' : '0 11px',
+                        background: rightSidebarOpen ? 'var(--accent-transparent)' : undefined,
+                        borderColor: rightSidebarOpen ? 'var(--accent-default)' : undefined,
+                        color: rightSidebarOpen ? 'var(--accent-hover)' : undefined,
+                    }}
+                >
+                    <Boxes size={13} color={rightSidebarOpen ? 'var(--accent-hover)' : 'var(--text-dim)'} aria-hidden="true" />
+                    {!isTablet && <span>Marketplace</span>}
+                </button>
+
+                <div style={{ width: '1px', height: '18px', background: 'var(--border-subtle)', margin: '0 2px' }} />
+
+                <button
+                    type="button"
+                    className="sr-btn-secondary"
                     onClick={() => { if (isGuest) setAuthModalOpen(true); else setShareModalOpen(true); }}
                     title="Partager ce document"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-main)', padding: isTablet ? '0 8px' : '0 12px', height: '28px', color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 500, cursor: 'pointer', transition: 'all 100ms ease' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--border-strong)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-surface)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
+                    aria-label="Partager ce document"
+                    style={{ padding: isTablet ? '0 8px' : '0 12px' }}
                 >
-                    <Share2 size={13} color="var(--text-dim)" />
+                    <Share2 size={13} color="var(--text-dim)" aria-hidden="true" />
                     {!isTablet && <span>Partager</span>}
                 </button>
                 {onExport && (
-                    <button onClick={onExport} title="Exporter le carnet de raid (Ctrl+E)"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-main)', padding: isTablet ? '0 8px' : '0 12px', height: '28px', color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: 500, cursor: 'pointer', transition: 'all 100ms ease', flexShrink: 0 }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--border-strong)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-surface)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
+                    <button
+                        type="button"
+                        className="sr-btn-primary"
+                        onClick={onExport}
+                        title="Exporter le carnet de raid (Ctrl+E)"
+                        aria-label="Exporter le carnet de raid"
+                        style={{ padding: isTablet ? '0 8px' : '0 12px' }}
                     >
-                        <Download size={13} color="var(--text-dim)" />
-                        {!isTablet && <span>Export</span>}
+                        <Download size={13} aria-hidden="true" />
+                        {!isTablet && <span>Exporter</span>}
                     </button>
                 )}
                 {updateStatus !== 'idle' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderRadius: '20px', background: 'rgba(110, 201, 126, 0.1)', border: '1px solid rgba(110, 201, 126, 0.2)', marginRight: '8px' }}>
-                        {updateStatus === 'checking' && <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Recherche...</span>}
-                        {updateStatus === 'available' && <span style={{ fontSize: '11px', color: 'var(--accent-default)', fontWeight: 700 }}>Mise à jour disponible</span>}
+                    <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderRadius: '20px', background: 'var(--accent-transparent)', border: '1px solid var(--border-strong)', marginRight: '8px' }}>
+                        {updateStatus === 'checking' && <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600 }}>Recherche…</span>}
+                        {updateStatus === 'available' && <span style={{ fontSize: '11px', color: 'var(--accent-hover)', fontWeight: 600 }}>Mise à jour disponible</span>}
                         {updateStatus === 'downloading' && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                                    <div style={{ width: `${updateProgress}%`, height: '100%', background: 'var(--accent-default)', transition: 'width 0.3s' }} />
+                                <div style={{ width: '60px', height: '4px', background: 'var(--bg-hover)', borderRadius: '2px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${updateProgress}%`, height: '100%', background: 'var(--accent-primary)', transition: 'width 0.3s' }} />
                                 </div>
-                                <span style={{ fontSize: '10px', color: 'var(--accent-default)', fontWeight: 800 }}>{updateProgress}%</span>
+                                <span className="tabular-nums" style={{ fontSize: '10px', color: 'var(--accent-hover)', fontWeight: 700 }}>{updateProgress}%</span>
                             </div>
                         )}
                         {updateStatus === 'downloaded' && (
-                            <button onClick={() => (window as any).electronAPI?.quitAndInstall()}
-                                style={{ background: 'var(--accent-default)', border: 'none', borderRadius: '12px', padding: '2px 10px', fontSize: '10.5px', fontWeight: 800, color: '#0a100d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <button
+                                type="button"
+                                onClick={() => (window as any).electronAPI?.quitAndInstall()}
+                                style={{ background: 'var(--accent-primary)', border: 'none', borderRadius: '12px', padding: '3px 10px', fontSize: '10.5px', fontWeight: 600, color: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                            >
                                 Redémarrer pour mettre à jour
                             </button>
                         )}
                     </div>
                 )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginRight: '4px', paddingRight: '10px', borderRight: '1px solid var(--bg-border)' }}>
-                    <button onClick={() => onToggleSidebar?.('right')} title="Marketplace & Ressources (Ctrl+M)"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: rightSidebarOpen ? 'var(--accent-transparent)' : 'var(--bg-surface)', border: '1px solid', borderColor: rightSidebarOpen ? 'var(--accent-default)' : 'var(--border-subtle)', borderRadius: 'var(--radius-main)', padding: isTablet ? '0 8px' : '0 12px', height: '28px', color: rightSidebarOpen ? 'var(--accent-hover)' : 'var(--text-primary)', fontSize: '11.5px', fontWeight: 500, cursor: 'pointer', transition: 'all 100ms ease', flexShrink: 0 }}
-                        onMouseEnter={e => { if (!rightSidebarOpen) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--border-strong)'; } }}
-                        onMouseLeave={e => { if (!rightSidebarOpen) { e.currentTarget.style.background = 'var(--bg-surface)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; } }}
-                    >
-                        <PanelRight size={13} color={rightSidebarOpen ? 'var(--accent-hover)' : 'var(--text-dim)'} />
-                        {!isTablet && <span>Marketplace</span>}
-                    </button>
-                </div>
+                <div style={{ width: '1px', height: '18px', background: 'var(--border-subtle)', margin: '0 2px' }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px', position: 'relative' }}>
-                    <button className="btn-icon btn-sm" title="Préférences (Ctrl+P)" onClick={onPreferencesOpen}><Settings size={17} strokeWidth={2.2} /></button>
-                    <button className="btn-icon btn-sm" title="Historique des notifications" onClick={() => { setShowNotifHistory(!showNotifHistory); setOpenMenu(null); }}>
-                        <Bell size={17} strokeWidth={2.2} />
-                        {state.notifications.length > 0 && <div style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', background: 'var(--semantic-red)', borderRadius: '50%' }} />}
+                    <button type="button" className="btn-icon btn-sm" title="Préférences (Ctrl+,)" aria-label="Préférences" onClick={onPreferencesOpen}><Settings size={17} strokeWidth={2.2} aria-hidden="true" /></button>
+                    <button type="button" className="btn-icon btn-sm" title="Historique des notifications" aria-label="Historique des notifications" aria-expanded={showNotifHistory} onClick={() => { setShowNotifHistory(!showNotifHistory); setOpenMenu(null); }} style={{ position: 'relative' }}>
+                        <Bell size={17} strokeWidth={2.2} aria-hidden="true" />
+                        {state.notifications.length > 0 && <span aria-hidden="true" style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', background: 'var(--semantic-red)', borderRadius: '50%' }} />}
                     </button>
                     {showNotifHistory && (
-                        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '8px', width: '320px', maxHeight: '400px', overflowY: 'auto', background: 'var(--bg-panel)', border: '1px solid var(--bg-border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-glass)', zIndex: 3000, display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Historique des Notifications</div>
+                        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '8px', width: '320px', maxHeight: '400px', overflowY: 'auto', overscrollBehavior: 'contain', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-lg)', zIndex: 3000, display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Historique des Notifications</div>
                             {state.notifications.length === 0 ? (
                                 <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '12px' }}>Aucune notification.</div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     {[...state.notifications].reverse().map(notif => (
-                                        <div key={notif.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--glass-border)', display: 'flex', gap: '12px', alignItems: 'flex-start', background: notif.type === 'error' ? 'rgba(239, 68, 68, 0.05)' : notif.type === 'warning' ? 'rgba(212, 145, 74, 0.05)' : 'transparent' }}>
-                                            <div style={{ color: notif.type === 'error' ? 'var(--semantic-red)' : notif.type === 'warning' ? 'var(--semantic-orange)' : 'var(--semantic-green)', marginTop: '2px' }}>•</div>
+                                        <div key={notif.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', gap: '12px', alignItems: 'flex-start', background: notif.type === 'error' ? 'var(--semantic-danger-bg)' : notif.type === 'warning' ? 'var(--semantic-orange-bg)' : 'transparent' }}>
+                                            <div aria-hidden="true" style={{ color: notif.type === 'error' ? 'var(--semantic-red)' : notif.type === 'warning' ? 'var(--semantic-orange)' : 'var(--semantic-green)', marginTop: '2px' }}>•</div>
                                             <div style={{ flex: 1 }}><div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.4 }}>{notif.message}</div></div>
                                         </div>
                                     ))}
@@ -879,24 +906,20 @@ export default function MenuBar({ onToggleSidebar, rightSidebarOpen, viewMode = 
                 </div>
                 <div style={{ position: 'relative', marginLeft: '2px' }} ref={userMenuRef}>
                     {!isGuest && user ? (
-                        <button onClick={() => setUserMenuOpen(prev => !prev)} title={`Connecté : ${user.username} (PostgreSQL synchronisé)`}
-                            style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: 0, color: 'var(--text-primary)', transition: 'all 100ms ease' }}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-surface)'; }}>
-                            <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>{user.username ? user.username.charAt(0) : <User size={13} />}</span>
-                            <span style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '7px', height: '7px', borderRadius: '50%', background: cloudSyncStatus === 'saving' ? '#60A5FA' : cloudSyncStatus === 'error' ? 'var(--semantic-danger)' : 'var(--semantic-success)', border: '1.5px solid var(--bg-dark)' }} />
+                        <button type="button" onClick={() => setUserMenuOpen(prev => !prev)} title={`Connecté : ${user.username} (PostgreSQL synchronisé)`} aria-label={`Menu utilisateur (${user.username})`} aria-expanded={userMenuOpen}
+                            style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: 0, color: 'var(--text-primary)', transition: 'all 100ms ease' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>{user.username ? user.username.charAt(0) : <User size={13} aria-hidden="true" />}</span>
+                            <span aria-hidden="true" style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '7px', height: '7px', borderRadius: '50%', background: cloudSyncStatus === 'saving' ? '#60A5FA' : cloudSyncStatus === 'error' ? 'var(--semantic-danger)' : 'var(--semantic-success)', border: '1.5px solid var(--bg-dark)' }} />
                         </button>
                     ) : (
-                        <button onClick={() => setAuthModalOpen(true)} title="Connexion au compte (Actuellement en mode Invité)"
-                            style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: 0, color: 'var(--text-dim)', transition: 'all 100ms ease' }}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--text-dim)'; e.currentTarget.style.background = 'var(--bg-surface)'; }}>
-                            <User size={13} />
-                            <span style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '7px', height: '7px', borderRadius: '50%', background: 'var(--semantic-warning)', border: '1.5px solid var(--bg-dark)' }} />
+                        <button type="button" onClick={() => setAuthModalOpen(true)} title="Connexion au compte (Actuellement en mode Invité)" aria-label="Connexion au compte"
+                            style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: 0, color: 'var(--text-dim)', transition: 'all 100ms ease' }}>
+                            <User size={13} aria-hidden="true" />
+                            <span aria-hidden="true" style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '7px', height: '7px', borderRadius: '50%', background: 'var(--semantic-warning)', border: '1.5px solid var(--bg-dark)' }} />
                         </button>
                     )}
                     {userMenuOpen && !isGuest && user && (
-                        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', minWidth: '200px', padding: '4px 0', zIndex: 3500 }}>
+                        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', minWidth: '200px', padding: '4px 0', zIndex: 3500, overscrollBehavior: 'contain' }}>
                             <div style={{ padding: '6px 12px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: '11px', color: 'var(--text-dim)' }}>Connecté : <strong style={{ color: 'var(--text-primary)' }}>{user.username}</strong></div>
                             <div className="menu-item-hover" onClick={() => { setProjectsModalOpen(true); setUserMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-primary)' }}><FolderOpen size={13} color="var(--text-dim)" /><span>Mes documents cloud</span></div>
                             <div className="menu-item-hover" onClick={() => { saveToCloudNow(); setUserMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-primary)' }}><Cloud size={13} color="var(--text-dim)" /><span>Enregistrer maintenant</span></div>

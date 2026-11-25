@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Layers, Settings, HelpCircle, ExternalLink, Key, Check, Info } from 'lucide-react';
+import { Map as MapIcon, Settings, HelpCircle, ExternalLink, Key, Check, Info } from 'lucide-react';
 import { useUI } from '../../hooks';
 
 const LAYERS = [
@@ -86,12 +86,12 @@ export default function MapSettings() {
                 onClick={() => setIsOpen(!isOpen)}
                 title="Paramètres de la carte"
             >
-                <Layers size={20} />
+                <MapIcon size={20} />
             </button>
 
             <div style={dropdownStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <Layers size={16} color="var(--accent-default)" />
+                    <MapIcon size={16} color="var(--text-secondary)" />
                     <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-bright)' }}>Fonds de Carte</span>
                 </div>
 

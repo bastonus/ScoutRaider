@@ -152,7 +152,7 @@ export default function LoginPage() {
             <div style={styles.card}>
                 {/* ── Wordmark ── */}
                 <div style={styles.wordmark}>
-                    <FleurDeLysLogo size={48} color="#6EC97E" />
+                    <FleurDeLysLogo size={48} color="var(--accent-primary)" />
                     <div style={styles.wordmarkText}>
                         <span style={styles.wordScout}>Scout</span>
                         <span style={styles.wordRaider}>Raider</span>
@@ -162,8 +162,10 @@ export default function LoginPage() {
                 </div>
 
                 {/* ── Tabs ── */}
-                <div style={styles.tabRow}>
+                <div role="tablist" aria-label="Mode d'authentification" style={styles.tabRow}>
                     <button
+                        role="tab"
+                        aria-selected={tab === 'login'}
                         style={{ ...styles.tabBtn, ...(tab === 'login' ? styles.tabBtnActive : {}) }}
                         onClick={() => { setTab('login'); setError(null); setFieldErrors({}); }}
                         type="button"
@@ -171,6 +173,8 @@ export default function LoginPage() {
                         Connexion
                     </button>
                     <button
+                        role="tab"
+                        aria-selected={tab === 'register'}
                         style={{ ...styles.tabBtn, ...(tab === 'register' ? styles.tabBtnActive : {}) }}
                         onClick={() => { setTab('register'); setError(null); setFieldErrors({}); }}
                         type="button"
@@ -180,10 +184,12 @@ export default function LoginPage() {
                 </div>
 
                 {/* ── Form ── */}
-                <form onSubmit={handleSubmit} style={styles.form}>
+                <form onSubmit={handleSubmit} style={styles.form} noValidate>
                     <div style={styles.fieldGroup}>
-                        <label style={styles.label}>Nom d'utilisateur</label>
+                        <label htmlFor="login-username" style={styles.label}>Nom d'utilisateur</label>
                         <input
+                            id="login-username"
+                            name="username"
                             className="sr-input"
                             style={{ ...styles.input, ...(fieldErrors.username ? styles.inputError : {}) }}
                             type="text"
@@ -191,18 +197,22 @@ export default function LoginPage() {
                             onChange={e => setUsername(e.target.value)}
                             placeholder={tab === 'login' ? 'scout_raider' : 'mon_pseudo'}
                             autoComplete="username"
+                            aria-invalid={!!fieldErrors.username}
+                            aria-describedby={fieldErrors.username ? 'login-username-error' : undefined}
                         />
                         {fieldErrors.username && (
-                            <span style={styles.fieldError}>{fieldErrors.username}</span>
+                            <span id="login-username-error" style={styles.fieldError}>{fieldErrors.username}</span>
                         )}
                     </div>
 
                     {tab === 'register' && (
                         <div style={styles.fieldGroup}>
-                            <label style={styles.label}>
+                            <label htmlFor="login-email" style={styles.label}>
                                 E-mail <span style={styles.optional}>(optionnel)</span>
                             </label>
                             <input
+                                id="login-email"
+                                name="email"
                                 className="sr-input"
                                 style={{ ...styles.input, ...(fieldErrors.email ? styles.inputError : {}) }}
                                 type="email"
@@ -210,16 +220,20 @@ export default function LoginPage() {
                                 onChange={e => setEmail(e.target.value)}
                                 placeholder="email@exemple.fr"
                                 autoComplete="email"
+                                aria-invalid={!!fieldErrors.email}
+                                aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
                             />
                             {fieldErrors.email && (
-                                <span style={styles.fieldError}>{fieldErrors.email}</span>
+                                <span id="login-email-error" style={styles.fieldError}>{fieldErrors.email}</span>
                             )}
                         </div>
                     )}
 
                     <div style={styles.fieldGroup}>
-                        <label style={styles.label}>Mot de passe</label>
+                        <label htmlFor="login-password" style={styles.label}>Mot de passe</label>
                         <input
+                            id="login-password"
+                            name="password"
                             className="sr-input"
                             style={{ ...styles.input, ...(fieldErrors.password ? styles.inputError : {}) }}
                             type="password"
@@ -227,14 +241,16 @@ export default function LoginPage() {
                             onChange={e => setPassword(e.target.value)}
                             placeholder="••••••••"
                             autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                            aria-invalid={!!fieldErrors.password}
+                            aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
                         />
                         {fieldErrors.password && (
-                            <span style={styles.fieldError}>{fieldErrors.password}</span>
+                            <span id="login-password-error" style={styles.fieldError}>{fieldErrors.password}</span>
                         )}
                     </div>
 
                     {error && (
-                        <div style={styles.errorBox}>
+                        <div role="alert" style={styles.errorBox}>
                             <div>{error.message}</div>
                             {error.hint && (
                                 <div style={styles.errorHint}>
@@ -332,7 +348,7 @@ const styles: Record<string, React.CSSProperties> = {
         fontSize: '48px',
         fontWeight: 800,
         letterSpacing: '-2px',
-        color: '#6EC97E',
+        color: 'var(--accent-hover)',
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
     },
     versionBadge: {
@@ -342,14 +358,14 @@ const styles: Record<string, React.CSSProperties> = {
         marginLeft: '6px',
         fontSize: '11px',
         fontWeight: 500,
-        color: '#3F3F46',
+        color: 'var(--text-dim)',
         letterSpacing: '0.04em',
         whiteSpace: 'nowrap' as const,
     },
     tagline: {
         margin: 0,
         fontSize: '12px',
-        color: '#52525B',
+        color: 'var(--text-dim)',
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
         fontWeight: 500,
@@ -368,7 +384,7 @@ const styles: Record<string, React.CSSProperties> = {
         padding: '8px 0',
         border: 'none',
         background: 'transparent',
-        color: '#52525B',
+        color: 'var(--text-dim)',
         fontSize: '13px',
         fontWeight: 500,
         borderRadius: '9px',

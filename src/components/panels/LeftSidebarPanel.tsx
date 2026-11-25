@@ -85,8 +85,8 @@ export default function LeftSidebarPanel() {
             {/* ── Top Header: Always displays the title of the selected layer ── */}
             <div style={{
                 padding: '12px 14px',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
-                background: 'rgba(0,0,0,0.22)',
+                borderBottom: '1px solid var(--border-subtle)',
+                background: 'var(--bg-dark)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -96,12 +96,12 @@ export default function LeftSidebarPanel() {
                     width: '10px', height: '10px', borderRadius: '3px',
                     background: color, flexShrink: 0
                 }} />
-                <span style={{ color, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                <span aria-hidden="true" style={{ color, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                     {Icon}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                        fontSize: '13px', fontWeight: 700, color: 'var(--text-bright)',
+                        fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)',
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                     }}>
                         {title}
@@ -110,8 +110,8 @@ export default function LeftSidebarPanel() {
                 {typeName && (
                     <span style={{
                         fontSize: '9px', fontWeight: 700, padding: '2px 6px',
-                        borderRadius: '4px', background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '4px', background: 'var(--bg-surface)',
+                        border: '1px solid var(--border-subtle)',
                         color: 'var(--text-dim)', textTransform: 'uppercase',
                         letterSpacing: '0.04em', flexShrink: 0
                     }}>
@@ -144,7 +144,7 @@ export default function LeftSidebarPanel() {
                         {selectedArea.text && (
                             <InfoCard
                                 label="Notes / Description"
-                                value={<span style={{ fontWeight: 400, fontSize: '12px', lineHeight: 1.5, color: '#cbd5e1' }}>{selectedArea.text}</span>}
+                                value={<span style={{ fontWeight: 400, fontSize: '12px', lineHeight: 1.5, color: 'var(--text-default)' }}>{selectedArea.text}</span>}
                             />
                         )}
                         <InfoCard

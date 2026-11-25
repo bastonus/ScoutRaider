@@ -4,7 +4,7 @@
 
 # ScoutRaider — Générateur de Carnets de Raid (Repository Blueprint)
 
-> **Version Beta 0.3.11** · Application de planification de raids scouts, disponible sur navigateur et en application de bureau (Electron).
+> **Version Beta 0.3.14** · Application de planification de raids scouts, disponible sur navigateur et en application de bureau (Electron).
 
 ---
 
@@ -61,9 +61,11 @@ The repository is organized into four primary architectural subsystems:
 
 ## System Verification
 
+- **Frontend Typecheck**: `npm run typecheck`
+- **Frontend Unit Tests**: `npm test`
 - **Frontend Build**: `npm run build`
 - **Desktop Electron**: `npm run electron`
-- **Backend Test Suite**: `cd backend && pytest tests/ -v`
+- **Backend Test Suite**: `cd backend && pytest app/tests/ -v`
 - **Full Production Packaging**: `npm run electron:build:win`
 
 ---

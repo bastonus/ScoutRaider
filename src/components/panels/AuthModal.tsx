@@ -2,12 +2,16 @@
  * AuthModal.tsx — Login / Registration / Guest Selection Modal.
  */
 
-import React, { useState } from 'react';
-import { X, User, Lock, Mail, ShieldAlert, CheckCircle2, ArrowRight } from 'lucide-react';
+import React, { useId, useState } from 'react';
+import { User, Lock, Mail, ShieldAlert, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
+import Modal from '../common/Modal';
 
 export default function AuthModal({ onClose }: { onClose: () => void }) {
     const { login, register, continueAsGuest } = useAuth();
+    const usernameId = useId();
+    const emailId = useId();
+    const passwordId = useId();
 
     const [tab, setTab] = useState<'login' | 'register'>('login');
     const [username, setUsername] = useState('');
@@ -36,75 +40,29 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     };
 
     return (
-        <div 
-            style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 999999,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(0,0,0,0.75)',
-                backdropFilter: 'blur(8px)',
-                padding: '20px'
-            }}
-            onClick={onClose}
+        <Modal
+            title={tab === 'login' ? 'Connexion' : 'Créer un compte'}
+            onClose={onClose}
+            maxWidth="400px"
         >
-            <div 
-                onClick={e => e.stopPropagation()}
-                style={{
-                    width: '100%',
-                    maxWidth: '400px',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-md)',
-                    boxShadow: 'var(--shadow-lg)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden'
-                }}
-            >
-                {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 16px',
-                    borderBottom: '1px solid var(--border-subtle)'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {tab === 'login' ? 'Connexion' : 'Créer un compte'}
-                        </span>
-                    </div>
-                    <button 
-                        onClick={onClose}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text-dim)',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            display: 'flex',
-                            alignItems: 'center'
-                        }}
-                    >
-                        <X size={16} />
-                    </button>
-                </div>
-
                 {/* Tabs */}
-                <div style={{
-                    display: 'flex',
-                    padding: '2px',
-                    margin: '12px 16px 0',
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-sm)',
-                    gap: '2px'
-                }}>
+                <div
+                    role="tablist"
+                    aria-label="Mode d'authentification"
+                    style={{
+                        display: 'flex',
+                        padding: '2px',
+                        margin: '12px 16px 0',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-sm)',
+                        gap: '2px'
+                    }}
+                >
                     <button
                         type="button"
+                        role="tab"
+                        aria-selected={tab === 'login'}
                         onClick={() => { setTab('login'); setError(null); }}
                         style={{
                             flex: 1,
@@ -124,6 +82,8 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
                     </button>
                     <button
                         type="button"
+                        role="tab"
+                        aria-selected={tab === 'register'}
                         onClick={() => { setTab('register'); setError(null); }}
                         style={{
                             flex: 1,
@@ -145,19 +105,22 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
 
                 {/* Error Banner */}
                 {error && (
-                    <div style={{
-                        margin: '12px 16px 0',
-                        padding: '8px 12px',
-                        background: 'var(--semantic-danger-bg)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        borderRadius: 'var(--radius-sm)',
-                        color: 'var(--semantic-danger)',
-                        fontSize: '11.5px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}>
-                        <ShieldAlert size={14} style={{ flexShrink: 0 }} />
+                    <div
+                        role="alert"
+                        style={{
+                            margin: '12px 16px 0',
+                            padding: '8px 12px',
+                            background: 'var(--semantic-danger-bg)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: 'var(--radius-sm)',
+                            color: 'var(--semantic-danger)',
+                            fontSize: '11.5px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}
+                    >
+                        <ShieldAlert size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
                         <span>{error}</span>
                     </div>
                 )}
@@ -165,14 +128,17 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
                 {/* Form */}
                 <form onSubmit={handleSubmit} style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '5px' }}>
+                        <label htmlFor={usernameId} style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '5px' }}>
                             {tab === 'login' ? "Nom d'utilisateur ou email" : "Nom d'utilisateur"}
                         </label>
                         <div style={{ position: 'relative' }}>
-                            <User size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--text-dim)' }} />
-                            <input 
+                            <User size={14} aria-hidden="true" style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--text-dim)', pointerEvents: 'none' }} />
+                            <input
+                                id={usernameId}
+                                name="username"
                                 type="text"
                                 required
+                                autoComplete="username"
                                 value={username}
                                 onChange={e => setUsername(e.target.value)}
                                 placeholder={tab === 'login' ? "ex: pierre ou pierre@raid.fr" : "ex: scout_75"}
@@ -184,7 +150,6 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
                                     borderRadius: 'var(--radius-sm)',
                                     color: 'var(--text-primary)',
                                     fontSize: '12px',
-                                    outline: 'none',
                                     boxSizing: 'border-box'
                                 }}
                             />
@@ -193,13 +158,16 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
 
                     {tab === 'register' && (
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '5px' }}>
+                            <label htmlFor={emailId} style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '5px' }}>
                                 Adresse email (optionnel)
                             </label>
                             <div style={{ position: 'relative' }}>
-                                <Mail size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--text-dim)' }} />
-                                <input 
+                                <Mail size={14} aria-hidden="true" style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--text-dim)', pointerEvents: 'none' }} />
+                                <input
+                                    id={emailId}
+                                    name="email"
                                     type="email"
+                                    autoComplete="email"
                                     value={email}
                                     onChange={e => setEmail(e.target.value)}
                                     placeholder="ex: scout@raider.fr"
@@ -211,7 +179,6 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
                                         borderRadius: 'var(--radius-sm)',
                                         color: 'var(--text-primary)',
                                         fontSize: '12px',
-                                        outline: 'none',
                                         boxSizing: 'border-box'
                                     }}
                                 />
@@ -220,14 +187,17 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
                     )}
 
                     <div>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '5px' }}>
+                        <label htmlFor={passwordId} style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '5px' }}>
                             Mot de passe
                         </label>
                         <div style={{ position: 'relative' }}>
-                            <Lock size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--text-dim)' }} />
-                            <input 
+                            <Lock size={14} aria-hidden="true" style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--text-dim)', pointerEvents: 'none' }} />
+                            <input
+                                id={passwordId}
+                                name="password"
                                 type="password"
                                 required
+                                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 placeholder="••••••••"
@@ -239,7 +209,6 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
                                     borderRadius: 'var(--radius-sm)',
                                     color: 'var(--text-primary)',
                                     fontSize: '12px',
-                                    outline: 'none',
                                     boxSizing: 'border-box'
                                 }}
                             />
@@ -268,7 +237,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
                         }}
                     >
                         {loading ? 'Chargement...' : (tab === 'login' ? 'Se connecter' : 'Créer mon compte')}
-                        <ArrowRight size={14} />
+                        <ArrowRight size={14} aria-hidden="true" />
                     </button>
                 </form>
 
@@ -288,7 +257,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
                     </div>
                     <button
                         type="button"
-                        onClick={continueAsGuest}
+                        onClick={() => { continueAsGuest(); onClose(); }}
                         style={{
                             padding: '5px 10px',
                             background: 'transparent',
@@ -300,19 +269,10 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
                             cursor: 'pointer',
                             transition: 'all 100ms ease'
                         }}
-                        onMouseEnter={e => {
-                            e.currentTarget.style.borderColor = 'var(--border-strong)';
-                            e.currentTarget.style.color = 'var(--text-primary)';
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                            e.currentTarget.style.color = 'var(--text-dim)';
-                        }}
                     >
                         Continuer en tant qu'invité
                     </button>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 }

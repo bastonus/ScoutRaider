@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Boxes } from 'lucide-react';
+import { X, Boxes, Maximize2 } from 'lucide-react';
 import UnifiedResourceHub from '../panels/UnifiedResourceHub';
 
 export type SectionId = 'layers' | 'orchestration' | 'themes' | 'modules' | 'maps' | 'export' | 'hub';
@@ -16,6 +16,7 @@ interface RightSidebarProps {
 export default function RightSidebar({ 
   width,
   onClose,
+  onMarketplaceOpen,
   onPreferencesOpen
 }: RightSidebarProps) {
   const isFull = width === '100%' || width === 'auto';
@@ -43,38 +44,41 @@ export default function RightSidebar({
         flexShrink: 0
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Boxes size={16} color="var(--accent-default)" />
-          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-bright)', letterSpacing: '0.02em' }}>
+          <Boxes size={16} color="var(--accent-hover)" aria-hidden="true" />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
             Marketplace & Ressources
           </span>
         </div>
-        {onClose && (
-          <button
-            onClick={onClose}
-            title="Fermer le panneau (Ctrl+])"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-dim)',
-              cursor: 'pointer',
-              padding: '4px',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              transition: 'all 100ms ease'
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-dim)'; e.currentTarget.style.background = 'transparent'; }}
-          >
-            <X size={15} />
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {onMarketplaceOpen && (
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={onMarketplaceOpen}
+              title="Agrandir la Marketplace"
+              aria-label="Agrandir la Marketplace en grand écran"
+            >
+              <Maximize2 size={14} aria-hidden="true" />
+            </button>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={onClose}
+              title="Fermer le panneau (Ctrl+])"
+              aria-label="Fermer le panneau"
+            >
+              <X size={15} aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Unified Resource Hub content */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <UnifiedResourceHub 
-          isCompact={false} 
+          isCompact={!isFull}
           onPreferencesOpen={onPreferencesOpen}
         />
       </div>

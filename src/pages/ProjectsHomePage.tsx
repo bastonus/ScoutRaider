@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { ModuleManagementService, ManagedModule } from '../logic/ModuleManagementService';
 import ModuleEditorModal from '../components/panels/ModuleEditorModal';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 
 type TabFilter = 'all' | 'mine' | 'shared';
 
@@ -109,11 +110,25 @@ export default function ProjectsHomePage() {
         refreshModules();
     };
 
+    const [confirmState, setConfirmState] = useState<{
+        title: string;
+        message: string;
+        confirmLabel: string;
+        onConfirm: () => void;
+    } | null>(null);
+
     const handleDeleteModule = (modId: string) => {
-        if (window.confirm('Voulez-vous vraiment supprimer ce module personnalisé ?')) {
-            ModuleManagementService.deleteCustomModule(modId);
-            refreshModules();
-        }
+        const mod = modulesList.find(m => m.id === modId);
+        setConfirmState({
+            title: `Supprimer « ${mod?.name || modId} » ?`,
+            message: 'Ce module personnalisé sera définitivement supprimé de votre espace local.',
+            confirmLabel: 'Supprimer le module',
+            onConfirm: () => {
+                ModuleManagementService.deleteCustomModule(modId);
+                refreshModules();
+                setConfirmState(null);
+            },
+        });
     };
 
     const [s3Toast, setS3Toast] = useState<{ message: string; isError?: boolean } | null>(null);
@@ -232,14 +247,21 @@ export default function ProjectsHomePage() {
         });
     };
 
-    const handleDelete = async (p: CloudProjectSummary) => {
-        if (!window.confirm(`Supprimer "${p.title}" ? Cette action est irréversible.`)) return;
-        try {
-            await CloudAuthService.deleteProject(p.id);
-            setProjects(prev => prev.filter(x => x.id !== p.id));
-        } catch (e: any) {
-            setError(e.message);
-        }
+    const handleDelete = (p: CloudProjectSummary) => {
+        setConfirmState({
+            title: `Supprimer « ${p.title} » ?`,
+            message: 'Ce projet et son contenu cloud seront définitivement supprimés. Cette action est irréversible.',
+            confirmLabel: 'Supprimer le projet',
+            onConfirm: async () => {
+                setConfirmState(null);
+                try {
+                    await CloudAuthService.deleteProject(p.id);
+                    setProjects(prev => prev.filter(x => x.id !== p.id));
+                } catch (e: any) {
+                    setError(e.message);
+                }
+            },
+        });
     };
 
     const handleLogout = () => {
@@ -252,391 +274,284 @@ export default function ProjectsHomePage() {
     // ── Render ───────────────────────────────────────────────────────────
     return (
         <div style={s.page}>
-
-            {/* ── Top-right session button ── */}
-            <div style={s.sessionCorner}>
-                {isGuest ? (
-                    <button style={s.sessionBtn} onClick={handleGuestLogin}>
-                        <User size={14} />
-                        <span>Connexion</span>
-                    </button>
-                ) : (
-                    <div style={{ position: 'relative' }}>
-                        <button style={s.sessionBtn} onClick={() => setUserMenuOpen(o => !o)}>
-                            <span style={s.avatarInitial}>{(user?.username || '?')[0].toUpperCase()}</span>
-                            <span style={s.sessionUser}>{user?.username || ''}</span>
-                            <ChevronDown size={12} style={{ color: '#52525B' }} />
-                        </button>
-                        {userMenuOpen && (
-                            <div style={s.userDropdown} onClick={e => e.stopPropagation()}>
-                                <button style={s.dropdownItem} onClick={handleLogout}>
-                                    <LogOut size={14} /> Déconnexion
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
             {/* Click-away for user menu */}
             {userMenuOpen && (
                 <div style={s.overlay} onClick={() => setUserMenuOpen(false)} />
             )}
 
-            {/* ── Hero wordmark ── */}
-            <div style={s.hero}>
-                <div style={s.heroLogo}>
-                    <FleurDeLysLogo size={64} color="#6EC97E" />
-                </div>
-                <h1 style={s.heroTitle}>
-                    <span style={s.heroScout}>Scout</span><span style={s.heroRaider}>Raider</span>
-                    <span style={s.heroVersion}>v{version}</span>
-                </h1>
-                <p style={s.heroSub}>Suite de cartographie tactique</p>
-
-                {/* ── Top-level Section Switcher: Projects vs Modules ── */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    background: '#18181B',
-                    border: '1px solid #27272A',
-                    borderRadius: '12px',
-                    padding: '4px',
-                    marginBottom: '20px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                }}>
-                    <button
-                        onClick={() => setActiveSection('projects')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 18px',
-                            borderRadius: '9px',
-                            border: 'none',
-                            background: activeSection === 'projects' ? 'rgba(110, 201, 126, 0.15)' : 'transparent',
-                            color: activeSection === 'projects' ? '#6EC97E' : '#71717A',
-                            fontSize: '13px',
-                            fontWeight: activeSection === 'projects' ? 700 : 500,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                        }}
-                    >
-                        <FileText size={15} />
-                        <span>Raids & Carnets ({projects.length})</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveSection('modules')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 18px',
-                            borderRadius: '9px',
-                            border: 'none',
-                            background: activeSection === 'modules' ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
-                            color: activeSection === 'modules' ? '#93C5FD' : '#71717A',
-                            fontSize: '13px',
-                            fontWeight: activeSection === 'modules' ? 700 : 500,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                        }}
-                    >
-                        <Boxes size={15} />
-                        <span>Gestion des Modules ({modulesList.length})</span>
-                    </button>
+            {/* ── Top Navigation Bar (Left-aligned brand, right-aligned Marketplace + Session) ── */}
+            <header style={{
+                height: '56px',
+                borderBottom: '1px solid var(--border-subtle)',
+                background: 'var(--bg-dark)',
+                padding: '0 clamp(16px, 3vw, 32px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                position: 'sticky',
+                top: 0,
+                zIndex: 100,
+                flexShrink: 0,
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <FleurDeLysLogo size={26} color="var(--accent-primary)" />
+                    <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                        ScoutRaider
+                    </span>
+                    <span className="tabular-nums" style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: 'var(--text-dim)',
+                        fontFamily: 'var(--font-mono)',
+                        padding: '1px 6px',
+                        borderRadius: '6px',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border-subtle)',
+                    }}>
+                        v{version}
+                    </span>
                 </div>
 
-                {/* Search + Action row */}
-                <div style={s.heroRow}>
-                    <div style={s.heroSearch}>
-                        <Search size={16} style={s.heroSearchIcon} />
-                        <input
-                            style={s.heroSearchInput}
-                            type="text"
-                            placeholder={activeSection === 'projects' ? "Rechercher un projet ou raid…" : "Rechercher un module (nom, ID, capability, tag)…"}
-                            value={activeSection === 'projects' ? search : moduleSearch}
-                            onChange={e => {
-                                if (activeSection === 'projects') setSearch(e.target.value);
-                                else setModuleSearch(e.target.value);
-                            }}
-                            autoFocus
-                        />
-                        {activeSection === 'projects' && !isGuest && (
-                            <button
-                                style={s.heroRefresh}
-                                onClick={() => loadProjects(false)}
-                                title="Actualiser"
-                                disabled={loadingProjects}
-                            >
-                                <RefreshCw size={14} className={loadingProjects ? "spin" : ""} />
-                            </button>
-                        )}
-                        {activeSection === 'modules' && (
-                            <button
-                                style={s.heroRefresh}
-                                onClick={refreshModules}
-                                title="Actualiser la liste des modules"
-                            >
-                                <RefreshCw size={14} />
-                            </button>
-                        )}
-                    </div>
-
-                    <button 
-                        style={{
-                            ...s.newBtn,
-                            background: 'linear-gradient(135deg, rgba(110,201,126,0.18), rgba(14,165,233,0.18))',
-                            border: '1px solid rgba(110,201,126,0.35)',
-                            color: '#6EC97E'
-                        }} 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <button
+                        type="button"
+                        className="sr-btn-secondary"
                         onClick={() => navigate('/marketplace')}
-                        title="Ouvrir la Marketplace des Modules de code & Orchestrations"
+                        title="Ouvrir la Marketplace (cartes, modules, trames et thèmes)"
                     >
-                        <Boxes size={15} />
+                        <Boxes size={14} color="var(--text-dim)" aria-hidden="true" />
                         <span>Marketplace</span>
                     </button>
 
-                    {activeSection === 'projects' ? (
-                        <button style={s.newBtn} onClick={handleNewProject}>
-                            <Plus size={15} />
-                            <span>Nouveau projet</span>
+                    {isGuest ? (
+                        <button type="button" className="sr-btn-secondary" onClick={handleGuestLogin}>
+                            <User size={14} aria-hidden="true" />
+                            <span>Connexion</span>
                         </button>
                     ) : (
-                        <button 
-                            style={{
-                                ...s.newBtn,
-                                background: '#2563eb',
-                                color: '#fff'
-                            }} 
-                            onClick={() => {
-                                setEditingModuleId(null);
-                                setModuleEditorOpen(true);
-                            }}
-                        >
-                            <Plus size={15} />
-                            <span>Nouveau Module</span>
-                        </button>
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                type="button"
+                                className="sr-btn-secondary"
+                                onClick={() => setUserMenuOpen(o => !o)}
+                                aria-expanded={userMenuOpen}
+                                aria-haspopup="menu"
+                                style={{ padding: '0 10px 0 6px' }}
+                            >
+                                <span style={s.avatarInitial}>{(user?.username || '?')[0].toUpperCase()}</span>
+                                <span style={s.sessionUser}>{user?.username || ''}</span>
+                                <ChevronDown size={12} color="var(--text-dim)" aria-hidden="true" />
+                            </button>
+                            {userMenuOpen && (
+                                <div role="menu" style={s.userDropdown} onClick={e => e.stopPropagation()}>
+                                    <button type="button" role="menuitem" style={s.dropdownItem} onClick={handleLogout}>
+                                        <LogOut size={14} aria-hidden="true" /> Déconnexion
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
-            </div>
+            </header>
 
-            {/* ── Main content ── */}
-            <main style={s.main}>
+            {/* ── Main Workspace (Left-aligned, Grid-based) ── */}
+            <main style={{
+                maxWidth: '1360px',
+                width: '100%',
+                margin: '0 auto',
+                padding: 'clamp(20px, 3vw, 32px) clamp(16px, 3vw, 32px) 64px',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+            }}>
+                {/* Workspace Title & Primary Action */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                        <h1 style={{ margin: 0, fontSize: 'clamp(20px, 2.5vw, 24px)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                            Raids & Carnets
+                        </h1>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-dim)' }}>
+                            {isGuest
+                                ? 'Mode invité — connectez-vous pour synchroniser vos carnets dans le cloud.'
+                                : getGreeting(user?.username || '')}
+                        </p>
+                    </div>
 
-                {activeSection === 'projects' ? (
-                    <>
-                        {/* Tabs row for projects */}
-                        {!isGuest && (
-                        <div style={s.toolRow}>
-                            <div style={s.tabRow}>
-                                {(['all', 'mine', 'shared'] as TabFilter[]).map(t => (
-                                    <button
-                                        key={t}
-                                        style={{ ...s.tabBtn, ...(tab === t ? s.tabBtnActive : {}) }}
-                                        onClick={() => setTab(t)}
-                                    >
-                                        {t === 'all' ? 'Tous' : t === 'mine' ? 'Mes projets' : 'Partagés'}
-                                        {t !== 'all' && (
-                                            <span style={s.tabCount}>
-                                                {t === 'mine'
-                                                    ? projects.filter(p => p.is_owner).length
-                                                    : projects.filter(p => !p.is_owner).length}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        )}
+                    <button
+                        type="button"
+                        className="sr-btn-primary sr-pressable"
+                        onClick={handleNewProject}
+                        style={{ height: '36px', padding: '0 16px', fontSize: '12.5px' }}
+                    >
+                        <Plus size={15} aria-hidden="true" />
+                        <span>Nouveau projet</span>
+                    </button>
+                </div>
 
-                        {/* Error */}
-                        {error && (
-                            <div style={s.errorBox}>
-                                ⚠ {error}
-                                <button style={s.errorClose} onClick={() => setError(null)}>✕</button>
-                            </div>
-                        )}
-
-                        {/* Loading */}
-                        {loadingProjects && (
-                            <div style={s.loadingRow}>
-                                <Loader2 size={20} className="spin" style={{ color: '#2563EB' }} />
-                                <span style={{ color: '#52525B', fontSize: '13px' }}>Chargement…</span>
-                            </div>
-                        )}
-
-                        {/* Guest state */}
-                        {isGuest && !loadingProjects && (
-                            <div style={s.emptyState}>
-                                <FolderOpen size={36} style={{ color: '#3F3F46', marginBottom: '12px' }} />
-                                <p style={s.emptyTitle}>Mode invité</p>
-                                <p style={s.emptyHint}>Connectez-vous pour accéder à vos projets cloud et activer la synchronisation.</p>
-                                <button style={s.newBtn} onClick={handleGuestLogin}>
-                                    <User size={14} /> Se connecter
+                {/* Filter Tabs & Search Row */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    paddingBottom: '12px',
+                    borderBottom: '1px solid var(--border-subtle)',
+                }}>
+                    {!isGuest ? (
+                        <div role="tablist" aria-label="Filtrer les projets" style={s.tabRow}>
+                            {(['all', 'mine', 'shared'] as TabFilter[]).map(t => (
+                                <button
+                                    key={t}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={tab === t}
+                                    style={{ ...s.tabBtn, ...(tab === t ? s.tabBtnActive : {}) }}
+                                    onClick={() => setTab(t)}
+                                >
+                                    <span>{t === 'all' ? 'Tous' : t === 'mine' ? 'Mes projets' : 'Partagés'}</span>
+                                    <span className="tabular-nums" style={s.tabCount}>
+                                        {t === 'all'
+                                            ? projects.length
+                                            : t === 'mine'
+                                            ? projects.filter(p => p.is_owner).length
+                                            : projects.filter(p => !p.is_owner).length}
+                                    </span>
                                 </button>
-                            </div>
-                        )}
-
-                        {/* Empty state */}
-                        {!isGuest && !loadingProjects && filteredProjects.length === 0 && (
-                            <div style={s.emptyState}>
-                                <FileText size={36} style={{ color: '#3F3F46', marginBottom: '12px' }} />
-                                <p style={s.emptyTitle}>
-                                    {search ? `Aucun résultat pour "${search}"` : 'Aucun projet pour le moment'}
-                                </p>
-                                {!search && (
-                                    <p style={s.emptyHint}>Créez votre premier projet pour commencer.</p>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Project grid */}
-                        {!isGuest && !loadingProjects && filteredProjects.length > 0 && (
-                            <div style={s.grid}>
-                                {filteredProjects.map(p => (
-                                    <ProjectCard
-                                        key={p.id}
-                                        project={p}
-                                        onOpen={() => handleOpen(p)}
-                                        onShare={() => setShareTarget(p)}
-                                        onCopyLink={() => handleCopyLink(p)}
-                                        onDelete={() => handleDelete(p)}
-                                        copied={copiedId === p.id}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    /* ── MODULES MANAGEMENT VIEW ── */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        
-                        {/* Stats Banner */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                            gap: '12px'
-                        }}>
-                            <div style={{ background: '#12131A', border: '1px solid #27272A', borderRadius: '12px', padding: '14px 18px' }}>
-                                <span style={{ fontSize: '11px', color: '#71717A', fontWeight: 600, textTransform: 'uppercase' }}>Modules Installés</span>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#FAFAFA', marginTop: '4px' }}>{modulesList.length}</div>
-                            </div>
-                            <div style={{ background: '#12131A', border: '1px solid #27272A', borderRadius: '12px', padding: '14px 18px' }}>
-                                <span style={{ fontSize: '11px', color: '#71717A', fontWeight: 600, textTransform: 'uppercase' }}>Dans ma Bibliothèque</span>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#6EC97E', marginTop: '4px' }}>
-                                    {modulesList.filter(m => ModuleManagementService.isInLibrary(m.id)).length}
-                                </div>
-                            </div>
-                            <div style={{ background: '#12131A', border: '1px solid #27272A', borderRadius: '12px', padding: '14px 18px' }}>
-                                <span style={{ fontSize: '11px', color: '#71717A', fontWeight: 600, textTransform: 'uppercase' }}>Modules Privés (Locaux)</span>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#FBBF24', marginTop: '4px' }}>
-                                    {modulesList.filter(m => !m.is_public).length}
-                                </div>
-                            </div>
-                            <div style={{ background: '#12131A', border: '1px solid #27272A', borderRadius: '12px', padding: '14px 18px' }}>
-                                <span style={{ fontSize: '11px', color: '#71717A', fontWeight: 600, textTransform: 'uppercase' }}>Modules Publics (Hub)</span>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#38BDF8', marginTop: '4px' }}>
-                                    {modulesList.filter(m => m.is_public).length}
-                                </div>
-                            </div>
+                            ))}
                         </div>
+                    ) : <div />}
 
-                        {/* Modules Filters Row */}
-                        <div style={s.toolRow}>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                {[
-                                    { id: 'all', label: 'Tous les modules', count: modulesList.length },
-                                    { id: 'private', label: 'Privés / Personnels', count: modulesList.filter(m => !m.is_public).length },
-                                    { id: 'public', label: 'Publics / Partagés', count: modulesList.filter(m => m.is_public).length },
-                                    { id: 'library', label: 'Ma Bibliothèque', count: modulesList.filter(m => ModuleManagementService.isInLibrary(m.id)).length },
-                                    { id: 'crypto', label: 'Chiffrement & Topo', count: modulesList.filter(m => m.resource_type === 'crypto_module').length },
-                                    { id: 'routing', label: 'Moteurs & Traces', count: modulesList.filter(m => m.resource_type === 'routing_engine' || m.resource_type === 'path_provider').length },
-                                ].map(f => {
-                                    const active = moduleFilter === f.id;
-                                    return (
-                                        <button
-                                            key={f.id}
-                                            onClick={() => setModuleFilter(f.id as any)}
-                                            style={{
-                                                padding: '6px 12px',
-                                                borderRadius: '8px',
-                                                border: 'none',
-                                                background: active ? '#27272A' : '#18181B',
-                                                color: active ? '#FAFAFA' : '#71717A',
-                                                fontSize: '12px',
-                                                fontWeight: active ? 700 : 500,
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                transition: 'all 0.12s ease'
-                                            }}
-                                        >
-                                            <span>{f.label}</span>
-                                            <span style={{
-                                                fontSize: '10px',
-                                                padding: '1px 5px',
-                                                borderRadius: '6px',
-                                                background: active ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
-                                                color: active ? '#fff' : '#71717A'
-                                            }}>
-                                                {f.count}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 240px', maxWidth: '360px', marginLeft: 'auto' }}>
+                        <div style={{ ...s.heroSearch, height: '34px' }}>
+                            <Search size={14} style={s.heroSearchIcon} aria-hidden="true" />
+                            <input
+                                style={s.heroSearchInput}
+                                type="text"
+                                aria-label="Rechercher un projet ou raid"
+                                placeholder="Rechercher un projet…"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                            />
+                            {!isGuest && (
+                                <button
+                                    type="button"
+                                    style={s.heroRefresh}
+                                    onClick={() => loadProjects(false)}
+                                    title="Actualiser les projets"
+                                    aria-label="Actualiser les projets"
+                                    disabled={loadingProjects}
+                                >
+                                    <RefreshCw size={13} className={loadingProjects ? "spin" : ""} aria-hidden="true" />
+                                </button>
+                            )}
                         </div>
+                    </div>
+                </div>
 
-                        {/* S3 Storage Notification Toast */}
-                        {s3Toast && (
-                            <div style={{
-                                padding: '10px 16px', borderRadius: '10px',
-                                background: s3Toast.isError ? 'rgba(239, 68, 68, 0.15)' : 'rgba(56, 189, 248, 0.15)',
-                                border: s3Toast.isError ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)',
-                                color: s3Toast.isError ? '#f87171' : '#38bdf8',
-                                fontSize: '12.5px', fontWeight: 600,
-                                display: 'flex', alignItems: 'center', gap: '8px',
-                                animation: 'fadeIn 0.2s ease'
-                            }}>
-                                <Cloud size={16} />
-                                <span>{s3Toast.message}</span>
-                            </div>
-                        )}
+                {/* Error */}
+                {error && (
+                    <div role="alert" style={s.errorBox}>
+                        <span>{error}</span>
+                        <button type="button" aria-label="Fermer l'erreur" style={s.errorClose} onClick={() => setError(null)}>✕</button>
+                    </div>
+                )}
 
-                        {/* Modules Grid */}
-                        {filteredModules.length === 0 ? (
-                            <div style={s.emptyState}>
-                                <Boxes size={36} style={{ color: '#3F3F46', marginBottom: '12px' }} />
-                                <p style={s.emptyTitle}>
-                                    {moduleSearch ? `Aucun module ne correspond à "${moduleSearch}"` : 'Aucun module dans cette catégorie'}
-                                </p>
-                                <p style={s.emptyHint}>Créez un nouveau module ou modifiez les filtres de recherche.</p>
-                            </div>
+                {/* Loading */}
+                {loadingProjects && (
+                    <div role="status" style={s.loadingRow}>
+                        <Loader2 size={18} className="spin" style={{ color: 'var(--accent-primary)' }} aria-hidden="true" />
+                        <span style={{ color: 'var(--text-dim)', fontSize: '13px' }}>Chargement des projets…</span>
+                    </div>
+                )}
+
+                {/* Guest state */}
+                {isGuest && !loadingProjects && (
+                    <div style={{
+                        border: '1px dashed var(--border-subtle)',
+                        borderRadius: '12px',
+                        padding: '32px 24px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        background: 'var(--bg-surface)',
+                    }}>
+                        <FolderOpen size={24} color="var(--text-dim)" aria-hidden="true" />
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            Espace cloud non connecté
+                        </div>
+                        <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-dim)', maxWidth: '460px', lineHeight: 1.5 }}>
+                            Connectez-vous pour retrouver vos raids enregistrés ou créez un nouveau projet local dès maintenant.
+                        </p>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                            <button type="button" className="sr-btn-primary" onClick={handleGuestLogin}>
+                                <User size={14} aria-hidden="true" /> Se connecter
+                            </button>
+                            <button type="button" className="sr-btn-secondary" onClick={handleNewProject}>
+                                <Plus size={14} aria-hidden="true" /> Créer en local
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Empty state */}
+                {!isGuest && !loadingProjects && filteredProjects.length === 0 && (
+                    <div style={{
+                        border: '1px dashed var(--border-subtle)',
+                        borderRadius: '12px',
+                        padding: '32px 24px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        background: 'var(--bg-surface)',
+                    }}>
+                        <FileText size={24} color="var(--text-dim)" aria-hidden="true" />
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {search ? `Aucun résultat pour « ${search} »` : 'Aucun carnet de raid pour le moment'}
+                        </div>
+                        <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-dim)', maxWidth: '420px', lineHeight: 1.5 }}>
+                            {search
+                                ? 'Essayez un autre mot-clé ou réinitialisez la recherche.'
+                                : 'Créez votre premier itinéraire pour tracer votre parcours et générer le carnet.'}
+                        </p>
+                        {search ? (
+                            <button type="button" className="sr-btn-secondary" onClick={() => setSearch('')}>
+                                Effacer la recherche
+                            </button>
                         ) : (
-                            <div style={s.grid}>
-                                {filteredModules.map((m: any) => (
-                                    <ManagedModuleCard
-                                        key={m.id}
-                                        module={m}
-                                        onEdit={() => {
-                                            setEditingModuleId(m.id);
-                                            setModuleEditorOpen(true);
-                                        }}
-                                        onTogglePublic={() => handleToggleModulePublic(m.id)}
-                                        onToggleLibrary={() => handleToggleModuleLibrary(m.id)}
-                                        onExport={() => ModuleManagementService.exportManifestJson(m)}
-                                        onPublishS3={() => handlePublishModuleS3(m.id)}
-                                        onDelete={!m.is_builtin ? () => handleDeleteModule(m.id) : undefined}
-                                    />
-                                ))}
-                            </div>
+                            <button type="button" className="sr-btn-primary" onClick={handleNewProject}>
+                                <Plus size={14} aria-hidden="true" /> Nouveau projet
+                            </button>
                         )}
                     </div>
                 )}
 
+                {/* Project grid */}
+                {!isGuest && !loadingProjects && filteredProjects.length > 0 && (
+                    <div style={s.grid}>
+                        {filteredProjects.map(p => (
+                            <ProjectCard
+                                key={p.id}
+                                project={p}
+                                onOpen={() => handleOpen(p)}
+                                onShare={() => setShareTarget(p)}
+                                onCopyLink={() => handleCopyLink(p)}
+                                onDelete={() => handleDelete(p)}
+                                copied={copiedId === p.id}
+                            />
+                        ))}
+                    </div>
+                )}
                 {/* Share Modal */}
                 {shareTarget && (
                     <ShareModal
@@ -660,15 +575,27 @@ export default function ProjectsHomePage() {
                         }}
                     />
                 )}
+                {/* Confirmation Dialog */}
+                {confirmState && (
+                    <ConfirmDialog
+                        title={confirmState.title}
+                        message={confirmState.message}
+                        confirmLabel={confirmState.confirmLabel}
+                        onConfirm={confirmState.onConfirm}
+                        onCancel={() => setConfirmState(null)}
+                    />
+                )}
             </main>
 
             {/* CSS */}
             <style>{`
                 @keyframes spin { to { transform: rotate(360deg); } }
                 @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-                .project-card:hover { transform: translateY(-1px); border-color: #3F3F46 !important; }
-                .action-btn:hover { background: #27272A !important; color: #FAFAFA !important; }
-                .delete-btn:hover { background: rgba(239,68,68,0.1) !important; color: #FCA5A5 !important; }
+                @media (hover: hover) {
+                    .project-card:hover { border-color: #3F3F46 !important; }
+                    .action-btn:hover { background: #27272A !important; color: #FAFAFA !important; }
+                    .delete-btn:hover { background: rgba(239,68,68,0.12) !important; color: #FCA5A5 !important; }
+                }
             `}</style>
         </div>
     );
@@ -686,28 +613,52 @@ interface CardProps {
 
 function ProjectCard({ project: p, onOpen, onCopyLink, onDelete, copied }: CardProps) {
     return (
-        <div
-            className="project-card"
-            style={s.card}
-            onClick={onOpen}
-        >
-            {/* Card preview */}
-            <div style={s.cardPreview}>
-                <FileText size={32} style={{ color: '#3F3F46' }} />
-            </div>
+        <article className="sr-card">
+            {/* Card preview + open action */}
+            <button
+                type="button"
+                onClick={onOpen}
+                aria-label={`Ouvrir le projet ${p.title}`}
+                style={{
+                    ...s.cardPreview,
+                    width: '100%',
+                    border: 'none',
+                    borderBottom: '1px solid #27272A',
+                    cursor: 'pointer',
+                    padding: 0,
+                }}
+            >
+                <FileText size={32} aria-hidden="true" style={{ color: 'var(--text-dim)' }} />
+            </button>
 
             {/* Card body */}
             <div style={s.cardBody}>
                 <div style={s.cardTop}>
-                    <span style={s.cardTitle} title={p.title}>{p.title}</span>
+                    <button
+                        type="button"
+                        onClick={onOpen}
+                        style={{
+                            ...s.cardTitle,
+                            background: 'transparent',
+                            border: 'none',
+                            padding: 0,
+                            textAlign: 'start',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            width: '100%',
+                        }}
+                        title={p.title}
+                    >
+                        {p.title}
+                    </button>
                     <div style={s.badgeRow}>
                         {p.is_public
-                            ? <span style={{ ...s.badge, ...s.badgePublic }}><Globe size={10} /> Public</span>
-                            : <span style={{ ...s.badge, ...s.badgePrivate }}><Lock size={10} /> Privé</span>
+                            ? <span style={{ ...s.badge, ...s.badgePublic }}><Globe size={10} aria-hidden="true" /> Public</span>
+                            : <span style={{ ...s.badge, ...s.badgePrivate }}><Lock size={10} aria-hidden="true" /> Privé</span>
                         }
                         {p.role && p.role !== 'owner' && (
                             <span style={{ ...s.badge, ...s.badgeRole }}>
-                                {p.role === 'editor' ? '✏ Éditeur' : <><Eye size={10} /> Lecteur</>}
+                                {p.role === 'editor' ? 'Éditeur' : <><Eye size={10} aria-hidden="true" /> Lecteur</>}
                             </span>
                         )}
                         {p.is_owner && (
@@ -718,40 +669,44 @@ function ProjectCard({ project: p, onOpen, onCopyLink, onDelete, copied }: CardP
 
                 {!p.is_owner && p.owner_username && (
                     <p style={s.ownerLine}>
-                        <User size={11} style={{ marginRight: '4px' }} />
+                        <User size={11} aria-hidden="true" style={{ marginRight: '4px' }} />
                         {p.owner_username}
                     </p>
                 )}
 
                 <div style={s.cardFooter}>
-                    <span style={s.dateText}>
-                        <Clock size={11} style={{ marginRight: '4px' }} />
+                    <span className="tabular-nums" style={s.dateText}>
+                        <Clock size={11} aria-hidden="true" style={{ marginRight: '4px' }} />
                         {formatRelativeDate(p.updated_at)}
                     </span>
 
-                    <div style={s.actionRow} onClick={e => e.stopPropagation()}>
+                    <div style={s.actionRow}>
                         <button
+                            type="button"
                             className="action-btn"
                             style={s.actionBtn}
-                            title={copied ? 'Lien copié !' : 'Copier le lien'}
+                            title={copied ? 'Lien copié' : 'Copier le lien de partage'}
+                            aria-label={copied ? 'Lien copié' : `Copier le lien de ${p.title}`}
                             onClick={onCopyLink}
                         >
-                            {copied ? '✓' : <Copy size={13} />}
+                            {copied ? <Check size={13} aria-hidden="true" style={{ color: 'var(--semantic-green)' }} /> : <Copy size={13} aria-hidden="true" />}
                         </button>
                         {p.is_owner && (
                             <button
+                                type="button"
                                 className="delete-btn action-btn"
                                 style={s.actionBtn}
-                                title="Supprimer"
+                                title="Supprimer le projet"
+                                aria-label={`Supprimer ${p.title}`}
                                 onClick={onDelete}
                             >
-                                <Trash2 size={13} />
+                                <Trash2 size={13} aria-hidden="true" />
                             </button>
                         )}
                     </div>
                 </div>
             </div>
-        </div>
+        </article>
     );
 }
 
@@ -904,9 +859,9 @@ function ManagedModuleCard({
                         display: 'flex', alignItems: 'center', gap: '6px',
                         padding: '5px 10px', borderRadius: '8px', cursor: 'pointer',
                         fontSize: '11px', fontWeight: 600,
-                        background: inLib ? 'rgba(110, 201, 126, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-                        border: inLib ? '1px solid rgba(110, 201, 126, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
-                        color: inLib ? '#6EC97E' : '#71717a'
+                        background: inLib ? 'var(--accent-transparent)' : 'var(--bg-surface)',
+                        border: inLib ? '1px solid var(--accent-default)' : '1px solid var(--border-subtle)',
+                        color: inLib ? 'var(--accent-hover)' : 'var(--text-dim)'
                     }}
                 >
                     <BookmarkCheck size={13} strokeWidth={inLib ? 2.5 : 1.8} />
@@ -1017,54 +972,56 @@ const s: Record<string, React.CSSProperties> = {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        paddingTop: '72px',
-        paddingBottom: '48px',
-        paddingLeft: '24px',
-        paddingRight: '24px',
+        paddingTop: 'clamp(48px, 8vw, 72px)',
+        paddingBottom: 'clamp(28px, 5vw, 48px)',
+        paddingLeft: 'clamp(16px, 4vw, 24px)',
+        paddingRight: 'clamp(16px, 4vw, 24px)',
         gap: '0px',
     },
     heroLogo: {
         marginBottom: '16px',
-        opacity: 0.9,
+        opacity: 0.95,
     },
     heroTitle: {
         margin: 0,
-        fontSize: 'clamp(48px, 10vw, 80px)',
+        fontSize: 'clamp(36px, 9vw, 72px)',
         fontWeight: 800,
-        letterSpacing: '-3px',
-        lineHeight: 1,
+        letterSpacing: '-0.03em',
+        lineHeight: 1.05,
         marginBottom: '10px',
         position: 'relative' as const,
         display: 'inline-block',
     },
     heroScout: {
-        color: '#3F3F46',
+        color: 'var(--text-primary)',
     },
     heroRaider: {
-        color: '#6EC97E',
+        color: 'var(--accent-hover)',
     },
     heroVersion: {
         position: 'absolute' as const,
         left: '100%',
         bottom: '8px',
         marginLeft: '8px',
-        fontSize: '13px',
+        fontSize: '12px',
         fontWeight: 500,
-        color: '#3F3F46',
+        color: 'var(--text-dim)',
         letterSpacing: '0.04em',
         whiteSpace: 'nowrap' as const,
     },
     heroSub: {
-        margin: '0 0 28px',
-        fontSize: '13px',
-        color: '#3F3F46',
-        letterSpacing: '0.5px',
+        margin: '0 0 24px',
+        fontSize: '12px',
+        color: 'var(--text-dim)',
+        letterSpacing: '0.06em',
         textTransform: 'uppercase' as const,
         fontWeight: 500,
+        textAlign: 'center',
     },
     heroRow: {
         display: 'flex',
         alignItems: 'center',
+        flexWrap: 'wrap' as const,
         gap: '8px',
         width: '100%',
         maxWidth: '600px',
@@ -1073,8 +1030,9 @@ const s: Record<string, React.CSSProperties> = {
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        flex: 1,
-        background: 'transparent',
+        flex: '1 1 240px',
+        minWidth: 0,
+        background: 'var(--bg-surface)',
         border: '1px solid #27272A',
         borderRadius: '10px',
         overflow: 'hidden',
@@ -1084,17 +1042,17 @@ const s: Record<string, React.CSSProperties> = {
     heroSearchIcon: {
         position: 'absolute',
         left: '12px',
-        color: '#3F3F46',
+        color: 'var(--text-dim)',
         pointerEvents: 'none',
         flexShrink: 0,
     } as React.CSSProperties,
     heroSearchInput: {
         flex: 1,
+        minWidth: 0,
         background: 'transparent',
         border: 'none',
-        outline: 'none',
         padding: '0 40px 0 36px',
-        color: '#A1A1AA',
+        color: 'var(--text-primary)',
         fontSize: '13px',
         fontFamily: 'inherit',
         height: '100%',
@@ -1103,7 +1061,7 @@ const s: Record<string, React.CSSProperties> = {
         background: 'transparent',
         border: 'none',
         borderLeft: '1px solid #27272A',
-        color: '#3F3F46',
+        color: 'var(--text-dim)',
         cursor: 'pointer',
         padding: '0 10px',
         height: '100%',
@@ -1118,7 +1076,7 @@ const s: Record<string, React.CSSProperties> = {
         maxWidth: '1200px',
         width: '100%',
         margin: '0 auto',
-        padding: '0 24px 80px',
+        padding: '0 clamp(16px, 3vw, 24px) 80px',
         flex: 1,
     },
     toolRow: {
@@ -1237,8 +1195,9 @@ const s: Record<string, React.CSSProperties> = {
     // ── Grid & cards ──
     grid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-        gap: '10px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 275px), 1fr))',
+        gridAutoRows: 'max-content',
+        gap: 'clamp(12px, 1.5vw, 16px)',
         animation: 'fadeIn 0.2s ease',
     },
     card: {
@@ -1295,12 +1254,12 @@ const s: Record<string, React.CSSProperties> = {
         padding: '2px 6px',
     },
     badgePublic: {
-        background: 'rgba(110,201,126,0.08)',
-        color: '#6EC97E',
+        background: 'var(--accent-transparent)',
+        color: 'var(--accent-hover)',
     },
     badgePrivate: {
         background: '#1C1C21',
-        color: '#52525B',
+        color: 'var(--text-dim)',
     },
     badgeRole: {
         background: 'rgba(99,102,241,0.1)',
@@ -1314,7 +1273,7 @@ const s: Record<string, React.CSSProperties> = {
         display: 'flex',
         alignItems: 'center',
         fontSize: '11px',
-        color: '#52525B',
+        color: 'var(--text-dim)',
         margin: 0,
     },
     cardFooter: {
@@ -1327,8 +1286,8 @@ const s: Record<string, React.CSSProperties> = {
     dateText: {
         display: 'flex',
         alignItems: 'center',
-        fontSize: '10px',
-        color: '#3F3F46',
+        fontSize: '10.5px',
+        color: 'var(--text-dim)',
         gap: '3px',
         fontFamily: "'JetBrains Mono', monospace",
     },
@@ -1342,14 +1301,14 @@ const s: Record<string, React.CSSProperties> = {
         justifyContent: 'center',
         background: 'transparent',
         border: 'none',
-        color: '#52525B',
+        color: 'var(--text-dim)',
         cursor: 'pointer',
         padding: '5px',
         borderRadius: '5px',
         transition: 'background 120ms ease, color 120ms ease',
         fontSize: '12px',
-        minWidth: '24px',
-        height: '24px',
+        minWidth: '28px',
+        height: '28px',
     },
 
     // ── Misc ──
@@ -1389,11 +1348,11 @@ const s: Record<string, React.CSSProperties> = {
     avatarInitial: {
         fontSize: '11px',
         fontWeight: 700,
-        color: '#6EC97E',
+        color: 'var(--accent-hover)',
         width: '20px',
         height: '20px',
         borderRadius: '50%',
-        background: 'rgba(110,201,126,0.1)',
+        background: 'var(--accent-transparent)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

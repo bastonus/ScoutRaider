@@ -243,10 +243,12 @@ export function routesReducer(state: AppState, action: AppAction): AppState | nu
 
             const allItins = [...currentSavedItins, newItin];
 
-            const nextLayerOrder = [
-                ...(state.layer_order || []).filter(item => item.kind !== 'itin' || currentSavedItins.some(i => i.id === item.id)),
-                { kind: 'itin' as const, id: newId }
-            ];
+            const cleanedOrder = (state.layer_order || []).filter(item => item.kind !== 'itin' || currentSavedItins.some(i => i.id === item.id));
+            const newItinItem = { kind: 'itin' as const, id: newId };
+            const selItinIdx = cleanedOrder.findIndex(o => o.id === state.selected_layer_id);
+            const nextLayerOrder = selItinIdx >= 0
+                ? [...cleanedOrder.slice(0, selItinIdx), newItinItem, ...cleanedOrder.slice(selItinIdx)]
+                : [...cleanedOrder, newItinItem];
 
             return {
                 ...state,
@@ -333,7 +335,7 @@ export function routesReducer(state: AppState, action: AppAction): AppState | nu
                 const freshId = `itin-${Date.now()}`;
                 const freshItin = {
                     id: freshId,
-                    name: 'Itinéraire 1 (Principal)',
+                    name: 'Itinéraire 1',
                     color: '#2d8ceb',
                     visible: true,
                     stages: [],

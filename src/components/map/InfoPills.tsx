@@ -1,11 +1,12 @@
 import React from 'react';
 import { Ruler, Loader2 } from 'lucide-react';
 import { useRoutes, useUI } from '../../hooks';
+import { formatDistanceFr } from '../../logic/geocoding';
 
 export default function InfoPills() {
-  const { polygonalSteps } = useRoutes();
+  const { routes } = useRoutes();
   const { isLoading, loadingText } = useUI();
-  const totalDist = (polygonalSteps || []).reduce((acc, seg) => acc + (seg.distance || 0), 0) / 1000;
+  const totalDistM = (routes || []).reduce((acc, r) => acc + (r?.distance_m || 0), 0);
 
   return (
     <div id="info-pills" style={{
@@ -34,13 +35,13 @@ export default function InfoPills() {
       }}>
         {isLoading ? (
             <>
-                <Loader2 size={14} className="spin" color="var(--accent-default)" style={{ animation: 'spin 1s linear infinite' }} />
+                <Loader2 size={14} className="spin" color="#64748B" style={{ animation: 'spin 1s linear infinite' }} />
                 <span>{loadingText || "Calculs en cours..."}</span>
             </>
         ) : (
             <>
-                <Ruler size={14} color="var(--accent-default)" />
-                <span style={{ fontFamily: 'var(--font-mono)' }}>{totalDist.toFixed(1)} km</span>
+                <Ruler size={14} color="#94A3B8" />
+                <span className="tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>{formatDistanceFr(totalDistM)}</span>
             </>
         )}
       </div>

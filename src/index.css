@@ -1,8 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
-
 @font-face {
   font-family: 'Maritime';
   src: url('/fonts/mari-01.ttf') format('truetype');
@@ -53,6 +48,7 @@ maritime, .font-maritime, [data-cipher="maritime"] {
 :root {
     /* ═══════ DESIGN TOKENS (HIGH-DENSITY TECHNICAL CAD / SIG) ═══════ */
     /* Surfaces */
+    --bg:             #09090B;
     --bg-base:        #09090B;          /* Canvas principal profond */
     --bg-dark:        #121215;          /* Barres latérales, menubar, statusbar */
     --bg-panel:       #121215;          /* Panneaux dockés */
@@ -61,14 +57,18 @@ maritime, .font-maritime, [data-cipher="maritime"] {
     --bg-hover:       #27272A;          /* Survol net */
     --bg-active:      #303036;          /* État pressé / actif */
     --bg-app:         #09090B;
+    --bg-glass:       #121215;
 
     /* Bordures & Séparations (1px solid #27272A / border-white/10) */
     --bg-border:      #27272A;
     --border-subtle:  #27272A;
+    --border-default: #27272A;
     --border-strong:  #3F3F46;
     --border-focus:   #52525B;
+    --panel-width:    min(360px, calc(100vw - 32px));
 
     /* Couleurs fonctionnelles — Bleu de mise en avant */
+    --accent:              #2563EB;
     --accent-primary:      #2563EB;
     --accent-primary-text: #FFFFFF;
     --accent-primary-hover:#1D4ED8;
@@ -97,9 +97,12 @@ maritime, .font-maritime, [data-cipher="maritime"] {
     --semantic-danger-bg: rgba(239, 68, 68, 0.10);
 
     /* Textes & Contraste */
+    --text-bright:    #FAFAFA;
     --text-primary:   #FAFAFA;
+    --text-main:      #FAFAFA;
     --text-default:   #D4D4D8;
-    --text-dim:       #71717A;
+    --text-secondary: #A1A1AA;
+    --text-dim:       #9CA3AF;
     --text-muted:     #A1A1AA;
 
     /* Rayons de bordure d'avant (doux & pilules) */
@@ -122,6 +125,7 @@ maritime, .font-maritime, [data-cipher="maritime"] {
     --shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md:     0 4px 12px rgba(0, 0, 0, 0.5);
     --shadow-lg:     0 8px 24px rgba(0, 0, 0, 0.85);
+    --shadow-xl:     0 12px 32px rgba(0, 0, 0, 0.9);
     --shadow-glow:   none;
 
     /* Transitions instantanées */
@@ -172,6 +176,10 @@ body:has(.app-shell) {
 }
 
 /* Typographie technique */
+h1, h2, h3 {
+    text-wrap: balance;
+}
+
 h1 {
     color: var(--text-primary);
     font-size: 18px;
@@ -228,90 +236,81 @@ code, pre, .font-mono, .tabular-nums {
     font-variant-numeric: tabular-nums;
 }
 
-/* ══════════════════════════════════════════════════
-   DOCKVIEW THEME (TECHNICAL COMPACT INTEGRATION)
-   ══════════════════════════════════════════════════ */
-.dockview-theme-dark {
-    --dv-background-color: var(--bg-base) !important;
-    --dv-group-background-color: var(--bg-panel) !important;
-    --dv-group-content-background-color: var(--bg-panel) !important;
-    --dv-activegroup-visiblepanel-tab-background-color: var(--bg-panel) !important;
-    --dv-inactivegroup-visiblepanel-tab-background-color: var(--bg-dark) !important;
-    --dv-activegroup-visiblepanel-tab-color: var(--text-primary) !important;
-    --dv-inactivegroup-visiblepanel-tab-color: var(--text-dim) !important;
-    --dv-tabs-and-actions-container-background-color: var(--bg-dark) !important;
-    --dv-drag-over-background-color: var(--accent-transparent) !important;
-    --dv-separator-border: var(--border-subtle) !important;
-    background: var(--bg-base) !important;
+/* Global accessibility, focus ring, touch & reduced-motion defaults */
+button,
+[role="button"],
+a {
+    -webkit-tap-highlight-color: transparent;
 }
 
-.dockview-theme-dark .dv-group {
-    background: var(--bg-panel) !important;
-    border: 1px solid var(--border-subtle) !important;
-    padding: 0 !important;
-    border-radius: var(--radius-sm) !important;
-    position: relative;
+:focus-visible {
+    outline: 2px solid var(--accent-hover);
+    outline-offset: 2px;
+}
+
+.sr-dialog-scroll {
+    overscroll-behavior: contain;
+}
+
+/* Fluid responsive grid for project/module cards (320px → 1440px+) */
+.sr-projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+    gap: clamp(10px, 1.5vw, 16px);
+}
+
+/* Tactile press scale (better-motion: 0.96 over 150ms ease-out) */
+.sr-pressable {
+    transition: transform 150ms ease-out, background-color 100ms ease, border-color 100ms ease;
+}
+.sr-pressable:active:not(:disabled) {
+    transform: scale(0.96);
+}
+
+/* Unified architectural card surface (Marketplace, Projects, Modules) */
+.sr-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
     overflow: hidden;
-}
-
-.dockview-theme-dark .dv-group::after {
-    display: none !important;
-}
-
-.dockview-theme-dark .dv-tabs-and-actions-container {
-    padding: 0 4px !important;
-    background: var(--bg-dark) !important;
-    height: 32px !important;
     display: flex;
-    align-items: center;
-    border-bottom: 1px solid var(--border-subtle) !important;
-    margin-bottom: 0 !important;
+    flex-direction: column;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+.sr-card[data-active="true"] {
+    border-color: var(--accent-primary);
+    background: color-mix(in srgb, var(--accent-primary) 7%, var(--bg-surface));
+}
+@media (hover: hover) {
+    .sr-card:hover {
+        border-color: var(--border-strong);
+    }
+    .sr-card[data-active="true"]:hover {
+        border-color: var(--accent-hover);
+    }
 }
 
-.dockview-theme-dark .dv-tab {
-    background: transparent !important;
-    border: none !important;
-    border-right: 1px solid var(--border-subtle) !important;
-    height: 32px !important;
-    line-height: 32px !important;
-    margin: 0 !important;
-    padding: 0 12px !important;
-    font-size: 11.5px !important;
-    font-weight: 500 !important;
-    color: var(--text-dim) !important;
-    transition: color 100ms ease, background-color 100ms ease;
+/* Sticky chrome scroll clearance (better-layout) */
+html {
+    scroll-padding-block-start: 64px;
 }
 
-.dockview-theme-dark .dv-tab:hover {
-    background: var(--bg-surface) !important;
-    color: var(--text-primary) !important;
+/* Prevent iOS Safari auto-zoom on mobile inputs (better-typography) */
+@media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    textarea,
+    select {
+        font-size: 16px !important;
+    }
 }
 
-.dockview-theme-dark .dv-tab-active {
-    background: var(--bg-panel) !important;
-    color: var(--text-primary) !important;
-    border-bottom: 2px solid var(--accent-default) !important;
-}
-
-.dockview-theme-dark .dv-group-content {
-    background: var(--bg-panel) !important;
-    border-radius: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    overflow: hidden !important;
-    position: relative;
-}
-
-.dockview-theme-dark .dv-separator,
-.dockview-theme-dark .dv-sash,
-.dockview-theme-dark .dv-sash.dv-enabled {
-    background: var(--border-subtle) !important;
-    opacity: 1 !important;
-    width: 2px !important;
-}
-
-.dockview-theme-dark .dv-sash:hover {
-    background: var(--accent-default) !important;
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
 
 /* ══════════════════════════════════════════════════
@@ -530,10 +529,10 @@ code, pre, .font-mono, .tabular-nums {
 }
 
 .btn-sm {
-    height: 26px;
+    height: 28px;
     padding: 0 10px;
-    font-size: 11px;
-    border-radius: var(--radius-sm);
+    font-size: 11.5px;
+    border-radius: 8px;
 }
 
 .btn-icon {
@@ -543,7 +542,7 @@ code, pre, .font-mono, .tabular-nums {
     background: transparent;
     border: 1px solid transparent;
     color: var(--text-dim);
-    border-radius: var(--radius-sm);
+    border-radius: 8px;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -551,10 +550,12 @@ code, pre, .font-mono, .tabular-nums {
     transition: all 100ms ease;
 }
 
-.btn-icon:hover {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-    border-color: var(--border-subtle);
+@media (hover: hover) {
+    .btn-icon:hover {
+        color: var(--text-primary);
+        background: var(--bg-hover);
+        border-color: var(--border-subtle);
+    }
 }
 
 .btn-icon.active {
@@ -1070,13 +1071,100 @@ textarea:focus {
 }
 
 /* Menus & Dropdowns */
-.menu-btn:hover {
-    background: var(--bg-hover);
+.sr-menu-trigger {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 4px 10px;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-dim);
+    transition: background-color 100ms ease, color 100ms ease;
+    font-family: inherit;
 }
 
-.menu-item-hover:hover {
+.sr-menu-trigger[aria-expanded="true"] {
     background: var(--bg-hover);
-    color: var(--text-primary) !important;
+    color: var(--text-primary);
+}
+
+.sr-menu-item {
+    width: 100%;
+    background: transparent;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 7px 14px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+    text-align: start;
+    font-family: inherit;
+    transition: background-color 100ms ease;
+}
+
+.sr-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 12px;
+    background: var(--accent-primary);
+    border: 1px solid var(--accent-primary);
+    border-radius: 8px;
+    color: var(--accent-primary-text);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 100ms ease, border-color 100ms ease;
+    flex-shrink: 0;
+}
+
+.sr-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 100ms ease, border-color 100ms ease;
+    flex-shrink: 0;
+}
+
+@media (hover: hover) {
+    .menu-btn:hover,
+    .sr-menu-trigger:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .menu-item-hover:hover,
+    .sr-menu-item:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary) !important;
+    }
+
+    .sr-btn-primary:hover {
+        background: var(--accent-primary-hover);
+        border-color: var(--accent-primary-hover);
+    }
+
+    .sr-btn-secondary:hover {
+        background: var(--bg-hover);
+        border-color: var(--border-strong);
+    }
 }
 
 /* ═══════════════════════════════════════

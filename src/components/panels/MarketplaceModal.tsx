@@ -1,6 +1,8 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { Boxes } from 'lucide-react';
 import UnifiedResourceHub, { UnifiedCategory } from './UnifiedResourceHub';
+import Modal from '../common/Modal';
+import { useViewport } from '../../hooks';
 
 interface MarketplaceModalProps {
   onClose: () => void;
@@ -8,6 +10,7 @@ interface MarketplaceModalProps {
 }
 
 export default function MarketplaceModal({ onClose, initialCategory = 'all' }: MarketplaceModalProps) {
+  const { isMobile } = useViewport();
   const cat: UnifiedCategory = 
     initialCategory === 'maps' ? 'maps' :
     initialCategory === 'code' ? 'code' :
@@ -16,82 +19,27 @@ export default function MarketplaceModal({ onClose, initialCategory = 'all' }: M
     initialCategory === 'my_library' ? 'my_library' : 'all';
 
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 99999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(8px)',
-        padding: '20px'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <Modal
+      title={
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <Boxes size={16} color="var(--accent-hover)" aria-hidden="true" />
+          Marketplace & Ressources
+        </span>
+      }
+      onClose={onClose}
+      width="1100px"
+      maxWidth="96vw"
+      height="88dvh"
+      maxHeight="92dvh"
+      fullScreenMobile
+      isMobile={isMobile}
     >
-      <div style={{
-        width: '100%',
-        maxWidth: '1100px',
-        height: '88vh',
-        background: 'var(--bg-base)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: '18px',
-        boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        position: 'relative'
-      }}>
-        {/* Floating Close Button in top right */}
-        <div style={{
-          position: 'absolute',
-          top: '10px',
-          right: '12px',
-          zIndex: 100,
-          pointerEvents: 'all'
-        }}>
-          <button
-            onClick={onClose}
-            title="Fermer (Échap)"
-            style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '10px',
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border-subtle)',
-              color: 'var(--text-dim)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 100ms ease'
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = 'var(--text-bright)';
-              e.currentTarget.style.borderColor = 'var(--border-strong)';
-              e.currentTarget.style.background = 'var(--bg-hover)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'var(--text-dim)';
-              e.currentTarget.style.borderColor = 'var(--border-subtle)';
-              e.currentTarget.style.background = 'var(--bg-elevated)';
-            }}
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Unified Resource Hub with floating bar aesthetic */}
-        <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
-          <UnifiedResourceHub
-            initialCategory={cat}
-            isCompact={false}
-          />
-        </div>
+      <div style={{ flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <UnifiedResourceHub
+          initialCategory={cat}
+          isCompact={false}
+        />
       </div>
-    </div>
+    </Modal>
   );
 }

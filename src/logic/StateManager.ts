@@ -52,7 +52,7 @@ export class StateManager {
         const defaultItineraries = [
             {
                 id: defaultItinId,
-                name: 'Itinéraire 1 (Principal)',
+                name: 'Itinéraire 1',
                 color: '#2d8ceb',
                 visible: true,
                 stages: [],
@@ -599,7 +599,7 @@ export class StateManager {
             migrated.itineraries = [
                 {
                     id: 'itin-1',
-                    name: 'Itinéraire 1 (Principal)',
+                    name: 'Itinéraire 1',
                     color: '#2d8ceb',
                     visible: true,
                     stages: [...migrated.stages],

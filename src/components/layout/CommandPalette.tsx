@@ -108,7 +108,7 @@ export default function CommandPalette({
             label: 'Ouvrir les Préférences de l\'Application',
             category: 'Actions Rapides',
             icon: <Settings size={16} color="#64748b" />,
-            shortcut: 'Ctrl+P',
+            shortcut: 'Ctrl+,',
             keywords: 'options preferences reglages configuration api cles',
             perform: onPreferencesOpen,
         });

@@ -15,6 +15,7 @@ interface StageMarkerProps {
     total: number;
     isMovable: boolean;
     isAnchored: boolean;
+    isHighlighted?: boolean;
     activeTool: string;
     pane?: string;
     onDragEnd: (idx: number, lat: number, lon: number) => void;
@@ -24,7 +25,7 @@ interface StageMarkerProps {
 }
 
 const StageMarker = React.memo(function StageMarker({
-    stage, idx, total, isMovable, isAnchored, activeTool, pane,
+    stage, idx, total, isMovable, isAnchored, isHighlighted = false, activeTool, pane,
     onDragEnd, onRemove, onAnchor, onUnAnchor,
 }: StageMarkerProps) {
     const markerRef = useRef<any>(null);
@@ -41,19 +42,21 @@ const StageMarker = React.memo(function StageMarker({
     }, [isMovable]);
 
     const isFirst = idx === 0;
-    const isLast = idx === total - 1;
-    const dotColor = isFirst ? 'var(--semantic-green)' : isLast ? 'var(--semantic-red)' : 'var(--accent-default)';
+    const isLast = idx === total - 1 && total > 1;
+    const dotColor = isFirst ? 'var(--semantic-green)' : isLast ? 'var(--semantic-red)' : '#475569';
     const cursorStyle = isMovable ? 'grab' : 'pointer';
 
-    const markerHtml = isAnchored
-        ? `<div style="width:36px;height:36px;border-radius:10px;background:#fff;border:3px solid #2d8ceb;color:#2d8ceb;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(45,140,235,0.35),0 3px 8px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;cursor:${cursorStyle};">${stage.label}</div>`
-        : `<div style="width:32px;height:32px;border-radius:10px;background:#fff;border:2.5px solid ${dotColor};color:${dotColor};font-weight:900;font-size:13.5px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;cursor:${cursorStyle};">${stage.label}</div>`;
+    const markerHtml = isHighlighted
+        ? `<div style="width:40px;height:40px;border-radius:12px;background:var(--accent-default);border:3px solid #ffffff;color:#ffffff;font-weight:900;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 6px rgba(59,130,246,0.45),0 6px 16px rgba(0,0,0,0.65);font-family:'Inter',sans-serif;cursor:${cursorStyle};transform:scale(1.06);">${stage.label}</div>`
+        : isAnchored
+            ? `<div style="width:36px;height:36px;border-radius:10px;background:#fff;border:3px solid #2d8ceb;color:#2d8ceb;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(45,140,235,0.35),0 3px 8px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;cursor:${cursorStyle};">${stage.label}</div>`
+            : `<div style="width:32px;height:32px;border-radius:10px;background:#fff;border:2.5px solid ${dotColor};color:${dotColor};font-weight:900;font-size:13.5px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;cursor:${cursorStyle};">${stage.label}</div>`;
 
     const icon = L.divIcon({
         className: 'custom-stage-marker',
         html: markerHtml,
-        iconSize: isAnchored ? [36, 36] : [32, 32],
-        iconAnchor: isAnchored ? [18, 18] : [16, 16],
+        iconSize: isHighlighted ? [40, 40] : isAnchored ? [36, 36] : [32, 32],
+        iconAnchor: isHighlighted ? [20, 20] : isAnchored ? [18, 18] : [16, 16],
     });
 
     // Stable handlers via useCallback — dependencies are primitive/stable
@@ -103,7 +106,7 @@ const StageMarker = React.memo(function StageMarker({
             ref={(ref: any) => { markerRef.current = ref; }}
             position={stage.coords as [number, number]}
             icon={icon}
-            zIndexOffset={isAnchored ? 15001 : 15000}
+            zIndexOffset={isHighlighted ? 15010 : isAnchored ? 15001 : 15000}
             draggable={isMovable}
             eventHandlers={eventHandlers}
         >
@@ -130,6 +133,16 @@ const StageMarker = React.memo(function StageMarker({
 export default function InteractiveStages() {
     const { state, dispatch } = useApp();
     const anchorIdx = state.anchor_stage_idx;
+    const [highlightedStageId, setHighlightedStageId] = React.useState<string | null>(null);
+
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<{ id: string | null }>).detail;
+            setHighlightedStageId(detail?.id ?? null);
+        };
+        window.addEventListener('scoutraider:highlight-stage', handler);
+        return () => window.removeEventListener('scoutraider:highlight-stage', handler);
+    }, []);
 
     // Failsafe: if the user releases the mouse anywhere, clear the drag guard
     useEffect(() => {
@@ -218,6 +231,7 @@ export default function InteractiveStages() {
                     total={state.stages.length}
                     isMovable={isMovable}
                     isAnchored={anchorIdx === idx}
+                    isHighlighted={highlightedStageId === stage.id}
                     activeTool={state.active_tool}
                     pane={activeItinPane}
                     onDragEnd={handleDragEnd}

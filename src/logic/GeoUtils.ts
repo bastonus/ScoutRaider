@@ -102,10 +102,10 @@ export function calculatePathLengthLonLat(coords: [number, number][]): number {
 export function formatArea(areaM2: number): string {
     if (!areaM2 || isNaN(areaM2) || areaM2 <= 0) return '0 m²';
     if (areaM2 >= 1_000_000) {
-        return `${(areaM2 / 1_000_000).toFixed(2)} km²`;
+        return `${(areaM2 / 1_000_000).toFixed(2).replace('.', ',')} km²`;
     }
     if (areaM2 >= 10_000) {
-        return `${(areaM2 / 10_000).toFixed(2)} ha`;
+        return `${(areaM2 / 10_000).toFixed(2).replace('.', ',')} ha`;
     }
     return `${Math.round(areaM2)} m²`;
 }

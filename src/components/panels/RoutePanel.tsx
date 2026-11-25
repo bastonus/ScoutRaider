@@ -1,386 +1,1488 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, FolderOpen, MoreHorizontal, GripVertical, MapPin, ArrowLeftRight } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import {
+    GripVertical, MapPin, ArrowLeftRight,
+    ChevronDown, Copy, Trash2, Edit3,
+    ArrowUp, ArrowDown, Footprints, Car, Compass,
+    Building2, Loader2, X, Undo2, Check, Flag, Play, RotateCcw
+} from 'lucide-react';
 import { useApp } from '../../AppContext';
 import { backgroundEngine } from '../../logic/BackgroundEngine';
-import { StateManager } from '../../logic/StateManager';
+import { IGNClient } from '../../logic/IGNClient';
+import { ElevationService } from '../../logic/ElevationService';
+import { mapRef } from '../map/MapComponent';
 import { Stage } from '../../logic/types';
+import {
+    SearchResult,
+    searchIGNWithBias,
+    parseCoords,
+    formatDistanceFr,
+    formatDurationFr,
+    formatStageAddress,
+} from '../../logic/geocoding';
 
-interface SearchResult { label: string; postcode?: string; lat: number; lon: number; }
+type RoutingMode = 'direct' | 'pedestrian' | 'car';
 
-async function searchIGN(query: string): Promise<SearchResult[]> {
-    try {
-        const url = `https://data.geopf.fr/geocodage/completion?text=${encodeURIComponent(query)}&maximumResponses=6&type=StreetAddress,PositionOfInterest`;
-        const res = await fetch(url);
-        if (!res.ok) return [];
-        const data = await res.json();
-        return (data.results || []).map((r: any) => ({
-            label: r.fulltext || r.label || '',
-            postcode: r.postcode || '',
-            lat: parseFloat(r.y), lon: parseFloat(r.x),
-        })).filter((r: SearchResult) => !isNaN(r.lat) && !isNaN(r.lon));
-    } catch { return []; }
+const MODE_LABELS: Record<RoutingMode, string> = {
+    direct: 'Hors piste',
+    pedestrian: 'Sentier',
+    car: 'Route',
+};
+
+const MODE_ICONS: Record<RoutingMode, React.ElementType> = {
+    direct: Compass,
+    pedestrian: Footprints,
+    car: Car,
+};
+
+const MODE_HINTS: Record<RoutingMode, string> = {
+    pedestrian: 'chemins et sentiers',
+    car: 'routes et voies',
+    direct: 'ligne droite',
+};
+
+function getLegDistanceMeters(leg: any): number {
+    if (!leg) return 0;
+    if (typeof leg.distance_m === 'number' && leg.distance_m > 0) return leg.distance_m;
+    const coords = leg.geojson?.geometry?.coordinates;
+    if (!coords || coords.length < 2) return 0;
+    let dist = 0;
+    const R = 6371e3;
+    for (let i = 0; i < coords.length - 1; i++) {
+        const [lon1, lat1] = coords[i];
+        const [lon2, lat2] = coords[i + 1];
+        const p1 = (lat1 * Math.PI) / 180;
+        const p2 = (lat2 * Math.PI) / 180;
+        const dp = ((lat2 - lat1) * Math.PI) / 180;
+        const dl = ((lon2 - lon1) * Math.PI) / 180;
+        const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+        dist += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+    return dist;
 }
 
-/** Try to parse a raw coordinate string like "48.8566, 2.3522" or "48.8566 2.3522".
- *  Accepts comma or space as separator, and both '.' and ',' as decimal mark. */
-function parseCoords(raw: string): { lat: number; lon: number } | null {
-    // Normalise: replace commas used as decimal marks inside numbers, then split on remaining comma/semicolon/space
-    const s = raw.trim();
-    // Pattern: two floating-point numbers separated by comma, semicolon, or whitespace
-    const m = s.match(/^(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)$/);
-    if (!m) return null;
-    const lat = parseFloat(m[1].replace(',', '.'));
-    const lon = parseFloat(m[2].replace(',', '.'));
-    if (isNaN(lat) || isNaN(lon)) return null;
-    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
-    return { lat, lon };
+function getLegDurationSeconds(leg: any, distM: number): number {
+    if (typeof leg?.duration_s === 'number' && leg.duration_s > 0) return leg.duration_s;
+    if (typeof leg?.geojson?.properties?.duration === 'number' && leg.geojson.properties.duration > 0) {
+        return leg.geojson.properties.duration;
+    }
+    const profile = leg?.profile || 'pedestrian';
+    const speedKmh = profile === 'car' ? 50 : 4.5;
+    return (distM / 1000 / speedKmh) * 3600;
 }
 
-function reRouteAdjacentLegs(stages: Stage[], routes: any[], smallRoads: boolean, dispatch: any, movedIdx: number, newLat: number, newLon: number) {
+function getMapCenterBias(): { lat: number; lon: number } | null {
+    const map = mapRef.current;
+    if (!map) return null;
+    const c = map.getCenter();
+    return { lat: c.lat, lon: c.lng };
+}
+
+function reRouteAdjacentLegs(
+    stages: Stage[],
+    routes: any[],
+    smallRoads: boolean,
+    dispatch: any,
+    movedIdx: number,
+    newLat: number,
+    newLon: number
+) {
     if (movedIdx > 0) {
         const prev = stages[movedIdx - 1];
+        const prevProfile = routes[movedIdx - 1]?.profile || 'pedestrian';
         if (routes[movedIdx - 1]) dispatch({ type: 'REMOVE_ROUTE', id: routes[movedIdx - 1].id });
-        backgroundEngine.enqueue('route_leg', 0, `job-${Date.now()}-prev`, { p1: [prev.coords[0], prev.coords[1]], p2: [newLat, newLon], profile: 'pedestrian', small_roads: smallRoads, insertIdx: movedIdx - 1 });
+        backgroundEngine.enqueue('route_leg', 0, `job-${Date.now()}-prev`, {
+            p1: [prev.coords[0], prev.coords[1]],
+            p2: [newLat, newLon],
+            profile: prevProfile,
+            small_roads: smallRoads,
+            insertIdx: movedIdx - 1,
+        });
     }
     if (movedIdx < stages.length - 1) {
         const next = stages[movedIdx + 1];
+        const nextProfile = routes[movedIdx]?.profile || 'pedestrian';
         if (routes[movedIdx]) dispatch({ type: 'REMOVE_ROUTE', id: routes[movedIdx].id });
-        backgroundEngine.enqueue('route_leg', 0, `job-${Date.now()}-next`, { p1: [newLat, newLon], p2: [next.coords[0], next.coords[1]], profile: 'pedestrian', small_roads: smallRoads, insertIdx: movedIdx });
+        backgroundEngine.enqueue('route_leg', 0, `job-${Date.now()}-next`, {
+            p1: [newLat, newLon],
+            p2: [next.coords[0], next.coords[1]],
+            profile: nextProfile,
+            small_roads: smallRoads,
+            insertIdx: movedIdx,
+        });
     }
 }
 
-function SmartDropdown({ results, onSelect, anchorRef }: { results: SearchResult[]; onSelect: (r: SearchResult) => void; anchorRef: React.RefObject<HTMLDivElement | null>; }) {
-    const [dropUp, setDropUp] = useState(false);
+function SmartDropdown({
+    results,
+    isLoading,
+    onSelect,
+    anchorRef,
+}: {
+    results: SearchResult[];
+    isLoading?: boolean;
+    onSelect: (r: SearchResult) => void;
+    anchorRef: React.RefObject<HTMLDivElement | null>;
+}) {
+    const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null);
+
     useEffect(() => {
-        if (!anchorRef.current) return;
-        const rect = anchorRef.current.getBoundingClientRect();
-        const dropHeight = Math.min(results.length * 52, 260);
-        setDropUp(window.innerHeight - rect.bottom < dropHeight && rect.top > window.innerHeight - rect.bottom);
-    }, [results]);
-    return (
-        <div style={{
-            position: 'absolute',
-            ...(dropUp ? { bottom: 'calc(100% + 6px)' } : { top: 'calc(100% + 6px)' }),
-            left: 0, right: 0, background: 'var(--bg-elevated)',
-            border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
-            zIndex: 9999, overflow: 'hidden',
-            boxShadow: 'var(--shadow-lg)',
-            maxHeight: '260px', overflowY: 'auto',
-        }}>
-            {results.map((r, i) => (
-                <div key={i} onMouseDown={e => { e.preventDefault(); onSelect(r); }}
-                    style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: i < results.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500 }}>{r.label}</span>
-                    {r.postcode && <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{r.postcode}</span>}
+        const update = () => {
+            if (!anchorRef.current) return;
+            const rect = anchorRef.current.getBoundingClientRect();
+            const count = Math.max(1, results.length);
+            const dropHeight = Math.min(count * 44, 180);
+            const dropUp = window.innerHeight - rect.bottom < dropHeight && rect.top > window.innerHeight - rect.bottom;
+            setPos({
+                ...(dropUp ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+                left: rect.left,
+                width: rect.width,
+            });
+        };
+        update();
+        window.addEventListener('resize', update);
+        return () => window.removeEventListener('resize', update);
+    }, [results, isLoading, anchorRef]);
+
+    if (!pos) return null;
+
+    return createPortal(
+        <div
+            style={{
+                position: 'fixed',
+                ...(pos.top !== undefined ? { top: `${pos.top}px` } : { bottom: `${pos.bottom}px` }),
+                left: `${pos.left}px`,
+                width: `${pos.width}px`,
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-strong)',
+                borderRadius: '10px',
+                zIndex: 9999,
+                boxShadow: 'var(--shadow-lg)',
+                maxHeight: '180px',
+                overflowY: 'auto',
+            }}
+        >
+            {isLoading ? (
+                <div
+                    style={{
+                        minHeight: '40px',
+                        padding: '8px 10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '12px',
+                        color: '#CBD5E1',
+                    }}
+                >
+                    <Loader2 size={13} className="spin" color="#64748B" />
+                    <span>Recherche…</span>
                 </div>
-            ))}
-        </div>
+            ) : (
+                results.slice(0, 3).map((r, i) => {
+                    const Icon = r.kind === 'poi' ? Building2 : MapPin;
+                    return (
+                        <button
+                            key={i}
+                            type="button"
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onSelect(r);
+                            }}
+                            style={{
+                                width: '100%',
+                                textAlign: 'left',
+                                minHeight: '40px',
+                                padding: '6px 10px',
+                                background: 'transparent',
+                                border: 'none',
+                                borderBottom: i < Math.min(results.length, 3) - 1 ? '1px solid var(--border-subtle)' : 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        >
+                            <Icon
+                                size={13}
+                                color={r.kind === 'poi' ? '#94A3B8' : '#64748B'}
+                                style={{ flexShrink: 0 }}
+                            />
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                <span
+                                    style={{
+                                        fontSize: '12px',
+                                        color: 'var(--text-primary)',
+                                        fontWeight: 500,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                    }}
+                                >
+                                    {r.label}
+                                </span>
+                                {r.postcode && !r.label.includes(r.postcode) && (
+                                    <span style={{ fontSize: '11px', color: '#94A3B8', fontFamily: 'var(--font-mono)' }}>
+                                        {r.postcode}
+                                    </span>
+                                )}
+                            </div>
+                        </button>
+                    );
+                })
+            )}
+        </div>,
+        document.body
     );
 }
 
-function StageRow({ stage, idx, total, isDragged, onDragStart, onDragOver, onDrop, onDragEnd }: any) {
+// Track reverse-geocoding requests across re-renders so each (stageId, coords) is fetched at most once
+const resolvedStageCoords = new Set<string>();
+
+function ModePickerPopover({
+    mode,
+    onChangeMode,
+    variant,
+}: {
+    mode: RoutingMode;
+    onChangeMode: (mode: RoutingMode) => void;
+    variant: 'icon' | 'chip';
+}) {
+    const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const portalPickerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!pickerPos) return;
+        const handler = (e: MouseEvent) => {
+            const target = e.target as Node;
+            if (!triggerRef.current?.contains(target) && !portalPickerRef.current?.contains(target)) {
+                setPickerPos(null);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [pickerPos]);
+
+    const currentMode: RoutingMode = mode || 'pedestrian';
+    const ModeIcon = MODE_ICONS[currentMode];
+
+    const togglePicker = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (pickerPos) {
+            setPickerPos(null);
+            return;
+        }
+        const rect = triggerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const estHeight = 132;
+        const top =
+            rect.bottom + estHeight > window.innerHeight
+                ? Math.max(8, rect.top - estHeight - 4)
+                : rect.bottom + 4;
+        const left = Math.min(Math.max(8, rect.right - 184), window.innerWidth - 192);
+        setPickerPos({ top, left });
+    };
+
+    return (
+        <>
+            <button
+                ref={triggerRef}
+                type="button"
+                onClick={togglePicker}
+                onDoubleClick={(e) => e.stopPropagation()}
+                aria-expanded={Boolean(pickerPos)}
+                aria-label={`Mode de routage : ${MODE_LABELS[currentMode]}`}
+                title={`Mode : ${MODE_LABELS[currentMode]}`}
+                style={
+                    variant === 'chip'
+                        ? {
+                              minHeight: '32px',
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-strong)',
+                              background: 'rgba(255, 255, 255, 0.06)',
+                              color: 'var(--text-primary)',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                          }
+                        : {
+                              minWidth: '32px',
+                              minHeight: '32px',
+                              padding: '0 6px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              background: 'transparent',
+                              color: currentMode === 'pedestrian' ? '#94A3B8' : '#94A3B8',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                          }
+                }
+            >
+                <ModeIcon size={14} aria-hidden="true" />
+                {variant === 'chip' && (
+                    <>
+                        <span>{MODE_LABELS[currentMode]}</span>
+                        <ChevronDown size={12} aria-hidden="true" style={{ color: '#94A3B8' }} />
+                    </>
+                )}
+            </button>
+
+            {pickerPos &&
+                createPortal(
+                    <div
+                        ref={portalPickerRef}
+                        role="menu"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: `${pickerPos.top}px`,
+                            left: `${pickerPos.left}px`,
+                            width: '184px',
+                            background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border-strong)',
+                            borderRadius: '10px',
+                            boxShadow: 'var(--shadow-lg)',
+                            padding: '4px',
+                            zIndex: 9999,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px',
+                        }}
+                    >
+                        {(['pedestrian', 'car', 'direct'] as RoutingMode[]).map((id) => {
+                            const Icon = MODE_ICONS[id];
+                            const active = currentMode === id;
+                            return (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    className="sr-menu-item"
+                                    onClick={() => {
+                                        setPickerPos(null);
+                                        if (!active) onChangeMode(id);
+                                    }}
+                                    style={{
+                                        minHeight: '38px',
+                                        fontSize: '12px',
+                                        gap: '8px',
+                                        padding: '4px 10px',
+                                        justifyContent: 'flex-start',
+                                        textAlign: 'left',
+                                        background: active ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                                        color: 'var(--text-primary)',
+                                        fontWeight: active ? 600 : 500,
+                                        borderRadius: '7px',
+                                    }}
+                                >
+                                    <Icon size={14} style={{ color: '#CBD5E1', flexShrink: 0 }} />
+                                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                        <span>{MODE_LABELS[id]}</span>
+                                        <span style={{ fontSize: '10.5px', color: '#94A3B8', fontWeight: 400 }}>
+                                            {MODE_HINTS[id]}
+                                        </span>
+                                    </div>
+                                    {active && <Check size={14} color="#CBD5E1" style={{ flexShrink: 0 }} />}
+                                </button>
+                            );
+                        })}
+                    </div>,
+                    document.body
+                )}
+        </>
+    );
+}
+
+interface StageRowProps {
+    stage: Stage;
+    idx: number;
+    total: number;
+    isSelected: boolean;
+    isMobile: boolean;
+    isDragged: boolean;
+    isNewFlash: boolean;
+    hasSegmentBelow: boolean;
+    legDist?: number;
+    legDurationS?: number;
+    legMode: RoutingMode;
+    isLegComputing?: boolean;
+    editTriggerCounter?: number;
+    isMultiSelected?: boolean;
+    onSelect: (meta: { ctrl: boolean; shift: boolean }) => void;
+    onChangeMode: (mode: RoutingMode) => void;
+    onDragStart: (e: React.DragEvent) => void;
+    onDragOver: (e: React.DragEvent) => void;
+    onDrop: () => void;
+    onDragEnd: (e: React.DragEvent) => void;
+    onReorderDelta: (fromIdx: number, toIdx: number) => void;
+    onStageDeleted: (label: string) => void;
+    onCoordsCopied?: (coords: string) => void;
+}
+
+function StageRow({
+    stage,
+    idx,
+    total,
+    isSelected,
+    isMobile,
+    isDragged,
+    isNewFlash,
+    hasSegmentBelow,
+    legDist,
+    legDurationS,
+    legMode,
+    isLegComputing,
+    editTriggerCounter,
+    isMultiSelected,
+    onSelect,
+    onChangeMode,
+    onDragStart,
+    onDragOver,
+    onDrop,
+    onDragEnd,
+    onReorderDelta,
+    onStageDeleted,
+    onCoordsCopied,
+}: StageRowProps) {
     const { state, dispatch } = useApp();
-    const [query, setQuery] = useState(stage.address || `${stage.coords[0].toFixed(5)}, ${stage.coords[1].toFixed(5)}`);
+    const [isEditing, setIsEditing] = useState(false);
+    const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+    const [query, setQuery] = useState(stage.address || '');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [showResults, setShowResults] = useState(false);
-    const [isFocused, setIsFocused] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const [isDraggingRow, setIsDraggingRow] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
+    const [copiedCoords, setCopiedCoords] = useState(false);
+    const [isTruncated, setIsTruncated] = useState(false);
+    const [swipeX, setSwipeX] = useState(0);
+
     const wrapperRef = useRef<HTMLDivElement>(null);
     const rowRef = useRef<HTMLDivElement>(null);
+    const editBoxRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const titleSpanRef = useRef<HTMLSpanElement>(null);
+    const portalMenuRef = useRef<HTMLDivElement>(null);
+    const touchStartRef = useRef<{ x: number; y: number; active: boolean } | null>(null);
+    const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const prevEditTriggerRef = useRef(editTriggerCounter || 0);
 
-    useEffect(() => { if (!isFocused) setQuery(stage.address || `${stage.coords[0].toFixed(5)}, ${stage.coords[1].toFixed(5)}`); }, [stage.address, stage.coords, isFocused]);
     useEffect(() => {
-        const handler = (e: MouseEvent) => { if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) { setShowResults(false); setIsFocused(false); } };
+        return () => {
+            if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (editTriggerCounter && editTriggerCounter !== prevEditTriggerRef.current) {
+            prevEditTriggerRef.current = editTriggerCounter;
+            if (isSelected) {
+                setIsEditing(true);
+                setTimeout(() => {
+                    inputRef.current?.focus();
+                    inputRef.current?.select();
+                }, 20);
+            }
+        }
+    }, [editTriggerCounter, isSelected]);
+
+    useEffect(() => {
+        if (!isSelected) return;
+        const timer = setTimeout(() => {
+            wrapperRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 60);
+        return () => clearTimeout(timer);
+    }, [isSelected]);
+
+    const coordsText = `${stage.coords[0].toFixed(4)}, ${stage.coords[1].toFixed(4)}`;
+    const hasReadableAddress = Boolean(stage.address && !parseCoords(stage.address));
+
+    // Staggered automatic reverse geocoding when stage has no address or only raw coordinates
+    useEffect(() => {
+        if (hasReadableAddress) return;
+        const key = `${stage.id}:${stage.coords[0].toFixed(5)},${stage.coords[1].toFixed(5)}`;
+        if (resolvedStageCoords.has(key)) return;
+
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            IGNClient.reverseGeocode(stage.coords[0], stage.coords[1]).then((addr) => {
+                if (cancelled || !addr || parseCoords(addr)) return;
+                resolvedStageCoords.add(key);
+                dispatch({
+                    type: 'MOVE_STAGE',
+                    id: stage.id,
+                    lat: stage.coords[0],
+                    lon: stage.coords[1],
+                    address: addr,
+                });
+            });
+        }, Math.min((total - 1 - idx) * 120, 1500));
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [stage.id, stage.coords, idx, total, hasReadableAddress, dispatch]);
+
+    useEffect(() => {
+        if (!isEditing) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsEditing(false);
+                setShowResults(false);
+                setQuery(stage.address || '');
+            }
+        };
+        window.addEventListener('keydown', onKeyDown, true);
+        return () => window.removeEventListener('keydown', onKeyDown, true);
+    }, [isEditing, stage.address]);
+
+    useEffect(() => {
+        if (!isEditing) {
+            setQuery(stage.address || '');
+        }
+    }, [stage.address, isEditing]);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            const target = e.target as Node;
+            const inRow = wrapperRef.current?.contains(target);
+            const inMenu = portalMenuRef.current?.contains(target);
+            if (!inRow && !inMenu) {
+                setShowResults(false);
+                setIsEditing(false);
+                setMenuPos(null);
+            }
+        };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
+
+    // Edit autocomplete: show only at >= 3 chars, with loading state & top-3 address-first ranking
     useEffect(() => {
-        if (!isFocused) return;
-        // Don't search if it looks like raw coordinates
-        if (parseCoords(query)) { setResults([]); setShowResults(false); return; }
+        if (!isEditing) return;
+        const trimmed = query.trim();
+        if (parseCoords(trimmed) || trimmed.length < 3) {
+            setResults([]);
+            setShowResults(false);
+            setIsSearching(false);
+            return;
+        }
+        setIsSearching(true);
+        setShowResults(true);
         const t = setTimeout(async () => {
-            if (query.trim().length >= 3) { const res = await searchIGN(query); setResults(res); setShowResults(res.length > 0); }
-            else { setResults([]); setShowResults(false); }
-        }, 320);
+            try {
+                const res = await searchIGNWithBias(trimmed, getMapCenterBias(), 3);
+                setResults(res);
+                setShowResults(res.length > 0);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 220);
         return () => clearTimeout(t);
-    }, [query, isFocused]);
+    }, [query, isEditing]);
+
+    const emitHighlight = (active: boolean) => {
+        window.dispatchEvent(
+            new CustomEvent('scoutraider:highlight-stage', { detail: { id: active ? stage.id : null } })
+        );
+    };
+
+    const centerOnMap = () => {
+        const map = mapRef.current;
+        if (!map) return;
+        map.flyTo([stage.coords[0], stage.coords[1]], Math.max(map.getZoom(), 14), { duration: 0.65 });
+    };
+
+    const computeClampedMenuPos = (preferredLeft: number, preferredTop: number, fallbackTop: number) => {
+        const menuWidth = 200;
+        const estHeight = 130;
+        const top =
+            preferredTop + estHeight > window.innerHeight
+                ? Math.max(8, fallbackTop - estHeight)
+                : preferredTop;
+        const left = Math.min(Math.max(8, preferredLeft), window.innerWidth - menuWidth - 8);
+        return { top, left };
+    };
+
+    const openContextMenu = (e: React.MouseEvent) => {
+        if (isEditing) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setMenuPos(computeClampedMenuPos(e.clientX, e.clientY + 2, e.clientY - 2));
+    };
 
     const handleSelect = (r: SearchResult) => {
-        setQuery(r.label); setShowResults(false); setIsFocused(false);
+        setQuery(r.label);
+        setShowResults(false);
+        setIsEditing(false);
         dispatch({ type: 'MOVE_STAGE', id: stage.id, lat: r.lat, lon: r.lon, address: r.label });
         reRouteAdjacentLegs(state.stages, state.routes, state.small_roads_only, dispatch, idx, r.lat, r.lon);
+        mapRef.current?.flyTo([r.lat, r.lon], Math.max(mapRef.current.getZoom(), 14), { duration: 0.6 });
     };
 
     const handleCommit = () => {
         const coords = parseCoords(query);
         if (coords) {
-            const label = `${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`;
-            setQuery(label); setShowResults(false); setIsFocused(false);
-            dispatch({ type: 'MOVE_STAGE', id: stage.id, lat: coords.lat, lon: coords.lon, address: label });
+            setShowResults(false);
+            setIsEditing(false);
+            dispatch({ type: 'MOVE_STAGE', id: stage.id, lat: coords.lat, lon: coords.lon, address: '' });
             reRouteAdjacentLegs(state.stages, state.routes, state.small_roads_only, dispatch, idx, coords.lat, coords.lon);
         } else if (results.length > 0) {
             handleSelect(results[0]);
+        } else {
+            setIsEditing(false);
+            setShowResults(false);
         }
     };
 
     const handleDelete = () => {
+        setMenuPos(null);
+        emitHighlight(false);
         dispatch({ type: 'REMOVE_STAGE', id: stage.id });
         if (idx > 0 && idx < state.stages.length - 1) {
-            const prev = state.stages[idx - 1], next = state.stages[idx + 1];
+            const prev = state.stages[idx - 1];
+            const next = state.stages[idx + 1];
+            const bridgeProfile = state.routes[idx - 1]?.profile || state.routes[idx]?.profile || 'pedestrian';
             dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Reconnexion...' });
-            backgroundEngine.enqueue('route_leg', 0, `job-bridge-${Date.now()}`, { p1: [prev.coords[0], prev.coords[1]], p2: [next.coords[0], next.coords[1]], profile: 'pedestrian', small_roads: state.small_roads_only, insertIdx: idx - 1 });
+            backgroundEngine.enqueue('route_leg', 0, `job-bridge-${Date.now()}`, {
+                p1: [prev.coords[0], prev.coords[1]],
+                p2: [next.coords[0], next.coords[1]],
+                profile: bridgeProfile,
+                small_roads: state.small_roads_only,
+                insertIdx: idx - 1,
+            });
         }
+        onStageDeleted(stage.label);
     };
 
-    const isFirst = idx === 0, isLast = idx === total - 1;
-    const dotColor = isFirst ? 'var(--semantic-green)' : isLast ? 'var(--semantic-red)' : 'var(--accent-default)';
-
-    // ── Drag handlers: only initiate drag from the grip handle ──
-    const handleGripMouseDown = () => {
-        // Make the row draggable when the user presses the grip
-        if (rowRef.current) rowRef.current.setAttribute('draggable', 'true');
-    };
-    const handleRowDragStart = (e: React.DragEvent) => {
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', String(idx));
-        setIsDraggingRow(true);
-        onDragStart(e);
-    };
-    const handleRowDragEnd = (e: React.DragEvent) => {
-        // Remove draggable so clicking/focusing the row normally doesn't accidentally drag
-        if (rowRef.current) rowRef.current.setAttribute('draggable', 'false');
-        setIsDraggingRow(false);
-        onDragEnd(e);
+    const handleCopyCoords = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard?.writeText(coordsText).catch(() => {});
+        setCopiedCoords(true);
+        onCoordsCopied?.(coordsText);
+        setTimeout(() => setCopiedCoords(false), 1500);
     };
 
-    return (
-        <div ref={wrapperRef} style={{ position: 'relative' }}>
-            <div
-                ref={rowRef}
-                draggable={false}
-                onDragStart={handleRowDragStart}
-                onDragOver={(e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver(e); }}
-                onDrop={onDrop}
-                onDragEnd={handleRowDragEnd}
-                style={{
-                    display: 'flex', alignItems: 'center', gap: '8px', padding: '0 8px 0 6px',
-                    minHeight: '36px',
-                    background: isFocused ? 'var(--bg-surface)' : 'var(--bg-dark)',
-                    border: `1px solid ${isFocused ? 'var(--border-strong)' : 'var(--border-subtle)'}`,
-                    borderRadius: 'var(--radius-sm)', transition: 'all 100ms ease',
-                    opacity: isDragged ? 0.35 : 1,
-                }}>
-                {/* Grip handle */}
-                <div
-                    onMouseDown={handleGripMouseDown}
-                    onMouseUp={() => { if (rowRef.current) rowRef.current.setAttribute('draggable', 'false'); }}
-                    title="Glisser pour réordonner"
-                    style={{ cursor: 'grab', padding: '4px 2px', marginLeft: '-2px', flexShrink: 0, display: 'flex', alignItems: 'center' }}
-                >
-                    <GripVertical size={14} style={{ color: 'var(--text-dim)', opacity: isDraggingRow ? 0.9 : 0.45 }} />
-                </div>
-                <div style={{
-                    width: '22px', height: '22px', borderRadius: 'var(--radius-xs)',
-                    background: isFocused ? dotColor : 'var(--bg-elevated)', border: `1px solid ${dotColor}`,
-                    color: isFocused ? '#111' : dotColor, fontWeight: 700, fontSize: '10.5px',
-                    fontFamily: 'var(--font-mono)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    transition: 'all 100ms ease',
-                }}>{stage.label}</div>
-                {/* Input */}
-                <input
-                    type="text"
-                    value={query}
-                    onChange={e => setQuery(e.target.value)}
-                    onFocus={() => { setIsFocused(true); if (results.length > 0) setShowResults(true); }}
-                    onBlur={() => setTimeout(() => setIsFocused(false), 150)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCommit(); } }}
-                    onDragStart={e => e.preventDefault()}
-                    draggable={false}
-                    placeholder="Adresse, lieu ou lat, lon…"
-                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '12px', fontFamily: 'var(--font-ui)', minWidth: 0 }}
-                />
-                <button type="button" onClick={handleDelete} title="Supprimer"
-                    style={{ width: '26px', height: '26px', borderRadius: 'var(--radius-xs)', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 100ms ease', flexShrink: 0 }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--semantic-danger-bg)'; (e.currentTarget as HTMLElement).style.color = 'var(--semantic-danger)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'; }}>
-                    <X size={14} strokeWidth={2} />
-                </button>
-            </div>
-            {showResults && results.length > 0 && <SmartDropdown results={results} onSelect={handleSelect} anchorRef={wrapperRef} />}
-        </div>
-    );
-}
+    const isFirst = idx === 0;
+    const isLast = idx === total - 1 && total > 1;
+    const dotColor = isFirst ? 'var(--semantic-green)' : isLast ? 'var(--semantic-red)' : '#94A3B8';
+    const badgeBorderColor = isFirst
+        ? 'var(--semantic-green)'
+        : isLast
+            ? 'var(--semantic-red)'
+            : 'rgba(148, 163, 184, 0.45)';
+    const parsedAddr = hasReadableAddress ? formatStageAddress(stage.address!) : { primary: `Étape ${stage.label}` };
+    const shortTitle = parsedAddr.primary || `Étape ${stage.label}`;
+    const fullTitle = parsedAddr.secondary ? `${parsedAddr.primary}, ${parsedAddr.secondary}` : parsedAddr.primary;
+    const legSummaryText =
+        hasSegmentBelow && legDist !== undefined
+            ? isLegComputing
+                ? '…'
+                : formatDistanceFr(legDist)
+            : '';
 
-function AddStageRow() {
-    const { state, dispatch } = useApp();
-    const [query, setQuery] = useState('');
-    const [results, setResults] = useState<SearchResult[]>([]);
-    const [showResults, setShowResults] = useState(false);
-    const [isFocused, setIsFocused] = useState(false);
-    const wrapperRef = useRef<HTMLDivElement>(null);
-    // Keep a ref to current stages so the callback always sees fresh data
-    const stagesRef = useRef(state.stages);
-    const routesRef = useRef(state.routes);
-    useEffect(() => { stagesRef.current = state.stages; }, [state.stages]);
-    useEffect(() => { routesRef.current = state.routes; }, [state.routes]);
-
-    useEffect(() => {
-        const h = (e: MouseEvent) => { if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) { setShowResults(false); setIsFocused(false); } };
-        document.addEventListener('mousedown', h);
-        return () => document.removeEventListener('mousedown', h);
-    }, []);
-    useEffect(() => {
-        // Don't trigger IGN search for raw coordinate input
-        if (parseCoords(query)) { setResults([]); setShowResults(false); return; }
-        const t = setTimeout(async () => {
-            if (query.trim().length >= 3) { const res = await searchIGN(query); setResults(res); setShowResults(res.length > 0); }
-            else { setResults([]); setShowResults(false); }
-        }, 320);
-        return () => clearTimeout(t);
-    }, [query]);
-
-    const handleSelect = (r: SearchResult) => {
-        setQuery(''); setShowResults(false); setIsFocused(false);
-        // Capture anchor BEFORE dispatching ADD_STAGE (state is still pre-add here)
-        const stages = stagesRef.current;
-        const routes = routesRef.current;
-        const anchorIdx = state.anchor_stage_idx >= 0 ? state.anchor_stage_idx : stages.length - 1;
-        dispatch({ type: 'ADD_STAGE', lat: r.lat, lon: r.lon, label: '-', address: r.label });
-        if (anchorIdx >= 0 && anchorIdx < stages.length) {
-            const prev = stages[anchorIdx];
-            dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Calcul du tronçon...' });
-            backgroundEngine.enqueue('route_leg', 0, `job-add-${Date.now()}`, { p1: [prev.coords[0], prev.coords[1]], p2: [r.lat, r.lon], profile: 'pedestrian', small_roads: state.small_roads_only, insertIdx: anchorIdx });
-            if (anchorIdx < stages.length - 1) {
-                const next = stages[anchorIdx + 1];
-                if (routes[anchorIdx]) dispatch({ type: 'REMOVE_ROUTE', id: routes[anchorIdx].id });
-                backgroundEngine.enqueue('route_leg', 0, `job-add-next-${Date.now()}`, { p1: [r.lat, r.lon], p2: [next.coords[0], next.coords[1]], profile: 'pedestrian', small_roads: state.small_roads_only, insertIdx: anchorIdx + 1 });
-            }
-        }
-        dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' });
-    };
-
-    const handleCommit = () => {
-        const coords = parseCoords(query);
-        if (coords) {
-            handleSelect({ label: `${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`, lat: coords.lat, lon: coords.lon });
-        } else if (results.length > 0) {
-            handleSelect(results[0]);
-        }
-    };
-
-    return (
-        <div ref={wrapperRef} style={{ position: 'relative' }}>
-            <div onClick={() => { if (state.active_tool !== 'route') dispatch({ type: 'SET_ACTIVE_TOOL', tool: 'route' }); }}
-                style={{
-                    display: 'flex', alignItems: 'center', gap: '8px', padding: '0 10px',
-                    minHeight: '40px',
-                    background: isFocused ? 'var(--bg-dark)' : 'rgba(92,189,110,0.04)',
-                    border: `1.5px dashed ${isFocused ? 'var(--accent-default)' : 'rgba(92,189,110,0.25)'}`,
-                    borderRadius: '12px', cursor: 'text', transition: '0.2s',
-                    boxShadow: isFocused ? '0 0 0 3px var(--accent-transparent)' : 'none',
-                }}>
-                <Plus size={13} style={{ color: 'var(--accent-default)', flexShrink: 0, opacity: 0.8 }} />
-                <input type="text" value={query} onChange={e => setQuery(e.target.value)}
-                    onFocus={() => { setIsFocused(true); if (results.length > 0) setShowResults(true); }}
-                    onBlur={() => setTimeout(() => setIsFocused(false), 150)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCommit(); } }}
-                    placeholder="Adresse, lieu ou lat, lon…"
-                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '12px', fontFamily: 'var(--font-ui)', minWidth: 0 }} />
-            </div>
-            {showResults && results.length > 0 && <SmartDropdown results={results} onSelect={handleSelect} anchorRef={wrapperRef} />}
-        </div>
-    );
-}
-
-// ── Drop Zone between stages ───────────────────────────────────────────────────
-function DropZone({ insertAfterIdx, dist, isDirect, onDrop, onToggleDirect }: { insertAfterIdx: number; dist?: string; isDirect?: boolean; onDrop: (idx: number) => void; onToggleDirect?: () => void }) {
-    const [over, setOver] = useState(false);
     return (
         <div
-            onDragOver={e => { e.preventDefault(); setOver(true); }}
-            onDragLeave={() => setOver(false)}
-            onDrop={e => { e.preventDefault(); setOver(false); onDrop(insertAfterIdx); }}
+            ref={wrapperRef}
+            className={isNewFlash ? 'sr-stage-flash' : undefined}
             style={{
-                display: 'flex', alignItems: 'center',
-                paddingLeft: '11px',
-                height: over ? '40px' : '32px',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                borderRadius: '12px',
-                background: over ? 'var(--accent-transparent)' : 'transparent',
-                border: over ? '1px dashed var(--accent-default)' : 'none',
-                cursor: 'default',
-                margin: '2px 0'
+                position: 'relative',
+                flexShrink: 0,
+                overflow: 'hidden',
+                contentVisibility: isSelected ? 'visible' : 'auto',
+                containIntrinsicSize: isMobile ? 'auto 48px' : 'auto 40px',
+                borderBottom: '1px solid var(--border-subtle)',
+                background: isSelected
+                    ? 'rgba(255, 255, 255, 0.045)'
+                    : isMultiSelected
+                        ? 'rgba(255, 255, 255, 0.03)'
+                        : isHovered
+                        ? 'rgba(255, 255, 255, 0.025)'
+                        : 'transparent',
+                transition: 'background 150ms ease',
+            }}
+            onMouseEnter={() => {
+                setIsHovered(true);
+                emitHighlight(true);
+                if (titleSpanRef.current) {
+                    setIsTruncated(titleSpanRef.current.scrollWidth > titleSpanRef.current.clientWidth);
+                }
+            }}
+            onMouseLeave={() => {
+                setIsHovered(false);
+                emitHighlight(false);
+            }}
+            onContextMenu={openContextMenu}
+            onTouchStart={(e) => {
+                if (isEditing || e.touches.length !== 1) return;
+                const t = e.touches[0];
+                const tx = t.clientX;
+                const ty = t.clientY;
+                if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = setTimeout(() => {
+                    touchStartRef.current = null;
+                    setMenuPos(computeClampedMenuPos(tx, ty + 2, ty - 2));
+                }, 500);
+                if (!isMobile) return;
+                touchStartRef.current = { x: tx, y: ty, active: false };
+            }}
+            onTouchMove={(e) => {
+                if (e.touches.length !== 1) return;
+                if (longPressTimerRef.current && touchStartRef.current) {
+                    const mdx = e.touches[0].clientX - touchStartRef.current.x;
+                    const mdy = e.touches[0].clientY - touchStartRef.current.y;
+                    if (Math.hypot(mdx, mdy) > 8) {
+                        clearTimeout(longPressTimerRef.current);
+                        longPressTimerRef.current = null;
+                    }
+                }
+                if (!isMobile || !touchStartRef.current) return;
+                const dx = e.touches[0].clientX - touchStartRef.current.x;
+                const dy = e.touches[0].clientY - touchStartRef.current.y;
+                if (!touchStartRef.current.active) {
+                    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.4 && dx < 0) {
+                        touchStartRef.current.active = true;
+                    } else if (Math.abs(dy) > 10) {
+                        touchStartRef.current = null;
+                        return;
+                    }
+                }
+                if (touchStartRef.current?.active) {
+                    setSwipeX(Math.max(-110, Math.min(0, dx)));
+                }
+            }}
+            onTouchEnd={() => {
+                if (longPressTimerRef.current) {
+                    clearTimeout(longPressTimerRef.current);
+                    longPressTimerRef.current = null;
+                }
+                if (!isMobile || !touchStartRef.current) return;
+                if (swipeX <= -72) {
+                    setSwipeX(0);
+                    touchStartRef.current = null;
+                    handleDelete();
+                } else {
+                    setSwipeX(0);
+                    touchStartRef.current = null;
+                }
             }}
         >
-            {/* Vertical Line Connector */}
-            <div style={{
-                width: '2px', height: '100%',
-                marginLeft: '10px',
-                background: over ? 'var(--accent-default)' : 'rgba(255,255,255,0.06)',
-                borderRadius: '1px',
-                transition: 'background 0.2s',
-            }} />
-
-            {/* Info Badges */}
-            {dist && !over && (
-                <div style={{ 
-                    display: 'flex', alignItems: 'center', gap: '6px', 
-                    marginLeft: '12px',
-                    animation: 'fadeInScale 0.2s ease-out'
-                }}>
-                    {/* Distance Badge */}
-                    <div style={{
-                        fontSize: '9px', color: 'rgba(255,255,255,0.7)', fontWeight: 800,
-                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: '6px', padding: '3px 8px', letterSpacing: '0.02em'
-                    }}>{dist}</div>
-
-                    {/* Profile Toggle Badge */}
-                    {onToggleDirect && (
-                        <div 
-                            onClick={(e) => { e.stopPropagation(); onToggleDirect(); }}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '6px',
-                                cursor: 'pointer', padding: '3px 8px', borderRadius: '6px',
-                                background: isDirect ? 'rgba(201, 149, 74, 0.15)' : 'rgba(255,255,255,0.04)',
-                                border: '1px solid',
-                                borderColor: isDirect ? 'rgba(201, 149, 74, 0.3)' : 'rgba(255,255,255,0.08)',
-                                transition: 'all 0.2s ease'
-                            }}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.borderColor = isDirect ? 'rgba(201, 149, 74, 0.5)' : 'rgba(255,255,255,0.2)';
-                                e.currentTarget.style.background = isDirect ? 'rgba(201, 149, 74, 0.25)' : 'rgba(255,255,255,0.08)';
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.borderColor = isDirect ? 'rgba(201, 149, 74, 0.3)' : 'rgba(255,255,255,0.08)';
-                                e.currentTarget.style.background = isDirect ? 'rgba(201, 149, 74, 0.15)' : 'rgba(255,255,255,0.04)';
-                            }}
-                        >
-                            <div style={{
-                                width: '6px', height: '6px', borderRadius: '50%',
-                                background: isDirect ? '#c9954a' : 'rgba(255,255,255,0.2)',
-                                transition: 'background 0.2s'
-                            }} />
-                            <span style={{ 
-                                fontSize: '9px', fontWeight: 700, 
-                                color: isDirect ? '#c9954a' : 'rgba(255,255,255,0.4)',
-                                textTransform: 'uppercase', letterSpacing: '0.03em'
-                            }}>
-                                Hors piste
-                            </span>
-                        </div>
-                    )}
+            {isMobile && swipeX < -4 && (
+                <div
+                    aria-hidden="true"
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(239, 68, 68, 0.22)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        paddingRight: '16px',
+                        color: 'var(--semantic-red)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        gap: '6px',
+                        pointerEvents: 'none',
+                    }}
+                >
+                    <Trash2 size={14} />
+                    <span>Supprimer</span>
                 </div>
             )}
 
-            {over && (
-                <span style={{ fontSize: '10px', color: 'var(--accent-default)', fontWeight: 800, marginLeft: '12px' }}>
-                    Déposer ici
-                </span>
+            <div
+                ref={rowRef}
+                draggable={!isEditing}
+                onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', String(idx));
+                    requestAnimationFrame(() => {
+                        setIsDraggingRow(true);
+                        onDragStart(e);
+                    });
+                }}
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    onDragOver(e);
+                }}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDrop();
+                }}
+                onDragEnd={(e) => {
+                    setIsDraggingRow(false);
+                    onDragEnd(e);
+                }}
+                onClick={(e) => {
+                    if (isEditing || menuPos) return;
+                    const ctrl = e.ctrlKey || e.metaKey;
+                    const shift = e.shiftKey;
+                    if (ctrl || shift) {
+                        if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+                        onSelect({ ctrl, shift });
+                        return;
+                    }
+                    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+                    clickTimerRef.current = setTimeout(() => {
+                        clickTimerRef.current = null;
+                        onSelect({ ctrl: false, shift: false });
+                        centerOnMap();
+                    }, 210);
+                }}
+                onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    if (clickTimerRef.current) {
+                        clearTimeout(clickTimerRef.current);
+                        clickTimerRef.current = null;
+                    }
+                    setMenuPos(null);
+                    setIsEditing(true);
+                    setTimeout(() => {
+                        inputRef.current?.focus();
+                        inputRef.current?.select();
+                    }, 20);
+                }}
+                    style={{
+                        display: 'flex',
+                        alignItems: isSelected ? 'flex-start' : 'center',
+                        gap: '12px',
+                        padding: isEditing ? '6px 12px' : isSelected ? '10px 12px 0 12px' : '4px 12px 4px 12px',
+                        minHeight: isSelected ? undefined : isMobile ? '48px' : '40px',
+                        background: isEditing ? 'rgba(255,255,255,0.04)' : 'transparent',
+                        opacity: isDragged ? 0.25 : 1,
+                        cursor: isEditing ? 'text' : isDraggingRow ? 'grabbing' : 'pointer',
+                        transform: swipeX ? `translateX(${swipeX}px)` : undefined,
+                        transition: swipeX === 0 ? 'transform 160ms ease' : undefined,
+                    }}
+                >
+                    {/* Letter badge (green start, red end, neutral grey middle) / Drag Handle */}
+                    <div
+                        aria-label={`Réordonner l'étape ${stage.label}`}
+                        title="Glisser pour réordonner"
+                        style={{
+                            width: '20px',
+                            height: '20px',
+                            marginTop: isEditing ? '4px' : isSelected ? '1px' : 0,
+                            borderRadius: '6px',
+                            border: !isMobile && !isEditing && (isHovered || isDraggingRow) ? 'none' : `1.5px solid ${badgeBorderColor}`,
+                            background: 'transparent',
+                            color: !isMobile && !isEditing && (isHovered || isDraggingRow) ? '#94A3B8' : dotColor,
+                            fontWeight: 800,
+                            fontSize: '10.5px',
+                            fontFamily: 'var(--font-mono)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            cursor: isEditing ? 'default' : 'grab',
+                            padding: 0,
+                        }}
+                    >
+                        {!isMobile && !isEditing && (isHovered || isDraggingRow) ? <GripVertical size={15} /> : stage.label}
+                    </div>
+
+                {/* Title (one-line collapsed; full when selected/editing) */}
+                <div
+                    ref={editBoxRef}
+                    style={{
+                        flex: 1,
+                        minWidth: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        gap: '2px',
+                    }}
+                >
+                    {isEditing ? (
+                        <>
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                minHeight: '28px',
+                                padding: '2px 4px 2px 6px',
+                                background: 'rgba(255, 255, 255, 0.06)',
+                                border: '1px solid var(--border-strong)',
+                                borderRadius: '7px',
+                            }}
+                        >
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                autoFocus
+                                value={query}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => setQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleCommit();
+                                    } else if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setIsEditing(false);
+                                        setShowResults(false);
+                                        setQuery(stage.address || '');
+                                    }
+                                }}
+                                placeholder={`Adresse ou ${coordsText}`}
+                                style={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    background: 'transparent',
+                                    border: 'none',
+                                    outline: 'none',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '12.5px',
+                                    fontWeight: 500,
+                                    fontFamily: 'var(--font-ui)',
+                                }}
+                            />
+                            <button
+                                type="button"
+                                aria-label="Annuler la modification"
+                                title="Annuler"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsEditing(false);
+                                    setShowResults(false);
+                                    setQuery(stage.address || '');
+                                }}
+                                style={{
+                                    width: '22px',
+                                    height: '22px',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: '#94A3B8',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    flexShrink: 0,
+                                    borderRadius: '4px',
+                                }}
+                            >
+                                <RotateCcw size={12} />
+                            </button>
+                        </div>
+                        <div
+                            className="tabular-nums"
+                            style={{
+                                fontSize: '11px',
+                                color: '#94A3B8',
+                                fontFamily: 'var(--font-mono)',
+                                lineHeight: 1.2,
+                                paddingLeft: '6px',
+                            }}
+                        >
+                            {coordsText}
+                        </div>
+                        </>
+                    ) : (
+                        <>
+                            <div style={{ display: 'flex', alignItems: isSelected ? 'flex-start' : 'center', gap: '6px', minWidth: 0 }}>
+                                {isFirst && (
+                                    <Play
+                                        size={9}
+                                        fill="currentColor"
+                                        style={{ color: 'var(--semantic-green)', flexShrink: 0, marginTop: isSelected ? '4px' : 0 }}
+                                        aria-hidden="true"
+                                    />
+                                )}
+                                {isLast && (
+                                    <Flag
+                                        size={10}
+                                        style={{ color: 'var(--semantic-red)', flexShrink: 0, marginTop: isSelected ? '3px' : 0 }}
+                                        aria-hidden="true"
+                                    />
+                                )}
+                                <span
+                                    ref={titleSpanRef}
+                                    style={{
+                                        flex: 1,
+                                        fontSize: '12.5px',
+                                        fontWeight: isSelected ? 600 : 500,
+                                        color: 'var(--text-primary)',
+                                        ...(isSelected
+                                            ? {
+                                                  display: '-webkit-box',
+                                                  WebkitLineClamp: 2,
+                                                  WebkitBoxOrient: 'vertical' as const,
+                                                  overflow: 'hidden',
+                                                  whiteSpace: 'normal',
+                                              }
+                                            : {
+                                                  whiteSpace: 'nowrap',
+                                                  overflow: 'hidden',
+                                                  textOverflow: 'ellipsis',
+                                              }),
+                                        lineHeight: 1.3,
+                                        minWidth: 0,
+                                    }}
+                                    title={!isSelected && isTruncated ? fullTitle : undefined}
+                                >
+                                    {shortTitle}
+                                </span>
+                                {isHovered && (
+                                    <button
+                                        type="button"
+                                        aria-label="Modifier l'étape"
+                                        title="Modifier"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsEditing(true);
+                                            setTimeout(() => {
+                                                inputRef.current?.focus();
+                                                inputRef.current?.select();
+                                            }, 20);
+                                        }}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            padding: '0 2px',
+                                            marginTop: isSelected ? '2px' : 0,
+                                            color: '#94A3B8',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            cursor: 'pointer',
+                                            flexShrink: 0,
+                                            lineHeight: 1,
+                                        }}
+                                    >
+                                        <Edit3 size={12} aria-hidden="true" />
+                                    </button>
+                                )}
+                            </div>
+                            {isSelected && (parsedAddr.secondary || isHovered) && (
+                                <div
+                                    style={{
+                                        height: '15px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        fontSize: '12px',
+                                        color: '#94A3B8',
+                                        lineHeight: 1.25,
+                                        overflow: 'hidden',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    {isHovered ? (
+                                        <button
+                                            type="button"
+                                            onClick={handleCopyCoords}
+                                            title="Copier les coordonnées"
+                                            aria-label="Copier les coordonnées"
+                                            className="tabular-nums"
+                                            style={{
+                                                padding: 0,
+                                                background: 'transparent',
+                                                border: 'none',
+                                                fontSize: '11.5px',
+                                                color: copiedCoords ? '#CBD5E1' : '#94A3B8',
+                                                fontFamily: 'var(--font-mono)',
+                                                lineHeight: 1.25,
+                                                whiteSpace: 'nowrap',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '5px',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            <span>{coordsText}</span>
+                                            {copiedCoords ? <Check size={11} aria-hidden="true" /> : <Copy size={11} aria-hidden="true" />}
+                                        </button>
+                                    ) : (
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {parsedAddr.secondary}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* Right slot: leg dist · dur when expanded; passive mode icon + km + mobile grip when collapsed */}
+                {!isEditing && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        {isSelected ? (
+                            hasSegmentBelow &&
+                            legDist !== undefined && (
+                                isLegComputing ? (
+                                    <span
+                                        className="tabular-nums"
+                                        style={{
+                                            whiteSpace: 'nowrap',
+                                            fontSize: '11.5px',
+                                            color: '#CBD5E1',
+                                            fontWeight: 500,
+                                        }}
+                                    >
+                                        Calcul…
+                                    </span>
+                                ) : (
+                                    <div
+                                        className="tabular-nums"
+                                        style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'flex-end',
+                                            gap: '2px',
+                                            lineHeight: 1.3,
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '5px',
+                                                fontSize: '12px',
+                                                color: '#CBD5E1',
+                                                fontWeight: 500,
+                                            }}
+                                        >
+                                            {legMode !== 'pedestrian' && (
+                                                <span
+                                                    title={`Mode : ${MODE_LABELS[legMode]}`}
+                                                    aria-label={`Mode : ${MODE_LABELS[legMode]}`}
+                                                    style={{
+                                                        color: 'var(--text-secondary)',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                    }}
+                                                >
+                                                    {React.createElement(MODE_ICONS[legMode], { size: 13, 'aria-hidden': true })}
+                                                </span>
+                                            )}
+                                            {formatDistanceFr(legDist)}
+                                        </span>
+                                        <span style={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 500 }}>
+                                            {formatDurationFr(legDurationS || 0)}
+                                        </span>
+                                    </div>
+                                )
+                            )
+                        ) : (
+                            <>
+                                {hasSegmentBelow && legMode !== 'pedestrian' && (
+                                    <span
+                                        title={`Mode : ${MODE_LABELS[legMode]}`}
+                                        aria-label={`Mode : ${MODE_LABELS[legMode]}`}
+                                        style={{
+                                            color: 'var(--text-secondary)',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                        }}
+                                    >
+                                        {React.createElement(MODE_ICONS[legMode], { size: 13, 'aria-hidden': true })}
+                                    </span>
+                                )}
+                                {legSummaryText && (
+                                    <span
+                                        className="tabular-nums"
+                                        title="Distance du tronçon entrant"
+                                        style={{
+                                            whiteSpace: 'nowrap',
+                                            fontSize: '12px',
+                                            color: '#94A3B8',
+                                            fontWeight: 500,
+                                        }}
+                                    >
+                                        {legSummaryText}
+                                    </span>
+                                )}
+                                {isMobile && (
+                                    <span style={{ color: '#64748B', display: 'inline-flex' }} aria-hidden="true">
+                                        <GripVertical size={15} />
+                                    </span>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Animated 150ms expansion: strict 1-thing-per-line layout */}
+            <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                    display: 'grid',
+                    gridTemplateRows: isSelected && !isEditing ? '1fr' : '0fr',
+                    opacity: isSelected && !isEditing ? 1 : 0,
+                    transition: 'grid-template-rows 150ms ease, opacity 150ms ease',
+                }}
+            >
+                <div style={{ overflow: 'hidden' }}>
+                    <div
+                        style={{
+                            padding: '10px 12px 10px 12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px',
+                        }}
+                    >
+                        {/* Full-width bottom controls row (spans under step badge): mode selector + Duplicate, Copy coords, gap, Delete */}
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                width: '100%',
+                            }}
+                        >
+                            {hasSegmentBelow && legDist !== undefined && (
+                                <div
+                                    role="group"
+                                    aria-label="Mode de routage"
+                                    style={{
+                                        flex: 1,
+                                        minWidth: 0,
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(3, 1fr)',
+                                        alignItems: 'center',
+                                        boxSizing: 'border-box',
+                                        height: isMobile ? '36px' : '30px',
+                                        padding: '2px',
+                                        borderRadius: '7px',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid var(--border-subtle)',
+                                        gap: '2px',
+                                    }}
+                                >
+                                    {(['pedestrian', 'car', 'direct'] as RoutingMode[]).map((id) => {
+                                        const Icon = MODE_ICONS[id];
+                                        const active = legMode === id;
+                                        return (
+                                            <button
+                                                key={id}
+                                                type="button"
+                                                aria-pressed={active}
+                                                aria-label={MODE_LABELS[id]}
+                                                title={`${MODE_LABELS[id]} (${MODE_HINTS[id]})`}
+                                                onClick={() => {
+                                                    if (!active) onChangeMode(id);
+                                                }}
+                                                style={{
+                                                    height: '100%',
+                                                    padding: '0 6px',
+                                                    borderRadius: '5px',
+                                                    border: 'none',
+                                                    background: active ? 'rgba(255, 255, 255, 0.14)' : 'transparent',
+                                                    color: active ? '#ffffff' : '#94A3B8',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '5px',
+                                                    fontSize: '11px',
+                                                    fontWeight: active ? 600 : 500,
+                                                    whiteSpace: 'nowrap',
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                <Icon size={12} aria-hidden="true" />
+                                                <span>{MODE_LABELS[id]}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            <button
+                                type="button"
+                                aria-label="Supprimer l'étape"
+                                title="Supprimer"
+                                onClick={handleDelete}
+                                style={{
+                                    boxSizing: 'border-box',
+                                    marginLeft: 'auto',
+                                    width: isMobile ? '36px' : '30px',
+                                    height: isMobile ? '36px' : '30px',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    background: 'rgba(239, 68, 68, 0.12)',
+                                    color: 'var(--semantic-red)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <Trash2 size={12} aria-hidden="true" />
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            {/* Context Menu (right-click / long-press only): 3 entries */}
+            {menuPos &&
+                createPortal(
+                    <div
+                        ref={portalMenuRef}
+                        role="menu"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: `${menuPos.top}px`,
+                            left: `${menuPos.left}px`,
+                            width: '200px',
+                            background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border-strong)',
+                            borderRadius: '10px',
+                            boxShadow: 'var(--shadow-lg)',
+                            padding: '4px',
+                            zIndex: 9999,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1px',
+                        }}
+                    >
+                        <button
+                            type="button"
+                            className="sr-menu-item"
+                            style={{ minHeight: '36px', fontSize: '12px', gap: '8px', padding: '0 10px', justifyContent: 'flex-start', textAlign: 'left' }}
+                            onClick={() => {
+                                setMenuPos(null);
+                                setIsEditing(true);
+                                setTimeout(() => {
+                                    inputRef.current?.focus();
+                                    inputRef.current?.select();
+                                }, 20);
+                            }}
+                        >
+                            <Edit3 size={13} /> Modifier le lieu
+                        </button>
+                        <button
+                            type="button"
+                            className="sr-menu-item"
+                            style={{ minHeight: '36px', fontSize: '12px', gap: '8px', padding: '0 10px', justifyContent: 'flex-start', textAlign: 'left' }}
+                            onClick={(e) => {
+                                setMenuPos(null);
+                                handleCopyCoords(e);
+                            }}
+                        >
+                            <MapPin size={13} /> Copier les coordonnées
+                        </button>
+                        <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '2px 4px' }} />
+                        <button
+                            type="button"
+                            className="sr-menu-item"
+                            style={{
+                                minHeight: '36px',
+                                fontSize: '12px',
+                                gap: '8px',
+                                padding: '0 10px',
+                                justifyContent: 'flex-start',
+                                textAlign: 'left',
+                                color: 'var(--semantic-danger)',
+                            }}
+                            onClick={handleDelete}
+                        >
+                            <Trash2 size={13} /> Supprimer
+                        </button>
+                    </div>,
+                    document.body
+                )}
+
+            {showResults && (isSearching || results.length > 0) && (
+                <SmartDropdown results={results} isLoading={isSearching} onSelect={handleSelect} anchorRef={editBoxRef} />
             )}
+        </div>
+    );
+}
+
+// ── Greyed Destination Preview Row ────────────────────────────────────────────
+function StagePreviewRow({
+    stage,
+    onDrop,
+}: {
+    stage: { label: string; address?: string; coords: [number, number] };
+    onDrop?: () => void;
+}) {
+    const parsed = stage.address && !parseCoords(stage.address) ? formatStageAddress(stage.address) : null;
+    const title = parsed?.primary || `${stage.coords[0].toFixed(4)}, ${stage.coords[1].toFixed(4)}`;
+    return (
+        <div
+            aria-hidden="true"
+            onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            }}
+            onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDrop?.();
+            }}
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                flexShrink: 0,
+                gap: '12px',
+                margin: '3px 6px 3px 4px',
+                padding: '6px 8px 6px 8px',
+                minHeight: '42px',
+                borderRadius: '8px',
+                background: 'rgba(148, 163, 184, 0.09)',
+                border: '1px dashed rgba(148, 163, 184, 0.45)',
+            }}
+        >
+            <div
+                style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '6px',
+                    border: '1.5px dashed rgba(148, 163, 184, 0.5)',
+                    color: '#94A3B8',
+                    fontWeight: 800,
+                    fontSize: '10.5px',
+                    fontFamily: 'var(--font-mono)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                }}
+            >
+                {stage.label}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                    style={{
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        color: '#94A3B8',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                    }}
+                >
+                    {title}
+                </div>
+                <div style={{ fontSize: '10.5px', color: 'rgba(148, 163, 184, 0.65)', fontFamily: 'var(--font-mono)' }}>
+                    {stage.coords[0].toFixed(4)}, {stage.coords[1].toFixed(4)}
+                </div>
+            </div>
         </div>
     );
 }
@@ -388,89 +1490,167 @@ function DropZone({ insertAfterIdx, dist, isDirect, onDrop, onToggleDirect }: { 
 // ── Main RoutePanel ────────────────────────────────────────────────────────────
 interface RoutePanelProps {
     embedded?: boolean;
+    isMobile?: boolean;
     onClose?: () => void;
+    onStageSelected?: () => void;
 }
 
-export default function RoutePanel({ embedded = false, onClose }: RoutePanelProps) {
+export default function RoutePanel({
+    embedded = false,
+    isMobile = false,
+    onStageSelected,
+}: RoutePanelProps) {
     const { state, dispatch } = useApp();
     const stages = state.stages;
+    const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+    const [editTriggerCounter, setEditTriggerCounter] = useState(0);
     const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
-    const prevLength = useRef(stages.length);
+    const [dragOverTargetIdx, setDragOverTargetIdx] = useState<number | null>(null);
+    /** Multi-selection set for stages (stage ids). */
+    const [multiStageSel, setMultiStageSel] = useState<Set<string>>(new Set());
+    /** Anchor index for Shift-range selection (in displayIndices positions). */
+    const lastStageSelDisplayPos = useRef<number | null>(null);
+    const [ascentM, setAscentM] = useState<number | null>(null);
+    const [flashStageId, setFlashStageId] = useState<string | null>(null);
+    const [undoToast, setUndoToast] = useState<{ label: string; key: number } | null>(null);
+    const [copyToast, setCopyToast] = useState<{ text: string; key: number } | null>(null);
+    const prevStageIds = useRef<Set<string>>(new Set(stages.map((s) => s.id)));
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [canScrollUp, setCanScrollUp] = useState(false);
+    const [canScrollDown, setCanScrollDown] = useState(false);
 
-    const handleOpen = async () => {
-        const loaded = await StateManager.loadProject();
-        if (loaded) {
-            dispatch({ type: 'LOAD_PROJECT', state: loaded });
-            dispatch({ type: 'ADD_NOTIFICATION', message: 'Projet chargé.', notifType: 'info' });
-        }
-    };
-
-    const handleSave = async () => {
-        dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Enregistrement...' });
-        const ok = await StateManager.saveProject(state);
-        dispatch({ type: 'SET_LOADING', isLoading: false });
-        dispatch({ type: 'ADD_NOTIFICATION', message: ok ? 'Projet enregistré.' : 'Erreur sauvegarde.', notifType: ok ? 'info' : 'error' });
-    };
+    // Track scroll visibility for Départ/Arrivée pills
+    const updateScrollPills = useCallback(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const { scrollTop, scrollHeight, clientHeight } = el;
+        const THRESHOLD = 24;
+        setCanScrollUp(scrollTop > THRESHOLD);
+        setCanScrollDown(scrollHeight - scrollTop - clientHeight > THRESHOLD);
+    }, []);
 
     useEffect(() => {
-        if (stages.length > prevLength.current && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        prevLength.current = stages.length;
-    }, [stages.length]);
+        const el = scrollRef.current;
+        if (!el) return;
+        updateScrollPills();
+        el.addEventListener('scroll', updateScrollPills, { passive: true });
+        const ro = new ResizeObserver(updateScrollPills);
+        ro.observe(el);
+        return () => {
+            el.removeEventListener('scroll', updateScrollPills);
+            ro.disconnect();
+        };
+    }, [updateScrollPills, stages.length]);
 
-    const getStageDistance = (index: number) => {
-        if (index === 0) return undefined;
-        const leg = state.routes[index - 1];
-        if (!leg || !leg.geojson?.geometry) return 'Calcul...';
-        const coords = leg.geojson.geometry.coordinates;
-        if (!coords || coords.length < 2) return '0.00 KM';
-        let dist = 0; const R = 6371e3;
-        for (let i = 0; i < coords.length - 1; i++) {
-            const [, lat1] = coords[i], [, lat2] = coords[i + 1];
-            const [lon1] = coords[i], [lon2] = coords[i + 1];
-            const p1 = lat1 * Math.PI / 180, p2 = lat2 * Math.PI / 180;
-            const dp = (lat2 - lat1) * Math.PI / 180, dl = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
-            dist += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    // Clear selection if selected stage was removed
+    useEffect(() => {
+        if (selectedStageId && !stages.some((s) => s.id === selectedStageId)) {
+            setSelectedStageId(null);
         }
-        return `${(dist / 1000).toFixed(2)} KM`;
-    };
+    }, [stages, selectedStageId]);
 
-    // Drop on a stage: insert dragged item AT that position
+    // Scroll to TOP on mount so latest step is immediately visible
+    useEffect(() => {
+        const scrollToTop = () => {
+            if (scrollRef.current) scrollRef.current.scrollTop = 0;
+        };
+        scrollToTop();
+        const raf = requestAnimationFrame(scrollToTop);
+        return () => cancelAnimationFrame(raf);
+    }, []);
+
+    // Auto-scroll to top + slide/flash new row on stage add
+    useEffect(() => {
+        const prevIds = prevStageIds.current;
+        const added = stages.find((s) => !prevIds.has(s.id));
+        if (added && stages.length > prevIds.size) {
+            if (scrollRef.current) scrollRef.current.scrollTop = 0;
+            setFlashStageId(added.id);
+            const t = setTimeout(() => setFlashStageId(null), 850);
+            prevStageIds.current = new Set(stages.map((s) => s.id));
+            return () => clearTimeout(t);
+        }
+        prevStageIds.current = new Set(stages.map((s) => s.id));
+    }, [stages]);
+
+    useEffect(() => {
+        if (!undoToast) return;
+        const t = setTimeout(() => setUndoToast(null), 5000);
+        return () => clearTimeout(t);
+    }, [undoToast]);
+
+    useEffect(() => {
+        if (!copyToast) return;
+        const t = setTimeout(() => setCopyToast(null), 2500);
+        return () => clearTimeout(t);
+    }, [copyToast]);
+
+    const { totalDistM, totalDurationS, allCoords } = useMemo(() => {
+        let d = 0;
+        let dur = 0;
+        const coords: [number, number][] = [];
+        for (let i = 0; i < Math.max(0, stages.length - 1); i++) {
+            const leg = state.routes[i];
+            const legDist = getLegDistanceMeters(leg);
+            d += legDist;
+            dur += getLegDurationSeconds(leg, legDist);
+            const c = leg?.geojson?.geometry?.coordinates;
+            if (Array.isArray(c)) {
+                for (const pt of c) {
+                    if (Array.isArray(pt) && pt.length >= 2) coords.push([pt[1], pt[0]]);
+                }
+            }
+        }
+        return { totalDistM: d, totalDurationS: dur, allCoords: coords };
+    }, [stages.length, state.routes]);
+
+    useEffect(() => {
+        if (allCoords.length < 2) {
+            setAscentM(null);
+            return;
+        }
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            ElevationService.computeProfile(allCoords)
+                .then((prof) => {
+                    if (!cancelled && prof) setAscentM(Math.round(prof.ascend_m));
+                })
+                .catch(() => {});
+        }, 400);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [allCoords]);
+
     const handleDropOnStage = (targetIdx: number) => {
-        if (draggedIdx === null || draggedIdx === targetIdx) { setDraggedIdx(null); return; }
+        setDragOverTargetIdx(null);
+        if (draggedIdx === null || draggedIdx === targetIdx) {
+            setDraggedIdx(null);
+            return;
+        }
         performReorder(draggedIdx, targetIdx);
     };
 
-    // Drop on a connector: insert dragged item AFTER that connector index
-    const handleDropOnConnector = (insertAfterIdx: number) => {
-        if (draggedIdx === null) return;
-        // insertAfterIdx is the index of the stage ABOVE the connector
-        // We want dragged to be placed at insertAfterIdx+1
-        let targetIdx = insertAfterIdx + 1;
-        if (draggedIdx < targetIdx) targetIdx -= 1; // account for removal shift
-        if (draggedIdx === targetIdx) { setDraggedIdx(null); return; }
-        performReorder(draggedIdx, targetIdx);
-    };
-
-    const handleToggleProfile = (idx: number) => {
+    const handleSetLegProfile = (idx: number, newProfile: RoutingMode) => {
         const stageA = state.stages[idx];
         const stageB = state.stages[idx + 1];
         if (!stageA || !stageB) return;
         const currentRoute = state.routes[idx];
-        if (!currentRoute) return;
+        if (currentRoute) dispatch({ type: 'REMOVE_ROUTE', id: currentRoute.id });
 
-        const newProfile = currentRoute.profile === 'direct' ? 'pedestrian' : 'direct';
+        dispatch({
+            type: 'SET_LOADING',
+            isLoading: true,
+            text: newProfile === 'direct' ? 'Ligne droite…' : `Calcul (${MODE_LABELS[newProfile]})…`,
+        });
 
-        dispatch({ type: 'REMOVE_ROUTE', id: currentRoute.id });
-        dispatch({ type: 'SET_LOADING', isLoading: true, text: newProfile === 'direct' ? 'Ligne droite...' : 'Routage (BRouter)...' });
-        
         backgroundEngine.enqueue('route_leg', 0, `job-route-${Date.now()}`, {
             p1: [stageA.coords[0], stageA.coords[1]],
             p2: [stageB.coords[0], stageB.coords[1]],
             profile: newProfile,
             small_roads: state.small_roads_only,
-            insertIdx: idx
+            insertIdx: idx,
         });
     };
 
@@ -481,122 +1661,586 @@ export default function RoutePanel({ embedded = false, onClose }: RoutePanelProp
         dispatch({ type: 'REORDER_STAGES', stages: newStages });
         setDraggedIdx(null);
 
-        // 1) Clear ALL existing routes
-        dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Recalcul global...' });
+        dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Recalcul global…' });
         for (const route of state.routes) {
             if (route) dispatch({ type: 'REMOVE_ROUTE', id: route.id });
         }
 
-        // 2) Recalculate all legs fresh
         for (let i = 0; i < newStages.length - 1; i++) {
             backgroundEngine.enqueue('route_leg', 0, `job-reorder-${Date.now()}-${i}`, {
                 p1: [newStages[i].coords[0], newStages[i].coords[1]],
                 p2: [newStages[i + 1].coords[0], newStages[i + 1].coords[1]],
-                profile: 'pedestrian', small_roads: state.small_roads_only, insertIdx: i
+                profile: 'pedestrian',
+                small_roads: state.small_roads_only,
+                insertIdx: i,
             });
         }
     };
 
+    const displayIndices = useMemo(() => {
+        const arr: number[] = [];
+        for (let i = stages.length - 1; i >= 0; i--) arr.push(i);
+        return arr;
+    }, [stages.length]);
+
+    // Desktop keyboard navigation: ArrowUp/Down selects, Enter edits, Delete removes, Alt+ArrowUp/Down reorders
+    useEffect(() => {
+        if (isMobile || stages.length === 0) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            const activeTag = (document.activeElement as HTMLElement | null)?.tagName;
+            if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || (document.activeElement as HTMLElement | null)?.isContentEditable) {
+                return;
+            }
+            const curOrigIdx = selectedStageId ? stages.findIndex((s) => s.id === selectedStageId) : -1;
+
+            if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                if (curOrigIdx === -1) return;
+                // In reversed display: ArrowUp moves toward Arrivée (+1), ArrowDown moves toward Départ (-1)
+                const targetIdx = e.key === 'ArrowUp' ? curOrigIdx + 1 : curOrigIdx - 1;
+                if (targetIdx >= 0 && targetIdx < stages.length) {
+                    e.preventDefault();
+                    performReorder(curOrigIdx, targetIdx);
+                }
+                return;
+            }
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                let nextOrigIdx: number;
+                if (curOrigIdx === -1) {
+                    nextOrigIdx = e.key === 'ArrowDown' ? stages.length - 1 : 0;
+                } else {
+                    const nextDispPos = displayIndices.indexOf(curOrigIdx) + (e.key === 'ArrowDown' ? 1 : -1);
+                    if (nextDispPos < 0 || nextDispPos >= displayIndices.length) return;
+                    nextOrigIdx = displayIndices[nextDispPos];
+                }
+                const targetStage = stages[nextOrigIdx];
+                if (targetStage) {
+                    setSelectedStageId(targetStage.id);
+                    mapRef.current?.flyTo([targetStage.coords[0], targetStage.coords[1]], Math.max(mapRef.current.getZoom(), 14), { duration: 0.55 });
+                }
+                return;
+            }
+
+            if (e.key === 'Enter' && curOrigIdx !== -1) {
+                e.preventDefault();
+                setEditTriggerCounter((c) => c + 1);
+                return;
+            }
+
+            if ((e.key === 'Delete' || e.key === 'Backspace') && curOrigIdx !== -1) {
+                e.preventDefault();
+                const targetStage = stages[curOrigIdx];
+                dispatch({ type: 'REMOVE_STAGE', id: targetStage.id });
+                if (curOrigIdx > 0 && curOrigIdx < stages.length - 1) {
+                    const prev = stages[curOrigIdx - 1];
+                    const next = stages[curOrigIdx + 1];
+                    const bridgeProfile = state.routes[curOrigIdx - 1]?.profile || state.routes[curOrigIdx]?.profile || 'pedestrian';
+                    dispatch({ type: 'SET_LOADING', isLoading: true, text: 'Reconnexion...' });
+                    backgroundEngine.enqueue('route_leg', 0, `job-bridge-${Date.now()}`, {
+                        p1: [prev.coords[0], prev.coords[1]],
+                        p2: [next.coords[0], next.coords[1]],
+                        profile: bridgeProfile,
+                        small_roads: state.small_roads_only,
+                        insertIdx: curOrigIdx - 1,
+                    });
+                }
+                setUndoToast({ label: targetStage.label, key: Date.now() });
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [isMobile, stages, selectedStageId, displayIndices, dispatch, state.routes, state.small_roads_only]);
+
+    // Escape → clear multi-selection; Delete → delete all selected stages
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            const tag = (document.activeElement as HTMLElement | null)?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            if (e.key === 'Escape') {
+                if (multiStageSel.size > 0) { e.preventDefault(); setMultiStageSel(new Set()); }
+                return;
+            }
+            if ((e.key === 'Delete' || e.key === 'Backspace') && multiStageSel.size > 0) {
+                e.preventDefault();
+                const toDelete = stages.filter((s) => multiStageSel.has(s.id));
+                if (toDelete.length === 0) return;
+                if (!window.confirm(`Supprimer ${toDelete.length} étape${toDelete.length > 1 ? 's' : ''} ?`)) return;
+                // Sort by index descending to avoid shifting issues
+                toDelete.forEach((s) => dispatch({ type: 'REMOVE_STAGE', id: s.id }));
+                setMultiStageSel(new Set());
+                setSelectedStageId(null);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [multiStageSel, stages, dispatch]);
+
     return (
-        <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            height: '100%', 
-            overflow: 'hidden',
-            background: embedded ? 'transparent' : 'var(--bg-panel)',
-            borderRight: embedded ? 'none' : '1px solid var(--bg-border)'
-        }}>
-            {/* Route toolbar */}
-            {stages.length >= 2 && (
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: embedded ? '6px 12px' : '8px 14px',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-                    background: embedded ? 'transparent' : 'rgba(0, 0, 0, 0.15)',
-                    flexShrink: 0,
-                }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 600 }}>
-                        {stages.length} étapes ({state.routes.length} tronçon{state.routes.length > 1 ? 's' : ''})
+        <div
+            style={{
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                flex: 1,
+                minHeight: 0,
+                maxHeight: '100%',
+                overflow: 'hidden',
+                background: embedded ? 'transparent' : 'var(--bg-panel)',
+                borderRight: embedded ? 'none' : '1px solid var(--bg-border)',
+            }}
+        >
+            <style>{`
+                @keyframes srStageSlideFlash {
+                    0% {
+                        opacity: 0.4;
+                        transform: translateY(-8px);
+                        background: rgba(59, 130, 246, 0.22);
+                    }
+                    35% {
+                        opacity: 1;
+                        transform: translateY(0);
+                        background: rgba(59, 130, 246, 0.16);
+                    }
+                    100% {
+                        opacity: 1;
+                        transform: translateY(0);
+                        background: transparent;
+                    }
+                }
+                .sr-stage-flash {
+                    animation: srStageSlideFlash 800ms cubic-bezier(0.16, 1, 0.3, 1);
+                }
+            `}</style>
+
+            {/* Reversed Feed Stage List with bottom fade */}
+            <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <div
+                    ref={scrollRef}
+                    onDragOver={(e) => {
+                        if (draggedIdx !== null) {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                        }
+                    }}
+                    onDrop={(e) => {
+                        if (draggedIdx !== null && dragOverTargetIdx !== null) {
+                            e.preventDefault();
+                            handleDropOnStage(dragOverTargetIdx);
+                        }
+                    }}
+                    onDragLeave={(e) => {
+                        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                            setDragOverTargetIdx(null);
+                        }
+                    }}
+                    style={{
+                        flex: 1,
+                        overflowY: 'auto',
+                        overscrollBehavior: 'contain',
+                        paddingBottom: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                    }}
+                >
+                    {displayIndices.map((origIdx) => {
+                        const stage = stages[origIdx];
+                        const hasSegmentBelow = origIdx > 0;
+                        const leg = hasSegmentBelow ? state.routes[origIdx - 1] : undefined;
+                        const legDist = hasSegmentBelow ? getLegDistanceMeters(leg) : undefined;
+                        const legDur =
+                            hasSegmentBelow && legDist !== undefined
+                                ? getLegDurationSeconds(leg, legDist)
+                                : undefined;
+                        const legMode = (leg?.profile as RoutingMode) || 'pedestrian';
+
+                        const showPreviewBefore =
+                            draggedIdx !== null &&
+                            dragOverTargetIdx === origIdx &&
+                            draggedIdx < dragOverTargetIdx;
+                        const showPreviewAfter =
+                            draggedIdx !== null &&
+                            dragOverTargetIdx === origIdx &&
+                            draggedIdx > dragOverTargetIdx;
+
+                        return (
+                            <React.Fragment key={stage.id}>
+                                {showPreviewBefore && (
+                                    <StagePreviewRow
+                                        stage={stages[draggedIdx!]}
+                                        onDrop={() => handleDropOnStage(origIdx)}
+                                    />
+                                )}
+                                <StageRow
+                                    stage={stage}
+                                    idx={origIdx}
+                                    total={stages.length}
+                                    isSelected={selectedStageId === stage.id && multiStageSel.size === 0}
+                                    isMultiSelected={multiStageSel.has(stage.id)}
+                                    isMobile={isMobile}
+                                    isDragged={draggedIdx === origIdx}
+                                    isNewFlash={flashStageId === stage.id}
+                                    hasSegmentBelow={hasSegmentBelow}
+                                    legDist={legDist}
+                                    legDurationS={legDur}
+                                    legMode={legMode}
+                                    isLegComputing={hasSegmentBelow && (!leg || !leg.geojson?.geometry)}
+                                    editTriggerCounter={editTriggerCounter}
+                                    onSelect={({ ctrl, shift }) => {
+                                        const dispPos = displayIndices.indexOf(origIdx);
+                                        if (ctrl) {
+                                            setMultiStageSel((prev) => {
+                                                const next = new Set(prev);
+                                                if (next.has(stage.id)) next.delete(stage.id);
+                                                else next.add(stage.id);
+                                                return next;
+                                            });
+                                            lastStageSelDisplayPos.current = dispPos;
+                                            return;
+                                        }
+                                        if (shift && lastStageSelDisplayPos.current !== null) {
+                                            const from = Math.min(lastStageSelDisplayPos.current, dispPos);
+                                            const to = Math.max(lastStageSelDisplayPos.current, dispPos);
+                                            setMultiStageSel(new Set(displayIndices.slice(from, to + 1).map((i) => stages[i].id)));
+                                            return;
+                                        }
+                                        // Plain click
+                                        setMultiStageSel(new Set());
+                                        lastStageSelDisplayPos.current = dispPos;
+                                        if (selectedStageId === stage.id) {
+                                            setSelectedStageId(null);
+                                        } else {
+                                            setSelectedStageId(stage.id);
+                                            onStageSelected?.();
+                                        }
+                                    }}
+                                    onChangeMode={(newMode) => handleSetLegProfile(origIdx - 1, newMode)}
+                                    onDragStart={() => {
+                                        setDraggedIdx(origIdx);
+                                        setDragOverTargetIdx(null);
+                                    }}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        if (draggedIdx !== null) {
+                                            setDragOverTargetIdx(origIdx === draggedIdx ? null : origIdx);
+                                        }
+                                    }}
+                                    onDrop={() => handleDropOnStage(origIdx)}
+                                    onDragEnd={() => {
+                                        setDraggedIdx(null);
+                                        setDragOverTargetIdx(null);
+                                    }}
+                                    onReorderDelta={performReorder}
+                                    onStageDeleted={(label) => setUndoToast({ label, key: Date.now() })}
+                                    onCoordsCopied={(text) => setCopyToast({ text, key: Date.now() })}
+                                />
+                                {showPreviewAfter && (
+                                    <StagePreviewRow
+                                        stage={stages[draggedIdx!]}
+                                        onDrop={() => handleDropOnStage(origIdx)}
+                                    />
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
+
+                    {stages.length === 0 && (
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '14px 12px',
+                                color: '#CBD5E1',
+                                fontSize: '12px',
+                            }}
+                        >
+                            <MapPin size={15} style={{ opacity: 0.6, flexShrink: 0 }} />
+                            <span>Cliquez sur la carte ou recherchez un lieu ci-dessus.</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Bottom edge fade for cut-off older steps */}
+                {stages.length > 2 && (
+                    <div
+                        aria-hidden="true"
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            height: '22px',
+                            pointerEvents: 'none',
+                            background: 'linear-gradient(to bottom, transparent, var(--bg-elevated))',
+                        }}
+                    />
+                )}
+
+                {/* Scroll-hint pill: Arrivée (top of list = last stage) */}
+                {canScrollUp && (
+                    <button
+                        type="button"
+                        aria-label="Remonter vers l'arrivée"
+                        onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+                        style={{
+                            position: 'absolute',
+                            top: '8px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '999px',
+                            border: '1px solid var(--border-subtle)',
+                            background: 'var(--bg-elevated)',
+                            color: '#94A3B8',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                            zIndex: 10,
+                        }}
+                    >
+                        <ArrowUp size={13} aria-hidden="true" />
+                    </button>
+                )}
+
+                {/* Scroll-hint pill: Départ (bottom of list = first stage) */}
+                {canScrollDown && (
+                    <button
+                        type="button"
+                        aria-label="Descendre vers le départ"
+                        onClick={() =>
+                            scrollRef.current?.scrollTo({
+                                top: scrollRef.current.scrollHeight,
+                                behavior: 'smooth',
+                            })
+                        }
+                        style={{
+                            position: 'absolute',
+                            bottom: '8px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '999px',
+                            border: '1px solid var(--border-subtle)',
+                            background: 'var(--bg-elevated)',
+                            color: '#94A3B8',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                            zIndex: 10,
+                        }}
+                    >
+                        <ArrowDown size={13} aria-hidden="true" />
+                    </button>
+                )}
+            </div>
+
+            {/* Multi-selection summary bar for stages */}
+            {multiStageSel.size >= 2 && (
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '7px 12px',
+                        borderTop: '1px solid var(--border-subtle)',
+                        background: 'rgba(255,255,255,0.04)',
+                        flexShrink: 0,
+                    }}
+                >
+                    <span style={{ flex: 1, fontSize: '12px', color: '#94A3B8', fontWeight: 500 }}>
+                        {multiStageSel.size} étapes sélectionnées
                     </span>
                     <button
-                        onClick={() => dispatch({ type: 'INVERT_ROUTE' })}
-                        title="Inverser le sens du parcours (Ctrl+I)"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            background: 'rgba(255, 255, 255, 0.04)',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
-                            color: 'var(--text-primary)',
-                            fontSize: '11px',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
+                        type="button"
+                        title={`Supprimer ${multiStageSel.size} étapes`}
+                        aria-label={`Supprimer ${multiStageSel.size} étapes`}
+                        onClick={() => {
+                            const toDelete = stages.filter((s) => multiStageSel.has(s.id));
+                            if (!window.confirm(`Supprimer ${toDelete.length} étape${toDelete.length > 1 ? 's' : ''} ?`)) return;
+                            toDelete.forEach((s) => dispatch({ type: 'REMOVE_STAGE', id: s.id }));
+                            setMultiStageSel(new Set());
+                            setSelectedStageId(null);
                         }}
-                        onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(110, 201, 126, 0.3)'}
-                        onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'}
+                        style={{ padding: '4px 6px', border: 'none', borderRadius: '6px', background: 'rgba(239,68,68,0.12)', color: 'var(--semantic-red)', cursor: 'pointer', display: 'inline-flex' }}
                     >
-                        <ArrowLeftRight size={12} color="var(--accent-default)" />
-                        <span>Inverser</span>
-                        <span style={{ fontSize: '9px', opacity: 0.5, padding: '0 3px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)' }}>Ctrl+I</span>
+                        <Trash2 size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        title="Désélectionner · Échap"
+                        aria-label="Annuler la sélection"
+                        onClick={() => setMultiStageSel(new Set())}
+                        style={{ padding: '4px 6px', border: 'none', borderRadius: '6px', background: 'transparent', color: '#64748B', cursor: 'pointer', display: 'inline-flex' }}
+                    >
+                        ✕
                     </button>
                 </div>
             )}
 
-            {/* Steps */}
-            <div ref={scrollRef} style={{ 
-                flex: 1, 
-                overflowY: 'auto', 
-                padding: embedded ? '12px' : '16px', 
-                scrollBehavior: 'smooth',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: embedded ? '10px' : '16px',
-                background: embedded ? 'transparent' : 'rgba(0,0,0,0.15)'
-            }}>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {stages.map((stage, idx) => (
-                        <React.Fragment key={stage.id}>
-                            {/* Connector / Drop zone BEFORE each stage (except first) */}
-                            {idx > 0 && (
-                                <DropZone
-                                    insertAfterIdx={idx - 1}
-                                    dist={getStageDistance(idx)}
-                                    isDirect={state.routes[idx - 1]?.profile === 'direct'}
-                                    onToggleDirect={() => handleToggleProfile(idx - 1)}
-                                    onDrop={handleDropOnConnector}
-                                />
-                            )}
-                            <StageRow
-                                stage={stage} idx={idx} total={stages.length}
-                                isDragged={draggedIdx === idx}
-                                onDragStart={() => setDraggedIdx(idx)}
-                                onDragOver={(e: any) => e.preventDefault()}
-                                onDrop={() => handleDropOnStage(idx)}
-                                onDragEnd={() => setDraggedIdx(null)}
-                            />
-                        </React.Fragment>
-                    ))}
-
-                    {stages.length > 0 && (
-                        <DropZone insertAfterIdx={stages.length - 1} onDrop={handleDropOnConnector} />
+            {/* Sticky Receipt Summary Footer */}
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    padding: '6px 8px 6px 12px',
+                    borderTop: '1px solid var(--border-subtle)',
+                    background: 'rgba(255, 255, 255, 0.035)',
+                    borderRadius: 0,
+                    flexShrink: 0,
+                    minHeight: '38px',
+                }}
+            >
+                <div
+                    className="tabular-nums"
+                    style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        gap: '5px',
+                        minWidth: 0,
+                    }}
+                >
+                    <span>
+                        {stages.length} étape{stages.length > 1 ? 's' : ''}
+                    </span>
+                    {totalDistM > 0 && (
+                        <>
+                            <span style={{ color: '#94A3B8' }}>·</span>
+                            <span>{formatDistanceFr(totalDistM)}</span>
+                        </>
                     )}
-
-                    <div style={{ marginTop: stages.length > 0 ? '2px' : '0' }}>
-                        <AddStageRow />
-                    </div>
+                    {totalDurationS > 0 && (
+                        <>
+                            <span style={{ color: '#94A3B8' }}>·</span>
+                            <span style={{ color: '#CBD5E1' }}>{formatDurationFr(totalDurationS)}</span>
+                        </>
+                    )}
                 </div>
 
-                {stages.length === 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '32px 16px', textAlign: 'center', color: 'var(--text-dim)' }}>
-                        <MapPin size={28} style={{ opacity: 0.2 }} />
-                        <p style={{ fontSize: '12px', lineHeight: 1.5, margin: 0 }}>Cliquez sur la carte ou recherchez une adresse pour démarrer votre itinéraire.</p>
-                    </div>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                    {stages.length >= 2 && (
+                        <button
+                            type="button"
+                            onClick={() => dispatch({ type: 'INVERT_ROUTE' })}
+                            title="Inverser l'itinéraire (Ctrl+I)"
+                            aria-label="Inverser l'itinéraire"
+                            style={{
+                                height: '30px',
+                                padding: '0 8px',
+                                background: 'rgba(255, 255, 255, 0.06)',
+                                border: '1px solid var(--border-subtle)',
+                                color: 'var(--text-primary)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                cursor: 'pointer',
+                                borderRadius: '7px',
+                                fontSize: '11.5px',
+                                fontWeight: 600,
+                            }}
+                        >
+                            <ArrowLeftRight size={13} aria-hidden="true" />
+                            <span>Inverser</span>
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {/* Non-blocking Undo Delete Toast */}
+            {undoToast &&
+                createPortal(
+                    <div
+                        role="status"
+                        style={{
+                            position: 'fixed',
+                            bottom: '24px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            zIndex: 9999,
+                            background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border-strong)',
+                            borderRadius: '12px',
+                            boxShadow: 'var(--shadow-lg)',
+                            padding: '8px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            fontSize: '12.5px',
+                            color: 'var(--text-primary)',
+                        }}
+                    >
+                        <span>Étape {undoToast.label} supprimée</span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                dispatch({ type: 'UNDO' });
+                                setUndoToast(null);
+                            }}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '4px 10px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-strong)',
+                                background: 'rgba(255,255,255,0.06)',
+                                color: 'var(--text-primary)',
+                                fontWeight: 600,
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            <Undo2 size={13} />
+                            Annuler
+                        </button>
+                    </div>,
+                    document.body
+                )}
+
+            {/* Non-blocking Coordinates Copied Toast */}
+            {copyToast &&
+                !undoToast &&
+                createPortal(
+                    <div
+                        role="status"
+                        className="tabular-nums"
+                        style={{
+                            position: 'fixed',
+                            bottom: '24px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            zIndex: 9999,
+                            background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border-strong)',
+                            borderRadius: '12px',
+                            boxShadow: 'var(--shadow-lg)',
+                            padding: '8px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '12.5px',
+                            color: 'var(--text-primary)',
+                        }}
+                    >
+                        <Check size={13} style={{ color: 'var(--semantic-green)', flexShrink: 0 }} aria-hidden="true" />
+                        <span>{copyToast.text} copié</span>
+                    </div>,
+                    document.body
+                )}
         </div>
     );
 }

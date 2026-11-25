@@ -196,7 +196,7 @@ export function syncActiveItinerary(nextState: AppState): AppState {
             ...nextState,
             itineraries: [{
                 id: defaultId,
-                name: 'Itinéraire 1 (Principal)',
+                name: 'Itinéraire 1',
                 color: '#2d8ceb',
                 visible: true,
                 stages: nextState.stages || [],

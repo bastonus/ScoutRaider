@@ -15,13 +15,13 @@ describe('GeoUtils', () => {
         });
 
         it('formats hectares (10 000 to 1 000 000 m²)', () => {
-            expect(formatArea(10000)).toBe('1.00 ha');
-            expect(formatArea(25000)).toBe('2.50 ha');
+            expect(formatArea(10000)).toBe('1,00 ha');
+            expect(formatArea(25000)).toBe('2,50 ha');
         });
 
         it('formats square kilometers (>= 1 000 000 m²)', () => {
-            expect(formatArea(1000000)).toBe('1.00 km²');
-            expect(formatArea(2500000)).toBe('2.50 km²');
+            expect(formatArea(1000000)).toBe('1,00 km²');
+            expect(formatArea(2500000)).toBe('2,50 km²');
         });
     });
 

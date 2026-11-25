@@ -79,7 +79,7 @@ export function getStageDotColor(stageLabel: string, stages: any[]): string {
     const stageIdx = stages.findIndex((st: any) => st.label === stageLabel);
     if (stageIdx === 0) return 'var(--semantic-green)';
     if (stageIdx === stages.length - 1 && stageIdx > 0) return 'var(--semantic-red)';
-    return 'var(--accent-hover)';
+    return '#94A3B8';
 }
 
 /**

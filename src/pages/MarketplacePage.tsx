@@ -12,22 +12,14 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
+import { useViewport } from '../hooks';
 import FleurDeLysLogo from '../components/layout/FleurDeLysLogo';
 import UnifiedResourceHub from '../components/panels/UnifiedResourceHub';
 
 export default function MarketplacePage() {
   const navigate = useNavigate();
   const { user, isGuest, cloudSyncStatus, logout, setAuthModalOpen } = useAuth();
-
-  // Responsive window width tracking
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const isMobile = windowWidth < 768;
+  const { isMobile } = useViewport();
 
   // User menu state & ref for click-away
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -74,51 +66,41 @@ export default function MarketplacePage() {
       flexDirection: 'column',
       overflow: 'hidden'
     }}>
-      {/* ── Top Navigation Bar ── */}
+      {/* ── Top Navigation Bar (consistent 56px bar matching ProjectsHomePage) ── */}
       <header
-        className="menu-bar"
         style={{
-          height: isMobile ? '46px' : '54px',
+          height: '56px',
           userSelect: 'none',
           background: 'var(--bg-dark)',
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
           alignItems: 'center',
-          padding: isMobile ? '0 8px' : '0 16px',
+          padding: '0 clamp(16px, 3vw, 32px)',
           justifyContent: 'space-between',
+          gap: '12px',
           zIndex: 2000,
           flexShrink: 0,
           WebkitAppRegion: 'drag'
         } as any}
       >
-        {/* LEFT: BACK BUTTON, LOGO, TITLE & BADGE */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', flexShrink: 0, WebkitAppRegion: 'no-drag' } as any}>
+        {/* LEFT: BACK BUTTON, LOGO & TITLE */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, WebkitAppRegion: 'no-drag' } as any}>
           <button
+            type="button"
             onClick={handleBack}
-            className="btn-icon btn-sm"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              padding: isMobile ? '4px' : '4px 8px',
-              height: '28px',
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-xs)',
-              color: 'var(--text-dim)',
-              fontSize: '11.5px',
-              cursor: 'pointer',
-              transition: 'all 100ms ease'
-            }}
-            title="Retour à l'éditeur"
+            className="sr-btn-secondary"
+            style={{ padding: isMobile ? '0 8px' : '0 10px' }}
+            title="Retour"
+            aria-label="Retour"
           >
-            <ArrowLeft size={14} />
+            <ArrowLeft size={14} aria-hidden="true" />
             {!isMobile && <span>Retour</span>}
           </button>
 
-          <div
+          <button
+            type="button"
             title="Retour aux projets"
+            aria-label="Retour aux projets"
             onClick={() => navigate('/projects')}
             style={{
               display: 'flex',
@@ -128,159 +110,142 @@ export default function MarketplacePage() {
               userSelect: 'none',
               flexShrink: 0,
               padding: '2px',
+              background: 'transparent',
+              border: 'none',
             }}
           >
-            <FleurDeLysLogo size={isMobile ? 22 : 28} color="#2563EB" />
-          </div>
+            <FleurDeLysLogo size={24} color="var(--accent-primary)" />
+          </button>
 
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: isMobile ? '13px' : '14.5px', fontWeight: 700, color: 'var(--text-bright)' }}>
-                Marketplace & Hub
-              </span>
-              <span style={{
-                fontSize: '9.5px',
-                fontWeight: 700,
-                padding: '1px 5px',
-                borderRadius: '4px',
-                background: 'rgba(37,99,235,0.15)',
-                border: '1px solid rgba(37,99,235,0.3)',
-                color: 'var(--accent-hover)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em'
-              }}>
-                Ressources
-              </span>
-            </div>
-            {!isMobile && (
-              <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>
-                Catalogue officiel et communautaire pour vos carnets de raid
-              </span>
-            )}
-          </div>
+          <span style={{
+            fontSize: '15px',
+            fontWeight: 700,
+            color: 'var(--text-primary)',
+            letterSpacing: '-0.02em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            Marketplace
+          </span>
         </div>
 
         {/* RIGHT: USER PROFILE & WINDOW CONTROLS */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', WebkitAppRegion: 'no-drag' } as any}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, WebkitAppRegion: 'no-drag' } as any}>
           {/* User Profile avatar */}
           <div style={{ position: 'relative' }} ref={userMenuRef}>
             {!isGuest && user ? (
               <button
+                type="button"
+                className="sr-btn-secondary"
                 onClick={() => setUserMenuOpen(prev => !prev)}
+                aria-expanded={userMenuOpen}
+                aria-haspopup="menu"
                 title={`Connecté en tant que ${user.username}`}
-                style={{
-                  height: '28px',
-                  borderRadius: '14px',
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '0 8px 0 6px',
-                  color: 'var(--text-primary)',
-                  fontSize: '11.5px',
-                  fontWeight: 600
-                }}
+                style={{ padding: '0 10px 0 6px' }}
               >
-                <div style={{
-                  width: '18px',
-                  height: '18px',
+                <span style={{
+                  width: '20px',
+                  height: '20px',
                   borderRadius: '50%',
-                  background: 'var(--accent-default)',
+                  background: 'var(--accent-transparent)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#fff',
-                  fontSize: '10px',
+                  color: 'var(--accent-hover)',
+                  fontSize: '11px',
                   fontWeight: 700
                 }}>
                   {user.username.charAt(0).toUpperCase()}
-                </div>
+                </span>
                 {!isMobile && <span>{user.username}</span>}
               </button>
             ) : (
               <button
+                type="button"
+                className="sr-btn-secondary"
                 onClick={() => setAuthModalOpen(true)}
                 title="Se connecter"
-                style={{
-                  height: '28px',
-                  borderRadius: 'var(--radius-xs)',
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '0 10px',
-                  color: 'var(--text-dim)',
-                  fontSize: '11.5px'
-                }}
               >
-                <User size={13} />
+                <User size={13} aria-hidden="true" />
                 <span>Connexion</span>
               </button>
             )}
 
             {/* User dropdown */}
             {userMenuOpen && !isGuest && user && (
-              <div style={{
+              <div role="menu" style={{
                 position: 'absolute',
                 top: 'calc(100% + 6px)',
                 right: 0,
                 background: 'var(--bg-elevated)',
                 border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-md)',
+                borderRadius: 'var(--radius-sm)',
                 boxShadow: 'var(--shadow-lg)',
                 minWidth: '180px',
                 padding: '4px 0',
                 zIndex: 3500
               }}>
-                <div
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="sr-menu-item"
                   onClick={() => {
                     navigate('/projects');
                     setUserMenuOpen(false);
                   }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px' }}
                 >
-                  <FolderOpen size={13} color="var(--text-dim)" />
-                  <span>Mes projets</span>
-                </div>
-                <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
-                <div
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <FolderOpen size={13} color="var(--text-dim)" aria-hidden="true" />
+                    Mes projets
+                  </span>
+                </button>
+                <div role="separator" style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="sr-menu-item"
                   onClick={() => {
                     handleLogout();
                     setUserMenuOpen(false);
                   }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--semantic-danger)' }}
+                  style={{ color: 'var(--semantic-danger)' }}
                 >
-                  <LogOut size={13} />
-                  <span>Se déconnecter</span>
-                </div>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <LogOut size={13} aria-hidden="true" />
+                    Se déconnecter
+                  </span>
+                </button>
               </div>
             )}
           </div>
 
           {/* Electron window controls if desktop app */}
           {(window as any).electronAPI && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px' }}>
               <button
+                type="button"
+                className="btn-icon"
+                aria-label="Réduire la fenêtre"
                 onClick={() => handleWindowControl('minimize')}
-                style={{ width: '28px', height: '28px', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                <Minus size={13} />
+                <Minus size={13} aria-hidden="true" />
               </button>
               <button
+                type="button"
+                className="btn-icon"
+                aria-label="Agrandir la fenêtre"
                 onClick={() => handleWindowControl('maximize')}
-                style={{ width: '28px', height: '28px', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                <Maximize2 size={12} />
+                <Maximize2 size={12} aria-hidden="true" />
               </button>
               <button
+                type="button"
+                className="btn-icon"
+                aria-label="Fermer la fenêtre"
                 onClick={() => handleWindowControl('close')}
-                style={{ width: '28px', height: '28px', background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                <X size={14} />
+                <X size={14} aria-hidden="true" />
               </button>
             </div>
           )}
@@ -288,7 +253,7 @@ export default function MarketplacePage() {
       </header>
 
       {/* ── Main Unified Resource Hub ── */}
-      <main style={{ flex: 1, height: 'calc(100dvh - 54px)', overflow: 'hidden' }}>
+      <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <UnifiedResourceHub
           initialCategory="all"
           isCompact={false}

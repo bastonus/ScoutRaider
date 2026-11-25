@@ -93,7 +93,7 @@ export default function TextAnnotationsLayer() {
             id,
             type: 'text',
             layerId: 'layer-texts',
-            title: `Texte ${count}`,
+            title: count === 1 ? 'Textes' : `Textes ${count}`,
             visible: true,
             color: '#38bdf8',
             fontSize: 16,
@@ -304,7 +304,7 @@ export default function TextAnnotationsLayer() {
     return (
         <>
             {/* ── All committed text items ── */}
-            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1150 }}>
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 950 }}>
                 {textLayers.filter(l => l.visible).map(layer =>
                     layer.texts.map(item => {
                         const preview = livePreviewItems?.find(p => p.id === item.id);

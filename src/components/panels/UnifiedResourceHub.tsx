@@ -120,139 +120,98 @@ function ResourceHubCard({
   const [imageFailed, setImageFailed] = useState(false);
   const isMap = item.category === 'maps';
   const hasBanner = !!item.previewBannerComponent || (!!item.previewImage && !imageFailed);
-  const color = item.color || '#3b82f6';
+  const color = item.color || 'var(--accent-primary)';
 
   return (
-    <div
+    <article
+      className="sr-card"
+      data-active={isActive ? 'true' : 'false'}
       draggable={!!onDragStart}
       onDragStart={onDragStart}
-      onClick={onApply}
       style={{
-        background: isActive ? 'rgba(110, 201, 126, 0.04)' : 'rgba(255, 255, 255, 0.02)',
-        borderRadius: '16px',
-        border: '1px solid',
-        borderColor: isActive ? 'var(--accent-default)' : 'rgba(255, 255, 255, 0.08)',
-        overflow: 'hidden',
-        boxShadow: isActive ? '0 0 0 1px var(--accent-default), 0 8px 24px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.15)',
-        transition: 'all 0.2s ease',
-        flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        cursor: onDragStart ? 'grab' : 'pointer',
-        boxSizing: 'border-box',
+        cursor: onDragStart ? 'grab' : 'default',
         width: '100%',
-        minHeight: hasBanner && isMap ? '285px' : '110px',
-        position: 'relative'
-      }}
-      onMouseEnter={e => {
-        if (!isActive) {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-        }
-      }}
-      onMouseLeave={e => {
-        if (!isActive) {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-        }
+        position: 'relative',
       }}
     >
-      {/* Top accent line if no banner (non-map cards) */}
-      {(!isMap || !hasBanner) && (
-        <div style={{ width: '100%', height: '3px', background: color, opacity: 0.8 }} />
-      )}
-
-      {/* Map Banner — full 140px with provider logo watermark */}
+      {/* Map Banner — sleek panoramic preview (compact in sidebar, taller in full gallery) */}
       {isMap && hasBanner && (
         <div style={{
           width: '100%',
-          height: '140px',
-          minHeight: '140px',
+          height: '96px',
           flexShrink: 0,
           position: 'relative',
           overflow: 'hidden',
-          background: '#0a0b0e'
+          background: 'var(--bg-dark)',
+          borderBottom: '1px solid var(--border-subtle)',
         }}>
           {item.previewBannerComponent ? (
             item.previewBannerComponent
           ) : item.previewImage ? (
             <img
               src={item.previewImage}
-              alt={item.name}
+              alt=""
               onError={() => setImageFailed(true)}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
           ) : null}
 
-          {/* Overlay badges — top left */}
-          <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+          {/* Quiet top-left status badges (max 2) */}
+          <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             {item.needsKey && !item.hasKey && (
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.95)', padding: '3px 7px', borderRadius: '6px',
-                display: 'flex', alignItems: 'center', gap: '5px',
-                color: '#fff', fontSize: '10px', fontWeight: 800
+              <span style={{
+                background: 'rgba(18, 18, 21, 0.88)', border: '1px solid rgba(239, 68, 68, 0.45)',
+                padding: '2px 7px', borderRadius: '6px',
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                color: '#FCA5A5', fontSize: '10px', fontWeight: 600
               }}>
-                <Lock size={11} strokeWidth={2.5} />
-                <span>Bloqué</span>
-              </div>
-            )}
-            {item.isFavorite && (
-              <div style={{
-                background: 'rgba(251, 191, 36, 0.9)', padding: '3px 7px', borderRadius: '6px',
-                display: 'flex', alignItems: 'center', gap: '4px',
-                color: '#000', fontSize: '10px', fontWeight: 800
-              }}>
-                <Star size={10} fill="currentColor" />
-                <span>Favori</span>
-              </div>
+                <Lock size={10} aria-hidden="true" />
+                Clé requise
+              </span>
             )}
             {item.isSatellite && (
-              <div style={{
-                background: 'rgba(139, 92, 246, 0.9)', padding: '3px 7px', borderRadius: '6px',
-                display: 'flex', alignItems: 'center', gap: '4px',
-                color: '#fff', fontSize: '10px', fontWeight: 800
+              <span style={{
+                background: 'rgba(18, 18, 21, 0.88)', border: '1px solid var(--border-strong)',
+                padding: '2px 7px', borderRadius: '6px',
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                color: 'var(--text-primary)', fontSize: '10px', fontWeight: 600
               }}>
-                <Satellite size={10} />
-                <span>Satellite</span>
-              </div>
+                <Satellite size={10} aria-hidden="true" />
+                Satellite
+              </span>
             )}
-            {item.badge && (
-              <div style={{
-                background: 'rgba(0,0,0,0.6)', padding: '3px 7px', borderRadius: '6px',
-                color: '#fff', fontSize: '10px', fontWeight: 700,
-                backdropFilter: 'blur(4px)'
+            {!item.isSatellite && item.isFavorite && (
+              <span style={{
+                background: 'rgba(18, 18, 21, 0.88)', border: '1px solid rgba(245, 158, 11, 0.4)',
+                padding: '2px 7px', borderRadius: '6px',
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                color: '#FCD34D', fontSize: '10px', fontWeight: 600
               }}>
-                {item.badge}
-              </div>
+                <Star size={10} fill="currentColor" aria-hidden="true" />
+                Recommandé
+              </span>
             )}
           </div>
 
-          {/* Provider logo watermark — bottom right with gradient */}
+          {/* Provider attribution — bottom right */}
           <div style={{
             position: 'absolute', bottom: 0, left: 0, right: 0,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
-            padding: '20px 10px 8px',
+            background: 'linear-gradient(to top, rgba(9,9,11,0.85), transparent)',
+            padding: '18px 10px 7px',
             display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end'
           }}>
             {item.logoImage ? (
               <img
                 src={item.logoImage}
                 alt={`Logo ${item.name}`}
-                style={{ height: '20px', maxWidth: '70px', objectFit: 'contain', opacity: 0.9 }}
+                style={{ height: '18px', maxWidth: '68px', objectFit: 'contain', opacity: 0.9 }}
               />
-            ) : item.author ? (
-              <span style={{
-                fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.7)',
-                fontFamily: 'monospace', letterSpacing: '0.5px'
-              }}>
-                @{item.author}
-              </span>
             ) : (
               <span style={{
-                fontSize: '11px', fontWeight: 900, color: 'rgba(255,255,255,0.7)',
-                fontFamily: 'monospace', letterSpacing: '1px'
+                fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.75)',
+                fontFamily: 'var(--font-mono)', letterSpacing: '0.03em'
               }}>
-                IGN
+                {item.author ? `@${item.author}` : 'IGN'}
               </span>
             )}
           </div>
@@ -261,99 +220,91 @@ function ResourceHubCard({
 
       {/* Card Content Body */}
       <div style={{
-        padding: isMap && hasBanner ? '10px' : '16px',
+        padding: '14px',
         display: 'flex',
         flexDirection: 'column',
         flex: 1,
         justifyContent: 'space-between',
         gap: '12px',
-        marginTop: isMap && hasBanner ? '0' : undefined
       }}>
         <div>
-          {/* Header row: Icon + Name + Version + Badges + Edit */}
+          {/* Header row: Icon + Title/Meta + Utility actions */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
               <div style={{
-                width: '32px', height: '32px', borderRadius: '9px',
-                background: `${color}18`, border: `1px solid ${color}35`,
+                width: '32px', height: '32px', borderRadius: '8px',
+                background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
                 color: color, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0
-              }}>
+              }} aria-hidden="true">
                 {item.icon}
               </div>
-              <div>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#f4f4f5' }}>
+                  <span
+                    title={item.name}
+                    style={{
+                      fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                    }}
+                  >
                     {item.name}
                   </span>
-                  {item.version && (
-                    <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#71717a' }}>
-                      v{item.version}
-                    </span>
-                  )}
                   {isActive && (
                     <span style={{
-                      background: 'rgba(110, 201, 126, 0.15)',
-                      color: 'var(--accent-default)',
-                      padding: '1px 5px',
+                      background: 'var(--accent-transparent)',
+                      color: 'var(--accent-hover)',
+                      padding: '1px 6px',
                       borderRadius: '4px',
-                      fontSize: '9px',
-                      fontWeight: 700,
-                      border: '1px solid rgba(110, 201, 126, 0.3)'
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      flexShrink: 0
                     }}>
                       Actif
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: '11px', color: '#a1a1aa', fontWeight: 500, marginTop: '2px' }}>
-                  {item.categoryLabel}
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 500, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>{item.categoryLabel}</span>
+                  {item.version && (
+                    <span className="tabular-nums" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+                      v{item.version}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Top right badges & Edit button */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
-              {/* Badge texte — affiché en body seulement pour les non-maps (pour les maps, il est en overlay bannière) */}
-              {item.badge && !item.isFavorite && !(isMap && hasBanner) && (
-                <span style={{
-                  fontSize: '9.5px', fontWeight: 700, padding: '2px 6px', borderRadius: '5px',
-                  background: 'rgba(255, 255, 255, 0.05)', color: color,
-                  border: '1px solid rgba(255, 255, 255, 0.08)'
-                }}>
-                  {item.badge}
-                </span>
-              )}
+            {/* Utility icons (S3 download / Edit) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
               {item.s3_download_url && (
                 <a
                   href={item.s3_download_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={e => e.stopPropagation()}
-                  title={`Télécharger depuis S3 Garage: ${item.s3_download_url}`}
+                  title={`Télécharger depuis S3 Garage`}
+                  aria-label={`Télécharger ${item.name} depuis S3`}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '3px',
-                    fontSize: '9px', fontWeight: 700, padding: '2px 5px',
-                    borderRadius: '5px', background: 'rgba(56, 189, 248, 0.1)',
-                    color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)',
+                    display: 'inline-flex', alignItems: 'center', gap: '3px',
+                    fontSize: '10px', fontWeight: 600, padding: '3px 6px',
+                    borderRadius: '6px', background: 'var(--bg-elevated)',
+                    color: 'var(--text-dim)', border: '1px solid var(--border-subtle)',
                     textDecoration: 'none'
                   }}
                 >
-                  <Cloud size={9} />
+                  <Cloud size={10} aria-hidden="true" />
                   <span>S3</span>
                 </a>
               )}
               {onEdit && (
                 <button
+                  type="button"
+                  className="btn-icon"
                   onClick={onEdit}
-                  title="Modifier le module"
-                  style={{
-                    background: 'transparent', border: 'none', color: '#71717a',
-                    padding: '4px', cursor: 'pointer', display: 'flex', borderRadius: '4px'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#71717a'}
+                  title={`Configurer ${item.name}`}
+                  aria-label={`Configurer ${item.name}`}
                 >
-                  <Pencil size={13} />
+                  <Pencil size={13} aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -363,7 +314,7 @@ function ResourceHubCard({
           <p style={{
             margin: '10px 0 0',
             fontSize: '12px',
-            color: 'rgba(255, 255, 255, 0.55)',
+            color: 'var(--text-dim)',
             lineHeight: 1.5,
             display: '-webkit-box',
             WebkitLineClamp: 2,
@@ -374,103 +325,101 @@ function ResourceHubCard({
           </p>
         </div>
 
-        {/* Management & Action Bar */}
+        {/* Unified Footer Action Bar */}
         <div style={{
-          paddingTop: isMap && hasBanner ? '0' : '10px',
-          borderTop: isMap && hasBanner ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
-          marginTop: isMap && hasBanner ? '16px' : undefined,
+          paddingTop: '10px',
+          borderTop: '1px solid var(--border-subtle)',
           display: 'flex',
-          flexDirection: isMap && hasBanner ? 'column' : 'row',
-          alignItems: isMap && hasBanner ? 'stretch' : 'center',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '8px'
-        }} onClick={e => e.stopPropagation()}>
-          
-          {/* Library Status Toggle */}
+          gap: '8px',
+        }}>
+          {/* Library Status Toggle — quiet when inactive so primary CTA stands out */}
           {onToggleLibrary ? (
             <button
+              type="button"
               onClick={onToggleLibrary}
-              title={item.isInLibrary ? 'Actif dans votre carnet (cliquer pour désactiver)' : 'Désactivé (cliquer pour activer)'}
+              aria-pressed={item.isInLibrary}
+              title={item.isInLibrary ? 'Inclus dans votre bibliothèque (cliquer pour retirer)' : 'Ajouter à votre bibliothèque'}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '5px 10px',
-                borderRadius: '8px',
+                gap: '5px',
+                padding: '5px 8px',
+                borderRadius: '7px',
                 cursor: 'pointer',
                 fontSize: '11px',
-                fontWeight: 600,
-                background: item.isInLibrary ? 'rgba(110, 201, 126, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-                border: item.isInLibrary ? '1px solid rgba(110, 201, 126, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
-                color: item.isInLibrary ? '#6EC97E' : '#71717a',
-                transition: 'all 0.15s ease'
+                fontWeight: 500,
+                background: item.isInLibrary ? 'var(--accent-transparent)' : 'transparent',
+                border: item.isInLibrary ? '1px solid rgba(37, 99, 235, 0.35)' : '1px solid transparent',
+                color: item.isInLibrary ? 'var(--accent-hover)' : 'var(--text-dim)',
+                transition: 'all 100ms ease',
               }}
             >
-              <BookmarkCheck size={13} strokeWidth={item.isInLibrary ? 2.5 : 1.8} />
-              <span>{item.isInLibrary ? 'Dans la bibliothèque' : 'Inactif'}</span>
+              <BookmarkCheck size={13} aria-hidden="true" />
+              <span>{item.isInLibrary ? 'Enregistré' : 'Enregistrer'}</span>
             </button>
-          ) : <div />}
+          ) : (
+            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+              {item.badge || (item.isBuiltIn ? 'Intégré' : 'Communauté')}
+            </span>
+          )}
 
-          {/* Action button */}
+          {/* Primary Card Action */}
           {item.needsKey && !item.hasKey ? (
             <button
+              type="button"
+              className="sr-pressable"
               onClick={onApply}
               style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                padding: '5px 12px',
-                borderRadius: '8px', background: 'rgba(251, 191, 36, 0.12)',
-                border: '1px solid rgba(251, 191, 36, 0.3)', color: '#fbbf24',
-                fontSize: '11px', fontWeight: 700, cursor: 'pointer',
-                width: isMap && hasBanner ? '100%' : undefined
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                padding: '6px 12px',
+                borderRadius: '7px', background: 'var(--semantic-orange-bg)',
+                border: '1px solid rgba(245, 158, 11, 0.35)', color: '#FCD34D',
+                fontSize: '11.5px', fontWeight: 600, cursor: 'pointer',
               }}
             >
-              <Lock size={12} />
-              <span>Débloquer</span>
+              <Lock size={12} aria-hidden="true" />
+              <span>Configurer</span>
             </button>
           ) : (
             <button
+              type="button"
+              className="sr-pressable"
               onClick={onApply}
               style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                padding: isMap && hasBanner ? '8px 14px' : '5px 14px',
-                borderRadius: '8px',
-                background: isActive ? 'rgba(110, 201, 126, 0.15)' : 'rgba(255, 255, 255, 0.06)',
-                border: isActive ? '1px solid rgba(110, 201, 126, 0.3)' : '1px solid rgba(255, 255, 255, 0.12)',
-                color: isActive ? 'var(--accent-default)' : '#fff',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                padding: '6px 12px',
+                borderRadius: '7px',
+                background: isActive ? 'var(--accent-primary)' : 'var(--bg-elevated)',
+                border: isActive ? '1px solid var(--accent-primary)' : '1px solid var(--border-strong)',
+                color: isActive ? '#FFFFFF' : 'var(--text-primary)',
                 fontSize: '11.5px', fontWeight: 600, cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                width: isMap && hasBanner ? '100%' : undefined
-              }}
-              onMouseEnter={e => {
-                if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-              }}
-              onMouseLeave={e => {
-                if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
               }}
             >
               {isActive ? (
                 <>
-                  <Check size={13} strokeWidth={2.5} />
-                  <span>Sélectionné</span>
+                  <Check size={12} strokeWidth={2.5} aria-hidden="true" />
+                  <span>Actif</span>
                 </>
               ) : item.category === 'code' ? (
                 <>
-                  <Play size={12} fill="#fff" />
+                  <Play size={11} aria-hidden="true" />
                   <span>Tester</span>
                 </>
               ) : item.category === 'maps' ? (
                 <>
-                  <MapIcon size={12} />
+                  <MapIcon size={12} aria-hidden="true" />
                   <span>Activer</span>
                 </>
               ) : item.category === 'routing' ? (
                 <>
-                  <Zap size={12} />
-                  <span>Sélectionner</span>
+                  <Zap size={12} aria-hidden="true" />
+                  <span>Choisir</span>
                 </>
               ) : (
                 <>
-                  <Play size={12} />
+                  <Play size={11} aria-hidden="true" />
                   <span>Appliquer</span>
                 </>
               )}
@@ -478,7 +427,7 @@ function ResourceHubCard({
           )}
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -1249,13 +1198,13 @@ export default function UnifiedResourceHub({
   }, [allItems, activeCategory, scopeFilter, searchQuery]);
 
   const categories = useMemo(() => [
-    { id: 'all' as UnifiedCategory, label: 'Tout', icon: <Sparkles size={13} />, count: allItems.length },
-    { id: 'maps' as UnifiedCategory, label: 'Fonds de carte', icon: <MapIcon size={13} />, count: mapItems.length },
-    { id: 'routing' as UnifiedCategory, label: 'Routage & Chemins', icon: <Compass size={13} />, count: routingItems.length },
-    { id: 'code' as UnifiedCategory, label: 'Codes & Énigmes', icon: <Code size={13} />, count: codeItems.length },
-    { id: 'orchestration' as UnifiedCategory, label: 'Trames de Raid', icon: <Sliders size={13} />, count: orchestrationItems.length },
-    { id: 'theme' as UnifiedCategory, label: 'Thèmes & Récits', icon: <Palette size={13} />, count: themeItems.length },
-    { id: 'my_library' as UnifiedCategory, label: 'Ma Bibliothèque', icon: <BookmarkCheck size={13} />, count: allItems.filter(i => i.isInLibrary).length }
+    { id: 'all' as UnifiedCategory, label: 'Tout', icon: <Sparkles size={12} aria-hidden="true" />, count: allItems.length },
+    { id: 'maps' as UnifiedCategory, label: 'Cartes', icon: <MapIcon size={12} aria-hidden="true" />, count: mapItems.length },
+    { id: 'routing' as UnifiedCategory, label: 'Routage', icon: <Compass size={12} aria-hidden="true" />, count: routingItems.length },
+    { id: 'code' as UnifiedCategory, label: 'Codes', icon: <Code size={12} aria-hidden="true" />, count: codeItems.length },
+    { id: 'orchestration' as UnifiedCategory, label: 'Trames', icon: <Sliders size={12} aria-hidden="true" />, count: orchestrationItems.length },
+    { id: 'theme' as UnifiedCategory, label: 'Thèmes', icon: <Palette size={12} aria-hidden="true" />, count: themeItems.length },
+    { id: 'my_library' as UnifiedCategory, label: 'Bibliothèque', icon: <BookmarkCheck size={12} aria-hidden="true" />, count: allItems.filter(i => i.isInLibrary).length }
   ], [allItems, mapItems, routingItems, codeItems, orchestrationItems, themeItems]);
 
   return (
@@ -1267,46 +1216,55 @@ export default function UnifiedResourceHub({
       color: 'var(--text-primary)',
       overflow: 'hidden'
     }}>
-      {/* ── TOP CONTROLS (FLOATING BAR AESTHETIC) ──────────────────────── */}
+      {/* ── COMPACT, UNCLUTTERED HEADER CONTROLS ──────────────────────── */}
       <div style={{
-        padding: isCompact ? '10px 12px' : '16px 24px',
+        padding: isCompact ? '10px 12px 8px' : '14px clamp(16px, 3vw, 32px) 10px',
         borderBottom: '1px solid var(--border-subtle)',
         background: 'var(--bg-dark)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
         flexShrink: 0
       }}>
-        {/* Search bar & Scope */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{
+          maxWidth: isCompact ? 'none' : '1360px',
+          width: '100%',
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+        }}>
+        {/* Search bar & compact Scope switch */}
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
           <div style={{
-            flex: 1,
+            flex: '1 1 180px',
+            minWidth: 0,
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
-            background: 'var(--bg-elevated)',
+            background: 'var(--bg-surface)',
             border: '1px solid var(--border-subtle)',
-            borderRadius: '14px',
-            padding: '0 12px',
-            height: '38px'
+            borderRadius: '8px',
+            padding: '0 10px',
+            height: '32px'
           }}>
-            <Search size={15} color="var(--text-dim)" style={{ flexShrink: 0, marginRight: '8px' }} />
+            <Search size={14} color="var(--text-dim)" aria-hidden="true" style={{ flexShrink: 0, marginRight: '7px' }} />
             <input
               type="text"
+              aria-label="Rechercher dans la marketplace"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher une carte, un code, une règle, un thème..."
+              placeholder="Rechercher…"
               style={{
                 background: 'transparent',
                 border: 'none',
-                outline: 'none',
                 color: 'var(--text-primary)',
-                fontSize: '12.5px',
-                width: '100%'
+                fontSize: '12px',
+                width: '100%',
+                minWidth: 0,
               }}
             />
             {searchQuery && (
               <button
+                type="button"
+                aria-label="Effacer la recherche"
                 onClick={() => setSearchQuery('')}
                 style={{
                   background: 'transparent',
@@ -1318,29 +1276,41 @@ export default function UnifiedResourceHub({
                   alignItems: 'center'
                 }}
               >
-                <X size={14} />
+                <X size={13} aria-hidden="true" />
               </button>
             )}
           </div>
 
-          {/* Scope Pills */}
-          <div style={{ ...CELL, borderRadius: '12px', padding: '3px 4px' }}>
+          {/* Lightweight Scope Switch */}
+          <div role="group" aria-label="Filtrer par source" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '2px',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: '8px',
+            padding: '2px',
+            height: '32px',
+            boxSizing: 'border-box',
+          }}>
             {(['all', 'installed', 'community'] as UnifiedScope[]).map(s => {
               const isSActive = scopeFilter === s;
               const label = s === 'all' ? 'Tous' : s === 'installed' ? 'Locaux' : 'Cloud';
               return (
                 <button
                   key={s}
+                  type="button"
+                  aria-pressed={isSActive}
                   onClick={() => setScopeFilter(s)}
                   style={{
-                    background: isSActive ? 'var(--accent-transparent)' : 'transparent',
+                    background: isSActive ? 'var(--bg-hover)' : 'transparent',
                     border: 'none',
-                    borderRadius: '8px',
-                    padding: '4px 10px',
-                    color: isSActive ? 'var(--accent-hover)' : 'var(--text-dim)',
+                    borderRadius: '6px',
+                    padding: '4px 8px',
+                    color: isSActive ? 'var(--text-primary)' : 'var(--text-dim)',
                     cursor: 'pointer',
                     fontSize: '11px',
-                    fontWeight: isSActive ? 700 : 500,
+                    fontWeight: isSActive ? 600 : 500,
                     transition: 'all 100ms ease'
                   }}
                 >
@@ -1353,98 +1323,93 @@ export default function UnifiedResourceHub({
           {/* Fullscreen trigger if compact */}
           {onExpandFullscreen && (
             <button
+              type="button"
+              className="btn-icon"
               onClick={onExpandFullscreen}
               title="Agrandir en grand écran"
-              style={{
-                width: '38px',
-                height: '38px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '12px',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-subtle)',
-                color: 'var(--text-dim)',
-                cursor: 'pointer'
-              }}
+              aria-label="Agrandir en grand écran"
+              style={{ height: '32px', width: '32px', border: '1px solid var(--border-subtle)' }}
             >
-              <Maximize2 size={15} />
+              <Maximize2 size={14} aria-hidden="true" />
             </button>
           )}
         </div>
 
-        {/* Categories segmented bar */}
-        <div style={{ ...CELL, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {/* Borderless Category Pills — airy, no nested box, counts only on active tab */}
+        <div role="tablist" aria-label="Catégories de ressources" style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '4px',
+        }}>
           {categories.map(cat => {
             const isCatActive = activeCategory === cat.id;
             return (
               <button
                 key={cat.id}
+                type="button"
+                role="tab"
+                aria-selected={isCatActive}
                 onClick={() => setActiveCategory(cat.id)}
                 style={{
-                  height: '32px',
-                  display: 'flex',
+                  height: '26px',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  padding: '0 12px',
-                  borderRadius: '10px',
-                  border: 'none',
+                  gap: '5px',
+                  padding: '0 8px',
+                  borderRadius: '6px',
+                  border: isCatActive ? '1px solid rgba(37, 99, 235, 0.35)' : '1px solid transparent',
                   background: isCatActive ? 'var(--accent-transparent)' : 'transparent',
                   color: isCatActive ? 'var(--accent-hover)' : 'var(--text-dim)',
-                  fontSize: '12px',
-                  fontWeight: isCatActive ? 700 : 500,
+                  fontSize: '11.5px',
+                  fontWeight: isCatActive ? 600 : 500,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
-                  transition: 'all 100ms ease'
-                }}
-                onMouseEnter={e => {
-                  if (!isCatActive) {
-                    e.currentTarget.style.background = 'var(--bg-hover)';
-                    e.currentTarget.style.color = 'var(--text-primary)';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!isCatActive) {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = 'var(--text-dim)';
-                  }
+                  transition: 'background-color 100ms ease, color 100ms ease'
                 }}
               >
                 {cat.icon}
                 <span>{cat.label}</span>
-                <span style={{
-                  fontSize: '9.5px',
-                  padding: '1px 5px',
-                  borderRadius: '10px',
-                  background: isCatActive ? 'rgba(37,99,235,0.25)' : 'rgba(255,255,255,0.06)',
-                  color: isCatActive ? '#93c5fd' : 'var(--text-dim)',
-                  fontWeight: 700
-                }}>
-                  {cat.count}
-                </span>
+                {isCatActive && (
+                  <span className="tabular-nums" style={{
+                    fontSize: '10px',
+                    color: 'var(--accent-hover)',
+                    fontWeight: 600,
+                    opacity: 0.85,
+                  }}>
+                    {cat.count}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
+        </div>
       </div>
 
-      {/* ── GALLERY AREA (RESPONSIVE MULTI-COLUMN GRID 2 OR 3 CARDS) ──── */}
+      {/* ── GALLERY AREA (RESPONSIVE AUTO-FILL GRID) ──── */}
       <div 
         ref={galleryRef}
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: containerWidth < 500 ? '12px' : '18px 20px',
-          display: 'grid',
-          gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
-          gridAutoRows: 'max-content',
-          gap: containerWidth < 500 ? '12px' : '16px',
-          alignContent: 'start',
-          alignItems: 'start',
-          background: 'rgba(0,0,0,0.15)'
+          overscrollBehavior: 'contain',
+          padding: isCompact ? '12px' : 'clamp(16px, 2.5vw, 24px) clamp(16px, 3vw, 32px)',
+          background: 'var(--bg-base)'
         }}
       >
+        <div style={{
+          maxWidth: isCompact ? 'none' : '1360px',
+          width: '100%',
+          margin: '0 auto',
+          display: 'grid',
+          gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(min(100%, 275px), 1fr))',
+          gridAutoRows: 'max-content',
+          gap: isCompact ? '10px' : '14px',
+          alignContent: 'start',
+          alignItems: 'stretch',
+        }}>
         {filteredItems.length === 0 ? (
           <div style={{
             gridColumn: '1 / -1',
@@ -1453,14 +1418,88 @@ export default function UnifiedResourceHub({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '8px',
+            gap: '10px',
             color: 'var(--text-dim)'
           }}>
-            <Sparkles size={28} style={{ opacity: 0.3 }} />
-            <div style={{ fontSize: '13.5px', fontWeight: 700 }}>Aucune ressource disponible</div>
-            <div style={{ fontSize: '11.5px', maxWidth: '300px', lineHeight: 1.5 }}>
-              Modifiez votre terme de recherche ou explorez une autre catégorie.
+            <Sparkles size={28} aria-hidden="true" style={{ opacity: 0.4 }} />
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              {searchQuery ? `Aucun résultat pour « ${searchQuery} »` : 'Aucune ressource dans cette catégorie'}
             </div>
+            <div style={{ fontSize: '12px', maxWidth: '320px', lineHeight: 1.5 }}>
+              Modifiez votre recherche ou réinitialisez les filtres pour explorer tout le catalogue.
+            </div>
+            {(searchQuery || scopeFilter !== 'all' || activeCategory !== 'all') && (
+              <button
+                type="button"
+                className="sr-btn-secondary"
+                onClick={() => { setSearchQuery(''); setScopeFilter('all'); setActiveCategory('all'); }}
+              >
+                Réinitialiser les filtres
+              </button>
+            )}
+          </div>
+        ) : activeCategory === 'all' && !searchQuery ? (
+          <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {([
+              { id: 'maps' as UnifiedCategory, title: 'Fonds de carte' },
+              { id: 'routing' as UnifiedCategory, title: 'Routage & Chemins' },
+              { id: 'code' as UnifiedCategory, title: 'Codes & Énigmes' },
+              { id: 'orchestration' as UnifiedCategory, title: 'Trames de Raid' },
+              { id: 'theme' as UnifiedCategory, title: 'Thèmes & Récits' },
+            ]).map(sec => {
+              const sectionItems = filteredItems.filter(i => i.category === sec.id);
+              if (sectionItems.length === 0) return null;
+              const previewCount = isCompact ? 2 : 4;
+              const visibleSlice = sectionItems.slice(0, previewCount);
+              return (
+                <section key={sec.id} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <h3 style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>{sec.title}</span>
+                      <span className="tabular-nums" style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 500 }}>
+                        ({sectionItems.length})
+                      </span>
+                    </h3>
+                    {sectionItems.length > previewCount && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveCategory(sec.id)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--accent-hover)',
+                          fontSize: '11.5px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                        }}
+                      >
+                        Voir tout ({sectionItems.length})
+                      </button>
+                    )}
+                  </div>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : 'repeat(auto-fill, minmax(min(100%, 275px), 1fr))',
+                    gridAutoRows: 'max-content',
+                    gap: isCompact ? '10px' : '14px',
+                    alignItems: 'stretch',
+                  }}>
+                    {visibleSlice.map(item => (
+                      <ResourceHubCard
+                        key={`${item.category}-${item.id}`}
+                        item={item}
+                        isActive={item.isActive}
+                        onApply={item.onApply}
+                        onEdit={item.onEdit}
+                        onToggleLibrary={() => handleToggleLocalLibrary(item)}
+                        onDragStart={item.onDragStart}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         ) : (
           filteredItems.map(item => (
@@ -1475,6 +1514,7 @@ export default function UnifiedResourceHub({
             />
           ))
         )}
+        </div>
       </div>
 
       {/* ── TESTER DRAWER (FOR CODES) ──────────────────────────────────── */}
