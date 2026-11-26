@@ -48,21 +48,6 @@ export class StateManager {
             }
         }
 
-        const defaultItinId = 'itin-1';
-        const defaultItineraries = [
-            {
-                id: defaultItinId,
-                name: 'Itinéraire 1',
-                color: '#2d8ceb',
-                visible: true,
-                stages: [],
-                routes: [],
-                polygonal_steps: [],
-                polygonal_legs: {},
-                carnet_steps: {},
-            }
-        ];
-
         const defaultAnnotationLayers = [
             { id: 'layer-points', name: 'Points & Repères', type: 'points' as const, visible: true, color: '#3b82f6', isDefault: true },
             { id: 'layer-areas', name: 'Zones & Périmètres', type: 'areas' as const, visible: true, color: '#10b981', isDefault: true }
@@ -70,7 +55,7 @@ export class StateManager {
 
         return {
             version: CURRENT_SCHEMA_VERSION,
-            document_title: 'Document sans titre',
+            document_title: '',
             document_title_synced: false,
             current_filepath: null,
             active_mode: 'map',
@@ -79,15 +64,15 @@ export class StateManager {
             active_route_id: null,
             route_chain: [],
 
-            itineraries: defaultItineraries as any,
-            active_itinerary_id: defaultItinId,
+            itineraries: [],
+            active_itinerary_id: '',
 
             annotation_layers: defaultAnnotationLayers,
             point_annotations: [],
             area_annotations: [],
             draw_annotations: [],
             text_annotations: [],
-            layer_order: [{ kind: 'itin' as const, id: defaultItinId }],
+            layer_order: [],
 
             stages: [],
             geojson_data: null,
@@ -146,7 +131,7 @@ export class StateManager {
             ],
             carnet_view: 'participant',
             carnet_include_general_map: true,
-            carnet_include_elevation_profile: true,
+            carnet_include_elevation_profile: false,
             enabled_annexes: [],
 
             export_queue: [],
@@ -594,27 +579,43 @@ export class StateManager {
         if (!Array.isArray(migrated.polygonal_steps)) migrated.polygonal_steps = [];
         if (!Array.isArray(migrated.carnet_steps)) migrated.carnet_steps = [];
 
-        // Ensure multi-itinerary support
+        // Ensure multi-itinerary support (only auto-wrap legacy root stages if non-empty)
         if (!Array.isArray(migrated.itineraries) || migrated.itineraries.length === 0) {
-            migrated.itineraries = [
-                {
-                    id: 'itin-1',
-                    name: 'Itinéraire 1',
-                    color: '#2d8ceb',
-                    visible: true,
-                    stages: [...migrated.stages],
-                    routes: [...migrated.routes],
-                    polygonal_steps: [...migrated.polygonal_steps],
-                    polygonal_legs: { ...migrated.polygonal_legs },
-                    carnet_steps: [...migrated.carnet_steps],
-                    custom_assignments: { ...(migrated.custom_assignments || {}) },
-                    custom_languages: { ...(migrated.custom_languages || {}) }
-                }
-            ];
-            migrated.active_itinerary_id = 'itin-1';
+            const hasLegacyContent =
+                migrated.stages.length > 0 ||
+                migrated.routes.length > 0 ||
+                migrated.polygonal_steps.length > 0 ||
+                migrated.carnet_steps.length > 0;
+            if (hasLegacyContent) {
+                migrated.itineraries = [
+                    {
+                        id: 'itin-1',
+                        name: 'Itinéraire 1',
+                        color: '#2d8ceb',
+                        visible: true,
+                        stages: [...migrated.stages],
+                        routes: [...migrated.routes],
+                        polygonal_steps: [...migrated.polygonal_steps],
+                        polygonal_legs: { ...migrated.polygonal_legs },
+                        carnet_steps: [...migrated.carnet_steps],
+                        custom_assignments: { ...(migrated.custom_assignments || {}) },
+                        custom_languages: { ...(migrated.custom_languages || {}) }
+                    }
+                ];
+                migrated.active_itinerary_id = 'itin-1';
+            } else {
+                migrated.itineraries = [];
+                migrated.active_itinerary_id = '';
+            }
         } else {
-            if (!migrated.active_itinerary_id || !migrated.itineraries.some(it => it.id === migrated.active_itinerary_id)) {
-                migrated.active_itinerary_id = migrated.itineraries[0].id;
+            // Filter out empty itineraries on load
+            migrated.itineraries = migrated.itineraries.filter(
+                it => (it.stages?.length || 0) > 0 || ((it as any).manual_steps?.length || 0) > 0 || (it.polygonal_steps?.length || 0) > 0
+            );
+            if (migrated.itineraries.length === 0) {
+                migrated.active_itinerary_id = '';
+            } else if (!migrated.active_itinerary_id || !migrated.itineraries.some(it => it.id === migrated.active_itinerary_id)) {
+                migrated.active_itinerary_id = migrated.itineraries[migrated.itineraries.length - 1].id;
             }
         }
 

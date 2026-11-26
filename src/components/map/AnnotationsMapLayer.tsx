@@ -10,6 +10,7 @@ import { IGNClient } from '../../logic/IGNClient';
 import { PRESET_COLORS } from './AnnotationModals';
 import { Trash2 } from 'lucide-react';
 import { layerPaneName } from '../../logic/LayerOrder';
+import { setMapHoverHint, clearMapHoverHint } from './mapHoverHint';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 function createPointIcon(color: string, title: string, isSelected = false, pointId = '', lat = 0, lng = 0) {
@@ -142,10 +143,15 @@ const VertexMarker = React.memo(function VertexMarker({
         dragstart: handleDragStart,
         drag: handleDrag,
         dragend: handleDragEnd,
+        mouseover: () => setMapHoverHint({
+            action: isDrawing && vIdx === 0 && totalVertices >= 3 ? 'Clic : fermer la zone' : 'Glisser : déplacer',
+            accent: color,
+        }),
+        mouseout: clearMapHoverHint,
         // Ne pas stopper la propagation : le clic doit remonter à la map
         // pour permettre la fermeture du polygone (clic sur le premier sommet).
         click: (e: any) => { /* laisser remonter à la map */ },
-    }), [handleDragStart, handleDrag, handleDragEnd]);
+    }), [handleDragStart, handleDrag, handleDragEnd, vIdx, isDrawing, totalVertices, color]);
 
     return (
         <Marker
@@ -156,14 +162,7 @@ const VertexMarker = React.memo(function VertexMarker({
             bubblingMouseEvents={true}
             zIndexOffset={3000}
             eventHandlers={eventHandlers}
-        >
-            <Tooltip direction="top" offset={[0, -12]}>
-                <span style={{ fontSize: '10px' }}>
-                    <b>S{vIdx + 1}</b>
-                    {isDrawing && vIdx === 0 && totalVertices >= 3 ? ' — clic pour fermer' : ' — glisser pour déplacer'}
-                </span>
-            </Tooltip>
-        </Marker>
+        />
     );
 });
 
@@ -226,15 +225,28 @@ const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
         dragend: handleDragEnd,
         click: handleClick,
         contextmenu: handleContextMenu,
-        mouseover: async () => {
+        mouseover: () => {
             setHovering(true);
+            const action = activeTool === 'route' || activeTool === 'route_direct'
+                ? 'Clic : relier à ce repère'
+                : areaMode
+                    ? 'Clic : ancrer le sommet'
+                    : 'Clic : éditer · Glisser : déplacer · Clic droit : supprimer';
+            setMapHoverHint({
+                action,
+                accent: point.color || '#3b82f6',
+            });
             if (!address) {
-                const addr = await IGNClient.reverseGeocode(point.coords[0], point.coords[1]);
-                setAddress(addr);
+                IGNClient.reverseGeocode(point.coords[0], point.coords[1]).then((addr) => {
+                    if (addr) setAddress(addr);
+                });
             }
         },
-        mouseout: () => setHovering(false),
-    }), [handleDragStart, handleDragEnd, handleClick, handleContextMenu, address, point.coords, areaMode, activeTool]);
+        mouseout: () => {
+            setHovering(false);
+            clearMapHoverHint();
+        },
+    }), [handleDragStart, handleDragEnd, handleClick, handleContextMenu, address, point.coords, point.color, areaMode, activeTool]);
 
     return (
         <Marker
@@ -245,24 +257,6 @@ const PointAnnotationMarker = React.memo(function PointAnnotationMarker({
             zIndexOffset={2000}
             eventHandlers={eventHandlers}
         >
-            <Tooltip direction="top" offset={[0, -42]} className="sr-map-label-point-hover">
-                <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
-                    <div style={{ fontWeight: 800, color: point.color || '#3b82f6', marginBottom: '2px' }}>{point.title}</div>
-                    {point.text && <div style={{ fontSize: '10px', color: '#e2e8f0', maxWidth: '200px', whiteSpace: 'normal', lineHeight: 1.3, marginBottom: '2px' }}>{point.text}</div>}
-                    <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic', marginBottom: '4px' }}>
-                        {address || `${point.coords[0].toFixed(5)}, ${point.coords[1].toFixed(5)}`}
-                    </div>
-                    <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '3px' }}>
-                        {activeTool === 'route' || activeTool === 'route_direct' ? (
-                            <span style={{ color: '#6ee7b7' }}>Clic : relier l'itinéraire à ce repère</span>
-                        ) : areaMode ? (
-                            <span style={{ color: '#6ee7b7' }}>Clic : ancrer le sommet de la zone</span>
-                        ) : (
-                            <span>Clic : éditer · Glisser : déplacer · Clic droit : supprimer</span>
-                        )}
-                    </div>
-                </div>
-            </Tooltip>
             <Popup className="sr-annotation-popup" autoPanPadding={[40, 40]}>
                 <div style={{ minWidth: '210px', padding: '10px', background: '#141e17', borderRadius: '10px', border: `1px solid ${point.color || '#3b82f6'}55`, color: '#e8f0eb' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -728,18 +722,19 @@ export default function AnnotationsMapLayer() {
                                     pathOptions={{ color: isRouted ? '#10b981' : (area.color || '#5b6af0'), weight: 4, dashArray: isRouted ? undefined : '7 5', opacity: 0.95, interactive: true } as any}
                                     eventHandlers={{
                                         click:     (e: any) => { L.DomEvent.stopPropagation(e); handleToggleEdge(area, eIdx); },
-                                        mouseover: (e: any) => { e.target.setStyle({ weight: 6 }); },
-                                        mouseout:  (e: any) => { e.target.setStyle({ weight: 4 }); },
+                                        mouseover: (e: any) => {
+                                            e.target.setStyle({ weight: 6 });
+                                            setMapHoverHint({
+                                                action: isRouted ? 'Clic : passer en ligne droite' : 'Clic : router sur sentiers',
+                                                accent: isRouted ? '#10b981' : (area.color || '#5b6af0'),
+                                            });
+                                        },
+                                        mouseout:  (e: any) => {
+                                            e.target.setStyle({ weight: 4 });
+                                            clearMapHoverHint();
+                                        },
                                     }}
-                                >
-                                    <Tooltip sticky direction="top">
-                                        <div style={{ fontSize: '10px' }}>
-                                            {isRouted
-                                                ? <><span style={{ color: '#10b981' }}>⛰ BRouter</span> — <span style={{ opacity: 0.6 }}>clic → droit</span></>
-                                                : <>— Droit — <span style={{ color: '#10b981' }}>clic → router</span></>}
-                                        </div>
-                                    </Tooltip>
-                                </Polyline>
+                                />
                             );
                         })}
 

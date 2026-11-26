@@ -9,12 +9,13 @@
  *   - Ctrl+T shortcut support
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Polyline, Tooltip, useMap } from 'react-leaflet';
+import { Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useAnnotations, useUI } from '../../hooks';
 import type { DrawAnnotation, DrawStroke } from '../../logic/types';
 import { layerPaneName } from '../../logic/LayerOrder';
 import Transformer, { TransformerTarget } from './Transformer';
+import { setMapHoverHint, clearMapHoverHint } from './mapHoverHint';
 
 const MIN_SAMPLE_PX = 4;
 
@@ -56,17 +57,13 @@ export default function DrawAnnotationsLayer() {
 
     // Ensure map dragging is disabled while in draw mode so panning does not conflict
     useEffect(() => {
-        const container = map.getContainer();
         if (isDrawTool) {
             map.dragging.disable();
-            container.style.cursor = 'crosshair';
         } else {
             map.dragging.enable();
-            container.style.cursor = '';
         }
         return () => {
             map.dragging.enable();
-            container.style.cursor = '';
         };
     }, [isDrawTool, map]);
 
@@ -332,18 +329,14 @@ export default function DrawAnnotationsLayer() {
                                         L.DomEvent.stopPropagation(e);
                                         // Clicking a stroke selects this specific sublayer
                                         dispatch({ type: 'SET_SELECTED_SUBLAYER', layerId: draw.id, sublayerId: stroke.id });
-                                    }
+                                    },
+                                    mouseover: () => setMapHoverHint({
+                                        action: 'Clic : sélectionner ce trait',
+                                        accent: stroke.color,
+                                    }),
+                                    mouseout: clearMapHoverHint,
                                 } : undefined}
-                            >
-                                {canInteractWithStroke && (
-                                    <Tooltip sticky direction="top">
-                                        <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
-                                            <b style={{ color: stroke.color }}>{draw.title}</b>
-                                            <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>Clic : sélectionner ce trait</div>
-                                        </div>
-                                    </Tooltip>
-                                )}
-                            </Polyline>
+                            />
                             {/* Visual stroke */}
                             <Polyline
                                 positions={pts}

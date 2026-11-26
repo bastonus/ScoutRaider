@@ -1,17 +1,47 @@
 /**
- * SlashCommandPalette.tsx — Palette de commandes slash (/)
- * Permet de rechercher et insérer tout type de bloc, référence, ou action.
- * Inclut /h1, /titre 1, /code, /chiffre, etc.
+ * SlashCommandPalette.tsx — Palette de commandes slash (/) style Notion/Antigravity.
+ * - Flotte juste sous la ligne courante du curseur dans le textarea.
+ * - Le textarea GARDE le focus et les frappes après "/" filtrent la liste via event.
+ * - Pas de champ de recherche dans la palette : c'est la zone de texte qui est l'input.
  */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
-    Search, X, Type, Code2, Hash, Heading1, Heading2, Heading3,
-    List, Quote, Divide, Image, FileText, Lock, Unlock,
-    Eye, Sparkles, Zap, Link, ChevronDown, ChevronUp,
-    CheckSquare, MapPin, Sigma, ListTodo
+    Type, Code2, Heading1, Heading2, Heading3,
+    List, ListOrdered, Quote, Minus, Image, FileText,
+    Sparkles, Link, CheckSquare, MapPin, Sigma, ListTodo,
+    Flag, Map as MapIcon, Mountain, Compass, KeyRound
 } from 'lucide-react';
-import { MODULE_META, ALL_MODULE_IDS } from '../../logic/ModuleRegistry';
-import type { ModuleId } from '../../logic/types';
+import { filterEditorCommands, type EditorCommandDef } from './editorCommands';
+
+function getCommandIcon(cmd: EditorCommandDef): React.ReactNode {
+    switch (cmd.id) {
+        case 'paragraph':      return <Type size={14} />;
+        case 'h1':             return <Heading1 size={14} />;
+        case 'h2':             return <Heading2 size={14} />;
+        case 'h3':             return <Heading3 size={14} />;
+        case 'bullet':         return <List size={14} />;
+        case 'numbered':       return <ListOrdered size={14} />;
+        case 'checklist':      return <CheckSquare size={14} />;
+        case 'quote':          return <Quote size={14} />;
+        case 'divider':        return <Minus size={14} />;
+        case 'formula':        return <Sigma size={14} />;
+        case 'code_generic':   return <Code2 size={14} />;
+        case 'raid_step':      return <Flag size={14} />;
+        case 'raid_map':       return <MapIcon size={14} />;
+        case 'raid_guided':    return <Compass size={14} />;
+        case 'raid_elevation': return <Mountain size={14} />;
+        case 'image':          return <Image size={14} />;
+        case 'file':           return <FileText size={14} />;
+        case 'toc':            return <ListTodo size={14} />;
+        case 'annexe':         return <Sparkles size={14} />;
+        case 'ref_step':       return <Link size={14} />;
+        case 'ref_poi':        return <MapPin size={14} />;
+        default:
+            if (cmd.group === 'Chiffrement') return <KeyRound size={14} />;
+            return <Code2 size={14} />;
+    }
+}
 
 interface SlashCommandPaletteProps {
     isOpen: boolean;
@@ -20,6 +50,7 @@ interface SlashCommandPaletteProps {
     onSearchReference: (query: string) => void;
     anchorRef: React.RefObject<HTMLDivElement>;
     triggerPosition?: { x: number; y: number } | null;
+    initialQuery?: string;
 }
 
 export default function SlashCommandPalette({
@@ -28,152 +59,144 @@ export default function SlashCommandPalette({
     onInsertBlock,
     onSearchReference,
     anchorRef,
-    triggerPosition
+    triggerPosition,
+    initialQuery = ''
 }: SlashCommandPaletteProps) {
-    const [query, setQuery] = useState('');
+    const [query, setQuery] = useState(initialQuery);
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const [showAll, setShowAll] = useState(false);
-    const inputRef = useRef<HTMLInputElement>(null);
-    const listRef = useRef<HTMLDivElement>(null);
+    const itemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
-    // ─── Commandes disponibles ──────────────────────────────────────────────
-    const allCommands = useMemo(() => {
-        const commands: Array<{
-            id: string;
-            label: string;
-            description: string;
-            icon: React.ReactNode;
-            category: 'block' | 'heading' | 'media' | 'code' | 'reference' | 'action';
-            keywords: string[];
-            action: () => void;
-        }> = [];
-
-        // --- Titres / Headings ---
-        commands.push(
-            { id: 'h1', label: 'Titre 1', description: 'Grand titre principal', icon: <Heading1 size={14} />, category: 'heading', keywords: ['titre', 'h1', 'heading', 'title', '#'], action: () => onInsertBlock('heading', { level: 1 }) },
-            { id: 'h2', label: 'Titre 2', description: 'Titre de section', icon: <Heading2 size={14} />, category: 'heading', keywords: ['titre', 'h2', 'heading', '##'], action: () => onInsertBlock('heading', { level: 2 }) },
-            { id: 'h3', label: 'Titre 3', description: 'Sous-titre', icon: <Heading3 size={14} />, category: 'heading', keywords: ['titre', 'h3', 'heading', '###'], action: () => onInsertBlock('heading', { level: 3 }) },
-        );
-
-        // --- Blocs de base ---
-        commands.push(
-            { id: 'paragraph', label: 'Paragraphe', description: 'Texte normal', icon: <Type size={14} />, category: 'block', keywords: ['para', 'texte', 'text', 'p'], action: () => onInsertBlock('paragraph') },
-            { id: 'bullet', label: 'Liste à puces', description: 'Liste non ordonnée', icon: <List size={14} />, category: 'block', keywords: ['liste', 'bullet', 'puce', '-', '*'], action: () => onInsertBlock('bullet_list') },
-            { id: 'numbered', label: 'Liste numérotée', description: 'Liste ordonnée', icon: <List size={14} />, category: 'block', keywords: ['liste', 'number', 'numéro', '1.', 'ol'], action: () => onInsertBlock('numbered_list') },
-            { id: 'checklist', label: 'Liste de tâches', description: 'Cases à cocher', icon: <CheckSquare size={14} />, category: 'block', keywords: ['todo', 'check', 'tâche', 'case', '[ ]'], action: () => onInsertBlock('check_list') },
-            { id: 'quote', label: 'Citation', description: 'Bloc de citation', icon: <Quote size={14} />, category: 'block', keywords: ['quote', 'citation', '>', 'blockquote'], action: () => onInsertBlock('blockquote') },
-            { id: 'divider', label: 'Séparateur', description: 'Ligne horizontale', icon: <Divide size={14} />, category: 'block', keywords: ['hr', 'ligne', 'séparateur', '---'], action: () => onInsertBlock('divider') },
-        );
-
-        // --- Médias ---
-        commands.push(
-            { id: 'image', label: 'Image', description: 'Insérer une image', icon: <Image size={14} />, category: 'media', keywords: ['img', 'image', 'photo', 'picture'], action: () => onInsertBlock('image') },
-            { id: 'file', label: 'Fichier', description: 'Joindre un fichier', icon: <FileText size={14} />, category: 'media', keywords: ['file', 'fichier', 'pièce', 'jointe', 'attach'], action: () => onInsertBlock('file') },
-        );
-
-        // --- Blocs de code / chiffrement ---
-        const textualModules = ALL_MODULE_IDS.filter(id =>
-            ['morse', 'vigenere', 'polybe', 'templier', 'maritime', 'avocat', 'cassis', 'texte_clair'].includes(id)
-        );
-
-        textualModules.forEach(modId => {
-            const meta = MODULE_META[modId];
-            commands.push({
-                id: `code_${modId}`,
-                label: `Code ${meta?.label || modId}`,
-                description: meta?.description || `Bloc chiffré ${meta?.label}`,
-                icon: <Code2 size={14} />,
-                category: 'code',
-                keywords: ['code', 'chiffre', 'encrypt', 'cipher', modId, meta?.label?.toLowerCase() || ''],
-                action: () => onInsertBlock('crypto_block', { cipher: modId as ModuleId })
-            });
-        });
-
-        // Bloc code générique
-        commands.push({
-            id: 'code_generic',
-            label: 'Bloc de code (générique)',
-            description: 'Bloc de code avec coloration syntaxique',
-            icon: <Code2 size={14} />,
-            category: 'code',
-            keywords: ['code', 'snippet', '```', 'programmation'],
-            action: () => onInsertBlock('code_block')
-        });
-
-        // --- Références / Recherche ---
-        commands.push(
-            { id: 'ref_step', label: 'Référer une étape', description: 'Insérer une référence à une étape du carnet', icon: <Link size={14} />, category: 'reference', keywords: ['ref', 'référence', 'étape', 'step', '@'], action: () => onSearchReference('step:') },
-            { id: 'ref_page', label: 'Référer une page', description: 'Insérer un lien vers une page', icon: <FileText size={14} />, category: 'reference', keywords: ['page', 'lien', 'link', '#'], action: () => onSearchReference('page:') },
-            { id: 'ref_poi', label: 'Référer un POI', description: 'Insérer un point d\'intérêt', icon: <MapPin size={14} />, category: 'reference', keywords: ['poi', 'point', 'intérêt', 'repère'], action: () => onSearchReference('poi:') },
-        );
-
-        // --- Actions ---
-        commands.push(
-            { id: 'annexe', label: 'Insérer annexe', description: 'Table de décodage (Morse, Polybe, etc.)', icon: <Sparkles size={14} />, category: 'action', keywords: ['annexe', 'table', 'décodage', 'alphabet'], action: () => onInsertBlock('annexe') },
-            { id: 'formula', label: 'Formule LaTeX', description: 'Insérer une formule mathématique', icon: <Sigma size={14} />, category: 'action', keywords: ['latex', 'formule', 'math', '$', 'équation'], action: () => onInsertBlock('latex') },
-            { id: 'toc', label: 'Table des matières', description: 'Générer une table des matières', icon: <ListTodo size={14} />, category: 'action', keywords: ['toc', 'sommaire', 'table', 'matières'], action: () => onInsertBlock('toc') },
-        );
-
-        return commands;
-    }, [onInsertBlock, onSearchReference]);
-
-    // ─── Filtrage ──────────────────────────────────────────────────────────
-    const filteredCommands = useMemo(() => {
-        if (!query.trim()) {
-            return showAll ? allCommands : allCommands.slice(0, 8);
+    useEffect(() => {
+        if (isOpen) {
+            window.dispatchEvent(new CustomEvent('textual:close-menus', { detail: { except: 'slash-palette' } }));
+            setQuery(initialQuery);
+            setSelectedIndex(0);
         }
-        const q = query.toLowerCase().replace(/^\//, '');
-        return allCommands.filter(cmd =>
-            cmd.label.toLowerCase().includes(q) ||
-            cmd.description.toLowerCase().includes(q) ||
-            cmd.keywords.some(k => k.toLowerCase().includes(q)) ||
-            cmd.id.toLowerCase().includes(q)
-        );
-    }, [query, allCommands, showAll]);
+    }, [isOpen, initialQuery]);
 
-    // ─── Gestion clavier ──────────────────────────────────────────────────
+    // Écouter les mises à jour de la query envoyées par le textarea actif (frappe après "/")
+    useEffect(() => {
+        if (!isOpen) return;
+        const onQueryUpdate = (e: Event) => {
+            const { query: q } = (e as CustomEvent<{ query: string | null }>).detail;
+            if (q === null) {
+                // Le "/" a été effacé → fermer la palette
+                onClose();
+            } else {
+                setQuery(q);
+            }
+        };
+        window.addEventListener('textual:slash-query', onQueryUpdate);
+        return () => window.removeEventListener('textual:slash-query', onQueryUpdate);
+    }, [isOpen, onClose]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const onCloseOthers = (e: Event) => {
+            if ((e as CustomEvent).detail?.except !== 'slash-palette') onClose();
+        };
+        window.addEventListener('textual:close-menus', onCloseOthers);
+        return () => window.removeEventListener('textual:close-menus', onCloseOthers);
+    }, [isOpen, onClose]);
+
+    const GROUP_ORDER: Record<string, number> = { Chiffrement: 0, Raid: 1, Texte: 2, Avancé: 3 };
+    const GROUP_LABELS: Record<string, string> = {
+        Chiffrement: 'Chiffrement',
+        Raid: 'Raid & Itinéraire',
+        Texte: 'Texte',
+        Avancé: 'Avancé',
+    };
+
+    const rawFiltered = useMemo(() => filterEditorCommands(query), [query]);
+
+    const { orderedCommands, groupedCommands } = useMemo(() => {
+        const sorted = [...rawFiltered].sort(
+            (a, b) => (GROUP_ORDER[a.group] ?? 9) - (GROUP_ORDER[b.group] ?? 9)
+        );
+        const groups: Array<{
+            name: string;
+            label: string;
+            items: Array<{ cmd: EditorCommandDef; flatIdx: number }>;
+        }> = [];
+        const groupMap = new Map<string, Array<{ cmd: EditorCommandDef; flatIdx: number }>>();
+
+        sorted.forEach((cmd, idx) => {
+            if (!groupMap.has(cmd.group)) {
+                const arr: Array<{ cmd: EditorCommandDef; flatIdx: number }> = [];
+                groupMap.set(cmd.group, arr);
+                groups.push({ name: cmd.group, label: GROUP_LABELS[cmd.group] || cmd.group, items: arr });
+            }
+            groupMap.get(cmd.group)!.push({ cmd, flatIdx: idx });
+        });
+
+        return { orderedCommands: sorted, groupedCommands: groups };
+    }, [rawFiltered]);
+
+    const filteredCommands = orderedCommands;
+
+    useEffect(() => { setSelectedIndex(0); }, [query]);
+
+    useEffect(() => {
+        const el = itemRefs.current.get(selectedIndex);
+        if (el) el.scrollIntoView({ block: 'nearest' });
+    }, [selectedIndex]);
+
+    const executeCommand = (cmd: EditorCommandDef) => {
+        if (cmd.blockType === 'ref_step') {
+            onSearchReference('step:');
+        } else if (cmd.blockType === 'ref_poi') {
+            onSearchReference('poi:');
+        } else {
+            onInsertBlock(cmd.blockType, cmd.config);
+        }
+        onClose();
+    };
+
+    // ─── Navigation clavier — le textarea garde le focus ────────────────────
     useEffect(() => {
         if (!isOpen) return;
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 onClose();
                 return;
             }
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                setSelectedIndex(i => Math.min(i + 1, filteredCommands.length - 1));
+                e.stopPropagation();
+                setSelectedIndex(i => filteredCommands.length > 0 ? (i + 1) % filteredCommands.length : 0);
+                return;
             }
             if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                setSelectedIndex(i => Math.max(i - 1, 0));
-            }
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                if (filteredCommands[selectedIndex]) {
-                    filteredCommands[selectedIndex].action();
-                    onClose();
-                }
+                e.stopPropagation();
+                setSelectedIndex(i => filteredCommands.length > 0 ? (i - 1 + filteredCommands.length) % filteredCommands.length : 0);
+                return;
             }
             if (e.key === 'Tab') {
                 e.preventDefault();
-                setShowAll(true);
+                e.stopPropagation();
+                setSelectedIndex(i => filteredCommands.length > 0
+                    ? e.shiftKey
+                        ? (i - 1 + filteredCommands.length) % filteredCommands.length
+                        : (i + 1) % filteredCommands.length
+                    : 0);
+                return;
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (filteredCommands[selectedIndex]) {
+                    executeCommand(filteredCommands[selectedIndex]);
+                }
             }
         };
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
+        document.addEventListener('keydown', handleKeyDown, true);
+        return () => document.removeEventListener('keydown', handleKeyDown, true);
     }, [isOpen, filteredCommands, selectedIndex, onClose]);
 
-    // ─── Focus input à l'ouverture ────────────────────────────────────────
-    useEffect(() => {
-        if (isOpen && inputRef.current) {
-            inputRef.current.focus();
-            setSelectedIndex(0);
-            setShowAll(false);
-        }
-    }, [isOpen]);
-
-    // ─── Clic extérieur pour fermer ───────────────────────────────────────
+    // ─── Fermeture au clic en dehors ─────────────────────────────────────────
     useEffect(() => {
         if (!isOpen) return;
         const handleClickOutside = (e: MouseEvent) => {
@@ -185,211 +208,182 @@ export default function SlashCommandPalette({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen, anchorRef, onClose]);
 
-    if (!isOpen) return null;
+    if (!isOpen || typeof document === 'undefined') return null;
 
-    // Positionnement
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        zIndex: 9999,
-        pointerEvents: 'auto',
-    };
+    // ─── Positionnement : juste sous la ligne du curseur ─────────────────────
+    const menuWidth = 290;
+    const menuMaxHeight = 320;
+    let left = 24;
+    let top = 80;
+    let flippedAbove = false;
+
     if (triggerPosition) {
-        style.left = triggerPosition.x;
-        style.top = triggerPosition.y;
+        left = triggerPosition.x;
+        top = triggerPosition.y;
     } else if (anchorRef.current) {
         const rect = anchorRef.current.getBoundingClientRect();
-        style.left = rect.left;
-        style.top = rect.bottom + 4;
+        left = rect.left;
+        top = rect.bottom + 4;
     }
 
-    return (
+    if (typeof window !== 'undefined') {
+        left = Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8));
+        if (top + menuMaxHeight > window.innerHeight - 12) {
+            top = Math.max(8, top - menuMaxHeight - 8);
+            flippedAbove = true;
+        }
+    }
+
+    return createPortal(
         <div
             ref={anchorRef}
-            style={style}
-            onMouseDown={e => e.stopPropagation()}
+            role="menu"
+            aria-label="Insérer un bloc"
+            style={{ position: 'fixed', left, top, zIndex: 99999, pointerEvents: 'auto' }}
+            // NE PAS voler le focus du textarea
+            onMouseDown={e => e.preventDefault()}
         >
             <div style={{
                 background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-strong)',
-                borderRadius: '12px',
-                boxShadow: 'var(--shadow-xl)',
-                minWidth: '320px',
-                maxWidth: '480px',
-                maxHeight: '500px',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
+                width: `${menuWidth}px`,
+                maxHeight: `${menuMaxHeight}px`,
+                display: 'flex',
+                flexDirection: 'column',
                 overflow: 'hidden',
-                animation: 'islandPopoverIn 140ms cubic-bezier(0.16, 1, 0.3, 1)',
+                transformOrigin: flippedAbove ? 'bottom left' : 'top left',
+                animation: 'islandPopoverIn 110ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}>
-                {/* Search input */}
-                <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-subtle)' }}>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <Search size={16} color="var(--text-dim)" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }} />
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={query}
-                            onChange={e => setQuery(e.target.value)}
-                            placeholder="Tapez / pour chercher… (ex: /h1, /code, /morse)"
-                            style={{
-                                width: '100%',
-                                padding: '8px 10px 8px 36px',
-                                background: 'var(--bg-base)',
-                                border: '1px solid var(--border-subtle)',
-                                borderRadius: '8px',
-                                color: 'var(--text-primary)',
-                                fontSize: '13px',
-                                fontFamily: 'var(--font-ui)',
-                                outline: 'none',
-                                boxSizing: 'border-box',
-                            }}
-                            onKeyDown={e => {
-                                if (e.key === 'Escape') onClose();
-                            }}
-                            autoComplete="off"
-                            spellCheck={false}
-                        />
-                        {query && (
-                            <button
-                                onClick={() => setQuery('')}
-                                style={{
-                                    position: 'absolute',
-                                    right: '8px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: 'var(--text-dim)',
-                                    cursor: 'pointer',
-                                    padding: '2px',
-                                }}
-                                aria-label="Effacer"
-                            >
-                                <X size={14} />
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Results list */}
-                <div ref={listRef} style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                {/* Liste filtrée — pas de champ de recherche ici, le textarea est l'input */}
+                <div style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    overscrollBehavior: 'contain',
+                    padding: '4px 4px',
+                }}>
                     {filteredCommands.length === 0 ? (
-                        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '13px' }}>
-                            Aucune commande trouvée pour « {query} »
+                        <div style={{
+                            padding: '14px 12px',
+                            textAlign: 'center',
+                            color: 'var(--text-dim)',
+                            fontSize: '12.5px',
+                        }}>
+                            Aucun résultat
                         </div>
                     ) : (
-                        <>
-                            {filteredCommands.map((cmd, idx) => (
-                                <button
-                                    key={cmd.id}
-                                    type="button"
-                                    onClick={() => { cmd.action(); onClose(); }}
-                                    onMouseEnter={() => setSelectedIndex(idx)}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px',
-                                        width: '100%',
-                                        padding: '10px 12px',
-                                        border: 'none',
-                                        background: idx === selectedIndex ? 'var(--accent-transparent)' : 'transparent',
-                                        color: 'var(--text-primary)',
-                                        fontSize: '13px',
-                                        fontWeight: idx === selectedIndex ? 600 : 400,
-                                        textAlign: 'left',
-                                        cursor: 'pointer',
-                                        transition: 'background 80ms ease',
-                                        boxSizing: 'border-box',
-                                    }}
-                                >
-                                    <span style={{
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        width: '24px', height: '24px', color: 'var(--accent-hover)', flexShrink: 0
-                                    }}>
-                                        {cmd.icon}
-                                    </span>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            {cmd.label}
-                                        </div>
-                                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            {cmd.description}
-                                        </div>
-                                    </div>
-                                    <span style={{
-                                        fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)',
-                                        textTransform: 'uppercase', letterSpacing: '0.05em',
-                                        background: 'var(--bg-hover)', padding: '2px 6px', borderRadius: '4px'
-                                    }}>
-                                        {cmd.category}
-                                    </span>
-                                </button>
-                            ))}
-
-                            {!showAll && filteredCommands.length < allCommands.length && (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAll(true)}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        width: '100%', padding: '8px 12px',
-                                        border: 'none', background: 'transparent',
-                                        color: 'var(--accent-hover)', fontSize: '12px',
-                                        fontWeight: 600, cursor: 'pointer',
-                                    }}
-                                >
-                                    <ChevronDown size={14} />
-                                    <span>Afficher tout ({allCommands.length} commandes)</span>
-                                </button>
-                            )}
-                            {showAll && (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAll(false)}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        width: '100%', padding: '8px 12px',
-                                        border: 'none', background: 'transparent',
-                                        color: 'var(--text-dim)', fontSize: '12px',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    <ChevronUp size={14} />
-                                    <span>Réduire</span>
-                                </button>
-                            )}
-                        </>
+                        groupedCommands.map((group, gIdx) => (
+                            <div key={group.name} role="group" aria-label={group.label}
+                                style={{ marginTop: gIdx > 0 ? '4px' : 0 }}>
+                                <div style={{
+                                    padding: '5px 10px 2px',
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.08em',
+                                    color: group.name === 'Chiffrement'
+                                        ? 'var(--accent-hover)'
+                                        : 'var(--text-dim)',
+                                }}>
+                                    {group.label}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                    {group.items.map(({ cmd, flatIdx }) => {
+                                        const isSel = flatIdx === selectedIndex;
+                                        return (
+                                            <button
+                                                key={cmd.id}
+                                                role="menuitem"
+                                                aria-selected={isSel}
+                                                ref={el => { if (el) itemRefs.current.set(flatIdx, el); else itemRefs.current.delete(flatIdx); }}
+                                                type="button"
+                                                onClick={() => executeCommand(cmd)}
+                                                onMouseEnter={() => setSelectedIndex(flatIdx)}
+                                                onMouseDown={e => e.preventDefault()}
+                                                title={cmd.description}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    width: '100%',
+                                                    padding: '5px 8px',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    background: isSel ? 'var(--bg-hover)' : 'transparent',
+                                                    color: isSel ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                                    fontSize: '13px',
+                                                    fontWeight: isSel ? 500 : 400,
+                                                    textAlign: 'left',
+                                                    cursor: 'pointer',
+                                                    transition: 'background 40ms',
+                                                    boxSizing: 'border-box',
+                                                    outline: isSel ? '1.5px solid var(--accent-default)' : 'none',
+                                                    outlineOffset: '-1.5px',
+                                                }}
+                                            >
+                                                {/* Icône */}
+                                                <span style={{
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    width: '22px', height: '22px', borderRadius: '5px',
+                                                    flexShrink: 0,
+                                                    background: 'var(--bg-surface)',
+                                                    color: isSel && group.name === 'Chiffrement'
+                                                        ? 'var(--accent-hover)'
+                                                        : isSel ? 'var(--text-primary)' : 'var(--text-dim)',
+                                                }}>
+                                                    {getCommandIcon(cmd)}
+                                                </span>
+                                                {/* Label */}
+                                                <span style={{
+                                                    flex: 1, minWidth: 0,
+                                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                                }}>
+                                                    {cmd.label}
+                                                </span>
+                                                {/* Shortcut */}
+                                                {cmd.shortcut && (
+                                                    <span style={{
+                                                        fontSize: '11px',
+                                                        fontFamily: 'var(--font-mono)',
+                                                        color: 'var(--text-dim)',
+                                                        flexShrink: 0,
+                                                        opacity: 0.65,
+                                                    }}>
+                                                        {cmd.shortcut}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))
                     )}
                 </div>
 
-                {/* Footer hint */}
+                {/* Pied minimaliste */}
                 <div style={{
-                    padding: '8px 12px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+                    gap: '8px', padding: '3px 10px',
                     borderTop: '1px solid var(--border-subtle)',
-                    fontSize: '11px',
-                    color: 'var(--text-dim)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                 }}>
-                    <kbd style={{
-                        background: 'var(--bg-hover)', border: '1px solid var(--border-subtle)',
-                        borderRadius: '4px', padding: '1px 6px', fontFamily: 'var(--font-mono)', fontSize: '10px'
-                    }}>
-                        ↑ ↓
-                    </kbd>
-                    <span>Naviguer</span>
-                    <kbd style={{
-                        background: 'var(--bg-hover)', border: '1px solid var(--border-subtle)',
-                        borderRadius: '4px', padding: '1px 6px', fontFamily: 'var(--font-mono)', fontSize: '10px'
-                    }}>
-                        Entrée
-                    </kbd>
-                    <span>Sélectionner</span>
-                    <kbd style={{
-                        background: 'var(--bg-hover)', border: '1px solid var(--border-subtle)',
-                        borderRadius: '4px', padding: '1px 6px', fontFamily: 'var(--font-mono)', fontSize: '10px'
-                    }}>
-                        Échap
-                    </kbd>
-                    <span>Fermer</span>
+                    {([['↑↓', 'Naviguer'], ['↵', 'Choisir'], ['Échap', 'Fermer']] as [string, string][]).map(([key, label]) => (
+                        <span key={key} style={{
+                            display: 'flex', alignItems: 'center', gap: '3px',
+                            fontSize: '11px', color: 'var(--text-dim)',
+                        }}>
+                            <kbd style={{
+                                fontFamily: 'var(--font-mono)', fontSize: '10px',
+                                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                                borderRadius: '3px', padding: '1px 4px',
+                            }}>{key}</kbd>
+                            <span style={{ opacity: 0.5 }}>{label}</span>
+                        </span>
+                    ))}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
-

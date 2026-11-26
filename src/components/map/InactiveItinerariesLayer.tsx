@@ -1,9 +1,10 @@
 import React from 'react';
-import { Polyline, Marker, Tooltip } from 'react-leaflet';
+import { Polyline, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import { useRoutes, useAnnotations, useUI } from '../../hooks';
 import { Itinerary } from '../../logic/types';
 import { layerPaneName } from '../../logic/LayerOrder';
+import { setMapHoverHint, clearMapHoverHint } from './mapHoverHint';
 
 export default function InactiveItinerariesLayer() {
     const { itineraries = [], activeItineraryId: activeId, routes: activeRoutes, stages: activeStages, dispatch } = useRoutes();
@@ -72,18 +73,14 @@ export default function InactiveItinerariesLayer() {
                                         click: (e) => {
                                             L.DomEvent.stopPropagation(e);
                                             handleSelectItin(itin.id, itin.name);
-                                        }
+                                        },
+                                        mouseover: () => setMapHoverHint({
+                                            action: 'Clic : activer et éditer',
+                                            accent: color,
+                                        }),
+                                        mouseout: clearMapHoverHint,
                                     } : undefined}
-                                >
-                                    {!isCreationTool && (
-                                        <Tooltip sticky>
-                                            <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
-                                                <span style={{ fontWeight: 700, color }}>{itin.name}</span>
-                                                <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>Clic : activer et éditer cet itinéraire</div>
-                                            </div>
-                                        </Tooltip>
-                                    )}
-                                </Polyline>
+                                />
                                 
                                 {/* Visible dashed route */}
                                 <Polyline
@@ -111,18 +108,14 @@ export default function InactiveItinerariesLayer() {
                                         click: (e) => {
                                             L.DomEvent.stopPropagation(e);
                                             handleSelectItin(itin.id, itin.name);
-                                        }
+                                        },
+                                        mouseover: () => setMapHoverHint({
+                                            action: 'Clic : activer et éditer',
+                                            accent: color,
+                                        }),
+                                        mouseout: clearMapHoverHint,
                                     } : undefined}
-                                >
-                                    {!isCreationTool && (
-                                        <Tooltip sticky>
-                                            <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
-                                                <span style={{ fontWeight: 700, color }}>{itin.name}</span>
-                                                <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>Clic : activer et éditer cet itinéraire</div>
-                                            </div>
-                                        </Tooltip>
-                                    )}
-                                </Polyline>
+                                />
                                 <Polyline
                                     positions={fallbackLine}
                                     pane={layerPaneName(itin.id)}
@@ -181,19 +174,14 @@ export default function InactiveItinerariesLayer() {
                                         click: (e) => {
                                             L.DomEvent.stopPropagation(e);
                                             handleSelectItin(itin.id, itin.name);
-                                        }
+                                        },
+                                        mouseover: () => setMapHoverHint({
+                                            action: 'Clic : activer et éditer',
+                                            accent: color,
+                                        }),
+                                        mouseout: clearMapHoverHint,
                                     } : undefined}
-                                >
-                                    {!isCreationTool && (
-                                        <Tooltip direction="top" offset={[0, -12]}>
-                                            <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
-                                                <span style={{ fontWeight: 700, color }}>{itin.name}</span> — Étape {stage.label}
-                                                {stage.address ? <div style={{ fontSize: '9px', color: '#cbd5e1' }}>{stage.address}</div> : null}
-                                                <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>Clic : activer et éditer cet itinéraire</div>
-                                            </div>
-                                        </Tooltip>
-                                    )}
-                                </Marker>
+                                />
                             );
                         })}
                     </React.Fragment>

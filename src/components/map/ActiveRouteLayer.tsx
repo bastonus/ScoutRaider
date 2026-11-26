@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Polyline, Marker, Popup, useMap, useMapEvents, Tooltip } from 'react-leaflet';
+import { Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
 import { backgroundEngine } from '../../logic/BackgroundEngine';
@@ -9,6 +9,7 @@ import { ModuleLogic } from '../../logic/ModuleLogic';
 import { NavigationText } from '../../logic/NavigationText';
 import { PolygonalEngine } from '../../logic/PolygonalEngine';
 import { layerPaneName } from '../../logic/LayerOrder';
+import { setMapHoverHint, clearMapHoverHint } from './mapHoverHint';
 
 /** Map routing mode to map stroke style: Route = solid, Sentier = dotted, Hors piste = dashed */
 function getProfileDashArray(profile?: string): string | undefined {
@@ -93,16 +94,14 @@ const AzimutHandle = React.memo(({ idx, position, azimut, onDrag, onDragEnd }: {
                 dragend: (e) => {
                     onDragEnd(e, idx);
                     e.target.unbindTooltip();
-                }
+                },
+                mouseover: () => setMapHoverHint({
+                    action: 'Glisser : réorienter le segment',
+                    accent: '#F59E0B',
+                }),
+                mouseout: clearMapHoverHint,
             }}
-        >
-            <Tooltip direction="top" offset={[0, -12]}>
-                <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
-                    <b style={{ color: '#2d8ceb' }}>Azimut {azimut || 0}°</b>
-                    <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>Glisser pour réorienter le segment</div>
-                </div>
-            </Tooltip>
-        </Marker>
+        />
     );
 });
 
@@ -126,7 +125,6 @@ export default function ActiveRouteLayer() {
     const activeItin = (state.itineraries || []).find((it: any) => it.id === state.active_itinerary_id);
     const itinColor = activeItin?.color || '#f97316';
 
-    const [encodingPopupVal, setEncodingPopupVal] = useState<{ idx: number, latlng: [number, number] } | null>(null);
     const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
     // If an itinerary is not the selected layer or tool is not a routing tool,
@@ -411,25 +409,26 @@ export default function ActiveRouteLayer() {
                                         }
                                     },
                                     mouseover: () => {
-                                        if ((activeTool === 'route_direct' && r.profile !== 'direct') || (activeTool === 'route' && r.profile === 'direct')) {
+                                        if (activeTool === 'route_direct' && r.profile !== 'direct') {
                                             (window as any).__isHoveringCompatible = true;
+                                            setMapHoverHint({
+                                                action: 'Clic : convertir en hors piste',
+                                                accent: '#F59E0B',
+                                            });
+                                        } else if (activeTool === 'route' && r.profile === 'direct') {
+                                            (window as any).__isHoveringCompatible = true;
+                                            setMapHoverHint({
+                                                action: 'Clic : convertir en tracé BRouter',
+                                                accent: '#3B82F6',
+                                            });
                                         }
                                     },
                                     mouseout: () => {
                                         (window as any).__isHoveringCompatible = false;
+                                        clearMapHoverHint();
                                     }
                                 }}
-                            >
-                                {(activeTool === 'route_direct' || activeTool === 'route') && (
-                                    <Tooltip sticky>
-                                        <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
-                                            <b style={{ color: 'var(--accent-default)' }}>{r.profile === 'direct' ? 'Hors piste' : 'Tracé pédestre'}</b><br />
-                                            {activeTool === 'route_direct' && r.profile !== 'direct' && <span>Clic : convertir en hors piste</span>}
-                                            {activeTool === 'route' && r.profile === 'direct' && <span>Clic : convertir en tracé BRouter</span>}
-                                        </div>
-                                    </Tooltip>
-                                )}
-                            </Polyline>
+                            />
                             {/* Visible route line */}
                             <Polyline 
                                 positions={positions} 
@@ -486,7 +485,7 @@ export default function ActiveRouteLayer() {
                     'annotate_point', 'annotate_area', 'annotate_area_routed', 
                     'annotate_draw', 'annotate_text'
                 ].includes(activeTool);
-                const canInteractWithRoute = (isRouteTool || activeTool === 'encodage') && !isOtherCreationTool;
+                const canInteractWithRoute = isRouteTool && !isOtherCreationTool;
 
                 return (
                     <React.Fragment key={`poly-seg-${idx}`}>
@@ -497,9 +496,7 @@ export default function ActiveRouteLayer() {
                             pathOptions={{ color: 'transparent', weight: 20, interactive: canInteractWithRoute }}
                             eventHandlers={canInteractWithRoute ? {
                                 click: (e: any) => {
-                                    if (activeTool === 'encodage') {
-                                        setEncodingPopupVal({ idx, latlng: [e.latlng.lat, e.latlng.lng] });
-                                    } else if (activeTool === 'node') {
+                                    if (activeTool === 'node') {
                                         const closest = findClosestRoutePoint(e.latlng.lat, e.latlng.lng);
                                         if (closest.idx !== -1) {
                                             const newForced = [...state.polygonalization_settings.forced_nodes, closest.idx];
@@ -521,59 +518,36 @@ export default function ActiveRouteLayer() {
                                             }
                                         }
                                     }
-                                }
+                                },
+                                mouseover: () => {
+                                    if (isNodeTool) {
+                                        setMapHoverHint({
+                                            action: 'Clic : ajouter un nœud',
+                                            accent: '#38BDF8',
+                                        });
+                                    } else if (activeTool === 'route_direct') {
+                                        const legIdx = state.routes.findIndex(r => r && r.id === (seg as any).leg_key);
+                                        const r = legIdx !== -1 ? state.routes[legIdx] : null;
+                                        if (r?.profile !== 'direct') {
+                                            setMapHoverHint({
+                                                action: 'Clic : convertir en hors piste',
+                                                accent: '#F59E0B',
+                                            });
+                                        }
+                                    } else if (activeTool === 'route') {
+                                        const legIdx = state.routes.findIndex(r => r && r.id === (seg as any).leg_key);
+                                        const r = legIdx !== -1 ? state.routes[legIdx] : null;
+                                        if (r?.profile === 'direct') {
+                                            setMapHoverHint({
+                                                action: 'Clic : recalculer sur sentiers',
+                                                accent: '#3B82F6',
+                                            });
+                                        }
+                                    }
+                                },
+                                mouseout: clearMapHoverHint,
                             } : undefined}
-                        >
-                            {isNodeTool && (
-                                <Tooltip sticky>
-                                    <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
-                                        <b style={{ color: 'var(--accent-default)' }}>Outil Nœud</b><br />
-                                        <span>Clic : ajouter un nœud sur ce tronçon</span>
-                                    </div>
-                                </Tooltip>
-                            )}
-                            {activeTool === 'route_direct' && (
-                                <Tooltip sticky>
-                                    <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
-                                        <b style={{ color: 'var(--accent-default)' }}>Tracé hors piste (H)</b><br />
-                                        {(() => {
-                                            const legIdx = state.routes.findIndex(r => r && r.id === (seg as any).leg_key);
-                                            const r = legIdx !== -1 ? state.routes[legIdx] : null;
-                                            return r?.profile !== 'direct' ? (
-                                                <span style={{ color: '#6ee7b7' }}>Clic : convertir en ligne droite</span>
-                                            ) : (
-                                                <span style={{ opacity: 0.7 }}>Tronçon déjà en ligne droite</span>
-                                            );
-                                        })()}
-                                    </div>
-                                </Tooltip>
-                            )}
-                            {activeTool === 'route' && (
-                                <Tooltip sticky>
-                                    <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
-                                        <b style={{ color: 'var(--accent-default)' }}>Tracé pédestre BRouter (P)</b><br />
-                                        {(() => {
-                                            const legIdx = state.routes.findIndex(r => r && r.id === (seg as any).leg_key);
-                                            const r = legIdx !== -1 ? state.routes[legIdx] : null;
-                                            return r?.profile === 'direct' ? (
-                                                <span style={{ color: '#6ee7b7' }}>Clic : recalculer sur sentiers</span>
-                                            ) : (
-                                                <span style={{ opacity: 0.7 }}>Tronçon déjà calculé sur sentiers</span>
-                                            );
-                                        })()}
-                                    </div>
-                                </Tooltip>
-                            )}
-                            {activeTool === 'encodage' && (
-                                <Tooltip sticky>
-                                    <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)' }}>
-                                        <b style={{ color: 'var(--accent-default)' }}>Encodage du tronçon #{idx + 1}</b><br />
-                                        <span>Module : {MODULE_META[seg.assigned_module as import('../../logic/types').ModuleId]?.label || 'Carte IGN'}</span><br />
-                                        <span style={{ color: '#6ee7b7' }}>Clic : changer le module de chiffrement</span>
-                                    </div>
-                                </Tooltip>
-                            )}
-                        </Polyline>
+                        />
 
                         {/* Visible Segment Line */}
                         <Polyline 
@@ -659,19 +633,18 @@ export default function ActiveRouteLayer() {
                                     if (isNodeTool && e.originalEvent && e.originalEvent.altKey) {
                                         handleNodeRemove(idx);
                                     }
-                                }
+                                },
+                                mouseover: () => {
+                                    if (isNodeTool) {
+                                        setMapHoverHint({
+                                            action: 'Glisser : déplacer · Clic droit / Alt+Clic : supprimer',
+                                            accent: '#38BDF8',
+                                        });
+                                    }
+                                },
+                                mouseout: clearMapHoverHint,
                             }}
                         >
-                            <Tooltip direction="top" offset={[0, -8]}>
-                                <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', fontWeight: 600 }}>
-                                    Nœud polygonal #{idx + 1}
-                                    {isNodeTool ? (
-                                        <div style={{ fontSize: '10px', color: '#93c5fd', marginTop: '2px' }}>
-                                            Glisser : déplacer · Clic droit : supprimer
-                                        </div>
-                                    ) : null}
-                                </div>
-                            </Tooltip>
                             {isNodeTool && (
                                 <Popup closeButton={false}>
                                     <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-ui)' }}>
@@ -795,90 +768,6 @@ export default function ActiveRouteLayer() {
                     );
                 });
             })}
-
-            {/* ENCODING POPUP (Legacy parity + Live Preview) */}
-            {encodingPopupVal && activeTool === 'encodage' && (() => {
-                const seg = steps[encodingPopupVal.idx];
-                let segDist = 0;
-                if (seg && seg.coords) {
-                    for (let i = 0; i < seg.coords.length - 1; i++) {
-                        segDist += getDistanceMeters(seg.coords[i][1], seg.coords[i][0], seg.coords[i+1][1], seg.coords[i+1][0]);
-                    }
-                }
-                const theme = themeManager.getTheme(state.theme_id);
-                // Basic nav text for preview
-                const navText = NavigationText.generate(segDist || 100, seg?.azimut || 0, null, theme);
-
-                return (
-                    <Popup 
-                        position={encodingPopupVal.latlng}
-                        eventHandlers={{ remove: () => setEncodingPopupVal(null) }}
-                        closeButton={false}
-                        className="encoding-map-popup"
-                    >
-                        <div style={{
-                            padding: '12px',
-                            width: '290px',
-                            fontFamily: 'var(--font-ui)'
-                        }}>
-                            <div style={{ fontSize: '11px', color: '#999', fontWeight: 600, marginBottom: '8px', padding: '0 4px' }}>
-                                ASSIGNER UN MODULE (Tronçon {encodingPopupVal.idx})
-                            </div>
-                            <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                {ALL_MODULE_IDS.map(modId => {
-                                    const meta = MODULE_META[modId];
-                                    const encodedPreview = ModuleLogic.encode(modId, navText, { key: theme.vigenere_key });
-                                    
-                                    return (
-                                        <button
-                                            key={modId}
-                                            onClick={() => {
-                                                dispatch({ 
-                                                    type: 'ASSIGN_MODULES_RANGE', 
-                                                    startIdx: encodingPopupVal.idx, 
-                                                    endIdx: encodingPopupVal.idx, 
-                                                    moduleId: modId 
-                                                });
-                                                setEncodingPopupVal(null);
-                                            }}
-                                            style={{
-                                                display: 'flex', flexDirection: 'column', gap: '4px',
-                                                background: 'transparent', border: '1px solid transparent', padding: '6px 8px',
-                                                borderRadius: '6px', cursor: 'pointer', textAlign: 'left',
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                                                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.background = 'transparent';
-                                                e.currentTarget.style.borderColor = 'transparent';
-                                            }}
-                                        >
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: meta.color }} />
-                                                <span style={{ color: '#e5e7eb', fontSize: '12px', fontWeight: 600 }}>{meta.label}</span>
-                                            </div>
-                                            {/* Live Preview Text */}
-                                            {modId !== 'carte_ign' && modId !== 'gilwell' && (
-                                                <div style={{ 
-                                                    fontSize: '10px', 
-                                                    color: 'rgba(255,255,255,0.5)', 
-                                                    fontFamily: modId === 'morse' ? 'monospace' : 'inherit',
-                                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                                                    paddingLeft: '16px'
-                                                }}>
-                                                    {encodedPreview.replace(/\n/g, ' ')}
-                                                </div>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </Popup>
-                );
-            })()}
         </>
     );
 }

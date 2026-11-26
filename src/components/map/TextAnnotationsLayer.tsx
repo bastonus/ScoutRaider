@@ -49,19 +49,6 @@ export default function TextAnnotationsLayer() {
         };
     }, [map]);
 
-    // Ensure map dragging is disabled while in text mode for placing
-    useEffect(() => {
-        const container = map.getContainer();
-        if (isTextTool) {
-            container.style.cursor = 'crosshair';
-        } else {
-            container.style.cursor = '';
-        }
-        return () => {
-            container.style.cursor = '';
-        };
-    }, [isTextTool, map]);
-
     // Focus input when inline editing starts
     useEffect(() => {
         if (editingItemId && inputRef.current) {

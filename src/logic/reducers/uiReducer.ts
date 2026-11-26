@@ -18,7 +18,7 @@ export function uiReducer(state: AppState, action: AppAction, getInitialState: (
 
         case 'SET_ACTIVE_TOOL': {
             const cleaned = cleanupEmptyLayers(state, action.tool);
-            const routeTools = ['route', 'route_direct', 'node', 'azimut', 'encodage'];
+            const routeTools = ['route', 'route_direct', 'node', 'azimut'];
             let nextSelectedLayerId = cleaned.selected_layer_id;
             let nextActiveItinId = cleaned.active_itinerary_id;
             let nextStages = cleaned.stages;

@@ -490,6 +490,8 @@ export default function MarkdownRenderer({
         .markdown-renderer h2 { font-size: 1.5em; font-weight: 700; margin: 0.75em 0 0.5em; }
         .markdown-renderer h3 { font-size: 1.25em; font-weight: 600; margin: 0.83em 0 0.5em; }
         .markdown-renderer p { margin: 0.5em 0; }
+        .markdown-renderer.manual-html-view > :first-child { margin-top: 0; }
+        .markdown-renderer.manual-html-view > :last-child { margin-bottom: 0; }
         .markdown-renderer ul, .markdown-renderer ol { margin: 0.5em 0; padding-left: 1.5em; }
         .markdown-renderer li { margin: 0.25em 0; }
         .markdown-renderer blockquote { border-left: 3px solid var(--accent-default); padding-left: 1em; margin: 1em 0; color: var(--text-dim); font-style: italic; }

@@ -1,48 +1,37 @@
 /**
- * BlockGutter.tsx — Colonne latérale unifiée pour tous les blocs du carnet
- * Largeur fixe : 44px (22px indicateur + 8px gap + 14px menu 3 points)
- * Contient : indicateur de type, label d'étape (A,B,C), bouton 3 points
- * Aligné pour tous les types : commentaire, code, carte, computed, etc.
+ * BlockGutter.tsx — Gouttière unifiée de 40px façon Notion pour tous les blocs.
+ * Au repos : invisible (sauf repère d'anomalie ou coche de sélection).
+ * Au survol (ou focus tactile) : affiche `+` (insérer & menu `/`) et `⋮⋮` (glisser / menu du bloc).
  */
 import React, { useRef, useMemo } from 'react';
-import {
-    MessageSquarePlus, Code2, Map, MapPin, Layers,
-    Key, Grid, Hash, Flag, RotateCcw, Minus, Circle, Type,
-    MoreVertical, Check, MoveUp, MoveDown, Copy, Link2, Trash2,
-    Settings, Palette, Globe, Eye, EyeOff, Lock, Unlock
-} from 'lucide-react';
-import { MODULE_META } from '../../logic/ModuleRegistry';
+import { Plus, GripVertical, Check } from 'lucide-react';
 import { ModuleManagementService } from '../../logic/ModuleManagementService';
-import { CIPHER_FONTS, CIPHER_FONT_SIZES, CIPHER_ICONS } from './MarkdownRenderer';
 import UnifiedContextMenu from './UnifiedContextMenu';
 import type { ModuleId, CarnetStep, NavLanguage } from '../../logic/types';
 
-// ─── Largeur fixe du gutter ──────────────────────────────────────────────
-export const GUTTER_WIDTH = 26; // Colonne latérale épurée pour l'icône interactive du module
+// ─── Largeur fixe de la gouttière (Lot A : 40px) ──────────────────────────
+export const GUTTER_WIDTH = 40;
 
-// ─── Types ──────────────────────────────────────────────────────────────
 export interface BlockGutterProps {
-    /** Type de bloc pour choisir l'icône */
     blockType: 'html' | 'code' | 'computed' | 'map' | 'title' | 'generic';
-    /** Données du bloc */
     blockData: CarnetStep;
-    /** Couleur d'étape (optionnelle) */
     stepColor?: string;
-    /** Module ID pour les blocs code */
     moduleId?: ModuleId;
-    /** Si le bloc est sélectionné */
     isSelected?: boolean;
-    /** Si c'est un bloc titre */
     isTitle?: boolean;
-    /** Si le bloc parent est survolé */
     isHovered?: boolean;
-    /** Position d'ouverture externe du menu contextuel (clic droit ou long press) */
+    /** Sur tactile : affiche les poignées quand le bloc a le focus */
+    isFocused?: boolean;
+    /** Indique une anomalie sur ce bloc (repère discret dans la gouttière) */
+    hasWarning?: boolean;
     contextMenuPos?: { x: number; y: number } | null;
-    /** Callback d'ouverture manuelle du menu contextuel */
     onOpenContextMenu?: (pos: { x: number; y: number }) => void;
-    /** Callback de fermeture du menu contextuel */
     onCloseContextMenu?: () => void;
-    /** Callbacks */
+    /** + : insérer une ligne en dessous et ouvrir le menu / */
+    onInsertBelow?: (anchorRect: DOMRect) => void;
+    /** Glisser-déposer via ⋮⋮ */
+    onDragStart?: (e: React.DragEvent) => void;
+    onDragEnd?: (e: React.DragEvent) => void;
     onEdit?: () => void;
     onDelete?: () => void;
     onDuplicate?: () => void;
@@ -59,120 +48,37 @@ export interface BlockGutterProps {
     onLockToggle?: () => void;
     onOpenFonts?: () => void;
     onOpenSettings?: () => void;
-    /** États pour menu contextuel */
+    /** Actions Lot E/F/G */
+    onRegenerate?: () => void;
+    onDetach?: () => void;
+    onRestoreGenerated?: () => void;
+    onChangeTextColor?: (color: string) => void;
+    onChangeTextAlign?: (align: 'left' | 'center' | 'right') => void;
+    onChangeMapSize?: (size: 'column' | 'wide' | 'full') => void;
+    onToggleMapAutoFrame?: () => void;
+    onOpenOnMap?: () => void;
     isLocked?: boolean;
     isSolutionView?: boolean;
     hasSolution?: boolean;
     navLanguage?: NavLanguage;
     pois?: Array<{ id: string; name: string; selected: boolean }>;
-    /** Ref pour le conteneur parent (pour positionnement menu) */
     containerRef?: React.RefObject<HTMLDivElement>;
-    /** Si le bloc est calculé depuis l'itinéraire */
     isComputedBlock?: boolean;
 }
 
-/**
- * Retourne l'icône et la couleur pour un type de bloc/module
- */
-function getBlockIndicator(blockType: BlockGutterProps['blockType'], blockData: CarnetStep, moduleId?: ModuleId, isTitle = false) {
-    const meta = moduleId ? MODULE_META[moduleId] : null;
-    const color = meta?.color || '#6b7280';
-    const font = CIPHER_FONTS[moduleId || ''] || 'monospace';
-    const size = CIPHER_FONT_SIZES[moduleId || ''] || '14px';
-
-    switch (blockType) {
-        case 'title':
-            return {
-                icon: <MessageSquarePlus size={11} color={isTitle ? 'var(--accent-hover)' : 'var(--text-dim)'} strokeWidth={2.4} />,
-                bg: isTitle ? 'rgba(37, 99, 235, 0.15)' : 'var(--bg-surface)',
-                border: isTitle ? '1px solid rgba(37, 99, 235, 0.35)' : '1px solid var(--border-subtle)',
-                tooltip: 'Titre du document'
-            };
-
-        case 'html':
-            return {
-                icon: <MessageSquarePlus size={11} color='var(--text-dim)' strokeWidth={2.4} />,
-                bg: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                tooltip: 'Commentaire'
-            };
-
-        case 'code':
-            // Icône spécifique au cipher
-            const cipherIcon = CIPHER_ICONS[moduleId || ''] || <Code2 size={11} color={color} strokeWidth={2.5} />;
-            return {
-                icon: cipherIcon,
-                bg: `${color}18`,
-                border: `1.5px solid ${color}55`,
-                tooltip: `Code ${meta?.label || moduleId}`
-            };
-
-        case 'computed':
-            // Pour les blocs calculés, montrer l'icône du module
-            if (moduleId) {
-                if (['carte_ign', 'carte_simple', 'drapeaux'].includes(moduleId)) {
-                    return {
-                        icon: <MapPin size={11} color={color} strokeWidth={2.4} />,
-                        bg: `${color}18`,
-                        border: `1.5px solid ${color}55`,
-                        tooltip: `Carte ${MODULE_META[moduleId]?.label || moduleId}`
-                    };
-                }
-                if (moduleId === 'gilwell') {
-                    return {
-                        icon: <Layers size={11} color={color} strokeWidth={2.4} />,
-                        bg: `${color}18`,
-                        border: `1.5px solid ${color}55`,
-                        tooltip: 'Gilwell'
-                    };
-                }
-                // Ciphers textuels
-                const cipherIcon = CIPHER_ICONS[moduleId] || <Code2 size={11} color={color} strokeWidth={2.5} />;
-                return {
-                    icon: cipherIcon,
-                    bg: `${color}18`,
-                    border: `1.5px solid ${color}55`,
-                    tooltip: `${MODULE_META[moduleId]?.label || moduleId} (calculé)`
-                };
-            }
-            return {
-                icon: <Code2 size={11} color={color} strokeWidth={2.5} />,
-                bg: `${color}18`,
-                border: `1.5px solid ${color}55`,
-                tooltip: 'Bloc calculé'
-            };
-
-        case 'map':
-            return {
-                icon: <MapPin size={11} color={color} strokeWidth={2.4} />,
-                bg: `${color}18`,
-                border: `1.5px solid ${color}55`,
-                tooltip: 'Carte'
-            };
-
-        default:
-            return {
-                icon: <Circle size={11} color='var(--text-dim)' strokeWidth={2} />,
-                bg: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                tooltip: 'Bloc'
-            };
-    }
-}
-
-/**
- * Gutter unifié - Colonne de gauche fixe pour tous les blocs
- */
 export default function BlockGutter({
     blockType,
     blockData,
-    moduleId,
     isSelected,
-    isTitle = false,
     isHovered = false,
+    isFocused = false,
+    hasWarning = false,
     contextMenuPos,
     onOpenContextMenu,
     onCloseContextMenu,
+    onInsertBelow,
+    onDragStart,
+    onDragEnd,
     onEdit,
     onDelete,
     onDuplicate,
@@ -189,19 +95,24 @@ export default function BlockGutter({
     onLockToggle,
     onOpenFonts,
     onOpenSettings,
+    onRegenerate,
+    onDetach,
+    onRestoreGenerated,
+    onChangeTextColor,
+    onChangeTextAlign,
+    onChangeMapSize,
+    onToggleMapAutoFrame,
+    onOpenOnMap,
     isLocked = false,
     isSolutionView = false,
     hasSolution = false,
     navLanguage,
     pois = [],
-    containerRef,
     isComputedBlock = false
 }: BlockGutterProps) {
-    const indicator = getBlockIndicator(blockType, blockData, moduleId, isTitle);
-    const meta = moduleId ? MODULE_META[moduleId] : null;
     const triggerRef = useRef<HTMLButtonElement>(null);
+    const plusBtnRef = useRef<HTMLButtonElement>(null);
 
-    // Déterminer les ciphers textuels disponibles
     const textualCiphers = useMemo(() =>
         ModuleManagementService.getAllModules()
             .filter(m =>
@@ -212,64 +123,136 @@ export default function BlockGutter({
         []
     );
 
-    const handleIconClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const showHandles = isHovered || isFocused || Boolean(contextMenuPos);
+
+    const handleMenuClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
         e.preventDefault();
         const rect = e.currentTarget.getBoundingClientRect();
         onOpenContextMenu?.({ x: rect.right + 6, y: rect.top });
     };
 
+    const handlePlusClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        onInsertBelow?.(rect);
+    };
+
+    const handleBtnStyle: React.CSSProperties = {
+        width: '18px',
+        minWidth: '18px',
+        height: '28px',
+        minHeight: '28px',
+        borderRadius: '5px',
+        background: 'transparent',
+        border: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--text-dim)',
+        cursor: 'pointer',
+        padding: 0,
+        transition: 'background 100ms ease, color 100ms ease',
+    };
+
     return (
         <div
             className="block-gutter"
             style={{
-                width: GUTTER_WIDTH,
-                marginRight: '12px',
+                width: `${GUTTER_WIDTH}px`,
+                minWidth: `${GUTTER_WIDTH}px`,
                 flexShrink: 0,
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                gap: '2px',
-                paddingTop: '2px',
+                justifyContent: 'flex-start',
+                gap: 0,
+                paddingRight: '4px',
+                boxSizing: 'border-box',
                 position: 'relative',
                 userSelect: 'none',
             }}
         >
-            {/* Icône interactive du module (clic ouvre les options synthétiques) */}
-            <button
-                type="button"
-                onClick={handleIconClick}
+            {/* Poignées + et ⋮⋮ : visibles au survol ou au focus (tactile), sans décaler le contenu */}
+            <div
                 style={{
-                    width: '22px',
-                    height: '22px',
-                    borderRadius: '6px',
-                    background: indicator.bg,
-                    border: indicator.border,
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    color: meta?.color || 'var(--text-dim)',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
-                    cursor: 'pointer',
-                    padding: 0,
-                    transition: 'transform 120ms ease, box-shadow 120ms ease',
+                    gap: 0,
+                    opacity: showHandles ? 1 : 0,
+                    pointerEvents: showHandles ? 'auto' : 'none',
+                    transition: 'opacity 110ms ease',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
-                onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
-                title={`${indicator.tooltip} — Clic pour les options`}
             >
-                {indicator.icon}
-            </button>
+                <button
+                    ref={plusBtnRef}
+                    type="button"
+                    aria-label="Insérer un bloc en dessous"
+                    title="Cliquer pour insérer en dessous"
+                    onClick={handlePlusClick}
+                    style={handleBtnStyle}
+                    onMouseEnter={e => {
+                        e.currentTarget.style.background = 'var(--bg-hover)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                    }}
+                    onMouseLeave={e => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-dim)';
+                    }}
+                >
+                    <Plus size={14} strokeWidth={2.2} />
+                </button>
 
-            {/* Icône de synchronisation avec l'itinéraire */}
-            {isComputedBlock && (
-                <div title="Synchronisé avec l'itinéraire" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1px', opacity: 0.4 }}>
-                    <Link2 size={8} color="var(--text-dim)" strokeWidth={2} />
+                <button
+                    ref={triggerRef}
+                    type="button"
+                    aria-label="Menu du bloc et déplacement"
+                    title="Glisser pour déplacer · Cliquer pour les options"
+                    draggable={Boolean(onDragStart)}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                    onClick={handleMenuClick}
+                    style={{
+                        ...handleBtnStyle,
+                        cursor: onDragStart ? 'grab' : 'pointer',
+                    }}
+                    onMouseEnter={e => {
+                        e.currentTarget.style.background = 'var(--bg-hover)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                    }}
+                    onMouseLeave={e => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-dim)';
+                    }}
+                >
+                    <GripVertical size={14} strokeWidth={2.1} />
+                </button>
+            </div>
+
+            {/* Pastilles d'alerte retirées pour le moment */}
+
+            {/* Indicateur de multi-sélection */}
+            {isSelected && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        right: '8px',
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '4px',
+                        background: 'var(--accent-default)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#ffffff',
+                        pointerEvents: 'none',
+                    }}
+                    title="Bloc sélectionné"
+                >
+                    <Check size={10} strokeWidth={3} />
                 </div>
             )}
 
-            {/* Menu contextuel unifié (sans bouton 3 points visible, activable par clic icône, clic droit ou appui long) */}
             <UnifiedContextMenu
                 blockType={blockType}
                 blockId={blockData.id}
@@ -295,36 +278,22 @@ export default function BlockGutter({
                 onLockToggle={onLockToggle}
                 onOpenFontSelector={onOpenFonts}
                 onOpenSettings={onOpenSettings}
+                onRegenerate={onRegenerate}
+                onDetach={onDetach}
+                onRestoreGenerated={onRestoreGenerated}
+                onChangeTextColor={onChangeTextColor}
+                onChangeTextAlign={onChangeTextAlign}
+                onChangeMapSize={onChangeMapSize}
+                onToggleMapAutoFrame={onToggleMapAutoFrame}
+                onOpenOnMap={onOpenOnMap}
                 isLocked={isLocked}
                 isSolutionView={isSolutionView}
                 hasSolution={hasSolution}
                 navLanguage={navLanguage}
                 pois={pois}
                 isHovered={isHovered}
+                isComputedBlock={isComputedBlock}
             />
-
-            {/* Indicateur de sélection (check) */}
-            {isSelected && (
-                <div
-                    style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '5px',
-                        background: 'var(--accent-default)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#ffffff',
-                        marginTop: '2px',
-                    }}
-                    title="Bloc sélectionné"
-                >
-                    <Check size={11} strokeWidth={3} />
-                </div>
-            )}
         </div>
     );
 }
-
-// Re-export pour utilisation dans d'autres composants
-export { getBlockIndicator };

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Marker, Tooltip } from 'react-leaflet';
+import { Marker } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
 import { backgroundEngine } from '../../logic/BackgroundEngine';
 import { Stage } from '../../logic/types';
 import { layerPaneName } from '../../logic/LayerOrder';
+import { setMapHoverHint, clearMapHoverHint } from './mapHoverHint';
 
 // ── Per-stage marker — isolated in React.memo so parent re-renders
 // (e.g. setCursorPos on mousemove) don't unbind/rebind Leaflet event
@@ -92,6 +93,23 @@ const StageMarker = React.memo(function StageMarker({
         onRemove(idx);
     }, [idx, onRemove]);
 
+    const handleMouseOver = useCallback(() => {
+        const parts: string[] = [];
+        if (activeTool === 'route' || activeTool === 'route_direct') {
+            parts.push(isAnchored ? 'Clic : désancrer' : 'Clic : ancrer');
+        }
+        if (isMovable) parts.push('Glisser : déplacer');
+        parts.push('Clic droit : supprimer');
+        setMapHoverHint({
+            action: parts.join(' · '),
+            accent: dotColor,
+        });
+    }, [isAnchored, isMovable, activeTool, dotColor]);
+
+    const handleMouseOut = useCallback(() => {
+        clearMapHoverHint();
+    }, []);
+
     // Stable eventHandlers object — only changes when handlers change,
     // which only happens when their dependencies (primitives) change.
     const eventHandlers = React.useMemo(() => ({
@@ -99,7 +117,9 @@ const StageMarker = React.memo(function StageMarker({
         dragend: handleDragEnd,
         click: handleClick,
         contextmenu: handleContextMenu,
-    }), [handleDragStart, handleDragEnd, handleClick, handleContextMenu]);
+        mouseover: handleMouseOver,
+        mouseout: handleMouseOut,
+    }), [handleDragStart, handleDragEnd, handleClick, handleContextMenu, handleMouseOver, handleMouseOut]);
 
     return (
         <Marker
@@ -109,23 +129,7 @@ const StageMarker = React.memo(function StageMarker({
             zIndexOffset={isHighlighted ? 15010 : isAnchored ? 15001 : 15000}
             draggable={isMovable}
             eventHandlers={eventHandlers}
-        >
-            <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
-                <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
-                    <b style={{ color: dotColor }}>Étape {stage.label}</b>
-                    {stage.address ? <div style={{ fontSize: '9px', color: '#cbd5e1', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stage.address}</div> : null}
-                    <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>
-                        {isAnchored ? (
-                            <span style={{ color: '#60a5fa' }}>Clic : désancrer · </span>
-                        ) : (activeTool === 'route' || activeTool === 'route_direct') ? (
-                            <span style={{ color: '#6ee7b7' }}>Clic : ancrer pour insérer · </span>
-                        ) : null}
-                        {isMovable ? 'Glisser : déplacer · ' : ''}
-                        Clic droit : supprimer
-                    </div>
-                </div>
-            </Tooltip>
-        </Marker>
+        />
     );
 });
 

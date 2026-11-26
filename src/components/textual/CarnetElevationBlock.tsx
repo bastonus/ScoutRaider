@@ -1,12 +1,9 @@
 /**
- * CarnetElevationBlock.tsx — Visual Elevation Profile Block for the Carnet de Route.
- * Displays D+, D-, min/max altitudes, Naismith march duration, and responsive SVG graph.
- *
- * Intégré directement dans le flux du document SANS contours ni fonds isolants,
- * avec un switch discret dans la marge pour l'inclure ou le griser.
+ * CarnetElevationBlock.tsx — Bloc de profil altimétrique épuré façon Notion.
+ * Masqué par défaut ; activable depuis la barre d'actions discrète du titre.
  */
 import React, { useEffect, useState, useMemo } from 'react';
-import { Mountain, ArrowUpRight, ArrowDownRight, Clock, RefreshCw } from 'lucide-react';
+import { Mountain, RefreshCw, X } from 'lucide-react';
 import { useCarnet, useRoutes } from '../../hooks';
 import { ElevationService, ElevationProfileResult } from '../../logic/ElevationService';
 
@@ -16,10 +13,10 @@ export default function CarnetElevationBlock() {
     const [profile, setProfile] = useState<ElevationProfileResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [hovered, setHovered] = useState(false);
 
-    const isIncluded = carnetIncludeElevationProfile !== false;
+    const isIncluded = carnetIncludeElevationProfile === true;
 
-    // Extract all route coordinates in [lon, lat] format
     const allCoordsLonLat = useMemo(() => {
         const coords: [number, number][] = [];
         if (routes && routes.length > 0) {
@@ -51,14 +48,13 @@ export default function CarnetElevationBlock() {
     const stagesForProfile = useMemo(() => {
         return (stages || []).map(s => ({
             label: s.label,
-            coords: s.coords // [lat, lon]
+            coords: s.coords
         }));
     }, [stages]);
 
     useEffect(() => {
         let active = true;
-        if (!allCoordsLonLat || allCoordsLonLat.length < 2) {
-            setProfile(null);
+        if (!isIncluded || !allCoordsLonLat || allCoordsLonLat.length < 2) {
             return;
         }
 
@@ -67,9 +63,7 @@ export default function CarnetElevationBlock() {
             setError(null);
             try {
                 const res = await ElevationService.computeProfile(allCoordsLonLat, 'lonlat', stagesForProfile);
-                if (active) {
-                    setProfile(res);
-                }
+                if (active) setProfile(res);
             } catch (err: any) {
                 if (active) setError(err.message || 'Erreur altimétrie');
             } finally {
@@ -79,218 +73,125 @@ export default function CarnetElevationBlock() {
 
         fetchElevation();
         return () => { active = false; };
-    }, [allCoordsLonLat, stagesForProfile]);
+    }, [isIncluded, allCoordsLonLat, stagesForProfile]);
 
-    if (!allCoordsLonLat || allCoordsLonLat.length < 2) {
+    // Masqué par défaut ou si aucun tracé suffisant
+    if (!isIncluded || !allCoordsLonLat || allCoordsLonLat.length < 2) {
         return null;
     }
 
-    const accentCyan = '#06b6d4';
-    const accentGreen = '#5cbd6e';
-    const isSolution = carnetView === 'solution';
+    const accentColor = carnetView === 'solution' ? '#f87171' : '#60a5fa';
 
     return (
-        <div style={{
-            margin: '8px 0 28px 0',
-            background: 'transparent',
-            border: 'none',
-            boxShadow: 'none',
-            boxSizing: 'border-box',
-            width: '100%',
-        }}>
-            {/* ── Contrôles discrets dans la marge (switch & chargement) sans stroke ni titre ── */}
+        <div
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={{
+                margin: '4px 0 20px 0',
+                padding: 0,
+                background: 'transparent',
+                border: 'none',
+                borderRadius: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+                position: 'relative',
+            }}
+        >
+            {/* En-tête sobre : titre + métriques en ligne + bouton masquer au survol */}
             <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'flex-end',
-                padding: '2px 0 6px 0',
+                justifyContent: 'space-between',
                 gap: '12px',
+                marginBottom: '10px',
                 flexWrap: 'wrap',
-                marginBottom: '10px'
             }}>
-                {loading && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: accentCyan }}>
-                        <RefreshCw size={12} className="spin" />
-                        <span style={{ fontSize: '10.5px' }}>Calcul altimétrie...</span>
-                    </div>
-                )}
-
-                {/* Switch discret */}
-                <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isIncluded}
-                    onClick={() => dispatch({ type: 'TOGGLE_ELEVATION_PROFILE' })}
-                    style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '7px',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '2px 0',
-                        userSelect: 'none'
-                    }}
-                    title={isIncluded ? "Masquer le profil altimétrique" : "Afficher le profil altimétrique"}
-                >
-                    <div style={{
-                        width: '30px',
-                        height: '16px',
-                        borderRadius: '8px',
-                        background: isIncluded ? 'var(--accent-default)' : 'var(--bg-hover)',
-                        border: 'none',
-                        position: 'relative',
-                        transition: 'all 150ms ease',
-                        flexShrink: 0
-                    }}>
-                        <div style={{
-                            position: 'absolute',
-                            top: '2px',
-                            left: isIncluded ? '16px' : '2px',
-                            width: '12px',
-                            height: '12px',
-                            borderRadius: '50%',
-                            background: isIncluded ? '#ffffff' : 'var(--text-dim)',
-                            transition: 'all 150ms ease',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
-                        }} />
-                    </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                    <Mountain size={14} color="var(--text-dim)" style={{ flexShrink: 0 }} />
                     <span style={{
-                        fontSize: '11px',
+                        fontSize: '12.5px',
                         fontWeight: 600,
                         color: 'var(--text-primary)',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
                     }}>
                         Profil altimétrique
                     </span>
-                </button>
-            </div>
+                    {loading && <RefreshCw size={12} className="spin" color="var(--text-dim)" />}
+                </div>
 
-            {/* ── Contenu altimétrique sans fond isolant ni strokes ── */}
-            <div style={{
-                opacity: isIncluded ? 1 : 0.35,
-                filter: isIncluded ? 'none' : 'grayscale(0.95)',
-                transition: 'all 200ms ease'
-            }}>
-                {error ? (
-                    <div style={{ color: 'var(--semantic-danger)', fontSize: '12px', padding: '6px 0' }}>
-                        ⚠️ Impossible de charger les données altimétriques : {error}
-                    </div>
-                ) : profile ? (
-                    <div>
-                        {/* Metrics summary badges */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {profile && (
                         <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                            gap: '8px',
-                            marginBottom: '12px'
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            fontSize: '12px',
+                            fontFamily: 'var(--font-mono)',
+                            fontVariantNumeric: 'tabular-nums',
+                            color: 'var(--text-secondary)',
+                            flexWrap: 'wrap',
                         }}>
-                            {/* D+ Ascent */}
-                            <div style={{
-                                background: 'var(--bg-hover)',
-                                border: 'none',
-                                borderRadius: 'var(--radius-xs)',
-                                padding: '6px 10px',
-                                display: 'flex', alignItems: 'center', gap: '8px'
-                            }}>
-                                <ArrowUpRight size={15} color={accentGreen} />
-                                <div>
-                                    <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-                                        Dénivelé +
-                                    </div>
-                                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                                        +{profile.ascend_m} m
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* D- Descent */}
-                            <div style={{
-                                background: 'var(--bg-hover)',
-                                border: 'none',
-                                borderRadius: 'var(--radius-xs)',
-                                padding: '6px 10px',
-                                display: 'flex', alignItems: 'center', gap: '8px'
-                            }}>
-                                <ArrowDownRight size={15} color="#38bdf8" />
-                                <div>
-                                    <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-                                        Dénivelé -
-                                    </div>
-                                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                                        -{profile.descend_m} m
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Altitude Range */}
-                            <div style={{
-                                background: 'var(--bg-hover)',
-                                border: 'none',
-                                borderRadius: 'var(--radius-xs)',
-                                padding: '6px 10px',
-                                display: 'flex', alignItems: 'center', gap: '8px'
-                            }}>
-                                <Mountain size={15} color="#fbbf24" />
-                                <div>
-                                    <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-                                        Alt. Min / Max
-                                    </div>
-                                    <div style={{ fontSize: '12.5px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                                        {profile.min_alt_m}m / {profile.max_alt_m}m
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Estimated March Duration */}
-                            <div style={{
-                                background: 'var(--bg-hover)',
-                                border: 'none',
-                                borderRadius: 'var(--radius-xs)',
-                                padding: '6px 10px',
-                                display: 'flex', alignItems: 'center', gap: '8px'
-                            }}>
-                                <Clock size={15} color="#c084fc" />
-                                <div>
-                                    <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-                                        Temps scout
-                                    </div>
-                                    <div style={{ fontSize: '12.5px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                                        {Math.floor(profile.estimated_duration_min / 60)}h {String(profile.estimated_duration_min % 60).padStart(2, '0')}
-                                    </div>
-                                </div>
-                            </div>
+                            <span>D+ <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>+{profile.ascend_m} m</strong></span>
+                            <span>D− <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>−{profile.descend_m} m</strong></span>
+                            <span>{profile.min_alt_m}–{profile.max_alt_m} m</span>
+                            <span>{Math.floor(profile.estimated_duration_min / 60)}h{String(profile.estimated_duration_min % 60).padStart(2, '0')}</span>
                         </div>
+                    )}
 
-                        {/* Interactive SVG Profile */}
-                        <div
-                            style={{
-                                width: '100%',
-                                background: 'transparent',
-                                border: 'none',
-                                borderRadius: 'var(--radius-xs)',
-                                padding: '4px 0',
-                                overflowX: 'auto',
-                                WebkitOverflowScrolling: 'touch',
-                                boxSizing: 'border-box'
-                            }}
-                            dangerouslySetInnerHTML={{
-                                __html: ElevationService.generateSvg(profile, {
-                                    width: 760,
-                                    height: 150,
-                                    accentColor: isSolution ? '#f87171' : accentCyan,
-                                    textColor: '#94a3b8',
-                                    isDarkTheme: true
-                                })
-                            }}
-                        />
-                    </div>
-                ) : (
-                    <div style={{ textAlign: 'center', padding: '12px', color: 'var(--text-dim)', fontSize: '12px' }}>
-                        Chargement de l'altimétrie IGN en cours...
-                    </div>
-                )}
+                    <button
+                        type="button"
+                        onClick={() => dispatch({ type: 'TOGGLE_ELEVATION_PROFILE' })}
+                        title="Masquer le profil altimétrique"
+                        aria-label="Masquer le profil altimétrique"
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '5px',
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--text-dim)',
+                            cursor: 'pointer',
+                            opacity: hovered ? 1 : 0,
+                            transition: 'opacity 120ms ease, background 100ms ease',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dim)'; }}
+                    >
+                        <X size={13} />
+                    </button>
+                </div>
             </div>
+
+            {error ? (
+                <div style={{ color: 'var(--semantic-danger)', fontSize: '12px', padding: '4px 0' }}>
+                    Impossible de charger les données altimétriques : {error}
+                </div>
+            ) : profile ? (
+                <div
+                    style={{
+                        width: '100%',
+                        overflowX: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        boxSizing: 'border-box',
+                    }}
+                    dangerouslySetInnerHTML={{
+                        __html: ElevationService.generateSvg(profile, {
+                            width: 720,
+                            height: 140,
+                            accentColor,
+                            textColor: '#94a3b8',
+                            isDarkTheme: true,
+                        })
+                    }}
+                />
+            ) : (
+                <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-dim)', fontSize: '12px' }}>
+                    Chargement de l'altimétrie…
+                </div>
+            )}
         </div>
     );
 }

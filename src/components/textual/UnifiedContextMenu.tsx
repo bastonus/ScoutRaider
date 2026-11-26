@@ -7,12 +7,15 @@
  * - Appui long (500ms) sur mobile / tactile
  */
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
     MoreVertical, Edit2, Trash2, Copy, MoveUp, MoveDown,
     Lock, Unlock, Eye, EyeOff, Palette, MapPin, Check,
     Waves, Key, Grid, Hash, Flag, RotateCcw, Minus, Type, Layers, Code2
 } from 'lucide-react';
 import { ModuleManagementService } from '../../logic/ModuleManagementService';
+import { themeManager } from '../../logic/ThemeManager';
+import { useApp } from '../../AppContext';
 import type { ModuleId, NavLanguage } from '../../logic/types';
 
 export interface UnifiedContextMenuProps {
@@ -45,6 +48,15 @@ export interface UnifiedContextMenuProps {
     onLockToggle?: () => void;
     onOpenFontSelector?: () => void;
     onOpenSettings?: () => void;
+    onRegenerate?: () => void;
+    onDetach?: () => void;
+    onRestoreGenerated?: () => void;
+    onChangeTextColor?: (color: string) => void;
+    onChangeTextAlign?: (align: 'left' | 'center' | 'right') => void;
+    onChangeMapSize?: (size: 'column' | 'wide' | 'full') => void;
+    onToggleMapAutoFrame?: () => void;
+    onOpenOnMap?: () => void;
+    isComputedBlock?: boolean;
     onClose?: () => void;
 }
 
@@ -84,32 +96,61 @@ export default function UnifiedContextMenu({
     onToggleSolution,
     onLockToggle,
     onOpenFontSelector,
+    onRegenerate,
+    onDetach,
+    onRestoreGenerated,
+    onChangeTextColor,
+    onChangeTextAlign,
+    onChangeMapSize,
+    onToggleMapAutoFrame,
+    onOpenOnMap,
+    isComputedBlock = false,
     onClose
 }: UnifiedContextMenuProps) {
+    const { state, dispatch } = useApp();
     const [isOpen, setIsOpen] = useState(false);
+    const [showAdvancedCodes, setShowAdvancedCodes] = useState(false);
     const [menuCoords, setMenuCoords] = useState<{ x: number; y: number } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const triggerButtonRef = useRef<HTMLButtonElement>(null);
 
     const currentCipher = blockData?.moduleId as ModuleId | undefined;
+    const themeIds = useMemo(() => {
+        try {
+            return themeManager.getThemeIds();
+        } catch {
+            return ['Neutre'];
+        }
+    }, [isOpen]);
 
-    // Chargement dynamique des ciphers depuis la bibliothèque personnelle
-    const dynamicCiphers = useMemo(() => {
+    // Chargement dynamique de tous les ciphers (standards + codes avancés)
+    const { standardCiphers, advancedCiphers } = useMemo(() => {
+        const STANDARD_IDS = new Set(['morse', 'vigenere', 'avocat', 'cassis', 'polybe', 'templier', 'maritime', 'texte_clair']);
         const managedModules = ModuleManagementService.getAllModules();
         const textualModules = managedModules.filter(m =>
             m.resource_type === 'crypto_module' &&
             !['map_path', 'elevation_profile', 'map_overview'].includes(m.data_capability || '')
         );
-        return textualModules.map(m => ({
+        const mapped = textualModules.map(m => ({
             id: m.id as ModuleId,
-            label: m.name.length > 10 ? m.name.split(' ')[0] : m.name,
+            label: m.name.length > 14 ? m.name.split(' ')[0] : m.name,
+            fullName: m.name,
             color: m.color || '#6b7280',
+            isAdvanced: !STANDARD_IDS.has(m.id),
         }));
+        return {
+            standardCiphers: mapped.filter(c => !c.isAdvanced),
+            advancedCiphers: mapped.filter(c => c.isAdvanced),
+        };
     }, []);
+    const dynamicCiphers = useMemo(() => [...standardCiphers, ...advancedCiphers], [standardCiphers, advancedCiphers]);
+
+    const menuInstanceId = useRef(`ctx-${Math.random().toString(36).slice(2)}`);
 
     // Synchronisation si ouverture par anchorPosition externe (clic droit ou long press)
     useEffect(() => {
         if (anchorPosition) {
+            window.dispatchEvent(new CustomEvent('textual:close-menus', { detail: { except: menuInstanceId.current } }));
             setMenuCoords(anchorPosition);
             setIsOpen(true);
         }
@@ -121,7 +162,7 @@ export default function UnifiedContextMenu({
         onClose?.();
     };
 
-    // Clic extérieur ou touche Échap pour fermer
+    // Clic extérieur, Échap, défilement, ou ouverture d'un autre menu
     useEffect(() => {
         if (!isOpen) return;
         const handleOutside = (e: MouseEvent | TouchEvent) => {
@@ -132,13 +173,25 @@ export default function UnifiedContextMenu({
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') handleClose();
         };
+        const handleScroll = (e: Event) => {
+            if (menuRef.current && menuRef.current.contains(e.target as Node)) return;
+            handleClose();
+        };
+        const handleCloseOthers = (e: Event) => {
+            const except = (e as CustomEvent).detail?.except;
+            if (except !== menuInstanceId.current) handleClose();
+        };
         document.addEventListener('mousedown', handleOutside);
         document.addEventListener('touchstart', handleOutside);
         document.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('textual:close-menus', handleCloseOthers);
         return () => {
             document.removeEventListener('mousedown', handleOutside);
             document.removeEventListener('touchstart', handleOutside);
             document.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('textual:close-menus', handleCloseOthers);
         };
     }, [isOpen]);
 
@@ -220,19 +273,31 @@ export default function UnifiedContextMenu({
         >
             {showTriggerButton && triggerButton}
 
-            {isOpen && (
+            {isOpen && typeof document !== 'undefined' && createPortal(
                 <div
                     ref={menuRef}
-                    style={getComputedPosition()}
+                    role="menu"
+                    aria-label={`Options du bloc (${blockType})`}
+                    style={{ ...getComputedPosition(), zIndex: 99999 }}
                     onMouseDown={e => e.stopPropagation()}
                     onTouchStart={e => e.stopPropagation()}
+                    onKeyDown={e => {
+                        if (e.key === 'Escape') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleClose();
+                        }
+                    }}
                 >
                     <div style={{
                         width: '284px',
+                        maxHeight: '420px',
+                        overflowY: 'auto',
+                        overscrollBehavior: 'contain',
                         background: 'var(--bg-elevated)',
-                        border: '1px solid var(--border-strong)',
-                        borderRadius: '12px',
-                        boxShadow: 'var(--shadow-lg)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: '10px',
+                        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.45)',
                         padding: '6px',
                         display: 'flex',
                         flexDirection: 'column',
@@ -241,7 +306,30 @@ export default function UnifiedContextMenu({
                         userSelect: 'none',
                         boxSizing: 'border-box',
                     }}>
-                        {/* 1. BARRE D'ACTIONS RAPIDES (Éditer, Dupliquer, Monter, Descendre, Copier, Supprimer) */}
+                        {/* En-tête : type du bloc (puisque l'icône de gouttière permanente est retirée) */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '2px 6px 4px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: 'var(--text-dim)',
+                            borderBottom: '1px solid var(--border-subtle)',
+                        }}>
+                            <span>
+                                {blockType === 'html' ? 'Texte libre'
+                                    : blockType === 'map' ? 'Carte'
+                                    : blockType === 'code' ? `Code (${currentCipher || 'chiffré'})`
+                                    : isComputedBlock ? `Texte guidé (${currentCipher || 'clair'})`
+                                    : 'Bloc'}
+                            </span>
+                            {blockData?.isEdited && (
+                                <span style={{ fontSize: '11px', color: 'var(--accent-hover)' }}>Modifié</span>
+                            )}
+                        </div>
+
+                        {/* 1. BARRE D'ACTIONS COMMUNES (Dupliquer, Déplacer, Supprimer) */}
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -253,6 +341,7 @@ export default function UnifiedContextMenu({
                         }}>
                             {onEdit && (
                                 <button
+                                    role="menuitem"
                                     type="button"
                                     onClick={() => { onEdit(); handleClose(); }}
                                     title="Éditer le texte"
@@ -265,9 +354,10 @@ export default function UnifiedContextMenu({
                             )}
                             {onDuplicate && (
                                 <button
+                                    role="menuitem"
                                     type="button"
                                     onClick={() => { onDuplicate(); handleClose(); }}
-                                    title="Dupliquer l'étape"
+                                    title="Dupliquer"
                                     style={quickBtnStyle}
                                     onMouseEnter={quickBtnHover}
                                     onMouseLeave={quickBtnUnhover}
@@ -277,9 +367,10 @@ export default function UnifiedContextMenu({
                             )}
                             {onMoveUp && (
                                 <button
+                                    role="menuitem"
                                     type="button"
                                     onClick={() => { onMoveUp(); handleClose(); }}
-                                    title="Monter d'un rang"
+                                    title="Monter (Alt+Maj+↑)"
                                     style={quickBtnStyle}
                                     onMouseEnter={quickBtnHover}
                                     onMouseLeave={quickBtnUnhover}
@@ -289,9 +380,10 @@ export default function UnifiedContextMenu({
                             )}
                             {onMoveDown && (
                                 <button
+                                    role="menuitem"
                                     type="button"
                                     onClick={() => { onMoveDown(); handleClose(); }}
-                                    title="Descendre d'un rang"
+                                    title="Descendre (Alt+Maj+↓)"
                                     style={quickBtnStyle}
                                     onMouseEnter={quickBtnHover}
                                     onMouseLeave={quickBtnUnhover}
@@ -302,14 +394,13 @@ export default function UnifiedContextMenu({
                             <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)', margin: '0 2px' }} />
                             {onDelete && (
                                 <button
+                                    role="menuitem"
                                     type="button"
                                     onClick={() => {
-                                        if (window.confirm('Supprimer cette étape ?')) {
-                                            onDelete();
-                                            handleClose();
-                                        }
+                                        onDelete();
+                                        handleClose();
                                     }}
-                                    title="Supprimer l'étape"
+                                    title={isComputedBlock ? 'Masquer ce bloc (Annuler disponible)' : 'Supprimer'}
                                     style={{ ...quickBtnStyle, color: '#ef4444' }}
                                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)')}
                                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -319,26 +410,185 @@ export default function UnifiedContextMenu({
                             )}
                         </div>
 
-                        {/* 2. SÉLECTEUR SYNTHÉTIQUE DE CHIFFREMENT (Grille compacte 4×2) */}
+                        {/* Entrées propres : Texte libre (Couleur, Alignement) */}
+                        {blockType === 'html' && (onChangeTextColor || onChangeTextAlign) && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {onChangeTextColor && (
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Couleur</span>
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                            {['var(--text-primary)', '#a1a1aa', '#60a5fa', '#4ade80', '#fbbf24', '#f87171'].map(c => (
+                                                <button
+                                                    key={c}
+                                                    role="menuitem"
+                                                    type="button"
+                                                    aria-label={`Couleur ${c}`}
+                                                    onClick={() => { onChangeTextColor(c); handleClose(); }}
+                                                    style={{
+                                                        width: '16px', height: '16px', borderRadius: '50%',
+                                                        background: c, border: '1px solid var(--border-strong)', cursor: 'pointer', padding: 0,
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {onChangeTextAlign && (
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Alignement</span>
+                                        <div style={{ display: 'flex', gap: '3px' }}>
+                                            {(['left', 'center', 'right'] as const).map(a => (
+                                                <button
+                                                    key={a}
+                                                    role="menuitem"
+                                                    type="button"
+                                                    onClick={() => { onChangeTextAlign(a); handleClose(); }}
+                                                    style={{
+                                                        padding: '2px 7px', borderRadius: '5px', fontSize: '12px',
+                                                        border: '1px solid var(--border-subtle)',
+                                                        background: blockData?.textAlign === a ? 'var(--bg-hover)' : 'transparent',
+                                                        color: 'var(--text-primary)', cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    {a === 'left' ? 'Gauche' : a === 'center' ? 'Centre' : 'Droite'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Entrées propres : Texte guidé (généré) */}
+                        {isComputedBlock && (blockType === 'computed' || blockType === 'code') && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                {onRegenerate && (
+                                    <button
+                                        role="menuitem"
+                                        type="button"
+                                        onClick={() => { onRegenerate(); handleClose(); }}
+                                        style={rowItemStyle}
+                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                    >
+                                        <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>Régénérer</span>
+                                    </button>
+                                )}
+                                {onDetach && (
+                                    <button
+                                        role="menuitem"
+                                        type="button"
+                                        onClick={() => { onDetach(); handleClose(); }}
+                                        style={rowItemStyle}
+                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                    >
+                                        <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>Détacher (convertir en bloc libre)</span>
+                                    </button>
+                                )}
+                                {blockData?.isEdited && onRestoreGenerated && (
+                                    <button
+                                        role="menuitem"
+                                        type="button"
+                                        onClick={() => { onRestoreGenerated(); handleClose(); }}
+                                        style={rowItemStyle}
+                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                    >
+                                        <span style={{ fontSize: '12px', color: 'var(--accent-hover)' }}>Restaurer le texte généré</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Entrées propres : Carte (Taille, Cadrage, Ouvrir) */}
+                        {blockType === 'map' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {onChangeMapSize && (
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Taille</span>
+                                        <div style={{ display: 'flex', gap: '3px' }}>
+                                            {([
+                                                { id: 'column', label: 'Colonne' },
+                                                { id: 'wide', label: 'Large' },
+                                                { id: 'full', label: 'Plein' },
+                                            ] as const).map(sz => (
+                                                <button
+                                                    key={sz.id}
+                                                    role="menuitem"
+                                                    type="button"
+                                                    onClick={() => { onChangeMapSize(sz.id); handleClose(); }}
+                                                    style={{
+                                                        padding: '2px 7px', borderRadius: '5px', fontSize: '12px',
+                                                        border: '1px solid var(--border-subtle)',
+                                                        background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    {sz.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {onToggleMapAutoFrame && (
+                                    <button
+                                        role="menuitem"
+                                        type="button"
+                                        onClick={() => { onToggleMapAutoFrame(); handleClose(); }}
+                                        style={rowItemStyle}
+                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                    >
+                                        <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>Cadrage : auto sur l'étape / libre</span>
+                                    </button>
+                                )}
+                                {onOpenOnMap && (
+                                    <button
+                                        role="menuitem"
+                                        type="button"
+                                        onClick={() => { onOpenOnMap(); handleClose(); }}
+                                        style={rowItemStyle}
+                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                    >
+                                        <span style={{ fontSize: '12px', color: 'var(--accent-hover)' }}>Ouvrir sur la carte</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 2. CHIFFREMENT MIS EN AVANT (codes standards + codes avancés) */}
                         {(blockType === 'code' || blockType === 'computed') && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                <div style={sectionLabelStyle}>Chiffrement</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.06)', border: '1px solid rgba(59, 130, 246, 0.16)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div style={{ ...sectionLabelStyle, color: 'var(--accent-hover)' }}>Chiffrement & Codes</div>
+                                    {advancedCiphers.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAdvancedCodes(v => !v)}
+                                            style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', fontSize: '11px', cursor: 'pointer', padding: '0 2px' }}
+                                        >
+                                            {showAdvancedCodes ? 'Masquer avancés' : `+ ${advancedCiphers.length} avancés`}
+                                        </button>
+                                    )}
+                                </div>
                                 <div style={{
                                     display: 'grid',
                                     gridTemplateColumns: 'repeat(4, 1fr)',
                                     gap: '3px',
                                 }}>
-                                    {dynamicCiphers.map(c => {
+                                    {(showAdvancedCodes ? dynamicCiphers : standardCiphers).map(c => {
                                         const isCurrent = c.id === currentCipher;
                                         return (
                                             <button
                                                 key={c.id}
+                                                role="menuitem"
                                                 type="button"
                                                 onClick={() => {
                                                     onChangeCipher?.(c.id);
                                                     handleClose();
                                                 }}
-                                                title={`Chiffrement ${c.label}`}
+                                                title={`Chiffrement ${c.fullName}`}
                                                 style={{
                                                     display: 'flex',
                                                     flexDirection: 'column',
@@ -350,7 +600,7 @@ export default function UnifiedContextMenu({
                                                     background: isCurrent ? `${c.color}20` : 'transparent',
                                                     color: isCurrent ? c.color : 'var(--text-primary)',
                                                     cursor: 'pointer',
-                                                    fontSize: '10px',
+                                                    fontSize: '10.5px',
                                                     fontWeight: isCurrent ? 700 : 500,
                                                     transition: 'all 80ms ease',
                                                 }}
@@ -372,26 +622,65 @@ export default function UnifiedContextMenu({
                             </div>
                         )}
 
-                        {/* Pour commentaire HTML : Option de conversion rapide en bloc chiffré */}
+                        {/* Thème narratif appliqué à l'ensemble des phrases générées */}
+                        {blockType === 'computed' && themeIds.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={sectionLabelStyle}>Thème (toutes les phrases générées)</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                                    {themeIds.map(tId => {
+                                        const isActive = state.theme_id === tId;
+                                        return (
+                                            <button
+                                                key={tId}
+                                                role="menuitem"
+                                                type="button"
+                                                onClick={() => {
+                                                    dispatch({ type: 'SET_THEME', themeId: tId });
+                                                    handleClose();
+                                                }}
+                                                style={{
+                                                    padding: '3px 8px',
+                                                    borderRadius: '6px',
+                                                    border: isActive ? '1px solid var(--accent-default)' : '1px solid var(--border-subtle)',
+                                                    background: isActive ? 'var(--accent-transparent)' : 'transparent',
+                                                    color: isActive ? 'var(--accent-hover)' : 'var(--text-primary)',
+                                                    fontSize: '11.5px',
+                                                    fontWeight: isActive ? 600 : 400,
+                                                    cursor: 'pointer',
+                                                }}
+                                                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                                            >
+                                                {tId}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Pour texte libre : Chiffrer / Convertir en code (tous les codes) */}
                         {blockType === 'html' && onConvertToCode && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                <div style={sectionLabelStyle}>Convertir en message chiffré</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.06)', border: '1px solid rgba(59, 130, 246, 0.16)' }}>
+                                <div style={{ ...sectionLabelStyle, color: 'var(--accent-hover)' }}>Chiffrer avec un code</div>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '3px' }}>
-                                    {dynamicCiphers.slice(0, 4).map(c => (
+                                    {dynamicCiphers.map(c => (
                                         <button
                                             key={c.id}
+                                            role="menuitem"
                                             type="button"
                                             onClick={() => { onConvertToCode(c.id); handleClose(); }}
+                                            title={c.fullName}
                                             style={{
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
                                                 padding: '4px', borderRadius: '6px', border: '1px solid var(--border-subtle)',
-                                                background: 'transparent', color: c.color, fontSize: '10px', fontWeight: 600, cursor: 'pointer'
+                                                background: 'transparent', color: c.color, fontSize: '10.5px', fontWeight: 600, cursor: 'pointer'
                                             }}
                                             onMouseEnter={e => (e.currentTarget.style.background = `${c.color}15`)}
                                             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                         >
                                             <Code2 size={11} color={c.color} strokeWidth={2.4} />
-                                            <span>{c.label}</span>
+                                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.label}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -527,7 +816,8 @@ export default function UnifiedContextMenu({
                             )}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

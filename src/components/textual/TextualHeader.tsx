@@ -288,7 +288,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
     };
 
     const cipherBadgeStyle: React.CSSProperties = {
-        fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700,
+        fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 700,
         color: 'var(--accent-hover)', background: 'rgba(37, 99, 235, 0.1)',
         border: '1px solid var(--border-subtle)', borderRadius: '4px',
         padding: '1px 5px', letterSpacing: '0.04em', marginLeft: '4px',
@@ -309,7 +309,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
     };
 
     const dropdownHeaderStyle: React.CSSProperties = {
-        fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)',
+        fontSize: '11px', fontWeight: 700, color: 'var(--text-dim)',
         padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.04em',
     };
 
@@ -384,7 +384,7 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
                                     <div>
                                         <div>{opt.label}</div>
-                                        <div style={{ fontSize: '9.5px', color: 'var(--text-dim)', fontWeight: 400 }}>{opt.tag}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 400 }}>{opt.tag}</div>
                                     </div>
                                 </div>
                                 <span className={opt.fontClass} style={{ color: opt.color, fontSize: '13px' }}>{opt.sample}</span>
@@ -468,18 +468,20 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
     // ─── Items barre (ordre de priorité croissante = masqués en premier) ────
     const toolbarItems = useMemo<ToolbarItem[]>(() => {
         const items: ToolbarItem[] = [
-            { id: 'undo', priority: 0, minWidth: 35, render: () => toolBtn('undo', 'Annuler (Ctrl+Z)', <Undo2 size={13} strokeWidth={2.2} />) },
-            { id: 'redo', priority: 0, minWidth: 35, render: () => toolBtn('redo', 'Rétablir (Ctrl+Y)', <Redo2 size={13} strokeWidth={2.2} />) },
-            { id: 'bold', priority: 1, minWidth: 35, render: () => toolBtn('bold', 'Gras (Ctrl+B)', <Bold size={13} strokeWidth={2.4} />) },
-            { id: 'italic', priority: 1, minWidth: 35, render: () => toolBtn('italic', 'Italique (Ctrl+I)', <Italic size={13} strokeWidth={2.4} />) },
-            { id: 'underline', priority: 2, minWidth: 35, render: () => toolBtn('underline', 'Souligné (Ctrl+U)', <Underline size={13} strokeWidth={2.4} />) },
-            { id: 'code', priority: 2, minWidth: 35, render: () => toolBtn('code', 'Code en ligne', <Code size={13} strokeWidth={2.2} />) },
-            { id: 'h1', priority: 3, minWidth: 35, render: () => toolBtn('h1', 'Titre de section', <Heading size={13} strokeWidth={2.2} />) },
-            { id: 'list', priority: 3, minWidth: 35, render: () => toolBtn('list', 'Liste à puces', <List size={13} strokeWidth={2.2} />) },
-            { id: 'list-ordered', priority: 3, minWidth: 35, render: () => toolBtn('list-ordered', 'Liste numérotée', <ListOrdered size={13} strokeWidth={2.2} />) },
-            { id: 'quote', priority: 3, minWidth: 35, render: () => toolBtn('quote', 'Citation', <Quote size={13} strokeWidth={2.2} />) },
-            { id: 'cipher', priority: 4, minWidth: 95, render: () => cipherTrigger(false) },
-            { id: 'theme', priority: 5, minWidth: 175, render: () => themeTrigger(false) },
+            // Outils spécifiques à l'application scout — priorité maximale (masqués en dernier)
+            { id: 'cipher', priority: 0, minWidth: 95, render: () => cipherTrigger(false) },
+            { id: 'theme', priority: 0, minWidth: 175, render: () => themeTrigger(false) },
+            // Outils de formatage — priorité basse (versés dans le menu "..." en premier)
+            { id: 'undo', priority: 3, minWidth: 35, render: () => toolBtn('undo', 'Annuler (Ctrl+Z)', <Undo2 size={13} strokeWidth={2.2} />) },
+            { id: 'redo', priority: 3, minWidth: 35, render: () => toolBtn('redo', 'Rétablir (Ctrl+Y)', <Redo2 size={13} strokeWidth={2.2} />) },
+            { id: 'bold', priority: 4, minWidth: 35, render: () => toolBtn('bold', 'Gras (Ctrl+B)', <Bold size={13} strokeWidth={2.4} />) },
+            { id: 'italic', priority: 4, minWidth: 35, render: () => toolBtn('italic', 'Italique (Ctrl+I)', <Italic size={13} strokeWidth={2.4} />) },
+            { id: 'underline', priority: 5, minWidth: 35, render: () => toolBtn('underline', 'Souligné (Ctrl+U)', <Underline size={13} strokeWidth={2.4} />) },
+            { id: 'code', priority: 5, minWidth: 35, render: () => toolBtn('code', 'Code en ligne', <Code size={13} strokeWidth={2.2} />) },
+            { id: 'h1', priority: 5, minWidth: 35, render: () => toolBtn('h1', 'Titre de section', <Heading size={13} strokeWidth={2.2} />) },
+            { id: 'list', priority: 5, minWidth: 35, render: () => toolBtn('list', 'Liste à puces', <List size={13} strokeWidth={2.2} />) },
+            { id: 'list-ordered', priority: 5, minWidth: 35, render: () => toolBtn('list-ordered', 'Liste numérotée', <ListOrdered size={13} strokeWidth={2.2} />) },
+            { id: 'quote', priority: 5, minWidth: 35, render: () => toolBtn('quote', 'Citation', <Quote size={13} strokeWidth={2.2} />) },
         ];
         return items.sort((a, b) => a.priority - b.priority);
     }, [toolBtn, cipherTrigger, themeTrigger]);
@@ -745,8 +747,9 @@ export default function TextualHeader({ onExport }: TextualHeaderProps = {}) {
                     isItemVisible(item.id) ? (
                         <span key={item.id} style={{ display: 'flex', alignItems: 'center' }}>
                             {item.render()}
-                            {item.id !== toolbarItems[toolbarItems.length - 1]?.id &&
-                             <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)', margin: '0 2px', flexShrink: 0 }} />
+                            {(item.id === 'theme' || item.id === 'redo') &&
+                             item.id !== toolbarItems[toolbarItems.length - 1]?.id &&
+                             <div style={{ width: '1px', height: '16px', background: 'var(--border-subtle)', margin: '0 4px', flexShrink: 0 }} />
                             }
                         </span>
                     ) : null

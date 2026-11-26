@@ -7,6 +7,7 @@
  *  - Chaque annexe correspondante possède un bouton de switch dans sa marge/en-tête pour la griser ou l'inclure.
  */
 import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { ModuleId, CarnetView, NavLanguage, AnnexeId } from '../../logic/types';
 import { useApp } from '../../AppContext';
 import { CarnetEngine } from '../../logic/CarnetEngine';
@@ -16,18 +17,18 @@ import { MODULE_META, ALL_MODULE_IDS } from '../../logic/ModuleRegistry';
 import CarnetStepBlock, { StageHeaderBlock } from './CarnetStepBlock';
 import CodeBlockPicker from './CodeBlockPicker';
 import CarnetElevationBlock from './CarnetElevationBlock';
-import StepInsertSeparator from './StepInsertSeparator';
-import TextualHeader from './TextualHeader';
+import { GUTTER_WIDTH } from './BlockGutter';
 import SlashCommandPalette from './SlashCommandPalette';
 import { mapRef } from '../map/MapComponent';
 import L from 'leaflet';
 import type { ViewMode } from '../../App';
 import {
-    Compass, AlertTriangle, Sparkles, Binary,
+    AlertTriangle, Sparkles, Binary,
     LayoutGrid, KeyRound, Flag, Shield, Scale, Table,
-    CheckSquare, X, ChevronDown, Globe, Code2, SlidersHorizontal,
-    Maximize2, Minimize2, FileText,
+    CheckSquare, X, ChevronDown, Globe, Code2,
+    Maximize2, Minimize2,
     Lightbulb, ArrowRight,
+    Smile, Image as ImageIcon, Mountain, Lock, FileText, MoreHorizontal,
     Cloud, RefreshCw, CloudOff, AlertCircle
 } from 'lucide-react';
 
@@ -51,34 +52,32 @@ function AnnexeSwitch({ isChecked, onToggle }: { isChecked: boolean; onToggle: (
             title={isChecked ? "Masquer l'annexe" : "Afficher l'annexe"}
         >
             <div style={{
-                width: '30px',
-                height: '16px',
-                borderRadius: '8px',
+                width: '28px',
+                height: '15px',
+                borderRadius: '9999px',
                 background: isChecked ? 'var(--accent-default)' : 'var(--bg-hover)',
-                border: 'none',
                 position: 'relative',
-                transition: 'all 150ms ease',
+                transition: 'background 150ms ease',
                 flexShrink: 0
             }}>
                 <div style={{
                     position: 'absolute',
                     top: '2px',
-                    left: isChecked ? '16px' : '2px',
-                    width: '12px',
-                    height: '12px',
+                    left: isChecked ? '15px' : '2px',
+                    width: '11px',
+                    height: '11px',
                     borderRadius: '50%',
                     background: isChecked ? '#ffffff' : 'var(--text-dim)',
                     transition: 'left 150ms ease, background 150ms ease',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
                 }} />
             </div>
             <span style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: isChecked ? 'var(--text-secondary)' : 'var(--text-dim)',
                 whiteSpace: 'nowrap'
             }}>
-                Afficher l'annexe
+                {isChecked ? 'Incluse' : 'Masquée'}
             </span>
         </button>
     );
@@ -126,7 +125,9 @@ function MultiSelectBatchBar({
     ];
 
     return (
-        <div style={{
+        <div
+            data-textual-pane="true"
+            style={{
             display: 'flex',
             alignItems: 'center',
             gap: '3px',
@@ -209,7 +210,7 @@ function MultiSelectBatchBar({
                         overflowY: 'auto',
                         animation: 'islandPopoverIn 140ms cubic-bezier(0.16, 1, 0.3, 1)'
                     }}>
-                        <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '4px 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-dim)', padding: '4px 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             Appliquer aux {selectedCount} tronçons
                         </div>
                         {ALL_MODULE_IDS.map(mId => {
@@ -294,7 +295,7 @@ function MultiSelectBatchBar({
                         minWidth: '180px',
                         animation: 'islandPopoverIn 140ms cubic-bezier(0.16, 1, 0.3, 1)'
                     }}>
-                        <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '4px 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-dim)', padding: '4px 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             Langue de guidage
                         </div>
                         {languages.map((l, i) => (
@@ -431,93 +432,69 @@ function CloudSyncStatus() {
     );
 }
 
-// ─── Barre bas-gauche : Solutions (ampoule) + Erreurs ─────────────────────────
-function TextualBottomBar({ isSolution, onToggleSolution }: { isSolution: boolean; onToggleSolution: () => void }) {
-    const { state } = useApp();
-
-    // Récupérer les erreurs exposées par TextualHeader via window
-    const errorData = (window as any).__textualErrors || { items: [], hasErrors: false };
-    const errorItems = errorData.items || [];
-    const hasErrors = errorData.hasErrors || false;
+// ─── Barre d'état discrète en bas de l'éditeur (Lot A) ───────────────────────
+function TextualStatusBar({
+    isSolution,
+    onToggleSolution,
+    errorItems,
+    hasErrors
+}: {
+    isSolution: boolean;
+    onToggleSolution: () => void;
+    errorItems: Array<{ stepId: string; stepLabel: string; message: string; severity: 'error' | 'warning' }>;
+    hasErrors: boolean;
+}) {
     const errorCount = errorItems.length;
 
     return (
-        <div style={{
-            pointerEvents: 'auto',
+        <div
+            data-textual-pane="true"
+            style={{
+            height: '28px',
+            flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            justifyContent: 'space-between',
+            padding: '0 14px',
+            borderTop: '1px solid var(--border-subtle)',
+            background: 'var(--bg-base)',
+            fontSize: '12px',
+            color: 'var(--text-dim)',
+            userSelect: 'none',
+            position: 'relative',
+            zIndex: 100,
         }}>
-            {/* BOUTON SOLUTIONS (ampoule) */}
+            {/* Gauche : vide (pastilles d'alerte retirées pour le moment) */}
+            <div />
+
+            {/* Droite : toggle Solutions discret */}
             <button
                 type="button"
                 role="switch"
                 aria-checked={isSolution}
                 onClick={onToggleSolution}
-                title={isSolution ? "Masquer les solutions (Vue participant)" : "Afficher les solutions (Vue animateur) — Raccourci : Alt+S"}
+                title={isSolution ? 'Masquer les solutions (Alt+S)' : 'Afficher les solutions (Alt+S)'}
                 style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    padding: '0 10px',
-                    height: '36px',
-                    borderRadius: '10px',
-                    border: isSolution ? '1px solid var(--semantic-orange)' : '1px solid var(--border-subtle)',
-                    background: isSolution ? 'var(--semantic-orange)' : 'var(--bg-elevated)',
-                    color: isSolution ? '#09090b' : 'var(--text-primary)',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    background: isSolution ? 'rgba(245, 158, 11, 0.14)' : 'transparent',
+                    color: isSolution ? 'var(--semantic-orange)' : 'var(--text-dim)',
                     fontSize: '12px',
-                    fontWeight: isSolution ? 700 : 500,
+                    fontWeight: isSolution ? 600 : 400,
                     cursor: 'pointer',
-                    transition: 'all 100ms ease',
-                    boxShadow: 'var(--shadow-sm)',
-                    userSelect: 'none',
-                    whiteSpace: 'nowrap',
+                    transition: 'background 100ms ease, color 100ms ease',
                 }}
                 onMouseEnter={e => { if (!isSolution) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                onMouseLeave={e => { if (!isSolution) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                onMouseLeave={e => { if (!isSolution) e.currentTarget.style.background = 'transparent'; }}
             >
-                <Lightbulb size={14} strokeWidth={isSolution ? 2.5 : 2} color={isSolution ? '#09090b' : 'var(--text-dim)'} fill={isSolution ? '#09090b' : 'none'} />
+                <Lightbulb size={12} />
                 <span>Solutions</span>
-                <kbd style={{
-                    fontSize: '8.5px', padding: '0 4px', height: '16px', borderRadius: '4px',
-                    background: isSolution ? 'rgba(0, 0, 0, 0.15)' : 'var(--bg-surface)',
-                    color: isSolution ? '#09090b' : 'var(--text-dim)',
-                    border: isSolution ? 'none' : '1px solid var(--border-subtle)',
-                    fontFamily: 'var(--font-mono)', display: 'inline-flex', alignItems: 'center'
-                }} title="Raccourci clavier : Alt+S">Alt S</kbd>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', opacity: 0.65 }}>Alt+S</span>
             </button>
-
-            {/* BOUTON ERREURS (si des anomalies existent) */}
-            {errorCount > 0 && (
-                <div style={{ position: 'relative' }}>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            const evt = new CustomEvent('textual:open-errors');
-                            window.dispatchEvent(evt);
-                        }}
-                        title={`${errorCount} anomalie${errorCount > 1 ? 's' : ''} détectée${errorCount > 1 ? 's' : ''} dans le carnet — Cliquer pour voir la liste`}
-                        style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '5px',
-                            height: '36px', padding: '0 10px', borderRadius: '10px',
-                            border: `1px solid ${hasErrors ? '#dc2626' : '#d97706'}`,
-                            background: hasErrors ? '#ef4444' : '#f59e0b', color: '#ffffff',
-                            cursor: 'pointer', fontSize: '11px', fontWeight: 700,
-                            transition: 'all 100ms ease', boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = hasErrors ? '#dc2626' : '#d97706'}
-                        onMouseLeave={e => e.currentTarget.style.background = hasErrors ? '#ef4444' : '#f59e0b'}
-                    >
-                        <AlertTriangle size={13} strokeWidth={2.6} color="#ffffff" />
-                        <span>{errorCount}</span>
-                    </button>
-
-                    <ErrorBottomSheet
-                        errorItems={errorItems}
-                        hasErrors={hasErrors}
-                    />
-                </div>
-            )}
         </div>
     );
 }
@@ -571,7 +548,7 @@ function ErrorBottomSheet({ errorItems, hasErrors }: { errorItems: any[]; hasErr
                 transformOrigin: 'bottom right',
             }}
         >
-            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-dim)', padding: '4px 8px 6px', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--border-subtle)', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-dim)', padding: '4px 8px 6px', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--border-subtle)', marginBottom: '4px' }}>
                 Anomalies & Contraintes ({errorItems.length})
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -609,13 +586,18 @@ function ErrorBottomSheet({ errorItems, hasErrors }: { errorItems: any[]; hasErr
  * Écrit directement en grand format titre, au-dessus de l'étape 1,
  * et bidirectionnellement synchronisé avec state.document_title (MenuBar, exports, etc.).
  */
-function CarnetDocumentTitle() {
+const PAGE_ICONS = ['🧭', '🏕️', '🗺️', '🥾', '🌲', '🔥'];
+
+function CarnetDocumentTitle({ onEnterToBody }: { onEnterToBody?: () => void }) {
     const { state, dispatch } = useApp();
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const [title, setTitle] = useState(state.document_title || '');
+    const [title, setTitle] = useState(state.document_title === 'Document sans titre' ? '' : (state.document_title || ''));
+    const [hovered, setHovered] = useState(false);
+    const [iconIdx, setIconIdx] = useState<number | null>(null);
+    const [showCover, setShowCover] = useState(false);
 
     useEffect(() => {
-        setTitle(state.document_title || '');
+        setTitle(state.document_title === 'Document sans titre' ? '' : (state.document_title || ''));
     }, [state.document_title]);
 
     const adjustHeight = () => {
@@ -637,11 +619,7 @@ function CarnetDocumentTitle() {
 
     const handleBlur = () => {
         const clean = title.trim();
-        if (!clean) {
-            const fallback = 'Document sans titre';
-            setTitle(fallback);
-            dispatch({ type: 'SET_DOCUMENT_TITLE', title: fallback });
-        } else if (clean !== title) {
+        if (clean !== title) {
             setTitle(clean);
             dispatch({ type: 'SET_DOCUMENT_TITLE', title: clean });
         }
@@ -651,6 +629,7 @@ function CarnetDocumentTitle() {
         if (e.key === 'Enter') {
             e.preventDefault();
             textareaRef.current?.blur();
+            onEnterToBody?.();
         }
         if (e.key === 'Escape') {
             textareaRef.current?.blur();
@@ -660,47 +639,157 @@ function CarnetDocumentTitle() {
     return (
         <div
             className="carnet-document-title-wrapper"
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
             style={{
                 display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'flex-start',
+                flexDirection: 'column',
                 width: '100%',
                 marginBottom: '20px',
-                marginTop: '28px',
-                boxSizing: 'border-box'
+                marginTop: '4px',
+                boxSizing: 'border-box',
             }}
         >
-            {/* Spacer identique au gutter des blocs : 26px + 12px marginRight */}
-            <div style={{ width: '26px', marginRight: '12px', flexShrink: 0 }} />
+            {/* Couverture optionnelle style Notion (sans arrondis) */}
+            {showCover && (
+                <div style={{
+                    marginLeft: `${GUTTER_WIDTH}px`,
+                    height: '96px',
+                    borderRadius: 0,
+                    marginBottom: '16px',
+                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(15, 23, 42, 0.85))',
+                    border: '1px solid var(--border-subtle)',
+                    position: 'relative',
+                }}>
+                    {hovered && (
+                        <button
+                            type="button"
+                            onClick={() => setShowCover(false)}
+                            style={{
+                                position: 'absolute', right: '8px', bottom: '8px',
+                                padding: '3px 8px', borderRadius: '5px', border: 'none',
+                                background: 'rgba(0,0,0,0.55)', color: 'var(--text-secondary)',
+                                fontSize: '12px', cursor: 'pointer',
+                            }}
+                        >
+                            Retirer la couverture
+                        </button>
+                    )}
+                </div>
+            )}
 
-            <textarea
-                ref={textareaRef}
-                value={title}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                onKeyDown={handleKeyDown}
-                placeholder="Document sans titre"
-                rows={1}
-                spellCheck={false}
-                style={{
-                    flex: 1,
-                    minWidth: 0,
-                    background: 'transparent',
-                    border: 'none',
-                    outline: 'none',
-                    resize: 'none',
-                    overflow: 'hidden',
-                    fontSize: 'clamp(22px, 3.2vw, 32px)',
-                    fontWeight: 800,
-                    letterSpacing: '-0.025em',
-                    color: 'var(--text-primary)',
-                    fontFamily: 'var(--font-heading, "Plus Jakarta Sans", sans-serif)',
-                    lineHeight: 1.2,
-                    padding: 0,
-                    margin: 0,
-                    boxSizing: 'border-box',
-                }}
-            />
+            {/* Barre d'actions discrètes au survol façon Notion (cachée au repos) */}
+            <div style={{
+                paddingLeft: `${GUTTER_WIDTH}px`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '24px',
+                marginBottom: '4px',
+                opacity: hovered ? 1 : 0,
+                pointerEvents: hovered ? 'auto' : 'none',
+                transition: 'opacity 120ms ease',
+            }}>
+                <button
+                    type="button"
+                    onClick={() => setIconIdx(i => (i === null ? 0 : (i + 1 >= PAGE_ICONS.length ? null : i + 1)))}
+                    style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '5px',
+                        background: 'transparent', border: 'none', borderRadius: '5px',
+                        padding: '2px 6px', color: 'var(--text-dim)', fontSize: '12px', cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dim)'; }}
+                >
+                    <Smile size={13} />
+                    <span>{iconIdx === null ? 'Ajouter une icône' : 'Changer l\'icône'}</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setShowCover(c => !c)}
+                    style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '5px',
+                        background: 'transparent', border: 'none', borderRadius: '5px',
+                        padding: '2px 6px', color: 'var(--text-dim)', fontSize: '12px', cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dim)'; }}
+                >
+                    <ImageIcon size={13} />
+                    <span>{showCover ? 'Masquer la couverture' : 'Ajouter une couverture'}</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => dispatch({ type: 'TOGGLE_ELEVATION_PROFILE' })}
+                    style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '5px',
+                        background: 'transparent', border: 'none', borderRadius: '5px',
+                        padding: '2px 6px',
+                        color: state.carnet_include_elevation_profile ? 'var(--accent-hover)' : 'var(--text-dim)',
+                        fontSize: '12px', cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; if (!state.carnet_include_elevation_profile) e.currentTarget.style.color = 'var(--text-primary)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = state.carnet_include_elevation_profile ? 'var(--accent-hover)' : 'var(--text-dim)'; }}
+                >
+                    <Mountain size={13} />
+                    <span>{state.carnet_include_elevation_profile ? 'Masquer le profil' : 'Profil altimétrique'}</span>
+                </button>
+            </div>
+
+            {/* Icône + Titre principal alignés sur la gouttière 40px */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+                <div style={{ width: `${GUTTER_WIDTH}px`, minWidth: `${GUTTER_WIDTH}px`, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {iconIdx !== null && (
+                        <button
+                            type="button"
+                            onClick={() => setIconIdx(i => (i === null ? 0 : (i + 1) % PAGE_ICONS.length))}
+                            title="Cliquer pour changer d'icône"
+                            style={{
+                                width: '44px', height: '44px', fontSize: '34px', lineHeight: 1,
+                                background: 'transparent', border: 'none', borderRadius: '8px',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                padding: 0,
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                            {PAGE_ICONS[iconIdx]}
+                        </button>
+                    )}
+                    <style>{`.carnet-document-title-input::placeholder { color: rgba(255, 255, 255, 0.2); font-weight: 700; }`}</style>
+                    <textarea
+                        ref={textareaRef}
+                        className="carnet-document-title-input"
+                        value={title}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Sans titre"
+                        aria-label="Titre du document"
+                        rows={1}
+                        spellCheck={false}
+                        style={{
+                            width: '100%',
+                            background: 'transparent',
+                            border: 'none',
+                            borderRadius: 0,
+                            outline: 'none',
+                            resize: 'none',
+                            overflow: 'hidden',
+                            fontSize: 'clamp(32px, 4vw, 42px)',
+                            fontWeight: 700,
+                            letterSpacing: '-0.03em',
+                            color: 'var(--text-primary)',
+                            fontFamily: 'var(--font-heading, "Plus Jakarta Sans", sans-serif)',
+                            lineHeight: 1.15,
+                            padding: 0,
+                            margin: 0,
+                            boxSizing: 'border-box',
+                        }}
+                    />
+                </div>
+            </div>
         </div>
     );
 }
@@ -729,7 +818,56 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
     const [lastSelectedKey, setLastSelectedKey] = useState<string | null>(null);
     const [slashPaletteOpen, setSlashPaletteOpen] = useState(false);
     const [slashPaletteTrigger, setSlashPaletteTrigger] = useState<{ x: number; y: number } | null>(null);
+    const [slashTargetStepId, setSlashTargetStepId] = useState<string | null>(null);
+    const [slashInitialQuery, setSlashInitialQuery] = useState('');
+    const [autoFocusStepId, setAutoFocusStepId] = useState<string | null>(null);
+    const pendingAutoFocusNewStepRef = useRef(false);
+    const prevStepIdsRef = useRef<Set<string>>(new Set(steps.map(s => s.id)));
     const slashPaletteAnchorRef = useRef<HTMLDivElement>(null);
+
+    // Auto-focus d'un bloc fraîchement inséré (+ ouverture du menu / si déclenché par le bouton +)
+    useEffect(() => {
+        if (pendingAutoFocusNewStepRef.current) {
+            const added = steps.find(s => !prevStepIdsRef.current.has(s.id) && s.isManual);
+            if (added) {
+                pendingAutoFocusNewStepRef.current = false;
+                setAutoFocusStepId(added.id);
+                if (pendingInsertSlashRectRef.current) {
+                    const r = pendingInsertSlashRectRef.current;
+                    pendingInsertSlashRectRef.current = null;
+                    setSlashTargetStepId(added.id);
+                    setSlashInitialQuery('');
+                    setSlashPaletteTrigger({ x: r.right + 8, y: r.bottom + 4 });
+                    setSlashPaletteOpen(true);
+                }
+            }
+        }
+        prevStepIdsRef.current = new Set(steps.map(s => s.id));
+    }, [steps]);
+
+    // Raccourci Alt+S (Solutions) et toast Annuler lors du masquage d'un bloc généré
+    const [hiddenToastStepId, setHiddenToastStepId] = useState<string | null>(null);
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.altKey && (e.key === 's' || e.key === 'S')) {
+                e.preventDefault();
+                dispatch({ type: 'SET_CARNET_VIEW', view: state.carnet_view === 'solution' ? 'participant' : 'solution' });
+            }
+        };
+        const onHidden = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (detail?.stepId) {
+                setHiddenToastStepId(detail.stepId);
+                setTimeout(() => setHiddenToastStepId(prev => (prev === detail.stepId ? null : prev)), 5000);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        window.addEventListener('textual:block-hidden', onHidden);
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            window.removeEventListener('textual:block-hidden', onHidden);
+        };
+    }, [dispatch, state.carnet_view]);
 
     // Liste aplatie de tous les éléments sélectionnables pour la sélection de plage (Shift+Click)
     const flatItems = useMemo(() => {
@@ -915,8 +1053,29 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
     }, [dispatch]);
 
     const handleAddHtmlStep = useCallback((afterStepId: string, anchorSegmentIdx?: number) => {
+        pendingAutoFocusNewStepRef.current = true;
         dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, anchorSegmentIdx, content: '', manualType: 'html' });
     }, [dispatch]);
+
+    const handleTriggerSlashPalette = useCallback((stepId: string, rect: DOMRect, query: string) => {
+        setSlashTargetStepId(stepId);
+        setSlashInitialQuery(query);
+        // Positionner sous le caret (rect.left = x caret, rect.top = y caret pour les DOMRect miroirs)
+        const x = rect.left;
+        const y = rect.bottom > rect.top ? rect.bottom + 4 : rect.top + 4;
+        setSlashPaletteTrigger({ x, y });
+        setSlashPaletteOpen(true);
+    }, []);
+
+    const handleEnterFromTitle = useCallback(() => {
+        const firstManual = steps[0];
+        if (firstManual && firstManual.isManual && firstManual.manualType === 'html') {
+            setAutoFocusStepId(firstManual.id);
+        } else {
+            pendingAutoFocusNewStepRef.current = true;
+            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId: '', content: '', manualType: 'html' });
+        }
+    }, [steps, dispatch]);
 
     const handleAddCodeStep = useCallback((afterStepId: string, anchorSegmentIdx?: number) => {
         setPickingCodeFor({ stepId: afterStepId, anchorSegmentIdx });
@@ -955,23 +1114,28 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
     }, [dispatch, steps]);
 
     const handleMoveStepUp = useCallback((stepId: string) => {
-        const stepIdx = steps.findIndex(s => s.id === stepId);
-        if (stepIdx > 0) {
-            // Échanger avec l'étape précédente
-            const newSteps = [...steps];
-            [newSteps[stepIdx - 1], newSteps[stepIdx]] = [newSteps[stepIdx], newSteps[stepIdx - 1]];
-            // Note: This would need a proper REORDER action in the reducer
-            // For now, we'll need to implement this in the reducer
-        }
-    }, [dispatch, steps]);
+        dispatch({ type: 'MOVE_CARNET_STEP', stepId, direction: 'up' });
+    }, [dispatch]);
 
     const handleMoveStepDown = useCallback((stepId: string) => {
-        const stepIdx = steps.findIndex(s => s.id === stepId);
-        if (stepIdx >= 0 && stepIdx < steps.length - 1) {
-            const newSteps = [...steps];
-            [newSteps[stepIdx], newSteps[stepIdx + 1]] = [newSteps[stepIdx + 1], newSteps[stepIdx]];
-        }
-    }, [dispatch, steps]);
+        dispatch({ type: 'MOVE_CARNET_STEP', stepId, direction: 'down' });
+    }, [dispatch]);
+
+    const handleDragReorder = useCallback((sourceStepId: string, targetStepId: string, position: 'before' | 'after') => {
+        dispatch({ type: 'REORDER_CARNET_STEPS', sourceStepId, targetStepId, position });
+    }, [dispatch]);
+
+    const pendingInsertSlashRectRef = useRef<DOMRect | null>(null);
+    const handleInsertBelowAndOpenMenu = useCallback((afterStepId: string, rect: DOMRect) => {
+        pendingInsertSlashRectRef.current = rect;
+        pendingAutoFocusNewStepRef.current = true;
+        dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '', manualType: 'html' });
+    }, [dispatch]);
+
+    const handleSplitBlockOnEnter = useCallback((afterStepId: string, initialContent = '') => {
+        pendingAutoFocusNewStepRef.current = true;
+        dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: initialContent, manualType: 'html' });
+    }, [dispatch]);
 
     const handleCopyStep = useCallback((stepId: string) => {
         const step = steps.find(s => s.id === stepId);
@@ -1028,7 +1192,25 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
         }, viewMode === 'text' ? 120 : 0);
     }, [state.stages, viewMode, onViewModeChange]);
 
-    const warningCount = steps.reduce((n, s) => n + (s.warnings || []).filter(w => w.severity === 'error').length, 0);
+    const errorItems = useMemo(() => {
+        const items: { stepId: string; stepLabel: string; message: string; severity: 'error' | 'warning' }[] = [];
+        for (const step of steps) {
+            if (step.warnings && step.warnings.length > 0 && !step.isEdited && !step.isHidden) {
+                for (const w of step.warnings) {
+                    if (w.message) {
+                        items.push({
+                            stepId: step.id,
+                            stepLabel: step.fromLabel || 'Étape',
+                            message: w.message,
+                            severity: w.severity === 'error' ? 'error' : 'warning'
+                        });
+                    }
+                }
+            }
+        }
+        return items;
+    }, [steps]);
+    const hasErrors = useMemo(() => errorItems.some(i => i.severity === 'error'), [errorItems]);
 
     // Extraction de tous les modules réellement employés dans le carnet
     const usedModules = new Set<string>();
@@ -1054,80 +1236,90 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
     const accentColor = state.carnet_view === 'solution' ? 'var(--semantic-orange)' : 'var(--accent-hover)';
     const isSolution = state.carnet_view === 'solution';
 
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const handleContainerDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        if (!e.dataTransfer.types.includes('text/carnet-step-id')) return;
+        const el = scrollContainerRef.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        if (e.clientY < rect.top + 60) el.scrollBy({ top: -18 });
+        else if (e.clientY > rect.bottom - 60) el.scrollBy({ top: 18 });
+    };
+
+    const colStyle: React.CSSProperties = {
+        maxWidth: '760px',
+        width: '100%',
+        margin: '0 auto',
+        padding: '0 clamp(14px, 4vw, 40px)',
+        boxSizing: 'border-box',
+    };
+
     return (
-        <div style={{
+        <div
+            data-textual-pane="true"
+            tabIndex={-1}
+            style={{
             display: 'flex',
             flexDirection: 'column',
             height: '100%',
             background: 'var(--bg-base)',
             overflow: 'hidden',
             position: 'relative',
+            outline: 'none',
         }}>
-            {/* ── Bannière d'erreurs / avertissements ── */}
-            {warningCount > 0 && (
-                <div style={{
+            {/* ── Corps défilable : les fonds générés vont jusqu'aux bords de la page ── */}
+            <div
+                ref={scrollContainerRef}
+                onDragOver={handleContainerDragOver}
+                style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    paddingTop: '96px',
+                    paddingBottom: '96px',
                     display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '9px 16px',
-                    background: 'rgba(239, 68, 68, 0.12)',
-                    borderBottom: '1px solid rgba(239, 68, 68, 0.25)',
-                    fontSize: '11.5px',
-                    color: '#f87171',
-                    fontWeight: 600,
-                    flexShrink: 0
-                }}>
-                    <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
-                    <span>
-                        {warningCount} anomalie{warningCount > 1 ? 's' : ''} de contrainte détectée{warningCount > 1 ? 's' : ''} — vérifiez les étapes marquées dans le carnet
-                    </span>
-                </div>
-            )}
-
-            {/* ── Corps défilable sans boîtes séparatrices ── */}
-            <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                overflowX: 'hidden',
-                padding: 'clamp(12px, 3vw, 24px) clamp(10px, 4vw, 32px)',
-                paddingTop: '68px',
-                paddingBottom: '32px',
-                display: 'flex',
-                flexDirection: 'column',
-                boxSizing: 'border-box'
-            }}>
+                    flexDirection: 'column',
+                    boxSizing: 'border-box'
+                }}
+            >
                 <div style={{
-                    maxWidth: '920px',
                     width: '100%',
-                    margin: '0 auto',
+                    flex: 1,
                     display: 'flex',
                     flexDirection: 'column',
                     boxSizing: 'border-box'
                 }}>
-                        {/* ── Titre principal du document (au-dessus de l'étape 1, synchronisé avec le doc) ── */}
-                        <CarnetDocumentTitle />
+                        {/* ── Titre principal du document style Notion ── */}
+                        <div style={colStyle}>
+                            <CarnetDocumentTitle onEnterToBody={handleEnterFromTitle} />
+                        </div>
 
                         <>
-                            {/* Profil altimétrique monté dans le doc sans contours séparateurs */}
-                            <CarnetElevationBlock />
+                            {/* Profil altimétrique aligné sur la gouttière 40px */}
+                            <div style={colStyle}>
+                                <div style={{ paddingLeft: GUTTER_WIDTH }}>
+                                    <CarnetElevationBlock />
+                                </div>
+                            </div>
 
                             {pickingCodeFor?.stepId === "" && (
-                                <CodeBlockPicker
-                                    afterStepId=""
-                                    anchorSegmentIdx={pickingCodeFor.anchorSegmentIdx}
-                                    onClose={() => setPickingCodeFor(null)}
-                                />
+                                <div style={colStyle}>
+                                    <CodeBlockPicker
+                                        afterStepId=""
+                                        anchorSegmentIdx={pickingCodeFor.anchorSegmentIdx}
+                                        onClose={() => setPickingCodeFor(null)}
+                                    />
+                                </div>
                             )}
 
-                            {/* Séparateur initial au survol style ipynb (haut du carnet) */}
-                            <StepInsertSeparator
-                                afterStepId=""
-                                onAddComment={handleAddHtmlStep}
-                                onAddCode={handleAddCodeStep}
-                            />
-                            
-                            {steps.map((step, idx) => (
-                                <React.Fragment key={step.id}>
+                            {steps.map((step, idx) => {
+                                const visiblePrev = steps.slice(0, idx).reverse().find(s => !s.isHidden);
+                                const visibleNext = steps.slice(idx + 1).find(s => !s.isHidden);
+                                const isPrevGenerated = Boolean(visiblePrev && !visiblePrev.isManual);
+                                const isNextGenerated = Boolean(visibleNext && !visibleNext.isManual);
+                                const isGeneratedBand = !step.isManual && !step.isHidden;
+
+                                const blockEl = (
                                     <CarnetStepBlock
                                         step={step}
                                         stepIndex={idx}
@@ -1150,52 +1342,198 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                                         onOpenFontSelector={handleOpenFontSelector}
                                         onOpenSettings={handleOpenSettings}
                                         onStageClick={handleStageClick}
+                                        onTriggerSlashPalette={handleTriggerSlashPalette}
+                                        onInsertBelow={handleInsertBelowAndOpenMenu}
+                                        onSplitBlockOnEnter={handleSplitBlockOnEnter}
+                                        onDragReorder={handleDragReorder}
+                                        isPrevGenerated={isPrevGenerated}
+                                        isNextGenerated={isNextGenerated}
+                                        autoFocusStepId={autoFocusStepId}
+                                        onAutoFocusHandled={() => setAutoFocusStepId(null)}
+                                        splitMode={viewMode === 'split' && !isMobile}
                                     />
-                                    {pickingCodeFor?.stepId === step.id && (
-                                        <CodeBlockPicker
-                                            afterStepId={step.id}
-                                            anchorSegmentIdx={pickingCodeFor.anchorSegmentIdx}
-                                            onClose={() => setPickingCodeFor(null)}
-                                        />
-                                    )}
-                                    {/* Séparateur au survol style ipynb entre chaque étape */}
-                                    <StepInsertSeparator
-                                        afterStepId={step.id}
-                                        onAddComment={handleAddHtmlStep}
-                                        onAddCode={handleAddCodeStep}
-                                    />
-                                </React.Fragment>
-                            ))}
+                                );
+
+                                return (
+                                    <React.Fragment key={step.id}>
+                                        {isGeneratedBand ? blockEl : <div style={colStyle}>{blockEl}</div>}
+                                        {pickingCodeFor?.stepId === step.id && (
+                                            <div style={colStyle}>
+                                                <CodeBlockPicker
+                                                    afterStepId={step.id}
+                                                    anchorSegmentIdx={pickingCodeFor.anchorSegmentIdx}
+                                                    onClose={() => setPickingCodeFor(null)}
+                                                />
+                                            </div>
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
 
                             {/* ── Marqueur d'arrivée final : bloc d'étape à part entière ── */}
                             {steps.length > 0 && !steps[steps.length - 1].isManual && steps[steps.length - 1].toLabel && (
-                                <StageHeaderBlock
-                                    stageLabel={steps[steps.length - 1].toLabel!}
-                                    dotColor="var(--semantic-red)"
-                                    isArrival={true}
-                                    onStageClick={handleStageClick}
-                                />
-                            )}
-                            {/* Bandeau d'aide lorsque le tracé n'a pas encore été commencé */}
-                            {state.polygonal_steps.length === 0 && (
-                                <div style={{
-                                    marginTop: '24px',
-                                    padding: '16px 20px',
-                                    borderRadius: '12px',
-                                    background: 'var(--bg-surface)',
-                                    border: '1px dashed var(--border-subtle)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    color: 'var(--text-dim)',
-                                    fontSize: '12.5px'
-                                }}>
-                                    <Compass size={20} color="var(--accent-default)" style={{ flexShrink: 0 }} />
-                                    <span>
-                                        Tracez votre itinéraire dans la vue <strong>Carte</strong> avec au moins deux points pour synchroniser les étapes encodées de votre raid.
-                                    </span>
+                                <div style={colStyle}>
+                                    <StageHeaderBlock
+                                        stageLabel={steps[steps.length - 1].toLabel!}
+                                        dotColor="var(--semantic-red)"
+                                        isArrival={true}
+                                        splitMode={viewMode === 'split' && !isMobile}
+                                        onStageClick={handleStageClick}
+                                    />
                                 </div>
                             )}
+                            {/* Zone cliquable en pied de page façon Notion : cliquer pour ajouter un bloc et écrire */}
+                            <div
+                                onClick={() => {
+                                    const lastStep = steps[steps.length - 1];
+                                    if (lastStep && lastStep.isManual && lastStep.manualType === 'html' && !(lastStep.solutionText || '').trim()) {
+                                        setAutoFocusStepId(lastStep.id);
+                                    } else {
+                                        handleAddHtmlStep(lastStep ? lastStep.id : '');
+                                    }
+                                }}
+                                style={{
+                                    ...colStyle,
+                                    minHeight: '48px',
+                                    flex: 1,
+                                    cursor: 'text',
+                                }}
+                            />
+
+                            {/* Actions rapides vers le bas de la page tant qu'aucun bloc n'est rempli (le titre ne compte pas) */}
+                            {!steps.some(s => !s.isHidden && (!s.isManual || Boolean((s.solutionText || '').trim() || (s.encodedText || '').trim()))) && (() => {
+                                const emptyManualStep = steps.find(s => !s.isHidden && s.isManual && !(s.solutionText || '').trim() && !(s.encodedText || '').trim());
+                                const triggerQuickCode = (cipher: ModuleId) => {
+                                    if (emptyManualStep) {
+                                        dispatch({ type: 'CONVERT_MANUAL_STEP_TYPE', stepId: emptyManualStep.id, targetType: 'code', moduleId: cipher });
+                                        setAutoFocusStepId(emptyManualStep.id);
+                                    } else {
+                                        const afterStepId = steps.length > 0 ? steps[steps.length - 1].id : '';
+                                        pendingAutoFocusNewStepRef.current = true;
+                                        dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '', manualType: 'code', moduleId: cipher });
+                                    }
+                                };
+                                const triggerQuickText = () => {
+                                    if (emptyManualStep && emptyManualStep.manualType === 'html') {
+                                        setAutoFocusStepId(emptyManualStep.id);
+                                    } else {
+                                        handleAddHtmlStep(steps.length > 0 ? steps[steps.length - 1].id : '');
+                                    }
+                                };
+                                return (
+                                <div
+                                    style={{
+                                        ...colStyle,
+                                        marginTop: 'auto',
+                                        paddingTop: '32px',
+                                        paddingBottom: '8px',
+                                    }}
+                                    onClick={e => e.stopPropagation()}
+                                >
+                                    <div style={{ paddingLeft: `${GUTTER_WIDTH}px` }}>
+                                        <div style={{
+                                            fontSize: '12.5px',
+                                            color: 'var(--text-dim)',
+                                            marginBottom: '10px',
+                                        }}>
+                                            Commencer avec
+                                        </div>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            flexWrap: 'wrap',
+                                            gap: '8px',
+                                        }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => triggerQuickCode('morse')}
+                                                style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: '7px',
+                                                    height: '32px', padding: '0 13px', borderRadius: '9999px',
+                                                    background: 'rgba(37, 99, 235, 0.16)',
+                                                    border: '1px solid rgba(59, 130, 246, 0.32)',
+                                                    color: '#60a5fa', fontSize: '13px', fontWeight: 500,
+                                                    cursor: 'pointer', transition: 'background 100ms ease',
+                                                }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(37, 99, 235, 0.24)')}
+                                                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(37, 99, 235, 0.16)')}
+                                            >
+                                                <Lock size={14} />
+                                                <span>Message en Morse</span>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={triggerQuickText}
+                                                style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: '7px',
+                                                    height: '32px', padding: '0 13px', borderRadius: '9999px',
+                                                    background: 'var(--bg-surface)',
+                                                    border: '1px solid var(--border-subtle)',
+                                                    color: 'var(--text-primary)', fontSize: '13px', fontWeight: 500,
+                                                    cursor: 'pointer', transition: 'background 100ms ease',
+                                                }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
+                                            >
+                                                <FileText size={14} color="var(--text-dim)" />
+                                                <span>Texte libre</span>
+                                            </button>
+
+                                            {([
+                                                { id: 'vigenere', label: 'Vigenère', Icon: KeyRound },
+                                                { id: 'polybe', label: 'Polybe', Icon: LayoutGrid },
+                                                { id: 'templier', label: 'Templier', Icon: Shield },
+                                            ] as const).map(({ id, label, Icon }) => (
+                                                <button
+                                                    key={id}
+                                                    type="button"
+                                                    onClick={() => triggerQuickCode(id)}
+                                                    style={{
+                                                        display: 'inline-flex', alignItems: 'center', gap: '7px',
+                                                        height: '32px', padding: '0 13px', borderRadius: '9999px',
+                                                        background: 'var(--bg-surface)',
+                                                        border: '1px solid var(--border-subtle)',
+                                                        color: 'var(--text-primary)', fontSize: '13px', fontWeight: 500,
+                                                        cursor: 'pointer', transition: 'background 100ms ease',
+                                                    }}
+                                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
+                                                >
+                                                    <Icon size={14} color="var(--text-dim)" />
+                                                    <span>{label}</span>
+                                                </button>
+                                            ))}
+
+                                            <button
+                                                type="button"
+                                                aria-label="Plus de blocs et codes"
+                                                title="Tous les blocs et codes avancés (/)"
+                                                onClick={(e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    setSlashTargetStepId(null);
+                                                    setSlashInitialQuery('');
+                                                    setSlashPaletteTrigger({ x: rect.left, y: rect.bottom + 6 });
+                                                    setSlashPaletteOpen(true);
+                                                }}
+                                                style={{
+                                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                    width: '32px', height: '32px', borderRadius: '9999px',
+                                                    background: 'var(--bg-surface)',
+                                                    border: '1px solid var(--border-subtle)',
+                                                    color: 'var(--text-secondary)',
+                                                    cursor: 'pointer', transition: 'background 100ms ease',
+                                                }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                                                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
+                                            >
+                                                <MoreHorizontal size={15} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                );
+                            })()}
 
                             {/* Bouton de compilation si le tracé existe mais que les tronçons doivent être assemblés */}
                             {state.polygonal_steps.length > 0 && steps.filter(s => !s.isManual).length === 0 && (
@@ -1227,345 +1565,337 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                             )}
                         </>
                     
-                    {/* ── Annexes documentaires : affichées UNIQUEMENT si le code est employé dans le raid (sans contours ni fonds séparateurs) ── */}
+                    {/* ── Annexes documentaires style Notion : alignées sur la gouttière 40px ── */}
                     {steps.length > 0 && anyAnnexeEmployed && (
-                        <div style={{ marginTop: '40px', paddingBottom: '48px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                paddingBottom: '6px',
-                                borderBottom: '1px solid var(--border-subtle)'
-                            }}>
-                                <Table size={15} color={accentColor} />
-                                <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-primary)' }}>
-                                    Annexes de décodage des codes employés
-                                </span>
-                            </div>
+                        <div style={{ ...colStyle, marginTop: '48px', paddingBottom: '48px' }}>
+                            <div style={{ paddingLeft: `${GUTTER_WIDTH}px`, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    paddingBottom: '8px',
+                                    borderBottom: '1px solid var(--border-subtle)',
+                                }}>
+                                    <Table size={15} color="var(--text-dim)" />
+                                    <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
+                                        Annexes de décodage
+                                    </h2>
+                                </div>
 
-                            {/* ── Annexe Morse ── */}
-                            {hasMorse && (() => {
-                                const active = isAnnexeActive('alphabet_morse');
-                                return (
-                                    <div style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        boxShadow: 'none',
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <Binary size={14} color={active ? accentColor : 'var(--text-dim)'} />
-                                                <h3 style={{ fontSize: '11px', color: active ? accentColor : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0, fontWeight: 700 }}>
-                                                    TABLE DE CODE MORSE INTERNATIONAL
-                                                </h3>
-                                            </div>
-                                            <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'alphabet_morse' })} />
-                                        </div>
+                                {/* ── Annexe Morse ── */}
+                                {hasMorse && (() => {
+                                    const active = isAnnexeActive('alphabet_morse');
+                                    return (
                                         <div style={{
-                                            display: 'flex',
-                                            flexWrap: 'wrap',
-                                            gap: '6px',
-                                            opacity: active ? 1 : 0.35,
-                                            filter: active ? 'none' : 'grayscale(0.95)',
-                                            transition: 'all 200ms ease'
-                                        }}>
-                                            {Object.entries(ModuleLogic.getMorseTable()).map(([char, code]) => (
-                                                <div key={char} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xs)', padding: '5px 7px', textAlign: 'center', minWidth: '42px' }}>
-                                                    <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: active ? accentColor : 'var(--text-dim)' }}>{char.toUpperCase()}</span>
-                                                    <span style={{ display: 'block', fontFamily: '"Morse", "Courier New", monospace', fontSize: '20px', color: 'var(--text-default)', marginTop: '1px', letterSpacing: '2px' }}>{char.toUpperCase()}</span>
-                                                    <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--text-dim)' }}>{code}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ── Annexe Polybe ── */}
-                            {hasPolybe && (() => {
-                                const active = isAnnexeActive('grille_polybe');
-                                return (
-                                    <div style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        boxShadow: 'none',
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <LayoutGrid size={14} color={active ? accentColor : 'var(--text-dim)'} />
-                                                <h3 style={{ fontSize: '11px', color: active ? accentColor : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0, fontWeight: 700 }}>
-                                                    CARRÉ DE POLYBE (COORDONNÉES BI-CHIFFRÉES)
-                                                </h3>
-                                            </div>
-                                            <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'grille_polybe' })} />
-                                        </div>
-                                        <div style={{
-                                            overflowX: 'auto',
-                                            WebkitOverflowScrolling: 'touch',
-                                            opacity: active ? 1 : 0.35,
-                                            filter: active ? 'none' : 'grayscale(0.95)',
-                                            transition: 'all 200ms ease'
-                                        }}>
-                                            <table style={{ borderCollapse: 'collapse', fontSize: '11px', width: 'auto', margin: '0 auto' }}>
-                                                <tbody>
-                                                    <tr>
-                                                        <th style={{ border: '1px solid var(--border-subtle)', padding: '5px 8px', textAlign: 'center', background: active ? accentColor : 'var(--border-strong)', color: '#09090B' }}></th>
-                                                        {[1, 2, 3, 4, 5, 6].map(i => (
-                                                            <th key={i} style={{ border: '1px solid var(--border-subtle)', padding: '5px 8px', textAlign: 'center', background: active ? accentColor : 'var(--border-strong)', color: '#09090B', fontWeight: 700 }}>
-                                                                {i}
-                                                            </th>
-                                                        ))}
-                                                    </tr>
-                                                    {ModuleLogic.getPolybeGrid().map((row, rIdx) => (
-                                                        <tr key={rIdx}>
-                                                            <th style={{ border: '1px solid var(--border-subtle)', padding: '5px 8px', textAlign: 'center', background: active ? accentColor : 'var(--border-strong)', color: '#09090B', fontWeight: 700 }}>
-                                                                {rIdx + 1}
-                                                            </th>
-                                                            {row.map((cell, cIdx) => (
-                                                                <td key={cIdx} style={{ border: '1px solid var(--border-subtle)', padding: '5px 8px', textAlign: 'center', background: 'transparent' }}>
-                                                                    <b style={{ color: 'var(--text-primary)', fontSize: '12.5px' }}>{cell.char}</b><br/>
-                                                                    <small style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: '9px' }}>{cell.coord}</small>
-                                                                </td>
-                                                            ))}
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ── Annexe Vigenère ── */}
-                            {hasVigenere && (() => {
-                                const active = isAnnexeActive('tableau_vigenere');
-                                const v = ModuleLogic.getVigenereTable(themeManager.getTheme(state.theme_id).vigenere_key || 'MOUSTACHE');
-                                return (
-                                    <div style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        boxShadow: 'none',
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <KeyRound size={14} color={active ? accentColor : 'var(--text-dim)'} />
-                                                <h3 style={{ fontSize: '11px', color: active ? accentColor : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0, fontWeight: 700 }}>
-                                                    CARRÉ DE VIGENÈRE — Clé : <code style={{ fontFamily: 'var(--font-mono)', background: 'transparent', border: '1px solid var(--border-subtle)', padding: '1px 6px', borderRadius: '3px', color: 'var(--accent-hover)' }}>{v.key}</code>
-                                                </h3>
-                                            </div>
-                                            <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'tableau_vigenere' })} />
-                                        </div>
-                                        <div style={{
-                                            overflowX: 'auto',
-                                            WebkitOverflowScrolling: 'touch',
-                                            opacity: active ? 1 : 0.35,
-                                            filter: active ? 'none' : 'grayscale(0.95)',
-                                            transition: 'all 200ms ease'
-                                        }}>
-                                            <table style={{ borderCollapse: 'collapse', fontSize: '10px', width: 'auto', margin: '0 auto', fontFamily: 'var(--font-mono)' }}>
-                                                <tbody>
-                                                    <tr>
-                                                        <th style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: active ? accentColor : 'var(--border-strong)', color: '#09090B' }}></th>
-                                                        {v.alphabet.split('').map(c => (
-                                                            <th key={c} style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: active ? accentColor : 'var(--border-strong)', color: '#09090B', fontWeight: 700 }}>
-                                                                {c}
-                                                            </th>
-                                                        ))}
-                                                    </tr>
-                                                    {v.table.map((row, rIdx) => (
-                                                        <tr key={rIdx}>
-                                                            <th style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: active ? accentColor : 'var(--border-strong)', color: '#09090B', fontWeight: 700 }}>
-                                                                {v.alphabet[rIdx]}
-                                                            </th>
-                                                            {row.map((c, cIdx) => (
-                                                                <td key={cIdx} style={{ border: '1px solid var(--border-subtle)', padding: '3px 5px', textAlign: 'center', minWidth: '16px', fontSize: '9.5px', color: 'var(--text-default)' }}>
-                                                                    {c}
-                                                                </td>
-                                                            ))}
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ── Annexe Maritime ── */}
-                            {hasMaritime && (() => {
-                                const active = isAnnexeActive('index_drapeaux');
-                                return (
-                                    <div style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        boxShadow: 'none',
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <Flag size={14} color={active ? accentColor : 'var(--text-dim)'} />
-                                                <h3 style={{ fontSize: '11px', color: active ? accentColor : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0, fontWeight: 700 }}>
-                                                    CODE MARITIME & PAVILLONS NATO
-                                                </h3>
-                                            </div>
-                                            <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'index_drapeaux' })} />
-                                        </div>
-                                        <div style={{
-                                            display: 'flex',
-                                            flexWrap: 'wrap',
-                                            gap: '6px',
-                                            opacity: active ? 1 : 0.35,
-                                            filter: active ? 'none' : 'grayscale(0.95)',
-                                            transition: 'all 200ms ease'
-                                        }}>
-                                            {Object.entries(ModuleLogic.getNATOAlphabet()).map(([char, word]) => (
-                                                <div key={char} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xs)', padding: '5px 7px', textAlign: 'center', minWidth: '48px' }}>
-                                                    <span style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: active ? accentColor : 'var(--text-dim)' }}>{char.toUpperCase()}</span>
-                                                    <span style={{ display: 'block', fontFamily: '"Maritime", "Courier New", monospace', fontSize: '26px', color: 'var(--text-default)', marginTop: '2px' }}>{char.toUpperCase()}</span>
-                                                    <span style={{ display: 'block', fontSize: '9px', color: 'var(--text-dim)', marginTop: '2px' }}>{word}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ── Annexe Templier ── */}
-                            {hasTemplier && (() => {
-                                const active = isAnnexeActive('code_templier');
-                                return (
-                                    <div style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        boxShadow: 'none',
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <Shield size={14} color={active ? accentColor : 'var(--text-dim)'} />
-                                                <h3 style={{ fontSize: '11px', color: active ? accentColor : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0, fontWeight: 700 }}>
-                                                    CROIX TEMPLIÈRE
-                                                </h3>
-                                            </div>
-                                            <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'code_templier' })} />
-                                        </div>
-                                        <div style={{
-                                            textAlign: 'center',
-                                            overflowX: 'auto',
-                                            opacity: active ? 1 : 0.35,
-                                            filter: active ? 'none' : 'grayscale(0.95)',
-                                            transition: 'all 200ms ease'
-                                        }}>
-                                            <img
-                                                src="/assets/images/code_templier.jpg"
-                                                alt="Code Templier"
-                                                style={{ maxWidth: '100%', maxHeight: '320px', borderRadius: 'var(--radius-xs)', outline: '1px solid oklch(1 0 0 / 0.1)', outlineOffset: '-1px', objectFit: 'contain' }}
-                                            />
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ── Annexe Avocat ── */}
-                            {hasAvocat && (() => {
-                                const active = isAnnexeActive('methode_avocat');
-                                return (
-                                    <div style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        boxShadow: 'none',
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <Scale size={14} color={active ? accentColor : 'var(--text-dim)'} />
-                                                <h3 style={{ fontSize: '11px', color: active ? accentColor : 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0, fontWeight: 700 }}>
-                                                    MÉTHODE AVOCAT (A = K / DÉCALAGE +10)
-                                                </h3>
-                                            </div>
-                                            <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'methode_avocat' })} />
-                                        </div>
-                                        <div style={{
-                                            background: 'transparent',
+                                            background: 'var(--bg-surface)',
                                             border: '1px solid var(--border-subtle)',
-                                            borderRadius: 'var(--radius-xs)',
-                                            padding: '10px',
-                                            textAlign: 'center',
-                                            fontFamily: 'var(--font-mono)',
-                                            fontSize: '11.5px',
-                                            opacity: active ? 1 : 0.35,
-                                            filter: active ? 'none' : 'grayscale(0.95)',
-                                            transition: 'all 200ms ease'
+                                            borderRadius: '8px',
+                                            padding: '14px 16px',
                                         }}>
-                                            <div style={{ color: active ? accentColor : 'var(--text-dim)', fontWeight: 700, letterSpacing: '2px', marginBottom: '4px' }}>
-                                                A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <Binary size={14} color="var(--text-dim)" />
+                                                    <h3 style={{ fontSize: '13.5px', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>
+                                                        Code Morse international
+                                                    </h3>
+                                                </div>
+                                                <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'alphabet_morse' })} />
                                             </div>
-                                            <div style={{ color: 'var(--text-dim)', fontSize: '10px', marginBottom: '4px' }}>↓ décalage de 10 lettres (A devient K) ↓</div>
-                                            <div style={{ color: 'var(--text-primary)', fontWeight: 700, letterSpacing: '2px' }}>
-                                                K L M N O P Q R S T U V W X Y Z A B C D E F G H I J
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(46px, 1fr))',
+                                                gap: '6px',
+                                                opacity: active ? 1 : 0.35,
+                                                transition: 'opacity 180ms ease',
+                                            }}>
+                                                {Object.entries(ModuleLogic.getMorseTable()).map(([char, code]) => (
+                                                    <div key={char} style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '6px 4px', textAlign: 'center' }}>
+                                                        <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{char.toUpperCase()}</span>
+                                                        <span style={{ display: 'block', fontFamily: '"Morse", "Courier New", monospace', fontSize: '18px', color: 'var(--text-secondary)', marginTop: '2px', letterSpacing: '2px' }}>{char.toUpperCase()}</span>
+                                                        <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-dim)' }}>{code}</span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })()}
+                                    );
+                                })()}
+
+                                {/* ── Annexe Polybe ── */}
+                                {hasPolybe && (() => {
+                                    const active = isAnnexeActive('grille_polybe');
+                                    return (
+                                        <div style={{
+                                            background: 'var(--bg-surface)',
+                                            border: '1px solid var(--border-subtle)',
+                                            borderRadius: '8px',
+                                            padding: '14px 16px',
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <LayoutGrid size={14} color="var(--text-dim)" />
+                                                    <h3 style={{ fontSize: '13.5px', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>
+                                                        Carré de Polybe
+                                                    </h3>
+                                                </div>
+                                                <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'grille_polybe' })} />
+                                            </div>
+                                            <div style={{
+                                                overflowX: 'auto',
+                                                WebkitOverflowScrolling: 'touch',
+                                                opacity: active ? 1 : 0.35,
+                                                transition: 'opacity 180ms ease',
+                                            }}>
+                                                <table style={{ borderCollapse: 'collapse', fontSize: '12px', width: 'auto', margin: '0 auto', fontVariantNumeric: 'tabular-nums' }}>
+                                                    <tbody>
+                                                        <tr>
+                                                            <th style={{ border: '1px solid var(--border-subtle)', padding: '6px 10px', textAlign: 'center', background: 'var(--bg-hover)', color: 'var(--text-dim)' }}></th>
+                                                            {[1, 2, 3, 4, 5, 6].map(i => (
+                                                                <th key={i} style={{ border: '1px solid var(--border-subtle)', padding: '6px 10px', textAlign: 'center', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                                                    {i}
+                                                                </th>
+                                                            ))}
+                                                        </tr>
+                                                        {ModuleLogic.getPolybeGrid().map((row, rIdx) => (
+                                                            <tr key={rIdx}>
+                                                                <th style={{ border: '1px solid var(--border-subtle)', padding: '6px 10px', textAlign: 'center', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                                                    {rIdx + 1}
+                                                                </th>
+                                                                {row.map((cell, cIdx) => (
+                                                                    <td key={cIdx} style={{ border: '1px solid var(--border-subtle)', padding: '6px 10px', textAlign: 'center', background: 'var(--bg-base)' }}>
+                                                                        <b style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>{cell.char}</b><br />
+                                                                        <small style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{cell.coord}</small>
+                                                                    </td>
+                                                                ))}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* ── Annexe Vigenère ── */}
+                                {hasVigenere && (() => {
+                                    const active = isAnnexeActive('tableau_vigenere');
+                                    const v = ModuleLogic.getVigenereTable(themeManager.getTheme(state.theme_id).vigenere_key || 'MOUSTACHE');
+                                    return (
+                                        <div style={{
+                                            background: 'var(--bg-surface)',
+                                            border: '1px solid var(--border-subtle)',
+                                            borderRadius: '8px',
+                                            padding: '14px 16px',
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <KeyRound size={14} color="var(--text-dim)" />
+                                                    <h3 style={{ fontSize: '13.5px', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>
+                                                        Carré de Vigenère · Clé{' '}
+                                                        <code style={{ fontFamily: 'var(--font-mono)', background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', padding: '1px 6px', borderRadius: '4px', fontSize: '12px', color: 'var(--text-primary)' }}>
+                                                            {v.key}
+                                                        </code>
+                                                    </h3>
+                                                </div>
+                                                <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'tableau_vigenere' })} />
+                                            </div>
+                                            <div style={{
+                                                overflowX: 'auto',
+                                                WebkitOverflowScrolling: 'touch',
+                                                opacity: active ? 1 : 0.35,
+                                                transition: 'opacity 180ms ease',
+                                            }}>
+                                                <table style={{ borderCollapse: 'collapse', fontSize: '11px', width: 'auto', margin: '0 auto', fontFamily: 'var(--font-mono)' }}>
+                                                    <tbody>
+                                                        <tr>
+                                                            <th style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: 'var(--bg-hover)', color: 'var(--text-dim)' }}></th>
+                                                            {v.alphabet.split('').map(c => (
+                                                                <th key={c} style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                                                    {c}
+                                                                </th>
+                                                            ))}
+                                                        </tr>
+                                                        {v.table.map((row, rIdx) => (
+                                                            <tr key={rIdx}>
+                                                                <th style={{ border: '1px solid var(--border-subtle)', padding: '4px 6px', textAlign: 'center', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                                                    {v.alphabet[rIdx]}
+                                                                </th>
+                                                                {row.map((c, cIdx) => (
+                                                                    <td key={cIdx} style={{ border: '1px solid var(--border-subtle)', padding: '3px 5px', textAlign: 'center', minWidth: '16px', color: 'var(--text-secondary)', background: 'var(--bg-base)' }}>
+                                                                        {c}
+                                                                    </td>
+                                                                ))}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* ── Annexe Maritime ── */}
+                                {hasMaritime && (() => {
+                                    const active = isAnnexeActive('index_drapeaux');
+                                    return (
+                                        <div style={{
+                                            background: 'var(--bg-surface)',
+                                            border: '1px solid var(--border-subtle)',
+                                            borderRadius: '8px',
+                                            padding: '14px 16px',
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <Flag size={14} color="var(--text-dim)" />
+                                                    <h3 style={{ fontSize: '13.5px', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>
+                                                        Code maritime & pavillons NATO
+                                                    </h3>
+                                                </div>
+                                                <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'index_drapeaux' })} />
+                                            </div>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(54px, 1fr))',
+                                                gap: '6px',
+                                                opacity: active ? 1 : 0.35,
+                                                transition: 'opacity 180ms ease',
+                                            }}>
+                                                {Object.entries(ModuleLogic.getNATOAlphabet()).map(([char, word]) => (
+                                                    <div key={char} style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '6px 4px', textAlign: 'center' }}>
+                                                        <span style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{char.toUpperCase()}</span>
+                                                        <span style={{ display: 'block', fontFamily: '"Maritime", "Courier New", monospace', fontSize: '24px', color: 'var(--text-secondary)', marginTop: '2px' }}>{char.toUpperCase()}</span>
+                                                        <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)', marginTop: '2px' }}>{word}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* ── Annexe Templier ── */}
+                                {hasTemplier && (() => {
+                                    const active = isAnnexeActive('code_templier');
+                                    return (
+                                        <div style={{
+                                            background: 'var(--bg-surface)',
+                                            border: '1px solid var(--border-subtle)',
+                                            borderRadius: '8px',
+                                            padding: '14px 16px',
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <Shield size={14} color="var(--text-dim)" />
+                                                    <h3 style={{ fontSize: '13.5px', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>
+                                                        Croix templière
+                                                    </h3>
+                                                </div>
+                                                <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'code_templier' })} />
+                                            </div>
+                                            <div style={{
+                                                textAlign: 'center',
+                                                overflowX: 'auto',
+                                                opacity: active ? 1 : 0.35,
+                                                transition: 'opacity 180ms ease',
+                                            }}>
+                                                <img
+                                                    src="/assets/images/code_templier.jpg"
+                                                    alt="Code Templier"
+                                                    style={{ maxWidth: '100%', maxHeight: '320px', borderRadius: '6px', outline: '1px solid oklch(1 0 0 / 0.1)', outlineOffset: '-1px', objectFit: 'contain' }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* ── Annexe Avocat ── */}
+                                {hasAvocat && (() => {
+                                    const active = isAnnexeActive('methode_avocat');
+                                    return (
+                                        <div style={{
+                                            background: 'var(--bg-surface)',
+                                            border: '1px solid var(--border-subtle)',
+                                            borderRadius: '8px',
+                                            padding: '14px 16px',
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <Scale size={14} color="var(--text-dim)" />
+                                                    <h3 style={{ fontSize: '13.5px', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>
+                                                        Méthode Avocat (A = K, décalage +10)
+                                                    </h3>
+                                                </div>
+                                                <AnnexeSwitch isChecked={active} onToggle={() => dispatch({ type: 'TOGGLE_ANNEXE', annexeId: 'methode_avocat' })} />
+                                            </div>
+                                            <div style={{
+                                                background: 'var(--bg-base)',
+                                                border: '1px solid var(--border-subtle)',
+                                                borderRadius: '6px',
+                                                padding: '12px',
+                                                textAlign: 'center',
+                                                fontFamily: 'var(--font-mono)',
+                                                fontSize: '12px',
+                                                opacity: active ? 1 : 0.35,
+                                                transition: 'opacity 180ms ease',
+                                            }}>
+                                                <div style={{ color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '2px', marginBottom: '4px' }}>
+                                                    A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+                                                </div>
+                                                <div style={{ color: 'var(--text-dim)', fontSize: '11.5px', marginBottom: '4px' }}>↓ décalage de 10 lettres ↓</div>
+                                                <div style={{ color: 'var(--text-primary)', fontWeight: 600, letterSpacing: '2px' }}>
+                                                    K L M N O P Q R S T U V W X Y Z A B C D E F G H I J
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* ── Floating Toolbar globale en HAUT du carnet (Alignée avec la barre de recherche des cartes, 40px) ── */}
-            {/* Conteneur responsive : marge gauche 16px, barre prend tout l'espace, marge droite 16px + bouton maximize (~60px) */}
-            <div
-                id="textual-floating-bar-container"
-                style={{
-                    position: 'absolute',
-                    top: isMobile ? '12px' : '16px',
-                    left: isMobile ? '12px' : '16px',
-                    right: onViewModeChange && !isMobile ? '88px' : (isMobile ? '12px' : '16px'), // 16px marge + ~72px maximize+sync
-                    zIndex: 1100,
-                    pointerEvents: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-start', // barre alignée à gauche, utilise toute la largeur
-                }}
-            >
-                {selectedKeys.size > 1 ? (
+            {/* Barre d'actions par lot uniquement lors d'une multi-sélection */}
+            {selectedKeys.size > 1 && (
+                <div
+                    id="textual-floating-bar-container"
+                    style={{
+                        position: 'absolute',
+                        top: isMobile ? '12px' : '16px',
+                        left: isMobile ? '12px' : '16px',
+                        zIndex: 1100,
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                    }}
+                >
                     <MultiSelectBatchBar
                         selectedCount={selectedKeys.size}
                         onBatchModule={handleBatchAssignModule}
                         onBatchLanguage={handleBatchAssignLanguage}
                         onDeselectAll={() => setSelectedKeys(new Set())}
                     />
-                ) : (
-                    <TextualHeader
-                        onExport={onExport || (() => {})}
-                    />
-                )}
-            </div>
+                </div>
+            )}
 
-            {/* BOUTON HAUT DROITE ALIGNÉ : SYNC STATUS + MAXIMIZE / MINIMIZE (DESKTOP SEULEMENT) */}
-            {onViewModeChange && !isMobile && (
-                <div style={{
-                    position: 'absolute',
-                    top: '16px',
-                    right: '16px',
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '14px',
-                    padding: '3px 4px',
-                    boxShadow: 'none',
-                    zIndex: 1100,
-                    pointerEvents: 'all',
-                }}>
+            {/* BOUTONS HAUT DROITE DISCRETS : SOLUTIONS (tout le doc) + MAXIMIZE / MINIMIZE */}
+            <div style={{
+                position: 'absolute',
+                top: '12px',
+                right: '14px',
+                zIndex: 1100,
+                pointerEvents: 'all',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+            }}>
+                {onViewModeChange && !isMobile && (
                     <button
                         type="button"
                         onClick={() => onViewModeChange(viewMode === 'text' ? 'split' : 'text')}
                         title={viewMode === 'text' ? "Réduire le carnet (Mode partagé)" : "Agrandir le carnet (Plein écran)"}
                         style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '10px',
+                            width: '30px',
+                            height: '30px',
+                            borderRadius: '7px',
                             border: 'none',
                             background: viewMode === 'text' ? 'var(--accent-transparent)' : 'transparent',
                             color: viewMode === 'text' ? 'var(--accent-hover)' : 'var(--text-dim)',
@@ -1573,7 +1903,7 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            transition: 'all 120ms ease'
+                            transition: 'background 120ms ease, color 120ms ease'
                         }}
                         onMouseEnter={e => {
                             if (viewMode !== 'text') {
@@ -1589,93 +1919,264 @@ export default function TextualView({ onExport, viewMode = 'split', onViewModeCh
                         }}
                     >
                         {viewMode === 'text' ? (
-                            <Minimize2 size={16} strokeWidth={2.2} />
+                            <Minimize2 size={15} strokeWidth={2} />
                         ) : (
-                            <Maximize2 size={16} strokeWidth={2.2} />
+                            <Maximize2 size={15} strokeWidth={2} />
                         )}
+                    </button>
+                )}
+            </div>
+
+            {/* Toast Annuler lors du masquage d'un bloc généré (Lot F) */}
+            {hiddenToastStepId && (
+                <div style={{
+                    position: 'absolute',
+                    bottom: '40px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 1200,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+                    fontSize: '12.5px',
+                    color: 'var(--text-primary)',
+                }}>
+                    <span>Bloc masqué</span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            dispatch({ type: 'UNHIDE_COMPUTED_STEP', stepId: hiddenToastStepId });
+                            setHiddenToastStepId(null);
+                        }}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--accent-hover)',
+                            fontWeight: 600,
+                            fontSize: '12.5px',
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                        }}
+                    >
+                        Annuler
                     </button>
                 </div>
             )}
 
-            {/* ── BARRE FLOTTANTE BAS-DROITE : Solutions (ampoule) + Erreurs ── */}
-            <div
-                id="textual-bottom-bar"
-                style={{
-                    position: 'absolute',
-                    bottom: '16px',
-                    right: '16px',
-                    zIndex: 1100,
-                    pointerEvents: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                }}
-            >
-                <TextualBottomBar
-                    isSolution={isSolution}
-                    onToggleSolution={() => dispatch({ type: 'SET_CARNET_VIEW', view: isSolution ? 'participant' : 'solution' })}
-                />
-            </div>
+            {/* ── Barre d'état discrète en bas : anomalies & Solutions (Lot A) ── */}
+            <TextualStatusBar
+                isSolution={isSolution}
+                onToggleSolution={() => dispatch({ type: 'SET_CARNET_VIEW', view: isSolution ? 'participant' : 'solution' })}
+                errorItems={errorItems}
+                hasErrors={hasErrors}
+            />
 
             {/* ── Palette de commandes slash (/) ── */}
             <SlashCommandPalette
                 isOpen={slashPaletteOpen}
-                onClose={() => setSlashPaletteOpen(false)}
+                onClose={() => {
+                    setSlashPaletteOpen(false);
+                    setSlashTargetStepId(null);
+                    setSlashInitialQuery('');
+                }}
+                initialQuery={slashInitialQuery}
                 onInsertBlock={(blockType, config) => {
-                    // Gérer l'insertion de blocs via la palette
-                    const afterStepId = steps.length > 0 ? steps[steps.length - 1].id : '';
-                    switch (blockType) {
-                        case 'heading':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '# '.repeat(config?.level || 1) + ' ', manualType: 'html' });
-                            break;
-                        case 'paragraph':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '', manualType: 'html' });
-                            break;
-                        case 'bullet_list':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '- ', manualType: 'html' });
-                            break;
-                        case 'numbered_list':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '1. ', manualType: 'html' });
-                            break;
-                        case 'check_list':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '- [ ] ', manualType: 'html' });
-                            break;
-                        case 'blockquote':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '> ', manualType: 'html' });
-                            break;
-                        case 'divider':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '\n---\n', manualType: 'html' });
-                            break;
-                        case 'image':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '![]()', manualType: 'html' });
-                            break;
-                        case 'file':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '[Fichier]()', manualType: 'html' });
-                            break;
-                        case 'crypto_block':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '', manualType: 'code', moduleId: config?.cipher });
-                            break;
-                        case 'code_block':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '\n```\n\n```\n', manualType: 'html' });
-                            break;
-                        case 'annexe':
-                            // Insérer une annexe
-                            break;
-                        case 'latex':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '$$\n\n$$\n', manualType: 'html' });
-                            break;
-                        case 'toc':
-                            dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '[[TOC]]', manualType: 'html' });
-                            break;
+                    const snippetMap: Record<string, string> = {
+                        heading: '#'.repeat(config?.level || 1) + ' ',
+                        paragraph: '',
+                        bullet_list: '- ',
+                        numbered_list: '1. ',
+                        check_list: '- [ ] ',
+                        blockquote: '> ',
+                        divider: '\n---\n',
+                        image: '![]()',
+                        file: '[Fichier]()',
+                        code_block: '\n```\n\n```\n',
+                        latex: '$$\n\n$$\n',
+                        toc: '[[TOC]]',
+                    };
+
+                    if (slashTargetStepId) {
+                        const targetStep = steps.find(s => s.id === slashTargetStepId);
+                        const currentText = targetStep?.solutionText || '';
+                        const cleaned = currentText.replace(/(?:^|\n)\s*\/[^\n]*$/, (m) => (m.startsWith('\n') ? '\n' : ''));
+                        if (blockType === 'crypto_block') {
+                            if (cleaned !== currentText) {
+                                handleManualContentChange(slashTargetStepId, cleaned);
+                            }
+                            dispatch({
+                                type: 'CONVERT_MANUAL_STEP_TYPE',
+                                stepId: slashTargetStepId,
+                                targetType: 'code',
+                                moduleId: config?.cipher,
+                            });
+                            setAutoFocusStepId(slashTargetStepId);
+                            return;
+                        }
+                        if (blockType === 'annexe') return;
+
+                        const nextText = cleaned + (snippetMap[blockType] ?? '');
+                        handleManualContentChange(slashTargetStepId, nextText);
+                        setAutoFocusStepId(slashTargetStepId);
+                        return;
                     }
+
+                    // Fallback (Ctrl+/) : insérer un nouveau bloc après le dernier
+                    const afterStepId = steps.length > 0 ? steps[steps.length - 1].id : '';
+                    if (blockType === 'crypto_block') {
+                        pendingAutoFocusNewStepRef.current = true;
+                        dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: '', manualType: 'code', moduleId: config?.cipher });
+                        return;
+                    }
+                    if (blockType === 'annexe') return;
+
+                    pendingAutoFocusNewStepRef.current = true;
+                    dispatch({ type: 'INSERT_MANUAL_STEP_TYPED', afterStepId, content: snippetMap[blockType] ?? '', manualType: 'html' });
                 }}
                 onSearchReference={(query) => {
-                    // Gérer la recherche de références
                     console.log('Search reference:', query);
                 }}
                 anchorRef={slashPaletteAnchorRef}
                 triggerPosition={slashPaletteTrigger}
             />
+            {viewMode === 'split' && !isMobile && (
+                <SplitStageBadgesOverlay
+                    scrollContainerRef={scrollContainerRef}
+                    onStageClick={handleStageClick}
+                    depsKey={steps.length}
+                />
+            )}
         </div>
+    );
+}
+
+interface StageBadgePosition {
+    label: string;
+    color: string;
+    title: string;
+    top: number;
+    left: number;
+}
+
+function SplitStageBadgesOverlay({
+    scrollContainerRef,
+    onStageClick,
+    depsKey,
+}: {
+    scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+    onStageClick: (label: string) => void;
+    depsKey: number;
+}) {
+    const [badges, setBadges] = useState<StageBadgePosition[]>([]);
+    const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+    const recompute = useCallback(() => {
+        const container = scrollContainerRef.current;
+        if (!container) {
+            setBadges([]);
+            return;
+        }
+        const paneRect = container.getBoundingClientRect();
+        const anchors = container.querySelectorAll<HTMLElement>('[data-stage-anchor]');
+        const next: StageBadgePosition[] = [];
+        anchors.forEach((el) => {
+            const label = el.getAttribute('data-stage-anchor') || '';
+            const color = el.getAttribute('data-stage-color') || '#94A3B8';
+            const title = el.getAttribute('data-stage-title') || `Étape ${label}`;
+            const offset = Number(el.getAttribute('data-stage-offset') ?? 4);
+            const rect = el.getBoundingClientRect();
+            const top = Math.round(rect.top + (Number.isFinite(offset) ? offset : 4));
+            // Masquer si hors de la zone visible du panneau texte
+            if (top < paneRect.top + 4 || top > paneRect.bottom - 26) return;
+            next.push({
+                label,
+                color,
+                title,
+                top,
+                left: Math.round(paneRect.left - 11),
+            });
+        });
+        setBadges(next);
+    }, [scrollContainerRef]);
+
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        let raf = 0;
+        const schedule = () => {
+            cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(recompute);
+        };
+        schedule();
+        container.addEventListener('scroll', schedule, { passive: true });
+        window.addEventListener('resize', schedule);
+        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
+        ro?.observe(container);
+        return () => {
+            cancelAnimationFrame(raf);
+            container.removeEventListener('scroll', schedule);
+            window.removeEventListener('resize', schedule);
+            ro?.disconnect();
+        };
+    }, [scrollContainerRef, recompute, depsKey]);
+
+    if (typeof document === 'undefined' || badges.length === 0) return null;
+
+    return createPortal(
+        <div
+            aria-hidden={false}
+            style={{
+                position: 'fixed',
+                inset: 0,
+                pointerEvents: 'none',
+                zIndex: 1200,
+            }}
+        >
+            {badges.map((b, idx) => {
+                const isHovered = hoveredIdx === idx;
+                return (
+                    <button
+                        key={`${b.label}-${idx}`}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onStageClick(b.label); }}
+                        onMouseEnter={() => setHoveredIdx(idx)}
+                        onMouseLeave={() => setHoveredIdx(null)}
+                        title={b.title}
+                        aria-label={b.title}
+                        style={{
+                            position: 'fixed',
+                            left: `${b.left}px`,
+                            top: `${b.top}px`,
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '6px',
+                            background: isHovered ? 'var(--bg-elevated)' : 'var(--bg-base)',
+                            border: `1.5px solid ${b.color}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10.5px',
+                            fontWeight: 700,
+                            color: b.color,
+                            fontFamily: 'var(--font-mono)',
+                            cursor: 'pointer',
+                            padding: 0,
+                            pointerEvents: 'all',
+                            boxShadow: isHovered ? `0 0 8px ${b.color}66` : '0 1px 4px rgba(0, 0, 0, 0.35)',
+                            transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+                            transition: 'transform 120ms ease, box-shadow 120ms ease',
+                        }}
+                    >
+                        {b.label}
+                    </button>
+                );
+            })}
+        </div>,
+        document.body
     );
 }

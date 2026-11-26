@@ -116,8 +116,16 @@ export type AppAction =
     | { type: 'INSERT_MANUAL_STEP'; afterStepId: string; content: string }
     | { type: 'INSERT_MANUAL_STEP_TYPED'; afterStepId: string; content: string; manualType: 'html' | 'code'; moduleId?: string; anchorSegmentIdx?: number }
     | { type: 'CONVERT_MANUAL_STEP_TYPE'; stepId: string; targetType: 'html' | 'code'; moduleId?: ModuleId }
+    | { type: 'ISOLATE_SELECTION_TO_BLOCK'; stepId: string; lineIdx?: number; beforeText: string; selectedText: string; afterText: string; targetType: 'code' | 'html'; moduleId?: string }
     | { type: 'LOCK_DOCUMENT_TITLE' }
     | { type: 'REMOVE_MANUAL_STEP'; stepId: string }
+    | { type: 'REORDER_CARNET_STEPS'; sourceStepId: string; targetStepId: string; position: 'before' | 'after' }
+    | { type: 'MOVE_CARNET_STEP'; stepId: string; direction: 'up' | 'down' }
+    | { type: 'DETACH_COMPUTED_STEP'; stepId: string }
+    | { type: 'RESTORE_COMPUTED_STEP'; stepId: string }
+    | { type: 'HIDE_COMPUTED_STEP'; stepId: string }
+    | { type: 'UNHIDE_COMPUTED_STEP'; stepId: string }
+    | { type: 'SET_STEP_STYLE'; stepId: string; textColor?: string; textAlign?: 'left' | 'center' | 'right' }
     | { type: 'SET_NAV_LANGUAGE'; stepId?: string; segIdx?: number; lang: CarnetStep['navLanguage'] }
     | { type: 'TOGGLE_POI'; stepId?: string; segIdx?: number; poiId: string }
     | { type: 'TOGGLE_POIS_ON_MAP' }

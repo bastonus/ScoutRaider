@@ -1,10 +1,9 @@
 /**
- * StepInsertSeparator.tsx — Séparateur au survol inspiré de Jupyter / Colab (ipynb).
- * Affiche au survol de l'interligne deux boutons discrets pour insérer soit un 'Commentaire' (MD/HTML),
- * soit un 'Code' (choix d'un module textuel de la marketplace).
+ * StepInsertSeparator.tsx — Zone d'insertion discrète entre les blocs, façon Notion.
+ * Au survol de l'interligne, révèle un léger repère et deux actions minimalistes (+ Texte, + Code).
  */
 import React, { useState } from 'react';
-import { MessageSquarePlus, Code2, Plus } from 'lucide-react';
+import { Plus, Code2 } from 'lucide-react';
 
 interface StepInsertSeparatorProps {
     afterStepId: string;
@@ -27,126 +26,115 @@ export default function StepInsertSeparator({
             onMouseLeave={() => setHovered(false)}
             style={{
                 position: 'relative',
-                height: '22px',
-                margin: '-11px 0',
+                height: '16px',
+                margin: '-6px 0',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
+                paddingLeft: '38px',
                 zIndex: hovered ? 40 : 5,
-                transition: 'z-index 0s'
             }}
         >
-            {/* Ligne séparatrice fine inspirée des carnets de note ipynb */}
+            {/* Ligne de repère très discrète */}
             <div
                 style={{
                     position: 'absolute',
-                    left: '8px',
+                    left: '38px',
                     right: '8px',
                     height: '1px',
-                    background: 'linear-gradient(90deg, transparent, var(--border-default) 15%, var(--border-default) 85%, transparent)',
-                    opacity: hovered ? 1 : 0,
-                    transition: 'opacity 140ms ease',
-                    pointerEvents: 'none'
+                    background: 'var(--border-subtle)',
+                    opacity: hovered ? 0.65 : 0,
+                    transition: 'opacity 120ms ease',
+                    pointerEvents: 'none',
                 }}
             />
 
-            {/* Groupe de deux boutons centrés : + Commentaire et + Code */}
+            {/* Actions compactes sans ombres ni bordures lourdes */}
             <div
                 style={{
                     position: 'relative',
                     zIndex: 2,
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '0 8px',
+                    gap: '2px',
+                    padding: '0 4px',
                     background: 'var(--bg-base)',
-                    borderRadius: '9999px',
+                    borderRadius: '6px',
                     opacity: hovered ? 1 : 0,
-                    transform: hovered ? 'scale(1)' : 'scale(0.92)',
                     pointerEvents: hovered ? 'auto' : 'none',
-                    transition: 'all 140ms cubic-bezier(0.16, 1, 0.3, 1)',
-                    boxShadow: hovered ? '0 2px 10px rgba(0,0,0,0.35)' : 'none'
+                    transition: 'opacity 120ms ease',
                 }}
             >
-                {/* 1. Bouton + Commentaire */}
                 <button
                     type="button"
                     onClick={(e) => {
                         e.stopPropagation();
                         onAddComment(afterStepId, anchorSegmentIdx);
                     }}
-                    title="Insérer un bloc de commentaire libre (texte enrichi / markdown)"
+                    title="Insérer un bloc texte"
                     style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '5px',
-                        height: '24px',
-                        padding: '0 10px',
-                        borderRadius: '9999px',
-                        background: 'var(--bg-elevated)',
-                        border: '1px solid var(--border-subtle)',
-                        color: 'var(--text-secondary)',
-                        fontSize: '11px',
-                        fontWeight: 600,
+                        gap: '4px',
+                        height: '22px',
+                        padding: '0 7px',
+                        borderRadius: '5px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-dim)',
+                        fontSize: '11.5px',
+                        fontWeight: 500,
                         fontFamily: 'var(--font-ui)',
                         cursor: 'pointer',
-                        transition: 'all 120ms ease',
-                        whiteSpace: 'nowrap'
+                        transition: 'background 100ms ease, color 100ms ease',
+                        whiteSpace: 'nowrap',
                     }}
                     onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--bg-surface)';
+                        e.currentTarget.style.background = 'var(--bg-hover)';
                         e.currentTarget.style.color = 'var(--text-primary)';
-                        e.currentTarget.style.borderColor = 'var(--border-default)';
                     }}
                     onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'var(--bg-elevated)';
-                        e.currentTarget.style.color = 'var(--text-secondary)';
-                        e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-dim)';
                     }}
                 >
-                    <Plus size={11} strokeWidth={2.6} style={{ color: 'var(--text-dim)' }} />
-                    <MessageSquarePlus size={12} strokeWidth={2.2} />
-                    <span>Commentaire</span>
+                    <Plus size={12} strokeWidth={2.2} />
+                    <span>Texte</span>
                 </button>
 
-                {/* 2. Bouton + Code */}
                 <button
                     type="button"
                     onClick={(e) => {
                         e.stopPropagation();
                         onAddCode(afterStepId, anchorSegmentIdx);
                     }}
-                    title="Insérer un message encodé avec un code de la marketplace"
+                    title="Insérer un message chiffré"
                     style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '5px',
-                        height: '24px',
-                        padding: '0 10px',
-                        borderRadius: '9999px',
-                        background: 'var(--bg-elevated)',
-                        border: '1px solid var(--border-subtle)',
-                        color: 'var(--text-secondary)',
-                        fontSize: '11px',
-                        fontWeight: 600,
+                        gap: '4px',
+                        height: '22px',
+                        padding: '0 7px',
+                        borderRadius: '5px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-dim)',
+                        fontSize: '11.5px',
+                        fontWeight: 500,
                         fontFamily: 'var(--font-ui)',
                         cursor: 'pointer',
-                        transition: 'all 120ms ease',
-                        whiteSpace: 'nowrap'
+                        transition: 'background 100ms ease, color 100ms ease',
+                        whiteSpace: 'nowrap',
                     }}
                     onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--bg-surface)';
+                        e.currentTarget.style.background = 'var(--bg-hover)';
                         e.currentTarget.style.color = 'var(--accent-hover)';
-                        e.currentTarget.style.borderColor = 'var(--accent-default)';
                     }}
                     onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'var(--bg-elevated)';
-                        e.currentTarget.style.color = 'var(--text-secondary)';
-                        e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-dim)';
                     }}
                 >
-                    <Plus size={11} strokeWidth={2.6} style={{ color: 'var(--text-dim)' }} />
-                    <Code2 size={12} strokeWidth={2.4} />
+                    <Code2 size={12} strokeWidth={2.2} />
                     <span>Code</span>
                 </button>
             </div>

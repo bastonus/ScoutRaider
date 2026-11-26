@@ -81,7 +81,7 @@ export function cleanupEmptyLayers(state: AppState, incomingTool?: string): AppS
     const allPoints = state.point_annotations || [];
     const validPoints = isIncomingPoint
         ? allPoints
-        : allPoints.filter(p => p.coords && p.coords.length >= 2);
+        : allPoints.filter(p => p.coords && p.coords.length >= 2 && !(p.coords[0] === 0 && p.coords[1] === 0));
     const removedPointIds = new Set(allPoints.filter(p => !validPoints.includes(p)).map(p => p.id));
 
     const totalRemoved = removedItinIds.size + removedDrawIds.size + removedTextIds.size + removedAreaIds.size + removedPointIds.size;

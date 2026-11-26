@@ -381,6 +381,7 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
     // ── Dimensions canoniques réelles (pour l'affichage et l'export) ──
     const wrapperRef = useRef<HTMLDivElement>(null);
     const [wrapperAvailableWidth, setWrapperAvailableWidth] = useState<number>(750);
+    const [isHovered, setIsHovered] = useState(false);
 
     // Observe la largeur disponible réelle du conteneur parent
     useEffect(() => {
@@ -564,6 +565,8 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
     }, [canonicalWidth, canonicalHeight, scaleFactor, wrapperAvailableWidth, dispatch, stepId]);
 
     // Style des 4 poignées aux coins
+    const showControls = isHovered || Boolean(isDragging);
+
     const handleDotStyle: React.CSSProperties = {
         position: 'absolute',
         width: '9px',
@@ -573,6 +576,9 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
         borderRadius: 0,
         boxShadow: '0 1px 5px rgba(0,0,0,0.7)',
         zIndex: 50,
+        opacity: showControls ? 1 : 0,
+        pointerEvents: showControls ? 'auto' : 'none',
+        transition: 'opacity 140ms ease',
     };
 
     return (
@@ -600,6 +606,8 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
 
             {/* ── CONTENEUR VISUEL RÉSERVÉ DANS LE FLUX (s'adapte à l'échelle sur petit écran) ── */}
             <div
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
                 style={{
                     width: `${displayWidth}px`,
                     height: `${displayHeight}px`,
@@ -774,21 +782,24 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
                                     zIndex: 450,
                                     background: 'rgba(15,23,42,0.88)',
                                     color: 'rgba(255,255,255,0.80)',
-                                    fontSize: '9px',
+                                    fontSize: '12px',
                                     fontFamily: 'monospace',
                                     fontWeight: 600,
                                     padding: '2px 7px',
+                                    borderRadius: '4px',
                                     border: '1px solid rgba(255,255,255,0.12)',
                                     pointerEvents: 'none',
                                     whiteSpace: 'nowrap',
                                     letterSpacing: '0.04em',
+                                    opacity: showControls ? 1 : 0,
+                                    transition: 'opacity 140ms ease',
                                 }}>
                                     {label}
                                 </div>
                             );
                         })()}
 
-                        {/* Discrets boutons Zoom + / - locaux en bas à droite */}
+                        {/* Discrets boutons Zoom + / - locaux en bas à droite (visibles au survol) */}
                         <div style={{
                             position: 'absolute',
                             bottom: '8px',
@@ -799,8 +810,11 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
                             gap: '2px',
                             background: 'rgba(15, 23, 42, 0.85)',
                             border: '1px solid rgba(255, 255, 255, 0.15)',
-                            borderRadius: 0,
+                            borderRadius: '6px',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                            opacity: showControls ? 1 : 0,
+                            pointerEvents: showControls ? 'auto' : 'none',
+                            transition: 'opacity 140ms ease',
                         }}>
                             <button
                                 onClick={() => mapBridgeRef.current?.zoomIn()}
@@ -904,6 +918,9 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
                             cursor: 'ns-resize',
                             zIndex: 50,
                             boxShadow: '0 1px 4px rgba(0,0,0,0.6)',
+                            opacity: showControls ? 1 : 0,
+                            pointerEvents: showControls ? 'auto' : 'none',
+                            transition: 'opacity 140ms ease',
                         }}
                     />
 
@@ -922,6 +939,9 @@ export default function MiniMap({ stepId, moduleId, coords, initialPersist }: Mi
                             cursor: 'ew-resize',
                             zIndex: 50,
                             boxShadow: '0 1px 4px rgba(0,0,0,0.6)',
+                            opacity: showControls ? 1 : 0,
+                            pointerEvents: showControls ? 'auto' : 'none',
+                            transition: 'opacity 140ms ease',
                         }}
                     />
                 </div>

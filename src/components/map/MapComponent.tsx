@@ -8,6 +8,10 @@ import ActiveRouteLayer from './ActiveRouteLayer';
 import InteractiveStages from './InteractiveStages';
 import RouteRubberbandLayer from './RouteRubberbandLayer';
 import CursorPreviewLine from './CursorPreviewLine';
+import { getToolCursor, getToolCursorStyleSheet } from './toolCursors';
+import { clearMapHoverHint } from './mapHoverHint';
+
+const TOOL_CURSOR_STYLESHEET = getToolCursorStyleSheet();
 import InactiveItinerariesLayer from './InactiveItinerariesLayer';
 import AnnotationsMapLayer from './AnnotationsMapLayer';
 import DrawAnnotationsLayer from './DrawAnnotationsLayer';
@@ -128,14 +132,17 @@ function DynamicTileLayer() {
 }
 
 // ── Custom Attribution ───────────────────────────────────────────────────────
-function CustomAttribution() {
+function CustomAttribution({ side = 'left' }: { side?: 'left' | 'right' }) {
     const { state } = useApp();
     const layerId = state.active_ign_layer || 'PLAN.IGN';
     const layer = MAP_LAYERS[layerId] || MAP_LAYERS['PLAN.IGN'];
 
     return (
         <div style={{
-            position: 'absolute', bottom: '8px', left: '8px', zIndex: 1100,
+            position: 'absolute',
+            bottom: '8px',
+            ...(side === 'right' ? { right: '8px' } : { left: '8px' }),
+            zIndex: 1100,
             background: 'var(--bg-elevated)',
             padding: '3px 10px', borderRadius: 'var(--radius-pill)',
             border: '1px solid var(--border-subtle)',
@@ -143,7 +150,7 @@ function CustomAttribution() {
             pointerEvents: 'none', letterSpacing: '0.02em',
             display: 'flex', alignItems: 'center', gap: '6px'
         }}>
-            <span style={{ color: 'var(--accent-default)', opacity: 0.8 }}>DATA</span>
+            <span style={{ color: 'var(--text-secondary)', opacity: 0.8 }}>DATA</span>
             <span>{layer.attribution}</span>
         </div>
     );
@@ -188,6 +195,22 @@ function PoiLayer() {
             ))}
         </>
     );
+}
+
+function MapCursorManager({ activeTool }: { activeTool: string }) {
+    const map = useMap();
+    React.useEffect(() => {
+        const container = map.getContainer();
+        container.style.cursor = getToolCursor(activeTool);
+        container.dataset.activeTool = activeTool || 'default';
+        clearMapHoverHint();
+        return () => {
+            container.style.cursor = '';
+            delete container.dataset.activeTool;
+            clearMapHoverHint();
+        };
+    }, [map, activeTool]);
+    return <style>{TOOL_CURSOR_STYLESHEET}</style>;
 }
 
 function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | null) => void }) {
@@ -364,7 +387,7 @@ function MapEvents({ setCursorPos }: { setCursorPos: (pos: [number, number] | nu
 }
 
 
-export default function MapComponent() {
+export default function MapComponent({ attributionSide = 'left' }: { attributionSide?: 'left' | 'right' }) {
     const { state, dispatch } = useApp();
     const [cursorPos, setCursorPos] = React.useState<[number, number] | null>(null);
     const [isSatellite, setIsSatellite] = React.useState(false);
@@ -438,12 +461,13 @@ export default function MapComponent() {
             <MapContainer
                 center={position}
                 zoom={13}
-                style={{ height: '100%', width: '100%', cursor: ['route', 'route_direct', 'node', 'azimut', 'annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw', 'annotate_text'].includes(state.active_tool) ? 'crosshair' : 'grab' }}
+                style={{ height: '100%', width: '100%' }}
                 zoomControl={false}
                 attributionControl={false}
             >
+                <MapCursorManager activeTool={state.active_tool} />
                 <DynamicTileLayer />
-                <CustomAttribution />
+                <CustomAttribution side={attributionSide} />
                 <MapRefCapture />
                 <MapResizer />
                 <MapTooltipManager />

@@ -919,6 +919,11 @@ textarea:focus {
     border-radius: 0 !important;
 }
 
+.leaflet-container.leaflet-dragging,
+.leaflet-container.leaflet-dragging .leaflet-grab {
+    cursor: grabbing !important;
+}
+
 .leaflet-popup-content-wrapper {
     background: var(--bg-elevated) !important;
     color: var(--text-default) !important;

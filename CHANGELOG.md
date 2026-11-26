@@ -5,6 +5,41 @@ Tous les changements notables apportés à ce projet seront documentés dans ce 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-11-26
+
+### Éditeur Notion-style & système de dock de panneaux
+
+#### Éditeur inline Notion
+
+- **`InlineEditor` refactorisé** : l'éditeur passe d'un simple `<textarea>` à un `contentEditable` avec rendu Markdown en direct (`liveMarkdown.ts`). Dès que `**gras**`, `*italique*`, `` `code` `` ou `$latex$` sont fermés, le texte se met en forme instantanément.
+- **`SelectionBubble.tsx`** (nouveau) : menu flottant contextuel affiché à la sélection, inspiré de Notion. Contient : type de texte (Transformer en ▾), formatage (B / I / U / `</>` / Lien), Chiffrement, Couleur, Régénérer, Détacher, Paramètres.
+- **`editorCommands.ts`** (nouveau) : registre unique de commandes alimentant le menu `/`, la bulle de sélection et le menu contextuel de bloc — groupes Texte, Chiffrement, Raid, Avancé.
+- **`liveMarkdown.ts`** (nouveau) : conversion bidirectionnelle Markdown inline + LaTeX (KaTeX) ↔ HTML avec auto-preview dès la frappe (`applyAutoMarkdownInEditable`, `domToInlineMarkdown`, `inlineMarkdownToHtml`).
+- **`SlashCommandPalette`** refactorisée : palette unifiée alimentée par `editorCommands`, icônes sémantiques par type (Emoji, Image, Élévation, Chiffrement, TOC, Annexe, Référence…).
+- **`CarnetStepBlock`** étendu : position du caret récupérée via `getCaretLineBottom`, portail React pour la palette `/`.
+
+#### Système de dock de panneaux (MapWorkspace)
+
+- **`usePanelDock`** (nouveau hook) : state de dock indépendant pour les panneaux Étapes et Calques — ancrage gauche/droite, largeur des colonnes, `colSplitRatio`, ordre des panneaux ; persisté dans `localStorage` (`sr-panel-dock-v4`).
+- **`panelDrag.ts`** (nouveau utilitaire) : session de glisser-déposer pointer-based (`startPanelDragSession`) avec détection à ≥ 8 px ou 250 ms pour docker/undocker un panneau dans une colonne.
+- **`MapWorkspace`** refondu (+933 lignes) : layout à 3 colonnes (gauche dockée / carte / droite dockée), drag-to-dock via événements DOM `paneldragstart` / `paneldragend`, icône 6 points (SixDots SVG) sur les panneaux dockables.
+- **`FloatingSearch` (Étapes)** : nouveaux props `docked`, `onDock`, `onUndock`, `panelHeight`, `maxFloatingBodyHeight` ; contrôle de hauteur redimensionnable en mode flottant.
+- **`LayerManagerPanel` (Calques)** : nouveau prop `docked`, header drag-to-undock, variante `'dock'` pour `LayerAddButtons`.
+
+#### Carte & HUD
+
+- **`MapSatGeoBar.tsx`** (nouveau) : pill satellite + géolocalisation rendu dans la zone carte quand FloatingSearch est docké, toujours visible au-dessus de la carte.
+- **`mapHoverHint.ts`** (nouveau) : store externe léger (`useSyncExternalStore`) pour les hints de survol d'objets cartographiques sans re-render de la carte.
+- **`toolCursors.ts`** (nouveau) : curseurs SVG 32×32 haute-contraste avec double halo (sombre + blanc) pour chaque outil carte, lisibles sur tous les fonds (IGN Scan25, Satellite, Dark, OSM).
+- **`InfoPills`** : nouveau prop `centerOffsetPx` pour décaler la pill en fonction des colonnes dockées ; transition CSS `left 180ms ease` ; affichage des hints de survol (`useMapHoverHint`).
+- **`ActiveRouteLayer`** et **`InactiveItinerariesLayer`** : intègrent `setMapHoverHint` pour alimenter la pill en temps réel.
+
+#### Qualité & infrastructure
+
+- **TypeScript** : `npx tsc --noEmit` — 0 erreur.
+- **Build Vite** : ✓ built in ~3 s (`dist/assets/index-BT7X9FC9.js` 1 822 kB / gzip 523 kB).
+- **`.agents/skills/`** : ajout d'un ensemble de skills d'agent locaux (better-accessibility, better-colors, better-interface, better-layout, better-motion, better-typography, better-ui, better-writing, build-design, etc.) pour l'assistance design dans le workspace.
+
 ## [0.4.0] - 2026-11-25
 
 ### Refactoring majeur — Architecture modulaire AppContext & hooks spécialisés

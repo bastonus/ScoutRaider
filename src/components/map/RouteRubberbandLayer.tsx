@@ -6,10 +6,11 @@
  * Drops a new intermediate stage between stages[i] and stages[i+1] and reroutes both legs.
  */
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Polyline, Marker, Tooltip, useMap } from 'react-leaflet';
+import { Polyline, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useRoutes, useUI } from '../../hooks';
 import { backgroundEngine } from '../../logic/BackgroundEngine';
+import { setMapHoverHint, clearMapHoverHint } from './mapHoverHint';
 import { IGNClient } from '../../logic/IGNClient';
 
 const ghostIcon = L.divIcon({
@@ -276,19 +277,17 @@ export default function RouteRubberbandLayer() {
                         dragstart: handleDragStart,
                         drag: handleDrag,
                         dragend: handleDragEnd,
+                        mouseover: () => {
+                            if (!isDragging) {
+                                setMapHoverHint({
+                                    action: 'Glisser : dévier · Clic : insérer une étape',
+                                    accent: '#0284c7',
+                                });
+                            }
+                        },
+                        mouseout: clearMapHoverHint,
                     }}
-                >
-                    {!isDragging && (
-                        <Tooltip direction="top" offset={[0, -10]} opacity={0.92}>
-                            <div style={{ fontSize: '11px', fontFamily: 'var(--font-ui)', padding: '2px 4px' }}>
-                                <b style={{ color: '#0284c7' }}>Déviation de tracé</b>
-                                <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '2px' }}>
-                                    Glisser pour dévier · Clic : insérer une étape
-                                </div>
-                            </div>
-                        </Tooltip>
-                    )}
-                </Marker>
+                />
             )}
         </>
     );

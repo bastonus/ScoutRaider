@@ -12,6 +12,7 @@ import type {
 import type { AppAction } from '../../AppContext';
 import { calculatePolygonArea, formatArea } from '../GeoUtils';
 import { pushHistory } from '../historyManager';
+import { cleanupEmptyLayers } from '../layerCleanup';
 
 export function annotationsReducer(state: AppState, action: AppAction): AppState | null {
     switch (action.type) {
@@ -372,23 +373,21 @@ export function annotationsReducer(state: AppState, action: AppAction): AppState
         }
 
         case 'SET_SELECTED_LAYER': {
-            const updatedItins = (state.itineraries || []).map(it => it.id === state.active_itinerary_id ? {
-                ...it,
-                stages: state.stages,
-                routes: state.routes,
-                polygonal_steps: state.polygonal_steps,
-                polygonal_legs: state.polygonal_legs,
-                carnet_steps: state.carnet_steps,
-                custom_assignments: state.custom_assignments,
-                custom_languages: state.custom_languages,
-            } : it);
+            const isDraw = (state.draw_annotations || []).some(d => d.id === action.id);
+            const isArea = (state.area_annotations || []).some(a => a.id === action.id);
+            const isPoint = (state.point_annotations || []).some(p => p.id === action.id);
+            const isText = (state.text_annotations || []).some(t => t.id === action.id);
+            const isItin = (state.itineraries || []).some(it => it.id === action.id);
+            const incomingTool = isItin ? 'route' : isDraw ? 'annotate_draw' : isArea ? 'annotate_area' : isPoint ? 'annotate_point' : isText ? 'annotate_text' : undefined;
+            const cleaned = cleanupEmptyLayers(state, incomingTool);
+            const updatedItins = cleaned.itineraries || [];
 
             const targetItin = updatedItins.find(it => it.id === action.id);
             if (targetItin) {
                 const annotationTools = ['annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw', 'annotate_text'];
-                const nextTool = annotationTools.includes(state.active_tool) ? state.active_tool : 'route';
+                const nextTool = annotationTools.includes(cleaned.active_tool) ? cleaned.active_tool : 'route';
                 return {
-                    ...state,
+                    ...cleaned,
                     itineraries: updatedItins,
                     active_itinerary_id: targetItin.id,
                     selected_layer_id: targetItin.id,
@@ -406,7 +405,7 @@ export function annotationsReducer(state: AppState, action: AppAction): AppState
             }
 
             return {
-                ...state,
+                ...cleaned,
                 itineraries: updatedItins,
                 selected_layer_id: action.id,
                 selected_sublayer_id: null,

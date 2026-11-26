@@ -41,17 +41,39 @@ export function routesReducer(state: AppState, action: AppAction): AppState | nu
             }));
             const newAnchor = labeledStages.length - 1;
 
-            // Sync into active itinerary in itineraries list immediately
-            const activeId = state.active_itinerary_id;
-            const updatedItins = (state.itineraries || []).map(it => it.id === activeId ? {
-                ...it,
-                stages: labeledStages,
-                routes: newRoutes,
-            } : it);
+            // Sync into active itinerary in itineraries list immediately (or auto-create one if none exists)
+            const existingItins = state.itineraries || [];
+            let activeId = state.active_itinerary_id;
+            let updatedItins: Itinerary[];
+            if (!activeId || !existingItins.some(it => it.id === activeId)) {
+                const newItinId = `itin-${Date.now()}`;
+                const newItin: Itinerary = {
+                    id: newItinId,
+                    name: `Itinéraire ${existingItins.length + 1}`,
+                    color: '#2d8ceb',
+                    visible: true,
+                    stages: labeledStages,
+                    routes: newRoutes,
+                    polygonal_steps: state.polygonal_steps || [],
+                    polygonal_legs: state.polygonal_legs || {},
+                    carnet_steps: state.carnet_steps || [],
+                    custom_assignments: state.custom_assignments || {},
+                    custom_languages: state.custom_languages || {},
+                };
+                activeId = newItinId;
+                updatedItins = [...existingItins, newItin];
+            } else {
+                updatedItins = existingItins.map(it => it.id === activeId ? {
+                    ...it,
+                    stages: labeledStages,
+                    routes: newRoutes,
+                } : it);
+            }
 
             return {
                 ...state,
                 itineraries: updatedItins,
+                active_itinerary_id: activeId,
                 stages: labeledStages,
                 routes: newRoutes,
                 anchor_stage_idx: newAnchor,
@@ -330,27 +352,13 @@ export function routesReducer(state: AppState, action: AppAction): AppState | nu
             const remaining = state.itineraries.filter(it => it.id !== action.id);
             const nextSelId = state.selected_layer_id === action.id ? null : state.selected_layer_id;
 
-            // If the last itinerary is deleted, create a fresh default one
+            // If the last itinerary is deleted, leave itineraries empty
             if (remaining.length === 0) {
-                const freshId = `itin-${Date.now()}`;
-                const freshItin = {
-                    id: freshId,
-                    name: 'Itinéraire 1',
-                    color: '#2d8ceb',
-                    visible: true,
-                    stages: [],
-                    routes: [],
-                    polygonal_steps: [],
-                    polygonal_legs: {},
-                    carnet_steps: [],
-                    custom_assignments: {},
-                    custom_languages: {},
-                };
                 return {
                     ...state,
-                    itineraries: [freshItin],
-                    active_itinerary_id: freshId,
-                    selected_layer_id: freshId,
+                    itineraries: [],
+                    active_itinerary_id: '',
+                    selected_layer_id: nextSelId,
                     stages: [],
                     routes: [],
                     polygonal_steps: [],

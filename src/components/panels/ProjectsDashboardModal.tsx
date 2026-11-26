@@ -77,7 +77,7 @@ export default function ProjectsDashboardModal({ onClose }: ProjectsDashboardMod
 
     const handleNewDocument = () => {
         const freshState = StateManager.getInitialState();
-        freshState.document_title = 'Document sans titre';
+        freshState.document_title = '';
         dispatch({ type: 'LOAD_PROJECT', state: freshState });
         dispatch({ type: 'ADD_NOTIFICATION', message: 'Nouveau document vierge créé.', notifType: 'info' });
         onClose();

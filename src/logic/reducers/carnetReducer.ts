@@ -56,7 +56,7 @@ export function carnetReducer(state: AppState, action: AppAction): AppState | nu
             return { ...state, carnet_include_general_map: !state.carnet_include_general_map };
 
         case 'TOGGLE_ELEVATION_PROFILE':
-            return { ...state, carnet_include_elevation_profile: !(state.carnet_include_elevation_profile ?? true) };
+            return { ...state, carnet_include_elevation_profile: !(state.carnet_include_elevation_profile ?? false) };
 
         case 'MANUAL_MODULE_ASSIGNMENT': {
             pushHistory(state);
@@ -229,6 +229,81 @@ export function carnetReducer(state: AppState, action: AppAction): AppState | nu
             return autoRebuildCarnet({ ...state, carnet_steps: stepsT });
         }
 
+        case 'ISOLATE_SELECTION_TO_BLOCK': {
+            pushHistory(state);
+            const idx = state.carnet_steps.findIndex(s => s.id === action.stepId);
+            if (idx === -1) return state;
+
+            const targetStep = state.carnet_steps[idx];
+            const theme = themeManager.getTheme(state.theme_id);
+            const modId = (action.moduleId || 'texte_clair') as ModuleId;
+            const anchorSegmentIdx = !targetStep.isManual && targetStep.segmentIndices?.length
+                ? targetStep.segmentIndices[targetStep.segmentIndices.length - 1]
+                : (targetStep.anchorSegmentIdx ?? -1);
+
+            const makeManual = (content: string, manualType: 'html' | 'code', mId: ModuleId): CarnetStep => ({
+                id: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                fromLabel: '',
+                toLabel: '',
+                moduleId: mId,
+                distanceM: 0,
+                azimuth: 0,
+                coords: [],
+                solutionText: content,
+                encodedText: manualType === 'code'
+                    ? ModuleLogic.encode(mId, content, { key: theme.vigenere_key })
+                    : content,
+                warnings: [],
+                isManual: true,
+                manualType,
+                anchorSegmentIdx,
+            });
+
+            const hasBefore = action.beforeText.trim().length > 0;
+            const hasAfter = action.afterText.trim().length > 0;
+            const isolated = makeManual(action.selectedText.trim(), action.targetType, modId);
+            const steps = [...state.carnet_steps];
+
+            if (targetStep.isManual) {
+                const replacement: CarnetStep[] = [];
+                if (hasBefore) {
+                    replacement.push({ ...targetStep, solutionText: action.beforeText.trimEnd() });
+                }
+                replacement.push(isolated);
+                if (hasAfter) {
+                    replacement.push(makeManual(action.afterText.trimStart(), 'html', 'texte_clair'));
+                }
+                steps.splice(idx, 1, ...replacement);
+            } else {
+                const patchComputedText = (s: CarnetStep, txt: string): CarnetStep => {
+                    if (action.lineIdx !== undefined) {
+                        const existingLines = (s.solutionText || '').split('\n');
+                        const nextLines = [...existingLines];
+                        nextLines[action.lineIdx] = txt;
+                        const joined = nextLines.join('\n');
+                        return { ...s, isEdited: true, solutionText: joined, encodedText: joined };
+                    }
+                    return { ...s, isEdited: true, solutionText: txt, encodedText: txt };
+                };
+
+                if (hasBefore) {
+                    const updated = patchComputedText(targetStep, action.beforeText.trimEnd());
+                    const inserted: CarnetStep[] = [updated, isolated];
+                    if (hasAfter) {
+                        inserted.push(makeManual(action.afterText.trimStart(), 'html', 'texte_clair'));
+                    }
+                    steps.splice(idx, 1, ...inserted);
+                } else if (hasAfter) {
+                    const updated = patchComputedText(targetStep, action.afterText.trimStart());
+                    steps.splice(idx, 1, isolated, updated);
+                } else {
+                    steps.splice(idx, 1, isolated);
+                }
+            }
+
+            return autoRebuildCarnet({ ...state, carnet_steps: steps });
+        }
+
         case 'CONVERT_MANUAL_STEP_TYPE': {
             pushHistory(state);
             const theme_c = themeManager.getTheme(state.theme_id);
@@ -283,6 +358,96 @@ export function carnetReducer(state: AppState, action: AppAction): AppState | nu
             });
 
             return autoRebuildCarnet({ ...state, carnet_steps: newSteps });
+        }
+
+        case 'REORDER_CARNET_STEPS': {
+            const { sourceStepId, targetStepId, position } = action;
+            if (sourceStepId === targetStepId) return state;
+            const list = [...state.carnet_steps];
+            const srcIdx = list.findIndex(s => s.id === sourceStepId);
+            if (srcIdx === -1) return state;
+            pushHistory(state);
+            const [moved] = list.splice(srcIdx, 1);
+            const tgtIdx = list.findIndex(s => s.id === targetStepId);
+            if (tgtIdx === -1) {
+                list.push(moved);
+            } else {
+                const insertIdx = position === 'before' ? tgtIdx : tgtIdx + 1;
+                list.splice(insertIdx, 0, moved);
+            }
+            return { ...state, carnet_steps: list };
+        }
+
+        case 'MOVE_CARNET_STEP': {
+            const idx = state.carnet_steps.findIndex(s => s.id === action.stepId);
+            if (idx === -1) return state;
+            const targetIdx = action.direction === 'up' ? idx - 1 : idx + 1;
+            if (targetIdx < 0 || targetIdx >= state.carnet_steps.length) return state;
+            pushHistory(state);
+            const list = [...state.carnet_steps];
+            const [moved] = list.splice(idx, 1);
+            list.splice(targetIdx, 0, moved);
+            return { ...state, carnet_steps: list };
+        }
+
+        case 'DETACH_COMPUTED_STEP': {
+            pushHistory(state);
+            return {
+                ...state,
+                carnet_steps: state.carnet_steps.map(s => {
+                    if (s.id !== action.stepId) return s;
+                    return {
+                        ...s,
+                        isManual: true,
+                        manualType: 'html',
+                        isEdited: false,
+                        isHidden: false,
+                        warnings: [],
+                    };
+                }),
+            };
+        }
+
+        case 'RESTORE_COMPUTED_STEP': {
+            pushHistory(state);
+            const cleared = state.carnet_steps.map(s =>
+                s.id === action.stepId ? { ...s, isEdited: false, isHidden: false } : s
+            );
+            return autoRebuildCarnet({ ...state, carnet_steps: cleared });
+        }
+
+        case 'HIDE_COMPUTED_STEP': {
+            pushHistory(state);
+            return {
+                ...state,
+                carnet_steps: state.carnet_steps.map(s =>
+                    s.id === action.stepId ? { ...s, isHidden: true } : s
+                ),
+            };
+        }
+
+        case 'UNHIDE_COMPUTED_STEP': {
+            return {
+                ...state,
+                carnet_steps: state.carnet_steps.map(s =>
+                    s.id === action.stepId ? { ...s, isHidden: false } : s
+                ),
+            };
+        }
+
+        case 'SET_STEP_STYLE': {
+            pushHistory(state);
+            return {
+                ...state,
+                carnet_steps: state.carnet_steps.map(s => {
+                    if (s.id !== action.stepId) return s;
+                    return {
+                        ...s,
+                        ...(action.textColor !== undefined ? { textColor: action.textColor } : {}),
+                        ...(action.textAlign !== undefined ? { textAlign: action.textAlign } : {}),
+                    };
+                }),
+            };
         }
 
         case 'EDIT_COMPUTED_TEXT': {

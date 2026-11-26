@@ -22,6 +22,7 @@ import { mapRef } from '../map/MapComponent';
 import { calculatePolygonArea, formatArea } from '../../logic/GeoUtils';
 import { formatDistanceFr, formatStageAddress } from '../../logic/geocoding';
 import { PRESET_COLORS } from '../map/AnnotationModals';
+import { startPanelDragSession } from '../../utils/panelDrag';
 import {
     Itinerary,
     PointAnnotation,
@@ -740,7 +741,7 @@ export function LayerAddButtons({
     variant = 'bar',
     onCreated,
 }: {
-    variant?: 'bar' | 'sheet';
+    variant?: 'bar' | 'sheet' | 'dock';
     onCreated?: (id: string) => void;
 }) {
     const { state, dispatch } = useApp();
@@ -748,6 +749,7 @@ export function LayerAddButtons({
     const texts = ((state as any).text_annotations as TextAnnotation[]) || [];
     const selectedId = state.selected_layer_id;
     const isBar = variant === 'bar';
+    const isDock = variant === 'dock';
 
     const items = [
         {
@@ -866,7 +868,7 @@ export function LayerAddButtons({
                     style={{
                         position: 'relative',
                         width: isBar ? '32px' : undefined,
-                        height: isBar ? '32px' : '44px',
+                        height: isBar ? '32px' : isDock ? '30px' : '44px',
                         borderRadius: isBar ? '10px' : '7px',
                         border: 'none',
                         background: isBar ? 'transparent' : 'rgba(255, 255, 255, 0.04)',
@@ -964,8 +966,11 @@ function LayerPreviewRow({
 
 export default function LayerManagerPanel({
     isMobile = false,
+    docked = false,
+    onClose,
 }: {
     isMobile?: boolean;
+    docked?: boolean;
     onClose?: () => void;
 }) {
     const { state, dispatch } = useApp();
@@ -987,6 +992,17 @@ export default function LayerManagerPanel({
     const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: (CtxMenuItem | CtxMenuSeparator)[] } | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [copyToast, setCopyToast] = useState<{ text: string; key: number } | null>(null);
+    const [isDraggingDockedHeader, setIsDraggingDockedHeader] = useState(false);
+    const [dockedHeaderHover, setDockedHeaderHover] = useState(false);
+
+    const handleDockedHeaderPointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        if (!docked || isMobile) return;
+        startPanelDragSession(e, 'calques', {
+            fromDocked: true,
+            ignoreButton: true,
+            onDragStateChange: setIsDraggingDockedHeader,
+        });
+    }, [docked, isMobile]);
 
     const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const dragIdx = useRef<number | null>(null);
@@ -1301,32 +1317,6 @@ export default function LayerManagerPanel({
                         isMultiSelected={isInMultiSel && multiSel.size >= 2}
                         isEditing={renamingId === itin.id}
                         isMobile={isMobile}
-                        chevron={
-                            <button
-                                type="button"
-                                aria-label="Activer ce tracé"
-                                title={isActive ? 'Tracé actif' : 'Activer ce tracé'}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id });
-                                    dispatch({ type: 'SET_SELECTED_LAYER', id: itin.id });
-                                }}
-                                style={{
-                                    width: '20px',
-                                    height: '20px',
-                                    padding: 0,
-                                    border: 'none',
-                                    background: 'transparent',
-                                    color: isActive ? 'var(--text-primary)' : '#94A3B8',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                }}
-                            >
-                                <ChevronRight size={13} />
-                            </button>
-                        }
                         onSelect={(meta) => handleLayerClick(item, idx, meta, () => {
                             const wasSelected = selectedId === item.id && !selectedSublayerId;
                             handleSelectRow(item);
@@ -1371,29 +1361,24 @@ export default function LayerManagerPanel({
                             })
                         }
                         detailSlot={
-                            isExpanded && itineraries.length > 1 ? (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '54px' }}>
-                                    <span style={{ fontSize: '11.5px', color: '#94A3B8' }}>
-                                        {isActive ? 'Tracé actif dans Étapes' : 'Tracé secondaire'}
-                                    </span>
-                                    {!isActive && (
-                                        <button
-                                            type="button"
-                                            onClick={() => dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id })}
-                                            style={{
-                                                padding: '3px 8px',
-                                                borderRadius: '6px',
-                                                border: '1px solid var(--border-subtle)',
-                                                background: 'rgba(255,255,255,0.06)',
-                                                color: 'var(--text-primary)',
-                                                fontSize: '11px',
-                                                fontWeight: 500,
-                                                cursor: 'pointer',
-                                            }}
-                                        >
-                                            Définir comme actif
-                                        </button>
-                                    )}
+                            isExpanded && itineraries.length > 1 && !isActive ? (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingLeft: '54px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => dispatch({ type: 'SET_ACTIVE_ITINERARY', id: itin.id })}
+                                        style={{
+                                            padding: '3px 8px',
+                                            borderRadius: '6px',
+                                            border: '1px solid var(--border-subtle)',
+                                            background: 'rgba(255,255,255,0.06)',
+                                            color: 'var(--text-primary)',
+                                            fontSize: '11px',
+                                            fontWeight: 500,
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Définir comme actif
+                                    </button>
                                 </div>
                             ) : undefined
                         }
@@ -2002,6 +1987,68 @@ export default function LayerManagerPanel({
                 color: 'var(--text-primary)',
             }}
         >
+            {/* Docked header: title + close button (draggable to move dock side or undock to map) */}
+            {docked && (
+                <div
+                    onPointerDown={handleDockedHeaderPointerDown}
+                    onMouseEnter={() => setDockedHeaderHover(true)}
+                    onMouseLeave={() => setDockedHeaderHover(false)}
+                    title={!isMobile ? 'Maintenir et glisser pour déplacer ou remettre sur la carte' : undefined}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0 10px 0 14px',
+                        height: '40px',
+                        flexShrink: 0,
+                        borderBottom: '1px solid var(--border-subtle)',
+                        cursor: !isMobile ? (isDraggingDockedHeader ? 'grabbing' : 'grab') : undefined,
+                        userSelect: 'none',
+                        touchAction: 'none',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {!isMobile && dockedHeaderHover && (
+                            <svg width="9" height="12" viewBox="0 0 10 14" fill="var(--text-secondary)" aria-hidden="true" style={{ flexShrink: 0 }}>
+                                <circle cx="2.5" cy="2" r="1.3"/><circle cx="7.5" cy="2" r="1.3"/>
+                                <circle cx="2.5" cy="7" r="1.3"/><circle cx="7.5" cy="7" r="1.3"/>
+                                <circle cx="2.5" cy="12" r="1.3"/><circle cx="7.5" cy="12" r="1.3"/>
+                            </svg>
+                        )}
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.01em' }}>
+                            Calques
+                        </span>
+                    </div>
+                    {onClose && (
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            title="Replier les calques"
+                            aria-label="Replier les calques"
+                            style={{
+                                width: 28,
+                                height: 28,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: 'none',
+                                borderRadius: 8,
+                                background: 'transparent',
+                                color: 'var(--text-dim)',
+                                cursor: 'pointer',
+                                fontSize: 16,
+                                lineHeight: 1,
+                                flexShrink: 0,
+                            }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'; }}
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* Scrollable layer list */}
             <div
                 role="listbox"
@@ -2153,6 +2200,23 @@ export default function LayerManagerPanel({
                     }}
                 >
                     <LayerAddButtons variant="sheet" onCreated={setRenamingId} />
+                </div>
+            )}
+
+            {/* Docked column footer: full-width add buttons matching Étapes summary footer */}
+            {docked && !isMobile && (
+                <div
+                    style={{
+                        padding: '6px 10px',
+                        borderTop: '1px solid var(--border-subtle)',
+                        background: 'rgba(255, 255, 255, 0.035)',
+                        minHeight: '38px',
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                    }}
+                >
+                    <LayerAddButtons variant="dock" onCreated={setRenamingId} />
                 </div>
             )}
 

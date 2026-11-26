@@ -230,6 +230,12 @@ export interface CarnetStep {
      * When set, constraint warnings are suppressed for this step.
      */
     isEdited?: boolean;
+    /** If true, this computed step is hidden by the user (restorable via Undo or section regeneration) */
+    isHidden?: boolean;
+    /** Optional text color for free text blocks */
+    textColor?: string;
+    /** Optional text alignment for free text blocks */
+    textAlign?: 'left' | 'center' | 'right';
     /**
      * For manual steps: the polygonal segment index of the LAST segment
      * of the computed step that precedes this comment.

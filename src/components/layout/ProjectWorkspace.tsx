@@ -3,6 +3,7 @@ import MapWorkspace from '../map/MapWorkspace';
 import TextualView from '../textual/TextualView';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { useViewport } from '../../hooks';
+import { usePanelDock } from '../../hooks/usePanelDock';
 import type { ViewMode } from '../../App';
 
 interface ProjectWorkspaceProps {
@@ -15,30 +16,50 @@ interface ProjectWorkspaceProps {
 
 export default function ProjectWorkspace({ onExport, viewMode = 'map', onViewModeChange, onToggleSidebar, rightSidebarOpen }: ProjectWorkspaceProps) {
     const [mapWidthRatio, setMapWidthRatio] = useState(50);
+    const [isResizing, setIsResizing] = useState(false);
     const { isMobile } = useViewport();
     const resizing = useRef(false);
+    const rafRef = useRef<number | null>(null);
+    const { leftColOpen, leftColWidth } = usePanelDock();
+
+    // When the left column is docked and split mode is active, give the map
+    // more of the total width so the column doesn't shrink the actual map zone.
+    // We shift the split handle by half the column width (capped at 15 pp).
+    const colBonus = (!isMobile && leftColOpen && viewMode === 'split')
+        ? Math.min(15, Math.round((leftColWidth / 2) / 10))
+        : 0;
+    const effectiveMapRatio = Math.min(80, mapWidthRatio + colBonus);
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
-            if (resizing.current) {
-                const container = document.getElementById('project-workspace-container');
-                if (container) {
-                    const rect = container.getBoundingClientRect();
-                    let ratio: number;
-                    if (isMobile) {
-                        ratio = ((e.clientY - rect.top) / rect.height) * 100;
-                    } else {
-                        ratio = ((e.clientX - rect.left) / rect.width) * 100;
-                    }
-                    ratio = Math.max(20, Math.min(80, ratio));
-                    setMapWidthRatio(ratio);
-                }
-            }
+            if (!resizing.current) return;
+            const container = document.getElementById('project-workspace-container');
+            if (!container) return;
+
+            const rect = container.getBoundingClientRect();
+            const rawRatio = isMobile
+                ? ((e.clientY - rect.top) / rect.height) * 100
+                : ((e.clientX - rect.left) / rect.width) * 100;
+            const clamped = Math.max(20, Math.min(80, rawRatio));
+            const nextRatio = isMobile ? clamped : Math.max(20 - colBonus, Math.min(80 - colBonus, clamped - colBonus));
+
+            if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+            rafRef.current = requestAnimationFrame(() => {
+                setMapWidthRatio(nextRatio);
+                window.dispatchEvent(new Event('resize'));
+                rafRef.current = null;
+            });
         };
         const handleMouseUp = () => {
             if (resizing.current) {
                 resizing.current = false;
-                document.body.style.cursor = 'default';
+                setIsResizing(false);
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                if (rafRef.current !== null) {
+                    cancelAnimationFrame(rafRef.current);
+                    rafRef.current = null;
+                }
                 window.dispatchEvent(new Event('resize'));
             }
         };
@@ -47,8 +68,9 @@ export default function ProjectWorkspace({ onExport, viewMode = 'map', onViewMod
         return () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
+            if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
         };
-    }, [isMobile]);
+    }, [isMobile, colBonus]);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
@@ -64,10 +86,11 @@ export default function ProjectWorkspace({ onExport, viewMode = 'map', onViewMod
             >
                 {(viewMode === 'map' || viewMode === 'split') && (
                     <div style={{ 
-                        width: (isMobile && viewMode === 'split') ? '100%' : (viewMode === 'split' ? `${mapWidthRatio}%` : '100%'), 
+                        width: (isMobile && viewMode === 'split') ? '100%' : (viewMode === 'split' ? `${effectiveMapRatio}%` : '100%'), 
                         height: (isMobile && viewMode === 'split') ? `${mapWidthRatio}%` : '100%', 
                         position: 'relative', 
-                        flexShrink: 0 
+                        flexShrink: 0,
+                        transition: (!isMobile && viewMode === 'split' && !isResizing) ? 'width 200ms ease' : 'none',
                     }}>
                         <ErrorBoundary fallbackTitle="Erreur dans l'espace cartographique">
                             <MapWorkspace 
@@ -90,8 +113,10 @@ export default function ProjectWorkspace({ onExport, viewMode = 'map', onViewMod
                         tabIndex={0}
                         onMouseDown={(e) => { 
                             e.preventDefault(); 
-                            resizing.current = true; 
-                            document.body.style.cursor = isMobile ? 'row-resize' : 'col-resize'; 
+                            resizing.current = true;
+                            setIsResizing(true);
+                            document.body.style.cursor = isMobile ? 'row-resize' : 'col-resize';
+                            document.body.style.userSelect = 'none';
                         }}
                         onKeyDown={(e) => {
                             const dec = isMobile ? 'ArrowUp' : 'ArrowLeft';

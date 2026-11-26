@@ -10,13 +10,14 @@ import {
   Pencil, 
   Type, 
   ArrowLeft, 
-  ChevronUp, 
-  KeyRound
+  ChevronUp
 } from 'lucide-react';
 
 interface FloatingToolbarProps {
   activeTool: string;
   onToolChange: (toolId: string) => void;
+  /** Horizontal offset from 50% center to center inside remaining space when Calques bar is open. */
+  centerOffsetPx?: number;
 }
 
 // ── Shared island cell style ──────────────────────────────────────────────────
@@ -54,7 +55,7 @@ function RouteSentiersAreaIcon({ size = 18 }: { size?: number }) {
 
 const ANNOTATION_TOOLS = ['annotate_point', 'annotate_area', 'annotate_area_routed', 'annotate_draw', 'annotate_text'];
 
-export default function FloatingToolbar({ activeTool, onToolChange }: FloatingToolbarProps) {
+export default function FloatingToolbar({ activeTool, onToolChange, centerOffsetPx = 0 }: FloatingToolbarProps) {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   
   // 'main' = Tracé, Nœud, Azimut, Encodage, Panneau d'annotations
@@ -84,7 +85,7 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
     } else if (activeTool === 'route_direct') {
       setLastRouteMode('route_direct');
       setToolbarMode('main');
-    } else if (['node', 'azimut', 'encodage'].includes(activeTool)) {
+    } else if (['node', 'azimut'].includes(activeTool)) {
       setToolbarMode('main');
     }
   }, [activeTool]);
@@ -109,12 +110,15 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
       if (
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement ||
-        target.isContentEditable
+        target.isContentEditable ||
+        Boolean(target.closest?.('[contenteditable="true"], [data-textual-pane="true"]'))
       ) return;
       const key = e.key.toLowerCase();
       switch (key) {
@@ -137,11 +141,6 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
           break;
         case 'a':
           onToolChange('azimut');
-          setToolbarMode('main');
-          setRouteMenuOpen(false);
-          break;
-        case 'e':
-          onToolChange('encodage');
           setToolbarMode('main');
           setRouteMenuOpen(false);
           break;
@@ -258,8 +257,9 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
         style={{
           position: 'absolute',
           bottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
-          left: '50%',
+          left: centerOffsetPx ? `calc(50% + ${centerOffsetPx}px)` : '50%',
           transform: 'translateX(-50%)',
+          transition: 'left 180ms ease',
           zIndex: 1100,
           display: 'flex',
           alignItems: 'center',
@@ -456,9 +456,6 @@ export default function FloatingToolbar({ activeTool, onToolChange }: FloatingTo
 
             {/* Azimut */}
             {btn('azimut', <Compass size={18} strokeWidth={2} />, "Visée & Calcul d'azimut (A)")}
-
-            {/* Encodage Topo */}
-            {btn('encodage', <KeyRound size={17} strokeWidth={2} />, "Encodage cryptographique du raid (E)")}
 
             {/* Déclencheur du panneau d'annotations */}
             <button

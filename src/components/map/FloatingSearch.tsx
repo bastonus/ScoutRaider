@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Loader2, Route, MapPin, Plus, ChevronUp } from 'lucide-react';
+import { Search, Loader2, MapPin, Plus, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { mapRef } from './MapComponent';
 import L from 'leaflet';
 import { useApp } from '../../AppContext';
@@ -9,6 +9,7 @@ import { MAP_LAYERS } from '../../logic/MapConfig';
 import { backgroundEngine } from '../../logic/BackgroundEngine';
 import { SearchResult, searchIGNWithBias, parseCoords } from '../../logic/geocoding';
 import RoutePanel from '../panels/RoutePanel';
+import { startPanelDragSession } from '../../utils/panelDrag';
 
 // ── Geolocation marker ─────────────────────────────────────────────────────────
 let geoMarker: L.CircleMarker | null = null;
@@ -31,9 +32,32 @@ type GeoState = 'idle' | 'loading' | 'done' | 'failed';
 
 interface FloatingSearchProps {
     isSplitMode?: boolean;
+    /** When true: component is inside the left column (not floating). */
+    docked?: boolean;
+    /** Called when the user clicks the dock button or drags to dock. */
+    onDock?: () => void;
+    /** Called when the user clicks the undock button or drags to undock. */
+    onUndock?: () => void;
+    /** Optional controlled height of the expanded body in floating desktop mode. */
+    panelHeight?: number | null;
+    /** Called when the user resizes or resets the floating desktop body height. */
+    onPanelHeightChange?: (h: number | null) => void;
+    /** Optional max height clamp (e.g. to avoid overlapping bottom-left Calques). */
+    maxFloatingBodyHeight?: number | null;
+    /** Called when desktop expanded state changes. */
+    onExpandedChange?: (expanded: boolean) => void;
 }
 
-export default function FloatingSearch({ isSplitMode = false }: FloatingSearchProps) {
+export default function FloatingSearch({
+    isSplitMode = false,
+    docked = false,
+    onDock,
+    onUndock,
+    panelHeight: controlledPanelHeight,
+    onPanelHeightChange,
+    maxFloatingBodyHeight = null,
+    onExpandedChange,
+}: FloatingSearchProps) {
     const { state } = useApp();
     const { routes = [], stages = [], dispatch } = useRoutes();
     const { activeIgnLayer } = useUI();
@@ -45,8 +69,33 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
     const [isFocused, setIsFocused] = useState(false);
     const [isSatellite, setIsSatellite] = useState(false);
     const [geoState, setGeoState] = useState<GeoState>('idle');
-    const [isRouteExpanded, setIsRouteExpanded] = useState(false);
-    const [panelHeight, setPanelHeight] = useState<number | null>(null);
+    const [isRouteExpanded, setIsRouteExpanded] = useState(() => docked);
+    const [itinCtxMenu, setItinCtxMenu] = useState<{ x: number; y: number } | null>(null);
+    const itinCtxRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!itinCtxMenu) return;
+        const onDown = (e: PointerEvent) => {
+            if (itinCtxRef.current && !itinCtxRef.current.contains(e.target as Node)) {
+                setItinCtxMenu(null);
+            }
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setItinCtxMenu(null);
+        };
+        document.addEventListener('pointerdown', onDown, true);
+        window.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('pointerdown', onDown, true);
+            window.removeEventListener('keydown', onKey);
+        };
+    }, [itinCtxMenu]);
+    const [internalPanelHeight, setInternalPanelHeight] = useState<number | null>(null);
+    const panelHeight = controlledPanelHeight !== undefined ? controlledPanelHeight : internalPanelHeight;
+    const setPanelHeight = useCallback((h: number | null) => {
+        if (onPanelHeightChange) onPanelHeightChange(h);
+        else setInternalPanelHeight(h);
+    }, [onPanelHeightChange]);
     const [isResizing, setIsResizing] = useState(false);
     const expandedBodyRef = useRef<HTMLDivElement>(null);
     const [mobileSnap, setMobileSnap] = useState<'collapsed' | 'half' | 'full'>('collapsed');
@@ -79,9 +128,9 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         return () => window.removeEventListener('scoutraider:toggle-route-panel', handleToggle);
     }, []);
 
-    // Desktop Esc collapses the route panel when not typing in an input
+    // Desktop Esc collapses the route panel when not typing in an input (but not when docked)
     useEffect(() => {
-        if (isMobile || !isRouteExpanded) return;
+        if (isMobile || !isRouteExpanded || docked) return;
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return;
             const tag = (document.activeElement as HTMLElement | null)?.tagName;
@@ -90,7 +139,16 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [isMobile, isRouteExpanded]);
+    }, [isMobile, isRouteExpanded, docked]);
+
+    // When docked, always keep route panel expanded
+    useEffect(() => {
+        if (docked) setIsRouteExpanded(true);
+    }, [docked]);
+
+    useEffect(() => {
+        onExpandedChange?.(isRouteExpanded);
+    }, [isRouteExpanded, onExpandedChange]);
 
     useEffect(() => {
         const layer = MAP_LAYERS[activeIgnLayer || 'PLAN.IGN'];
@@ -168,17 +226,18 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
     }, [query, isFocused]);
 
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
+        const handleClickOutside = (e: PointerEvent) => {
             const target = e.target as Node;
             const inContainer = containerRef.current?.contains(target);
             const inDropdown = dropdownRef.current?.contains(target);
             if (!inContainer && !inDropdown) {
                 setShowResults(false);
                 setIsFocused(false);
+                searchInputRef.current?.blur();
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('pointerdown', handleClickOutside, true);
+        return () => document.removeEventListener('pointerdown', handleClickOutside, true);
     }, []);
 
     useEffect(() => {
@@ -373,10 +432,32 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         transition: 'all 100ms ease',
     });
 
+    // ── Long-press drag to dock (fires custom events picked up by MapWorkspace) ─
+    const [isDraggingBar, setIsDraggingBar] = useState(false);
+    // hover states for 6-dot drag hint on icons
+    const [searchIconHover, setSearchIconHover] = useState(false);
+
+    const handleBarPointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        if (docked) return;
+        startPanelDragSession(e, 'etapes', {
+            ignoreInput: true,
+            onDragStateChange: setIsDraggingBar,
+        });
+    }, [docked]);
+
+    const handleDockedHeaderPointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        if (!docked || isMobile) return;
+        startPanelDragSession(e, 'etapes', {
+            fromDocked: true,
+            ignoreButton: true,
+            onDragStateChange: setIsDraggingBar,
+        });
+    }, [docked, isMobile]);
+
     const hasStages = stages && stages.length > 0;
     const itineraries = state.itineraries || [];
-    const activeItin = itineraries.find((it) => it.id === state.active_itinerary_id) || itineraries[0];
-    const noTraces = itineraries.length === 0;
+    const activeItin = itineraries.find((it) => it.id === state.active_itinerary_id) || itineraries[itineraries.length - 1] || null;
+    const noTraces = !activeItin;
     const showItinColorDot = Boolean(activeItin && activeItin.color.toLowerCase() !== '#2d8ceb');
 
     // Top search bar row (always stays at the top; Étapes toggle button switches icon between Route and ChevronUp)
@@ -393,7 +474,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
 
         const onMove = (ev: PointerEvent) => {
             const maxH = Math.max(200, window.innerHeight - 104);
-            const nextH = Math.round(Math.max(158, Math.min(maxH, startHeight + (ev.clientY - startY))));
+            const nextH = Math.round(Math.max(110, Math.min(maxH, startHeight + (ev.clientY - startY))));
             setPanelHeight(nextH);
         };
         const onUp = () => {
@@ -405,7 +486,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
         window.addEventListener('pointercancel', onUp);
-    }, []);
+    }, [setPanelHeight]);
 
     // Mobile bottom sheet drag handle (snaps between collapsed / half / full)
     const handleSheetDragStart = useCallback(
@@ -448,41 +529,139 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
         [isMobile, mobileSnap]
     );
 
+    // ── Shared close-button style (same as LayerManagerPanel) ───────────────
+    const closeBtnStyle: React.CSSProperties = {
+        width: 28, height: 28, flexShrink: 0,
+        border: 'none', borderRadius: 8,
+        background: 'transparent', color: 'var(--text-dim)',
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 16, lineHeight: 1,
+        transition: 'background 100ms, color 100ms',
+    };
+
     const searchRow = (
+        <>
+        {/* Docked header: "Étapes · nom itinéraire · N [✕]" — draggable to move dock side or undock to map */}
+        {docked && !isMobile && (
+            <div
+                onPointerDown={handleDockedHeaderPointerDown}
+                onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setItinCtxMenu({ x: e.clientX, y: e.clientY });
+                }}
+                onMouseEnter={() => setSearchIconHover(true)}
+                onMouseLeave={() => setSearchIconHover(false)}
+                title="Maintenir et glisser pour déplacer ou remettre sur la carte"
+                style={{
+                    display: 'flex', alignItems: 'center',
+                    padding: '0 10px 0 14px', height: 40, flexShrink: 0,
+                    borderBottom: '1px solid var(--border-subtle)',
+                    gap: 8,
+                    cursor: isDraggingBar ? 'grabbing' : 'grab',
+                    userSelect: 'none',
+                    touchAction: 'none',
+                }}
+            >
+                {searchIconHover && (
+                    <svg width="9" height="12" viewBox="0 0 10 14" fill="var(--text-secondary)" aria-hidden="true" style={{ flexShrink: 0 }}>
+                        <circle cx="2.5" cy="2" r="1.3"/><circle cx="7.5" cy="2" r="1.3"/>
+                        <circle cx="2.5" cy="7" r="1.3"/><circle cx="7.5" cy="7" r="1.3"/>
+                        <circle cx="2.5" cy="12" r="1.3"/><circle cx="7.5" cy="12" r="1.3"/>
+                    </svg>
+                )}
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.01em', flexShrink: 0 }}>
+                    Étapes
+                </span>
+                {activeItin && (
+                    <>
+                        <span style={{ color: 'var(--border-strong)', fontSize: 11, flexShrink: 0 }}>·</span>
+                        {activeItin.color && (
+                            <span aria-hidden="true" style={{
+                                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                                background: activeItin.visible !== false ? activeItin.color : 'transparent',
+                                border: activeItin.visible !== false ? '1.5px solid transparent' : `1.5px solid ${activeItin.color}`,
+                            }} />
+                        )}
+                        <span style={{
+                            fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            flex: 1, minWidth: 0,
+                        }}>
+                            {activeItin.name}
+                        </span>
+                        {stages.length > 0 && (
+                            <span className="tabular-nums" style={{
+                                fontSize: '10.5px', fontWeight: 700,
+                                padding: '1px 5px', borderRadius: '8px',
+                                background: 'rgba(255,255,255,0.14)',
+                                color: '#ffffff', lineHeight: 1.25,
+                                fontFamily: 'var(--font-mono)', flexShrink: 0,
+                            }}>
+                                {stages.length}
+                            </span>
+                        )}
+                    </>
+                )}
+                {onUndock && (
+                    <button
+                        type="button"
+                        onClick={onUndock}
+                        title="Fermer le panneau"
+                        aria-label="Fermer le panneau Étapes"
+                        style={{ ...closeBtnStyle, marginLeft: activeItin ? 0 : 'auto' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'; }}
+                    >
+                        ✕
+                    </button>
+                )}
+            </div>
+        )}
         <div
             ref={searchBarRef}
+            onPointerDown={!isMobile && !docked ? handleBarPointerDown : undefined}
+            onMouseEnter={!isMobile && !docked ? () => setSearchIconHover(true) : undefined}
+            onMouseLeave={!isMobile && !docked ? () => setSearchIconHover(false) : undefined}
             style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: effectiveExpanded ? '12px' : '15px',
-                padding: effectiveExpanded ? '0 4px 0 12px' : '0 4px 0 14px',
+                padding: effectiveExpanded ? '0 4px 0 12px' : '0 4px 0 10px',
                 height: '40px',
                 flexShrink: 0,
                 borderBottom: effectiveExpanded ? '1px solid var(--border-subtle)' : 'none',
+                userSelect: 'none',
+                cursor: !isMobile && !docked ? (isDraggingBar ? 'grabbing' : 'grab') : undefined,
+                touchAction: 'none',
             }}
         >
             <style>{`.sr-search-input::placeholder { color: #CBD5E1; opacity: 0.85; }`}</style>
+
+            {/* Left icon: 6-dots on hover (drag hint) or letter/spinner */}
             {effectiveExpanded ? (
                 <div
                     aria-hidden="true"
-                    title={`Prochaine étape : ${String.fromCharCode(65 + stages.length)}`}
+                    title={!isMobile && !docked ? `Prochaine étape : ${String.fromCharCode(65 + stages.length)} · maintenir pour déplacer` : `Prochaine étape : ${String.fromCharCode(65 + stages.length)}`}
                     style={{
-                        width: '20px',
-                        height: '20px',
-                        borderRadius: '6px',
-                        border: '1.5px solid var(--border-strong)',
-                        color: 'var(--text-secondary)',
-                        fontWeight: 800,
-                        fontSize: '10.5px',
-                        fontFamily: 'var(--font-mono)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        width: '20px', height: '20px', borderRadius: '6px',
+                        border: (!isMobile && !docked && searchIconHover) ? 'none' : '1.5px solid var(--border-strong)',
+                        color: 'var(--text-secondary)', fontWeight: 800,
+                        fontSize: '10.5px', fontFamily: 'var(--font-mono)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
                         flexShrink: 0,
+                        cursor: !isMobile && !docked ? (isDraggingBar ? 'grabbing' : 'grab') : undefined,
+                        transition: 'border-color 120ms',
                     }}
                 >
                     {isSearching ? (
                         <Loader2 size={12} className="spin" color="#64748B" />
+                    ) : searchIconHover && !isMobile && !docked ? (
+                        <svg width="11" height="13" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
+                            <circle cx="2.5" cy="2"  r="1.3"/><circle cx="7.5" cy="2"  r="1.3"/>
+                            <circle cx="2.5" cy="7"  r="1.3"/><circle cx="7.5" cy="7"  r="1.3"/>
+                            <circle cx="2.5" cy="12" r="1.3"/><circle cx="7.5" cy="12" r="1.3"/>
+                        </svg>
                     ) : (
                         String.fromCharCode(65 + stages.length)
                     )}
@@ -490,7 +669,16 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
             ) : isSearching ? (
                 <Loader2 size={15} className="spin" color="#64748B" style={{ flexShrink: 0 }} />
             ) : (
-                <Search size={15} color="var(--text-secondary)" strokeWidth={2} style={{ flexShrink: 0 }} />
+                <>
+                    {!isMobile && !docked && searchIconHover
+                        ? <svg width="11" height="13" viewBox="0 0 10 14" fill="var(--text-secondary)" aria-hidden="true" style={{ flexShrink: 0 }}>
+                            <circle cx="2.5" cy="2"  r="1.3"/><circle cx="7.5" cy="2"  r="1.3"/>
+                            <circle cx="2.5" cy="7"  r="1.3"/><circle cx="7.5" cy="7"  r="1.3"/>
+                            <circle cx="2.5" cy="12" r="1.3"/><circle cx="7.5" cy="12" r="1.3"/>
+                          </svg>
+                        : <Search size={15} color="var(--text-secondary)" strokeWidth={2} style={{ flexShrink: 0 }} />
+                    }
+                </>
             )}
             <input
                 ref={searchInputRef}
@@ -510,7 +698,13 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                     fontFamily: 'var(--font-ui)',
                 }}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    setQuery(val);
+                    if (val.trim().length > 0 && noTraces) {
+                        dispatch({ type: 'ADD_ITINERARY' });
+                    }
+                }}
                 onFocus={() => {
                     setIsFocused(true);
                     setShowResults(true);
@@ -547,24 +741,29 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                 </button>
             )}
 
+            {/* Itinerary toggle button — hidden when docked (info shown in header instead) */}
+            {!docked && (
             <button
                 type="button"
-                disabled={noTraces}
                 aria-expanded={effectiveExpanded}
                 aria-label={
                     activeItin
                         ? `Étapes de ${activeItin.name}, ${stages.length} étape${stages.length > 1 ? 's' : ''}`
-                        : 'Aucun tracé'
+                        : 'Étapes'
                 }
                 onClick={() => {
-                    if (noTraces) return;
                     if (isMobile) {
                         setMobileSnap((prev) => (prev === 'collapsed' ? 'half' : 'collapsed'));
                     } else {
                         setIsRouteExpanded((prev) => !prev);
                     }
                 }}
-                title={noTraces ? 'Aucun tracé' : activeItin ? activeItin.name : 'Étapes'}
+                onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setItinCtxMenu({ x: e.clientX, y: e.clientY });
+                }}
+                title={activeItin ? `${activeItin.name} · clic droit pour changer d'itinéraire` : 'Étapes · clic droit pour créer un itinéraire'}
                 style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -574,36 +773,32 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                     borderRadius: '10px',
                     border: 'none',
                     background: 'transparent',
-                    color: noTraces
-                        ? 'var(--text-dim)'
-                        : effectiveExpanded || hasStages
-                          ? 'var(--text-primary)'
-                          : 'var(--text-secondary)',
-                    opacity: noTraces ? 0.55 : 1,
-                    cursor: noTraces ? 'not-allowed' : 'pointer',
+                    color: effectiveExpanded || hasStages
+                        ? 'var(--text-primary)'
+                        : 'var(--text-secondary)',
+                    cursor: 'pointer',
                     fontSize: '12px',
                     fontWeight: 600,
                     flexShrink: 0,
                 }}
             >
-                {showItinColorDot && activeItin && (
+                {/* Icon */}
+                {effectiveExpanded ? (
+                    <ChevronUp size={15} strokeWidth={2.3} aria-hidden="true" />
+                ) : activeItin ? (
                     <span
                         aria-hidden="true"
                         style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
+                            width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
                             background: activeItin.visible !== false ? activeItin.color : 'transparent',
-                            border: activeItin.visible !== false ? '1.5px solid transparent' : `1.5px solid ${activeItin.color}`,
+                            border: activeItin.visible !== false
+                                ? '1.5px solid transparent'
+                                : `1.5px solid ${activeItin.color}`,
                             transition: 'background-color 150ms ease, border-color 150ms ease',
-                            flexShrink: 0,
                         }}
                     />
-                )}
-                {effectiveExpanded ? (
-                    <ChevronUp size={15} strokeWidth={2.3} aria-hidden="true" />
                 ) : (
-                    <Route size={15} strokeWidth={2.2} aria-hidden="true" />
+                    <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
                 )}
                 <span
                     style={{
@@ -613,7 +808,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                         whiteSpace: 'nowrap',
                     }}
                 >
-                    {noTraces ? 'Aucun tracé' : activeItin?.name || 'Étapes'}
+                    {activeItin ? activeItin.name : 'Étapes'}
                 </span>
                 {!noTraces && (
                     <span
@@ -634,7 +829,11 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                     </span>
                 )}
             </button>
+            )}
+
+
         </div>
+        </>
     );
 
     return (
@@ -642,28 +841,37 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
             ref={containerRef}
             id="top-left-container"
             style={
-                isMobile
+                docked
                     ? {
-                          position: 'fixed',
-                          left: '8px',
-                          right: '8px',
-                          bottom: '8px',
-                          zIndex: 1200,
                           display: 'flex',
                           flexDirection: 'column',
-                          pointerEvents: 'none',
+                          flex: 1,
+                          minHeight: 0,
+                          pointerEvents: 'all',
+                          overflow: 'hidden',
                       }
-                    : {
-                          position: 'absolute',
-                          top: '16px',
-                          left: '16px',
-                          zIndex: 1200,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '8px',
-                          pointerEvents: 'none',
-                          maxWidth: 'calc(100% - 32px)',
-                      }
+                    : isMobile
+                      ? {
+                            position: 'fixed',
+                            left: '8px',
+                            right: '8px',
+                            bottom: '8px',
+                            zIndex: 1200,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            pointerEvents: 'none',
+                        }
+                      : {
+                            position: 'absolute',
+                            top: '16px',
+                            left: '16px',
+                            zIndex: 1200,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            pointerEvents: 'none',
+                            maxWidth: 'calc(100% - 32px)',
+                        }
             }
         >
             <div
@@ -671,27 +879,31 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                     display: 'flex',
                     gap: '8px',
                     pointerEvents: 'none',
-                    alignItems: 'flex-start',
+                    alignItems: docked ? 'stretch' : 'flex-start',
                     width: '100%',
+                    flex: docked ? 1 : undefined,
+                    minHeight: docked ? 0 : undefined,
                 }}
             >
-                {/* Desktop: top-left floating panel | Mobile: 3-snap bottom sheet */}
+                {/* Desktop: top-left floating panel | Mobile: 3-snap bottom sheet | Docked: fills column */}
                 <div
                     ref={cardRef}
                     style={{
                         display: 'flex',
                         flexDirection: 'column',
                         background: 'var(--bg-elevated)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: isMobile ? '16px' : '14px',
-                        boxShadow: effectiveExpanded ? 'var(--shadow-lg)' : 'var(--shadow-md)',
+                        border: docked ? 'none' : '1px solid var(--border-subtle)',
+                        borderRadius: docked ? 0 : (isMobile ? '16px' : '14px'),
+                        boxShadow: docked ? 'none' : (effectiveExpanded ? 'var(--shadow-lg)' : 'var(--shadow-md)'),
                         pointerEvents: 'all',
                         position: 'relative',
-                        width: isMobile ? '100%' : 'var(--panel-width)',
-                        flex: isMobile ? 1 : '0 0 auto',
+                        width: docked ? '100%' : (isMobile ? '100%' : 'var(--panel-width)'),
+                        height: docked ? '100%' : undefined,
+                        flex: (docked || isMobile) ? 1 : '0 0 auto',
                         minWidth: 0,
-                        overflow: 'visible',
-                        ...(isMobile && (sheetDragHeight !== null || mobileSnap !== 'collapsed')
+                        minHeight: docked ? 0 : undefined,
+                        overflow: docked ? 'hidden' : 'visible',
+                        ...(isMobile && !docked && (sheetDragHeight !== null || mobileSnap !== 'collapsed')
                             ? {
                                   height:
                                       sheetDragHeight !== null
@@ -735,22 +947,27 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                     {/* Search Bar stays pinned at the TOP */}
                     {searchRow}
 
-                    {/* Expanded Stages Body: fits content up to 60dvh (or dragged height) on desktop; fills sheet on mobile */}
+                    {/* Expanded Stages Body: fills column when docked; fits content on floating desktop; fills sheet on mobile */}
                     {effectiveExpanded && (
                         <>
                             <div
                                 ref={expandedBodyRef}
+                                data-etapes-body="true"
                                 style={{
                                     display: 'flex',
                                     flexDirection: 'column',
                                     overflow: 'hidden',
-                                    ...(isMobile
+                                    ...(docked
                                         ? { flex: 1, minHeight: 0 }
-                                        : {
-                                              height: panelHeight !== null ? `${panelHeight}px` : undefined,
-                                              maxHeight: panelHeight !== null ? 'calc(100dvh - 104px)' : '60dvh',
-                                              minHeight: 0,
-                                          }),
+                                        : isMobile
+                                          ? { flex: 1, minHeight: 0 }
+                                          : {
+                                                height: panelHeight !== null ? `${panelHeight}px` : undefined,
+                                                maxHeight: maxFloatingBodyHeight !== null
+                                                    ? `${maxFloatingBodyHeight}px`
+                                                    : panelHeight !== null ? 'calc(100dvh - 104px)' : '60dvh',
+                                                minHeight: 0,
+                                            }),
                                 }}
                             >
                                 <RoutePanel
@@ -762,7 +979,8 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                                     }}
                                 />
                             </div>
-                            {!isMobile && (
+                            {/* Bottom resize grabber: only shown in floating desktop mode */}
+                            {!isMobile && !docked && (
                                 <div
                                     role="separator"
                                     aria-orientation="horizontal"
@@ -810,6 +1028,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                             <div
                                 ref={dropdownRef}
                                 onMouseDown={(e) => e.preventDefault()}
+                                onPointerDown={(e) => e.preventDefault()}
                                 style={{
                                     position: 'fixed',
                                     ...(dropdownRect.top !== undefined
@@ -948,10 +1167,123 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                         </div>,
                         document.body
                     )}
+                    {/* Itinerary picker context menu (right-click on itinerary button or docked header) */}
+                    {itinCtxMenu && createPortal(
+                        <div
+                            ref={itinCtxRef}
+                            role="menu"
+                            aria-label="Choisir l'itinéraire actif"
+                            style={{
+                                position: 'fixed',
+                                left: Math.max(8, Math.min(itinCtxMenu.x, window.innerWidth - 230)),
+                                top: Math.max(8, Math.min(itinCtxMenu.y, window.innerHeight - Math.min(320, itineraries.length * 36 + 60))),
+                                minWidth: 210,
+                                maxWidth: 280,
+                                maxHeight: 300,
+                                overflowY: 'auto',
+                                background: 'var(--bg-elevated)',
+                                border: '1px solid var(--border-strong)',
+                                borderRadius: 11,
+                                boxShadow: 'var(--shadow-lg)',
+                                padding: 4,
+                                zIndex: 10000,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 2,
+                            }}
+                        >
+                            <div style={{
+                                padding: '4px 8px 3px',
+                                fontSize: 10,
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.06em',
+                                color: 'var(--text-dim)',
+                            }}>
+                                Itinéraire actif
+                            </div>
+                            {itineraries.map((it) => {
+                                const isActive = it.id === activeItin?.id;
+                                const stageCount = it.stages?.length || 0;
+                                return (
+                                    <button
+                                        key={it.id}
+                                        type="button"
+                                        role="menuitemradio"
+                                        aria-checked={isActive}
+                                        onClick={() => {
+                                            dispatch({ type: 'SET_ACTIVE_ITINERARY', id: it.id });
+                                            setItinCtxMenu(null);
+                                        }}
+                                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isActive ? 'rgba(255,255,255,0.05)' : 'transparent'; }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 8,
+                                            width: '100%',
+                                            padding: '6px 8px',
+                                            border: 'none',
+                                            borderRadius: 7,
+                                            background: isActive ? 'rgba(255,255,255,0.05)' : 'transparent',
+                                            color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                            fontSize: 12,
+                                            fontWeight: isActive ? 600 : 500,
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                        }}
+                                    >
+                                        <span aria-hidden="true" style={{
+                                            width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
+                                            background: it.visible !== false ? it.color : 'transparent',
+                                            border: it.visible !== false ? '1.5px solid transparent' : `1.5px solid ${it.color}`,
+                                        }} />
+                                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {it.name}
+                                        </span>
+                                        <span className="tabular-nums" style={{ fontSize: 10.5, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                                            {stageCount}
+                                        </span>
+                                        {isActive && <Check size={13} strokeWidth={2.5} style={{ flexShrink: 0, color: 'var(--text-primary)' }} />}
+                                    </button>
+                                );
+                            })}
+                            <div style={{ height: 1, background: 'var(--border-subtle)', margin: '2px 4px' }} />
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    dispatch({ type: 'ADD_ITINERARY' });
+                                    setItinCtxMenu(null);
+                                }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 7,
+                                    width: '100%',
+                                    padding: '6px 8px',
+                                    border: 'none',
+                                    borderRadius: 7,
+                                    background: 'transparent',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                }}
+                            >
+                                <Plus size={13} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                                <span>Nouvel itinéraire</span>
+                            </button>
+                        </div>,
+                        document.body
+                    )}
                 </div>
 
-                {/* Satellite + Geolocate Pill */}
-                <div style={toolbarStyle}>
+                {/* Satellite + Geolocate Pill — hidden when docked (shown in map zone via MapSatGeoBar) */}
+                {!docked && <div style={toolbarStyle}>
                     <button
                         type="button"
                         onClick={handleSatellite}
@@ -985,7 +1317,7 @@ export default function FloatingSearch({ isSplitMode = false }: FloatingSearchPr
                     >
                         {geoIcon()}
                     </button>
-                </div>
+                </div>}
             </div>
         </div>
     );
